@@ -1,0 +1,15 @@
+node_modules
+dist
+.vite
+.cache
+coverage
+*.log
+*.local
+
+# Local environment values must not be committed.
+.env
+.env.*
+!.env.demo
+!.env.example
+!.env.sample
+!.env.template

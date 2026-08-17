@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "skipLibCheck": true,
+
+    /* 통합 저장소는 JS(회원·마이페이지·지도)와 TS(메인·AI코스·서비스)가 섞여 있다.
+       allowJs 로 해석은 하되 checkJs 는 끈다 — JS 쪽은 타입 선언이 없어
+       켜면 수백 개 오류가 나고 얻는 것이 없다. */
+    "allowJs": true,
+    "checkJs": false,
+
+    "noEmit": true,
+    "jsx": "preserve",
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "strict": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noFallthroughCasesInSwitch": true,
+    "types": ["vite/client"],
+    "baseUrl": ".",
+    "paths": { "@/*": ["./src/*"] }
+  },
+  "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.vue"],
+  "exclude": ["src/**/*.spec.js"]
+}
