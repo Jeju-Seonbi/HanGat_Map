@@ -1,0 +1,14 @@
+.gradle/
+build/
+out/
+
+### env - 서비스 키·DB 비밀번호는 커밋 금지 ###
+.env
+
+### IDE ###
+.idea/
+*.iml
+.vscode/
+
+### OS ###
+.DS_Store
