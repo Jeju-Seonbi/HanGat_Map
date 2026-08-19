@@ -27,6 +27,9 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
+    // .env 로딩 (로컬 개발용 - 배포 환경은 실제 환경변수 사용)
+    implementation 'io.github.cdimascio:dotenv-java:3.0.0'
+
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
 
