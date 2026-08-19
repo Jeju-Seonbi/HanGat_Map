@@ -2,6 +2,25 @@ spring:
   application:
     name: hangat-api
 
+  # 기본값은 backend/docker-compose.yml 의 MariaDB와 일치 - .env 없이도 부팅된다
+  datasource:
+    url: ${DB_URL:jdbc:mariadb://localhost:3306/hangat}
+    username: ${DB_USER:hangat}
+    password: ${DB_PASS:hangat}
+    driver-class-name: org.mariadb.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        default_batch_fetch_size: 100
+
 server:
   port: ${SERVER_PORT:8080}
 
