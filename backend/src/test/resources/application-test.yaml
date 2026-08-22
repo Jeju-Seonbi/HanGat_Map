@@ -9,3 +9,8 @@ spring:
   jpa:
     hibernate:
       ddl-auto: create-drop
+
+# 테스트용 더미 - 실제 호출 없음 (WeatherClient 테스트는 목으로 대체)
+weather:
+  base-url: http://localhost
+  service-key: test-key
