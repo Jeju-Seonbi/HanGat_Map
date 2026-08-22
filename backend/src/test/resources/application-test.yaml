@@ -14,3 +14,11 @@ spring:
 weather:
   base-url: http://localhost
   service-key: test-key
+
+tour-api:
+  base-url: http://localhost
+  service-key: test-key
+
+congestion-api:
+  base-url: http://localhost
+  service-key: test-key
