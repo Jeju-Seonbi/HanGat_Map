@@ -3,14 +3,19 @@ package com.example.hangat.course;
 import com.example.hangat.course.model.AccommodationDto;
 import com.example.hangat.course.model.CourseRequestDto;
 import com.example.hangat.course.model.PlacePreferenceDto;
+import com.example.hangat.course.model.TourPlaceDto;
 import com.example.hangat.course.model.Transport;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class CourseService {
+
+    private final TourApiService tourApiService;
 
     public void createCourse(CourseRequestDto request) {
         LocalDate startDate = request.getStartDate();
@@ -49,6 +54,26 @@ public class CourseService {
 
         if (regions == null) {
             throw new IllegalArgumentException("권역 정보가 필요합니다.");
+        }
+
+        List<TourPlaceDto> tourPlaces = tourApiService.getTourPlaces();
+
+        System.out.println("관광지 개수 = " + tourPlaces.size());
+
+        for (TourPlaceDto place : tourPlaces) {
+            System.out.println(
+                    place.getTitle()
+                            + " / "
+                            + place.getAddress()
+                            + " / "
+                            + place.getLatitude()
+                            + " / "
+                            + place.getLongitude()
+            );
+        }
+
+        if (tourPlaces.isEmpty()) {
+            throw new IllegalArgumentException("조회된 관광지가 없습니다.");
         }
     }
 }
