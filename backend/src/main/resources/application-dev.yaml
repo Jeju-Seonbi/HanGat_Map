@@ -29,3 +29,8 @@ management:
     web:
       exposure:
         include: health, info
+
+# 날씨 조회용 API
+weather:
+  base-url: https://apis.data.go.kr/1360000
+  service-key: ${SERVICE_KEY}
