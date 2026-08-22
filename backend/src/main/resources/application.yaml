@@ -3,4 +3,4 @@ spring:
     active: dev
   jackson:
     deserialization:
-      accept-empty-array-as-null-object: true
+      accept-empty-string-as-null-object: true
