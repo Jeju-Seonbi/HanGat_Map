@@ -58,7 +58,7 @@ public class WeatherClient {
     /* 중기육상 - 발표일 기준 3~7일 후 하늘상태 및 강수확률 */
     public MidLandItem fetchMidLand(String tmFc) {
         KmaResponse<MidLandItem> response = call(
-                uri -> uri.path("/MidFcstInfoService/getMidTa")
+                uri -> uri.path("/MidFcstInfoService/getMidLandFcst")
                         .queryParam("regId", JEJU_LAND_REG_ID)
                         .queryParam("tmFc", tmFc),
                 new ParameterizedTypeReference<>() {
@@ -71,10 +71,10 @@ public class WeatherClient {
         try {
             KmaResponse<T> response = restClient.get()
                     .uri(uriBuilder -> params.apply(uriBuilder)
-                            .queryParam("serviceKey", properties.serviceKey())
+                            .queryParam("serviceKey", "{serviceKey}")
                             .queryParam("dataType", "JSON")
                             .queryParam("pageNo", 1)
-                            .build())
+                            .build(properties.serviceKey()))
                     .retrieve()
                     .body(type);
             validate(response);
