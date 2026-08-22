@@ -1,6 +1,7 @@
 package com.example.hangat.course;
 
 import com.example.hangat.course.model.AccommodationDto;
+import com.example.hangat.course.model.CongestionDto;
 import com.example.hangat.course.model.CourseRequestDto;
 import com.example.hangat.course.model.PlacePreferenceDto;
 import com.example.hangat.course.model.TourPlaceDto;
@@ -16,6 +17,7 @@ import java.util.List;
 public class CourseService {
 
     private final TourApiService tourApiService;
+    private final CongestionApiService congestionApiService;
 
     public void createCourse(CourseRequestDto request) {
         LocalDate startDate = request.getStartDate();
@@ -74,6 +76,25 @@ public class CourseService {
 
         if (tourPlaces.isEmpty()) {
             throw new IllegalArgumentException("조회된 관광지가 없습니다.");
+        }
+
+        for (TourPlaceDto place : tourPlaces) {
+            String signguCd;
+
+            if (place.getAddress() != null && place.getAddress().contains("제주시")) {
+                signguCd = "50110";
+            } else if (place.getAddress() != null && place.getAddress().contains("서귀포시")) {
+                signguCd = "50130";
+            } else {
+                continue;
+            }
+
+            List<CongestionDto> congestionData = congestionApiService.getCongestionData(
+                    signguCd,
+                    place.getTitle()
+            );
+
+            System.out.println("전체 혼잡도 데이터 개수 = " + congestionData.size());
         }
     }
 }
