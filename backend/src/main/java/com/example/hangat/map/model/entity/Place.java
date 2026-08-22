@@ -13,6 +13,8 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+
+import com.example.hangat.map.model.enums.BusinessStatus;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -42,11 +44,6 @@ import java.time.LocalDateTime;
 public class Place {
 
     private static final BigDecimal DEFAULT_RATING_AVG = new BigDecimal("0.00");
-
-    /** 명세서 business_status ENUM. @Enumerated(STRING)이므로 상수 <b>이름</b>이 곧 DB 값이다 - 이름을 바꾸면 기존 데이터가 깨진다. */
-    public enum BusinessStatus {
-        OPEN, TEMP_CLOSED, CLOSED, UNKNOWN
-    }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
