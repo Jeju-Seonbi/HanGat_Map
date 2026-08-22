@@ -1,3 +1,6 @@
 spring:
   profiles:
     active: dev
+  jackson:
+    deserialization:
+      accept-empty-array-as-null-object: true
