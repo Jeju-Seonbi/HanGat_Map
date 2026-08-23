@@ -5,6 +5,7 @@ import com.example.hangat.course.model.CongestionDto;
 import com.example.hangat.course.model.CourseCandidateDto;
 import com.example.hangat.course.model.CourseRequestDto;
 import com.example.hangat.course.model.PlacePreferenceDto;
+import com.example.hangat.course.model.PreferenceType;
 import com.example.hangat.course.model.TourPlaceDto;
 import com.example.hangat.course.model.Transport;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +16,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -62,6 +64,8 @@ public class CourseService {
             throw new IllegalArgumentException("권역 정보가 필요합니다.");
         }
 
+        validatePreferenceConflict(coursePlacePreferences);
+
         List<TourPlaceDto> tourPlaces = tourApiService.getTourPlaces();
 
         System.out.println("관광지 개수 = " + tourPlaces.size());
@@ -86,6 +90,15 @@ public class CourseService {
         List<CourseCandidateDto> courseCandidates = new ArrayList<>();
 
         for (TourPlaceDto place : tourPlaces) {
+            PreferenceType preferenceType = findPreferenceType(
+                    place,
+                    coursePlacePreferences
+            );
+
+            if (preferenceType == PreferenceType.AVOID) {
+                continue;
+            }
+
             String signguCd;
 
             if (place.getAddress() != null && place.getAddress().contains("제주시")) {
@@ -95,7 +108,8 @@ public class CourseService {
             } else {
                 courseCandidates.add(new CourseCandidateDto(
                         place,
-                        Collections.emptyList()
+                        Collections.emptyList(),
+                        preferenceType
                 ));
                 continue;
             }
@@ -110,7 +124,8 @@ public class CourseService {
             if (congestionData.isEmpty()) {
                 courseCandidates.add(new CourseCandidateDto(
                         place,
-                        Collections.emptyList()
+                        Collections.emptyList(),
+                        preferenceType
                 ));
                 continue;
             }
@@ -129,10 +144,128 @@ public class CourseService {
 
             courseCandidates.add(new CourseCandidateDto(
                     place,
-                    filteredCongestionData
+                    filteredCongestionData,
+                    preferenceType
             ));
         }
 
         System.out.println("코스 추천 후보 개수 = " + courseCandidates.size());
+    }
+
+    private void validatePreferenceConflict(List<PlacePreferenceDto> preferences) {
+        if (preferences == null || preferences.isEmpty()) {
+            return;
+        }
+
+        for (int i = 0; i < preferences.size(); i++) {
+            PlacePreferenceDto first = preferences.get(i);
+
+            if (first == null || first.getPreferenceType() == null) {
+                continue;
+            }
+
+            for (int j = i + 1; j < preferences.size(); j++) {
+                PlacePreferenceDto second = preferences.get(j);
+
+                if (second == null
+                        || second.getPreferenceType() == null
+                        || first.getPreferenceType() == second.getPreferenceType()) {
+                    continue;
+                }
+
+                if (isSamePreferredPlace(first, second)) {
+                    throw new IllegalArgumentException(
+                            "동일한 장소를 WANT와 AVOID에 동시에 지정할 수 없습니다."
+                    );
+                }
+            }
+        }
+    }
+
+    private boolean isSamePreferredPlace(
+            PlacePreferenceDto first,
+            PlacePreferenceDto second
+    ) {
+        if (first.getPlaceId() != null && second.getPlaceId() != null) {
+            return first.getPlaceId().equals(second.getPlaceId());
+        }
+
+        if (hasSourceIdentity(first) && hasSourceIdentity(second)) {
+            return first.getSourceCode().trim().equalsIgnoreCase(second.getSourceCode().trim())
+                    && first.getSourcePlaceId().trim().equals(second.getSourcePlaceId().trim());
+        }
+
+        String firstName = normalizePlaceName(first.getPlaceName());
+        String secondName = normalizePlaceName(second.getPlaceName());
+
+        return !firstName.isEmpty() && firstName.equals(secondName);
+    }
+
+    private boolean hasSourceIdentity(PlacePreferenceDto preference) {
+        return preference.getSourceCode() != null
+                && !preference.getSourceCode().isBlank()
+                && preference.getSourcePlaceId() != null
+                && !preference.getSourcePlaceId().isBlank();
+    }
+
+    private PreferenceType findPreferenceType(
+            TourPlaceDto place,
+            List<PlacePreferenceDto> preferences
+    ) {
+        if (preferences == null || preferences.isEmpty()) {
+            return null;
+        }
+
+        PreferenceType matchedPreferenceType = null;
+
+        for (PlacePreferenceDto preference : preferences) {
+            if (preference == null
+                    || preference.getPreferenceType() == null
+                    || !matchesTourPlace(place, preference)) {
+                continue;
+            }
+
+            if (preference.getPreferenceType() == PreferenceType.AVOID) {
+                return PreferenceType.AVOID;
+            }
+
+            matchedPreferenceType = PreferenceType.WANT;
+        }
+
+        return matchedPreferenceType;
+    }
+
+    private boolean matchesTourPlace(
+            TourPlaceDto place,
+            PlacePreferenceDto preference
+    ) {
+        String contentId = normalizeIdentifier(place.getContentId());
+
+        if (preference.getPlaceId() != null
+                && contentId.equals(String.valueOf(preference.getPlaceId()))) {
+            return true;
+        }
+
+        if (!contentId.isEmpty()
+                && preference.getSourcePlaceId() != null
+                && !preference.getSourcePlaceId().isBlank()
+                && contentId.equals(normalizeIdentifier(preference.getSourcePlaceId()))) {
+            return true;
+        }
+
+        String placeTitle = normalizePlaceName(place.getTitle());
+        String preferenceName = normalizePlaceName(preference.getPlaceName());
+
+        return !placeTitle.isEmpty() && placeTitle.equals(preferenceName);
+    }
+
+    private String normalizeIdentifier(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private String normalizePlaceName(String value) {
+        return value == null
+                ? ""
+                : value.replaceAll("\\s+", "").toLowerCase(Locale.ROOT);
     }
 }
