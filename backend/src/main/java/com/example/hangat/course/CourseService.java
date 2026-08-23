@@ -239,28 +239,10 @@ public class CourseService {
             TourPlaceDto place,
             PlacePreferenceDto preference
     ) {
-        String contentId = normalizeIdentifier(place.getContentId());
-
-        if (preference.getPlaceId() != null
-                && contentId.equals(String.valueOf(preference.getPlaceId()))) {
-            return true;
-        }
-
-        if (!contentId.isEmpty()
-                && preference.getSourcePlaceId() != null
-                && !preference.getSourcePlaceId().isBlank()
-                && contentId.equals(normalizeIdentifier(preference.getSourcePlaceId()))) {
-            return true;
-        }
-
         String placeTitle = normalizePlaceName(place.getTitle());
         String preferenceName = normalizePlaceName(preference.getPlaceName());
 
         return !placeTitle.isEmpty() && placeTitle.equals(preferenceName);
-    }
-
-    private String normalizeIdentifier(String value) {
-        return value == null ? "" : value.trim();
     }
 
     private String normalizePlaceName(String value) {
