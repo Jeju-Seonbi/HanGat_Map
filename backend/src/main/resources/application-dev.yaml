@@ -44,3 +44,9 @@ management:
 weather:
   base-url: https://apis.data.go.kr/1360000
   service-key: ${SERVICE_KEY}
+
+# 공공데이터포털 - 한국관광공사 계열 (KorService2 / 집중률 / 방문자수)
+# ★ service-key 는 Decoding 키. 계정당 인증키 1개가 활용신청한 모든 API에 통하므로 weather와 같은 값을 쓴다
+public-api:
+  service-key: ${SERVICE_KEY}
+  tour-base-url: https://apis.data.go.kr/B551011
