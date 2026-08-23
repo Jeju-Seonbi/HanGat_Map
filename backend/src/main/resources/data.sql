@@ -11,6 +11,7 @@
 
 DELETE FROM place_categories;
 DELETE FROM regions;
+DELETE FROM data_sources;
 
 -- ─────────────────────────────────────────────────────────────
 -- 권역 4개
@@ -65,3 +66,43 @@ INSERT INTO place_categories (code, name, display_order, is_active, created_at, 
   ('CONVENIENCE', '편의점',  5, TRUE, NOW(), NOW()),
   ('MART',        '마트',    6, TRUE, NOW(), NOW()),
   ('SHOPPING',    '쇼핑',    7, TRUE, NOW(), NOW());
+
+-- ─────────────────────────────────────────────────────────────
+-- 외부 데이터 출처 4개
+--
+-- place_source_mappings.source_code 가 FK로 이 code 를 가리키므로 적재보다 먼저 있어야 한다.
+--
+-- ★ attribution_text 는 화면 푸터의 출처 표기에 그대로 쓴다.
+--   공공데이터 이용 조건이자 심사 확인 항목이라 비워두면 안 된다.
+-- ★ disclaimer_text 는 '예측값'인 출처에 특히 필요하다 - 집중률은 실측이 아니라 예측이고,
+--   그 사실을 화면에서 숨기면 데이터 정직성 원칙(§1.2)에 어긋난다.
+-- ─────────────────────────────────────────────────────────────
+INSERT INTO data_sources (code, display_name, provider_name, homepage_url, api_url,
+                          license_name, license_url, attribution_text, disclaimer_text,
+                          display_order, is_active, created_at, updated_at) VALUES
+  ('KTO', '한국관광공사 국문 관광정보', '한국관광공사',
+   'https://knto.or.kr', 'https://www.data.go.kr/data/15101578/openapi.do',
+   '공공누리 제1유형', 'https://www.kogl.or.kr/info/license.do',
+   '출처: 한국관광공사 국문 관광정보 서비스', NULL,
+   1, TRUE, NOW(), NOW()),
+
+  ('KTO_CNCTR', '한국관광공사 관광지 집중률 예측', '한국관광공사',
+   'https://knto.or.kr', 'https://www.data.go.kr/data/15128555/openapi.do',
+   '공공누리 제1유형', 'https://www.kogl.or.kr/info/license.do',
+   '출처: 한국관광공사 관광지 집중률 방문자 추이 예측 정보',
+   '집중률은 실측 방문자 수가 아니라 예측값이며, 각 관광지의 최성수기를 100으로 본 상대 지수입니다. 관광지 간 절대 비교에는 쓸 수 없습니다.',
+   2, TRUE, NOW(), NOW()),
+
+  ('SBIZ', '소상공인시장진흥공단 상가정보', '소상공인시장진흥공단',
+   'https://www.semas.or.kr', 'https://www.data.go.kr/data/15012005/openapi.do',
+   '공공누리 제1유형', 'https://www.kogl.or.kr/info/license.do',
+   '출처: 소상공인시장진흥공단 상가(상권)정보',
+   '상가 정보는 수집 시점 기준이며 폐업·이전이 반영되지 않았을 수 있습니다.',
+   3, TRUE, NOW(), NOW()),
+
+  ('MOIS_GOODPRICE', '제주시 착한가격업소', '제주시',
+   'https://www.jejusi.go.kr', 'https://www.data.go.kr/data/15109183/openapi.do',
+   '공공누리 제1유형', 'https://www.kogl.or.kr/info/license.do',
+   '출처: 제주시 착한가격업소 정보',
+   '착한가격업소 지정 현황은 기준일자 기준이며 이후 변경될 수 있습니다.',
+   4, TRUE, NOW(), NOW());
