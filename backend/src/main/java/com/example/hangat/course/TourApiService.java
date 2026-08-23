@@ -8,6 +8,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
+import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -40,6 +41,14 @@ public class TourApiService {
                 .uri(uri)
                 .retrieve()
                 .body(TourApiResponseDto.class);
+
+        if (result == null
+                || result.getResponse() == null
+                || result.getResponse().getBody() == null
+                || result.getResponse().getBody().getItems() == null
+                || result.getResponse().getBody().getItems().getItem() == null) {
+            return Collections.emptyList();
+        }
 
         return result.getResponse()
                 .getBody()
