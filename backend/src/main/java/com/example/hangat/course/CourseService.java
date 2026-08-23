@@ -2,6 +2,7 @@ package com.example.hangat.course;
 
 import com.example.hangat.course.model.AccommodationDto;
 import com.example.hangat.course.model.CongestionDto;
+import com.example.hangat.course.model.CourseCandidateDto;
 import com.example.hangat.course.model.CourseRequestDto;
 import com.example.hangat.course.model.PlacePreferenceDto;
 import com.example.hangat.course.model.TourPlaceDto;
@@ -11,6 +12,8 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -80,6 +83,7 @@ public class CourseService {
         }
 
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
+        List<CourseCandidateDto> courseCandidates = new ArrayList<>();
 
         for (TourPlaceDto place : tourPlaces) {
             String signguCd;
@@ -89,6 +93,10 @@ public class CourseService {
             } else if (place.getAddress() != null && place.getAddress().contains("서귀포시")) {
                 signguCd = "50130";
             } else {
+                courseCandidates.add(new CourseCandidateDto(
+                        place,
+                        Collections.emptyList()
+                ));
                 continue;
             }
 
@@ -100,7 +108,10 @@ public class CourseService {
             System.out.println("전체 혼잡도 데이터 개수 = " + congestionData.size());
 
             if (congestionData.isEmpty()) {
-                System.out.println(place.getTitle() + " → 혼잡도 데이터 없음");
+                courseCandidates.add(new CourseCandidateDto(
+                        place,
+                        Collections.emptyList()
+                ));
                 continue;
             }
 
@@ -116,20 +127,12 @@ public class CourseService {
                     })
                     .toList();
 
-            if (filteredCongestionData.isEmpty()) {
-                System.out.println(place.getTitle() + " → 여행기간 내 혼잡도 데이터 없음");
-                continue;
-            }
-
-            System.out.println("===== " + place.getTitle() + " 여행기간 혼잡도 =====");
-
-            for (CongestionDto congestion : filteredCongestionData) {
-                System.out.println(
-                        congestion.getBaseYmd()
-                                + " / "
-                                + congestion.getCnctrRate()
-                );
-            }
+            courseCandidates.add(new CourseCandidateDto(
+                    place,
+                    filteredCongestionData
+            ));
         }
+
+        System.out.println("코스 추천 후보 개수 = " + courseCandidates.size());
     }
 }
