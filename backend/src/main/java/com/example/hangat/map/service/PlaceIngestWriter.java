@@ -4,12 +4,19 @@ import com.example.hangat.map.model.entity.DataSource;
 import com.example.hangat.map.model.entity.Place;
 import com.example.hangat.map.model.entity.PlaceCategory;
 import com.example.hangat.map.model.entity.PlaceSourceMapping;
+import com.example.hangat.map.model.entity.PlaceTag;
 import com.example.hangat.map.model.entity.Region;
+import com.example.hangat.map.model.entity.Tag;
+import com.example.hangat.map.model.enums.TagSourceType;
 import com.example.hangat.map.repository.DataSourceRepository;
 import com.example.hangat.map.repository.PlaceCategoryRepository;
 import com.example.hangat.map.repository.PlaceRepository;
 import com.example.hangat.map.repository.PlaceSourceMappingRepository;
+import com.example.hangat.map.repository.PlaceTagRepository;
 import com.example.hangat.map.repository.RegionRepository;
+import com.example.hangat.map.repository.TagRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,33 +40,41 @@ import java.util.Optional;
 @Component
 public class PlaceIngestWriter {
 
+    private static final Logger log = LoggerFactory.getLogger(PlaceIngestWriter.class);
+
     private final PlaceRepository placeRepository;
     private final PlaceSourceMappingRepository mappingRepository;
     private final RegionRepository regionRepository;
     private final PlaceCategoryRepository categoryRepository;
     private final DataSourceRepository dataSourceRepository;
+    private final TagRepository tagRepository;
+    private final PlaceTagRepository placeTagRepository;
 
     public PlaceIngestWriter(PlaceRepository placeRepository,
                              PlaceSourceMappingRepository mappingRepository,
                              RegionRepository regionRepository,
                              PlaceCategoryRepository categoryRepository,
-                             DataSourceRepository dataSourceRepository) {
+                             DataSourceRepository dataSourceRepository,
+                             TagRepository tagRepository,
+                             PlaceTagRepository placeTagRepository) {
         this.placeRepository = placeRepository;
         this.mappingRepository = mappingRepository;
         this.regionRepository = regionRepository;
         this.categoryRepository = categoryRepository;
         this.dataSourceRepository = dataSourceRepository;
+        this.tagRepository = tagRepository;
+        this.placeTagRepository = placeTagRepository;
     }
 
     /** 저장 대상 한 건. 파싱·판정이 끝난 상태로 넘어온다. */
-    public record Row(String sourcePlaceId, String regionCode, String categoryCode,
+    public record Row(String sourcePlaceId, String regionCode, String categoryCode, String tagCode,
                       String name, String normalizedName, String roadAddress,
                       BigDecimal latitude, BigDecimal longitude, String phone,
                       String dataHash, String rawPayload, LocalDateTime sourceUpdatedAt) {
     }
 
     /** 청크 처리 결과. */
-    public record ChunkResult(int inserted, int updated, int unchanged) {
+    public record ChunkResult(int inserted, int updated, int unchanged, int tagged) {
     }
 
     @Transactional
@@ -68,13 +83,15 @@ public class PlaceIngestWriter {
                 .orElseThrow(() -> new IllegalStateException(
                         "data_sources에 '" + sourceCode + "' 행이 없다. data.sql 적재를 먼저 확인할 것"));
 
-        // 마스터는 4행·7행뿐이라 트랜잭션 안에서 한 번만 읽어 재사용한다
+        // 마스터는 4행·7행·246행뿐이라 트랜잭션 안에서 한 번만 읽어 재사용한다
         Map<String, Region> regions = new HashMap<>();
         Map<String, PlaceCategory> categories = new HashMap<>();
+        Map<String, Tag> tags = new HashMap<>();
 
         int inserted = 0;
         int updated = 0;
         int unchanged = 0;
+        int tagged = 0;
 
         for (Row row : rows) {
             Region region = regions.computeIfAbsent(row.regionCode(),
@@ -102,6 +119,10 @@ public class PlaceIngestWriter {
                         .reviewCount(0)
                         .build());
 
+                if (applyTag(place, row, tags, false)) {
+                    tagged++;
+                }
+
                 mappingRepository.save(PlaceSourceMapping.builder()
                         .place(place)
                         .source(source)
@@ -125,9 +146,37 @@ public class PlaceIngestWriter {
             mapping.getPlace().updateFromSource(region, category, row.name(), row.normalizedName(),
                     row.roadAddress(), row.latitude(), row.longitude(), row.phone());
             mapping.markSynced(row.dataHash(), row.rawPayload(), row.sourceUpdatedAt());
+            if (applyTag(mapping.getPlace(), row, tags, true)) {
+                tagged++;
+            }
             updated++;
         }
 
-        return new ChunkResult(inserted, updated, unchanged);
+        return new ChunkResult(inserted, updated, unchanged, tagged);
+    }
+
+    /**
+     * 장소에 세부분류 태그를 붙인다. KTO는 장소당 소분류 하나를 주므로 항상 1건이다.
+     *
+     * @param replaceExisting 갱신 경로면 true - 분류가 바뀌었을 수 있어 기존 API 태그를 걷어내고
+     *                        다시 붙인다. 신규 경로에서는 붙어 있을 게 없으므로 DELETE를 아낀다
+     * @return 실제로 붙였으면 true
+     */
+    private boolean applyTag(Place place, Row row, Map<String, Tag> cache, boolean replaceExisting) {
+        if (replaceExisting) {
+            placeTagRepository.deleteByPlaceAndSourceType(place, TagSourceType.API);
+        }
+        if (row.tagCode() == null) {
+            return false;
+        }
+        Tag tag = cache.computeIfAbsent(row.tagCode(),
+                code -> tagRepository.findByCode(code).orElse(null));
+        if (tag == null) {
+            // 코드표에 없는 분류코드. KTO가 코드표보다 먼저 장소를 푸는 경우가 있어 장소는 살린다
+            log.warn("코드표에 없는 세부분류 code={} title={}", row.tagCode(), row.name());
+            return false;
+        }
+        placeTagRepository.save(PlaceTag.fromApi(place, tag));
+        return true;
     }
 }

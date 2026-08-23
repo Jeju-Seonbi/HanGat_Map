@@ -50,6 +50,21 @@ public record KtoPlaceItem(
         String cpyrhtDivCd,
 
         /** 최종 수정 시각 (YYYYMMDDHHmmss). 변경 감지에 쓴다. */
-        String modifiedtime
+        String modifiedtime,
+
+        /** 분류체계 대분류 코드 (예: {@code NA} 자연관광). 세부 분류 태그의 상위 맥락. */
+        String lclsSystm1,
+
+        /** 분류체계 중분류 코드 (예: {@code NA01} 자연관광지). */
+        String lclsSystm2,
+
+        /**
+         * ★ 분류체계 소분류 코드 (예: {@code NA010100} "산, 고개, 오름, 봉우리").
+         *
+         * <p>화면의 "모든 종류의 관광지" 드롭다운이 이 값으로 채워진다. 별도 API를 부르지 않아도
+         * 목록 응답에 이미 들어 있다(2026-08-24 실측 - 가마오름 = NA / NA01 / NA010100).
+         * 이름은 {@code lclsSystmCode2}가 준다.
+         */
+        String lclsSystm3
 ) {
 }

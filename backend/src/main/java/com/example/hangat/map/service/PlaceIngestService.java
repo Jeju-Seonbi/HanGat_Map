@@ -57,19 +57,26 @@ public class PlaceIngestService {
     private final PublicApiClient client;
     private final RegionResolver regionResolver;
     private final PlaceIngestWriter writer;
+    private final TagSyncService tagSyncService;
 
-    public PlaceIngestService(PublicApiClient client, RegionResolver regionResolver, PlaceIngestWriter writer) {
+    public PlaceIngestService(PublicApiClient client, RegionResolver regionResolver,
+                              PlaceIngestWriter writer, TagSyncService tagSyncService) {
         this.client = client;
         this.regionResolver = regionResolver;
         this.writer = writer;
+        this.tagSyncService = tagSyncService;
     }
 
     /** 적재 결과 요약. 제외 건수를 함께 돌려줘 "왜 2,147이 아닌지" 바로 알 수 있게 한다. */
     public record IngestResult(int fetched, int inserted, int updated, int unchanged,
-                               int skippedNoRegion, int skippedNoCategory, int skippedNoId) {
+                               int skippedNoRegion, int skippedNoCategory, int skippedNoId,
+                               int tagged, int skippedNoTag) {
     }
 
     public IngestResult ingest() {
+        // 장소가 참조할 태그를 먼저 채운다. 1콜이고 별도 트랜잭션이라 여기서 이미 커밋이 끝난다
+        tagSyncService.sync();
+
         List<KtoPlaceItem> items = client.fetchAll(PATH, Map.of("lDongRegnCd", JEJU),
                 new TypeReference<TourApiResponse<KtoPlaceItem>>() {
                 });
@@ -79,6 +86,7 @@ public class PlaceIngestService {
         int noRegion = 0;
         int noCategory = 0;
         int noId = 0;
+        int noTag = 0;
 
         for (KtoPlaceItem item : items) {
             if (isBlank(item.contentid()) || isBlank(item.title())) {
@@ -99,8 +107,14 @@ public class PlaceIngestService {
                 continue;
             }
 
+            String tagCode = blankToNull(item.lclsSystm3());
+            if (tagCode == null) {
+                noTag++;   // 분류가 없어도 장소는 넣는다 - 지도에는 찍혀야 하니까
+                log.debug("세부분류 없음 title={}", item.title());
+            }
+
             rows.add(new PlaceIngestWriter.Row(
-                    item.contentid(), regionCode, categoryCode,
+                    item.contentid(), regionCode, categoryCode, tagCode,
                     item.title(), normalize(item.title()), blankToNull(item.addr1()),
                     // ★ mapy=위도, mapx=경도. 순서를 바꾸면 제주 전역 핀이 통째로 어긋난다
                     toDecimal(item.mapy(), LAT_MIN, LAT_MAX, "위도", item.title()),
@@ -112,16 +126,18 @@ public class PlaceIngestService {
         int inserted = 0;
         int updated = 0;
         int unchanged = 0;
+        int tagged = 0;
         for (int i = 0; i < rows.size(); i += CHUNK) {
             List<PlaceIngestWriter.Row> chunk = rows.subList(i, Math.min(i + CHUNK, rows.size()));
             PlaceIngestWriter.ChunkResult r = writer.saveChunk(SOURCE_CODE, chunk);
             inserted += r.inserted();
             updated += r.updated();
             unchanged += r.unchanged();
+            tagged += r.tagged();
         }
 
         IngestResult result = new IngestResult(items.size(), inserted, updated, unchanged,
-                noRegion, noCategory, noId);
+                noRegion, noCategory, noId, tagged, noTag);
         log.info("KTO 적재 완료 {}", result);
         if (noRegion > 0) {
             log.warn("권역 판정 실패로 제외 {}건 - 추자도 등 본섬 밖은 의도된 제외다(설계서 §5.1)", noRegion);
@@ -185,12 +201,19 @@ public class PlaceIngestService {
         }
     }
 
-    /** 변경 감지용. 다음 배치에서 이 값이 같으면 UPDATE를 건너뛴다. */
+    /**
+     * 변경 감지용. 다음 배치에서 이 값이 같으면 UPDATE를 건너뛴다.
+     *
+     * <p>⚠️ <b>새로 쓰기 시작한 필드는 반드시 씨앗에 넣어야 한다.</b> 씨앗에 없으면 해시가 그대로라
+     * 기존 행이 전부 '변경 없음'으로 판정돼 새 필드가 영원히 안 채워진다.
+     * {@code lclsSystm3}(세부분류)를 넣은 이유가 이것이다 - 넣지 않으면 이미 적재된
+     * 2,138건에 태그가 하나도 안 붙는다.
+     */
     private String hash(KtoPlaceItem item) {
         String seed = String.join("|",
                 nz(item.title()), nz(item.addr1()), nz(item.addr2()), nz(item.tel()),
                 nz(item.mapx()), nz(item.mapy()), nz(item.contenttypeid()),
-                nz(item.firstimage()), nz(item.modifiedtime()));
+                nz(item.firstimage()), nz(item.modifiedtime()), nz(item.lclsSystm3()));
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256").digest(seed.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(digest);
