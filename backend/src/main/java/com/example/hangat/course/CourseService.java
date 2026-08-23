@@ -3,7 +3,9 @@ package com.example.hangat.course;
 import com.example.hangat.course.model.AccommodationDto;
 import com.example.hangat.course.model.CongestionDto;
 import com.example.hangat.course.model.CourseCandidateDto;
+import com.example.hangat.course.model.CourseRegionDto;
 import com.example.hangat.course.model.CourseRequestDto;
+import com.example.hangat.course.model.CourseStyleDto;
 import com.example.hangat.course.model.PlacePreferenceDto;
 import com.example.hangat.course.model.PreferenceType;
 import com.example.hangat.course.model.TourPlaceDto;
@@ -31,8 +33,8 @@ public class CourseService {
         Integer people = request.getPeople();
         Integer budgetTotal = request.getBudgetTotal();
         Transport transport = request.getTransport();
-        List<String> regions = request.getRegions();
-        List<String> styles = request.getStyles();
+        List<CourseRegionDto> courseRegions = request.getCourseRegions();
+        List<CourseStyleDto> courseStyles = request.getCourseStyles();
         List<PlacePreferenceDto> coursePlacePreferences = request.getCoursePlacePreferences();
         AccommodationDto accommodation = request.getAccommodation();
 
@@ -56,11 +58,11 @@ public class CourseService {
             throw new IllegalArgumentException("이동수단은 필수입니다.");
         }
 
-        if (styles == null || styles.isEmpty()) {
+        if (courseStyles == null || courseStyles.isEmpty()) {
             throw new IllegalArgumentException("여행 스타일은 1개 이상 선택해야 합니다.");
         }
 
-        if (regions == null) {
+        if (courseRegions == null) {
             throw new IllegalArgumentException("권역 정보가 필요합니다.");
         }
 
