@@ -39,7 +39,16 @@ public class PlaceService {
     public PlaceDetailResponse getPlace(Long placeId) {
         Place place = placeRepository.findDetailById(placeId)
                 .orElseThrow(() -> new BaseException(BaseResponseStatus.PLACE_NOT_FOUND));
-        return PlaceDetailResponse.from(place);
+        return PlaceDetailResponse.from(place, findApiTag(placeId));
+    }
+
+    /**
+     * 세부분류 1건. KTO는 장소당 소분류를 하나만 주지만, 그 전제가 깨져도 상세가 죽지 않게
+     * 예외 대신 첫 건을 쓴다 - 목록 쪽에서 같은 장소가 두 줄로 드러나므로 이상은 그쪽에서 먼저 보인다.
+     */
+    private Object[] findApiTag(Long placeId) {
+        List<Object[]> found = placeRepository.findApiTagOf(placeId);
+        return found.isEmpty() ? null : found.get(0);
     }
 
     /**

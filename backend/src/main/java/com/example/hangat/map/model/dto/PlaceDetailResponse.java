@@ -35,6 +35,10 @@ public class PlaceDetailResponse {
     private final String categoryCode;
     private final String categoryName;
 
+    /** 세부분류 - 목록과 같은 값이다. 설명은 {@link PlaceListResponse#getTagName()} 참고. */
+    private final String tagCode;
+    private final String tagName;
+
     private final String roadAddress;
     private final String lotAddress;
     private final BigDecimal latitude;
@@ -65,8 +69,15 @@ public class PlaceDetailResponse {
     private final BigDecimal ratingAvg;
     private final int reviewCount;
 
-    public static PlaceDetailResponse from(Place place) {
+    /**
+     * @param apiTag {@code [code, name]} 또는 미분류면 null.
+     *               엔티티에서 못 꺼내는 이유는 place_tags를 {@code Place}의 컬렉션으로 매핑하지 않았기 때문이다
+     *               (목록 쿼리에 {@code @OneToMany}가 끼면 행이 늘어난다 - PlaceRepository 주석 참고).
+     */
+    public static PlaceDetailResponse from(Place place, Object[] apiTag) {
         return PlaceDetailResponse.builder()
+                .tagCode(apiTag == null ? null : (String) apiTag[0])
+                .tagName(apiTag == null ? null : (String) apiTag[1])
                 .id(place.getId())
                 .name(place.getName())
                 .regionCode(place.getRegion().getCode())

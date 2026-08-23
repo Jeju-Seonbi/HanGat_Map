@@ -36,6 +36,12 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
      * 목록 SELECT 절. <b>이 인자 순서가 곧 {@link PlaceListResponse} 생성자 시그니처</b>이며
      * 엔티티 필드 선언 순서(주소 → 좌표 → 편의정보)와 같게 맞춰 뒀다 - 다르게 두면 좌표 스왑이 눈에 안 띈다.
      *
+     * <p><b>세부분류 조인이 행을 늘리지 않는 근거</b>: {@code sourceType = API}로 좁혀 두었고
+     * KTO는 장소당 소분류를 하나만 준다. 운영자가 손으로 붙이는 태그는 {@code ADMIN}이라 여기 안 걸린다.
+     * 나중에 한 장소에 API 태그를 둘 이상 붙이게 되면 <b>목록에 같은 장소가 두 줄 나온다</b> -
+     * distinct로 덮지 말고(위 CLOB 단서 참고) 태그를 별도 쿼리로 분리할 것.
+     * {@code left join}이라 미분류 장소도 목록에서 빠지지 않는다.
+     *
      * <p>폐업(CLOSED)만 제외한다: 헛걸음을 만드는 '틀린 정보'라서 '없는 정보'인 UNKNOWN과 성격이 다르다.
      * TEMP_CLOSED·UNKNOWN은 남기고 상태값을 실어 화면이 배지로 표시한다
      * (KTO 적재분 2,138건이 전부 UNKNOWN이라 OPEN만 남기면 통째로 사라진다).
@@ -44,6 +50,7 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
             select new com.example.hangat.map.model.dto.PlaceListResponse(
                 p.id, p.name,
                 r.code, r.name, c.code, c.name,
+                t.code, t.name,
                 p.roadAddress, p.lotAddress,
                 p.latitude, p.longitude,
                 p.phone, p.operatingHoursText,
@@ -52,6 +59,10 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
             from Place p
                 join p.region r
                 join p.primaryCategory c
+                left join PlaceTag pt
+                    on pt.place = p
+                    and pt.sourceType = com.example.hangat.map.model.enums.TagSourceType.API
+                left join pt.tag t
             where p.businessStatus <> com.example.hangat.map.model.enums.BusinessStatus.CLOSED""";
 
     /** KTO 적재 순서를 유지한다. 이름순은 H2와 MariaDB의 한글 collation이 달라 테스트가 환경마다 흔들린다. */
@@ -80,4 +91,17 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
      */
     @Query("select p from Place p join fetch p.region join fetch p.primaryCategory where p.id = :id")
     Optional<Place> findDetailById(@Param("id") Long id);
+
+    /**
+     * 상세의 세부분류. 목록과 달리 한 건짜리 조회라 조인을 얹지 않고 쿼리를 하나 더 쓴다 -
+     * fetch join을 늘리면 {@code Optional}이 NonUniqueResult로 깨질 여지만 생긴다.
+     */
+    @Query("""
+            select t.code, t.name
+            from PlaceTag pt
+              join pt.tag t
+            where pt.place.id = :placeId
+              and pt.sourceType = com.example.hangat.map.model.enums.TagSourceType.API
+            """)
+    List<Object[]> findApiTagOf(@Param("placeId") Long placeId);
 }

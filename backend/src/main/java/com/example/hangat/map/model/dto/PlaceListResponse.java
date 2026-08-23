@@ -32,9 +32,19 @@ public class PlaceListResponse {
     private final String regionCode;
     private final String regionName;
 
-    /** 프론트 c의 대분류. 세부분류(오름/해변/전시)는 아직 컬럼이 없다(§10-③). */
+    /** 프론트 c의 대분류(관광지/음식점/숙박...). 화면 필터 7종이 이 값으로 걸린다. */
     private final String categoryCode;
     private final String categoryName;
+
+    /**
+     * 프론트 c의 세부분류 - "모든 종류의 관광지" 드롭다운을 채우는 값(오름/해수욕장/미술관...).
+     *
+     * <p>places에 컬럼이 없어서(§10-③) place_tags에서 온다. 출처는 한국관광공사 분류체계
+     * 246개이고, KTO가 장소당 소분류를 <b>하나만</b> 주므로 단수 필드로 내린다.
+     * 미분류 장소는 null이며 화면은 '정보 없음'으로 둔다.
+     */
+    private final String tagCode;
+    private final String tagName;
 
     /** 프론트 addr. 오름·해안은 지번만 있는 곳이 많아 둘 다 내리고 화면이 있는 쪽을 고른다. */
     private final String roadAddress;
@@ -64,6 +74,7 @@ public class PlaceListResponse {
     public PlaceListResponse(Long id, String name,
                              String regionCode, String regionName,
                              String categoryCode, String categoryName,
+                             String tagCode, String tagName,
                              String roadAddress, String lotAddress,
                              BigDecimal latitude, BigDecimal longitude,
                              String phone, String operatingHoursText,
@@ -75,6 +86,8 @@ public class PlaceListResponse {
         this.regionName = regionName;
         this.categoryCode = categoryCode;
         this.categoryName = categoryName;
+        this.tagCode = tagCode;
+        this.tagName = tagName;
         this.roadAddress = roadAddress;
         this.lotAddress = lotAddress;
         this.latitude = latitude;

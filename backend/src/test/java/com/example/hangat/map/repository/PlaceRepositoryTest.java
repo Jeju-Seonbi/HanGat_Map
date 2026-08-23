@@ -3,8 +3,12 @@ package com.example.hangat.map.repository;
 import com.example.hangat.map.model.dto.PlaceListResponse;
 import com.example.hangat.map.model.entity.Place;
 import com.example.hangat.map.model.entity.PlaceCategory;
+import com.example.hangat.map.model.entity.PlaceTag;
 import com.example.hangat.map.model.entity.Region;
+import com.example.hangat.map.model.entity.Tag;
 import com.example.hangat.map.model.enums.BusinessStatus;
+import com.example.hangat.map.model.enums.TagSourceType;
+import com.example.hangat.map.model.enums.TagType;
 import org.hibernate.Hibernate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,15 +47,21 @@ class PlaceRepositoryTest {
     private Region west;
     private PlaceCategory tourist;
     private PlaceCategory food;
+    private Tag 오름;
 
     @BeforeEach
     void setUp() {
         west = Region.builder().code("WEST").name("서부").displayOrder((byte) 1).build();
         tourist = PlaceCategory.builder().code("TOURIST").name("관광지").build();
         food = PlaceCategory.builder().code("FOOD").name("음식점").build();
+        오름 = Tag.builder()
+                .code("NA010100").name("산, 고개, 오름, 봉우리").description("자연관광 > 자연경관")
+                .tagType(TagType.PLACE).isActive(true)
+                .build();
         em.persist(west);
         em.persist(tourist);
         em.persist(food);
+        em.persist(오름);
     }
 
     @Test
@@ -68,6 +78,7 @@ class PlaceRepositoryTest {
                 .isGoodPrice(true).isHiddenGem(false)
                 .build();
         em.persist(금오름);
+        em.persist(PlaceTag.fromApi(금오름, 오름));
         em.flush();
         em.clear();
 
@@ -78,6 +89,8 @@ class PlaceRepositoryTest {
         assertThat(found.getRegionName()).isEqualTo("서부");
         assertThat(found.getCategoryCode()).isEqualTo("TOURIST");
         assertThat(found.getCategoryName()).isEqualTo("관광지");
+        assertThat(found.getTagCode()).isEqualTo("NA010100");
+        assertThat(found.getTagName()).isEqualTo("산, 고개, 오름, 봉우리");
         assertThat(found.getRoadAddress()).isEqualTo("도로명주소값");
         assertThat(found.getLotAddress()).isEqualTo("지번주소값");
         assertThat(found.getLatitude()).isEqualByComparingTo("33.356");
@@ -106,6 +119,38 @@ class PlaceRepositoryTest {
         assertThat(found.getToiletAvailable()).isNull();
         assertThat(found.getLatitude()).isNull();
         assertThat(상시개방.getId()).isNotNull();
+    }
+
+    @Test
+    void 세부분류가_없어도_목록에서_빠지지_않는다() {
+        Place 분류있음 = place("분류있는곳", tourist, false, BusinessStatus.UNKNOWN);
+        place("분류없는곳", tourist, false, BusinessStatus.UNKNOWN);
+        em.persist(PlaceTag.fromApi(분류있음, 오름));
+        em.flush();
+        em.clear();
+
+        // left join이라서다. inner join이면 미분류 장소가 지도에서 통째로 사라지는데,
+        // 목록 건수만 보고는 '원래 그만큼인가' 싶어 알아채기 어렵다
+        List<PlaceListResponse> all = placeRepository.findListAll();
+        assertThat(names(all)).contains("분류있는곳", "분류없는곳");
+        assertThat(findByName(all, "분류없는곳").getTagName()).isNull();
+    }
+
+    @Test
+    void 운영자_태그는_목록_세부분류에_섞이지_않는다() {
+        Place 금오름 = place("금오름", tourist, false, BusinessStatus.UNKNOWN);
+        em.persist(PlaceTag.builder()
+                .place(금오름).tag(오름)
+                .weight(java.math.BigDecimal.ONE).sourceType(TagSourceType.ADMIN)
+                .build());
+        em.flush();
+        em.clear();
+
+        // 조인이 sourceType=API로 좁혀져 있다. 안 좁히면 ADMIN 태그가 붙는 순간
+        // 같은 장소가 목록에 두 줄 나오고, 지도에는 마커가 겹쳐 찍힌다
+        List<PlaceListResponse> all = placeRepository.findListAll();
+        assertThat(names(all)).containsExactly("금오름");
+        assertThat(all.get(0).getTagName()).isNull();
     }
 
     @Test
