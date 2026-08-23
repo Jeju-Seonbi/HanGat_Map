@@ -13,19 +13,10 @@ spring:
       minimum-idle: 2
       connection-timeout: 30000
 
-  # 맵 마스터 코드 데이터(data.sql) 적재 - MariaDB는 비임베디드라 always가 없으면 실행조차 안 된다
-  sql:
-    init:
-      mode: always
-      # ★ 없으면 OS 기본 인코딩(한국어 Windows=MS949)으로 읽어 한글이 깨진 채 DB에 들어간다.
-      #   에러도 안 나고 조용히 들어가므로 반드시 명시할 것
-      encoding: UTF-8
 
   jpa:
     hibernate:
       ddl-auto: update
-    # Hibernate가 테이블을 만든 뒤에 data.sql이 돌게 한다 (기본값이면 테이블 생성 전에 돌아 실패)
-    defer-datasource-initialization: true
     show-sql: false
     properties:
       hibernate:

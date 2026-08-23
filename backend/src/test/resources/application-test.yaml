@@ -6,12 +6,6 @@ spring:
     password:
     driver-class-name: org.h2.Driver
 
-  # 테스트에는 마스터 데이터를 넣지 않는다.
-  # H2는 임베디드라 기본값(embedded)으로도 data.sql이 실행되는데,
-  # 테이블 생성 전에 돌아 'table not found'로 테스트가 통째로 깨진다.
-  sql:
-    init:
-      mode: never
 
   jpa:
     hibernate:
