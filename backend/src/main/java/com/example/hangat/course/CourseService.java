@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @Service
@@ -78,6 +79,8 @@ public class CourseService {
             throw new IllegalArgumentException("조회된 관광지가 없습니다.");
         }
 
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
+
         for (TourPlaceDto place : tourPlaces) {
             String signguCd;
 
@@ -95,6 +98,38 @@ public class CourseService {
             );
 
             System.out.println("전체 혼잡도 데이터 개수 = " + congestionData.size());
+
+            if (congestionData.isEmpty()) {
+                System.out.println(place.getTitle() + " → 혼잡도 데이터 없음");
+                continue;
+            }
+
+            List<CongestionDto> filteredCongestionData = congestionData.stream()
+                    .filter(congestion -> {
+                        LocalDate congestionDate = LocalDate.parse(
+                                congestion.getBaseYmd(),
+                                formatter
+                        );
+
+                        return !congestionDate.isBefore(startDate)
+                                && !congestionDate.isAfter(endDate);
+                    })
+                    .toList();
+
+            if (filteredCongestionData.isEmpty()) {
+                System.out.println(place.getTitle() + " → 여행기간 내 혼잡도 데이터 없음");
+                continue;
+            }
+
+            System.out.println("===== " + place.getTitle() + " 여행기간 혼잡도 =====");
+
+            for (CongestionDto congestion : filteredCongestionData) {
+                System.out.println(
+                        congestion.getBaseYmd()
+                                + " / "
+                                + congestion.getCnctrRate()
+                );
+            }
         }
     }
 }
