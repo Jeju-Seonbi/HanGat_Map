@@ -2,12 +2,15 @@ package com.example.hangat.course;
 
 import com.example.hangat.course.model.CongestionApiResponseDto;
 import com.example.hangat.course.model.CongestionDto;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
+import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -20,6 +23,7 @@ public class CongestionApiService {
     private String serviceKey;
 
     private final RestClient restClient = RestClient.create();
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public List<CongestionDto> getCongestionData(
             String signguCd,
@@ -44,14 +48,51 @@ public class CongestionApiService {
                 )
                 .toUri();
 
-        CongestionApiResponseDto result = restClient.get()
+        String response = restClient.get()
                 .uri(uri)
                 .retrieve()
-                .body(CongestionApiResponseDto.class);
+                .body(String.class);
 
-        return result.getResponse()
-                .getBody()
-                .getItems()
-                .getItem();
+        try {
+            if (response == null || response.isBlank()) {
+                return Collections.emptyList();
+            }
+
+            JsonNode root = objectMapper.readTree(response);
+            JsonNode bodyNode = root
+                    .path("response")
+                    .path("body");
+            JsonNode itemsNode = bodyNode.path("items");
+
+            if (itemsNode.isMissingNode() || itemsNode.isNull()) {
+                return Collections.emptyList();
+            }
+
+            if (itemsNode.isTextual() && itemsNode.asText().isBlank()) {
+                return Collections.emptyList();
+            }
+
+            CongestionApiResponseDto result = objectMapper.readValue(
+                    response,
+                    CongestionApiResponseDto.class
+            );
+
+            if (result.getResponse() == null
+                    || result.getResponse().getBody() == null
+                    || result.getResponse().getBody().getItems() == null
+                    || result.getResponse().getBody().getItems().getItem() == null) {
+                return Collections.emptyList();
+            }
+
+            return result.getResponse()
+                    .getBody()
+                    .getItems()
+                    .getItem();
+        } catch (Exception e) {
+            throw new RuntimeException(
+                    "혼잡도 API 응답 처리 중 오류가 발생했습니다.",
+                    e
+            );
+        }
     }
 }
