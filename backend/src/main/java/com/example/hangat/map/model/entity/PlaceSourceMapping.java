@@ -109,6 +109,17 @@ public class PlaceSourceMapping {
         this.isActive = true;
     }
 
+    /**
+     * 동기화 결과를 기록한다. 다음 배치가 {@code dataHash}를 비교해 변경분만 갱신할 수 있게 한다.
+     * {@code place}·{@code sourcePlaceId}는 이 매핑의 정체성이라 바꾸지 않는다.
+     */
+    public void markSynced(String dataHash, String rawPayload, LocalDateTime sourceUpdatedAt) {
+        this.dataHash = dataHash;
+        this.rawPayload = rawPayload;
+        this.sourceUpdatedAt = sourceUpdatedAt;
+        this.lastSyncedAt = LocalDateTime.now();
+    }
+
     @PrePersist
     void onCreate() {
         LocalDateTime now = LocalDateTime.now();

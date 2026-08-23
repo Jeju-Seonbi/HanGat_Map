@@ -160,6 +160,29 @@ public class Place {
         this.ratingAvg = DEFAULT_RATING_AVG;
     }
 
+    /**
+     * 외부 출처에서 받은 기본 정보를 갱신한다.
+     *
+     * <p>출처가 이름·주소·전화를 고치면 따라간다. 후기에서 나오는 값({@code ratingAvg}·{@code reviewCount})과
+     * 우리가 계산하는 값({@code isHiddenGem} 등)은 <b>건드리지 않는다</b> - 배치가 덮어쓰면 안 되는 컬럼이다.
+     *
+     * <p>{@code @Setter}를 안 쓰고 이 메서드를 두는 이유: "무엇을 왜 바꾸는지"가 이름에 드러나고,
+     * 바꾸면 안 되는 컬럼이 실수로 열리지 않는다(§8 Lombok 제약).
+     */
+    public void updateFromSource(Region region, PlaceCategory primaryCategory,
+                                 String name, String normalizedName,
+                                 String roadAddress, BigDecimal latitude, BigDecimal longitude,
+                                 String phone) {
+        this.region = region;
+        this.primaryCategory = primaryCategory;
+        this.name = name;
+        this.normalizedName = normalizedName;
+        this.roadAddress = roadAddress;
+        this.latitude = latitude;
+        this.longitude = longitude;
+        this.phone = phone;
+    }
+
     @PrePersist
     void onCreate() {
         LocalDateTime now = LocalDateTime.now();
