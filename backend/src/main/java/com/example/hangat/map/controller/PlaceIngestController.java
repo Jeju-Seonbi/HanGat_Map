@@ -1,6 +1,7 @@
 package com.example.hangat.map.controller;
 
 import com.example.hangat.common.model.BaseResponse;
+import com.example.hangat.map.service.CongestionIngestService;
 import com.example.hangat.map.service.PlaceIngestService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -27,9 +28,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class PlaceIngestController {
 
     private final PlaceIngestService placeIngestService;
+    private final CongestionIngestService congestionIngestService;
 
-    public PlaceIngestController(PlaceIngestService placeIngestService) {
+    public PlaceIngestController(PlaceIngestService placeIngestService,
+                                 CongestionIngestService congestionIngestService) {
         this.placeIngestService = placeIngestService;
+        this.congestionIngestService = congestionIngestService;
     }
 
     @Operation(summary = "KTO 관광정보 적재",
@@ -38,5 +42,14 @@ public class PlaceIngestController {
     @PostMapping("/places")
     public BaseResponse<PlaceIngestService.IngestResult> ingestPlaces() {
         return BaseResponse.success(placeIngestService.ingest());
+    }
+
+    @Operation(summary = "관광지별 집중률 적재",
+            description = "제주 전역 집중률을 받아 congestion_forecasts에 넣는다. "
+                    + "장소 매칭은 이름으로만 가능해 일부는 붙지 않는다(실측 448곳 중 347곳). "
+                    + "같은 날 다시 돌리면 그날 발표 버전만 지우고 다시 넣는다.")
+    @PostMapping("/congestion")
+    public BaseResponse<CongestionIngestService.CongestionIngestResult> ingestCongestion() {
+        return BaseResponse.success(congestionIngestService.ingest());
     }
 }

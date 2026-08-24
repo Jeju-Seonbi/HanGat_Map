@@ -104,4 +104,18 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
               and pt.sourceType = com.example.hangat.map.model.enums.TagSourceType.API
             """)
     List<Object[]> findApiTagOf(@Param("placeId") Long placeId);
+
+    /**
+     * 이름 매칭용 (id, normalized_name) 목록.
+     *
+     * <p>집중률 API가 고유 ID를 안 줘서 이름으로만 이어붙일 수 있다(설계서 §3.6).
+     * 2,138건뿐이라 배치가 시작할 때 통째로 읽어 메모리 맵으로 쓴다 -
+     * 9,856행을 한 건씩 조회하면 그만큼 쿼리가 나간다.
+     */
+    @Query("""
+            select p.id, p.normalizedName
+            from Place p
+            where p.businessStatus <> com.example.hangat.map.model.enums.BusinessStatus.CLOSED
+            """)
+    List<Object[]> findIdAndNormalizedName();
 }

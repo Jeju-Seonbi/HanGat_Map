@@ -151,9 +151,12 @@ public class PlaceIngestService {
      * 집중률 API 매칭용 정규화 이름.
      * 집중률은 좌표도 고유 ID도 없이 관광지명만 주므로 표기 흔들림
      * ('성산일출봉' vs '성산 일출봉')을 흡수해야 한다(설계서 §3.6).
+     *
+     * <p>규칙 본체는 {@link PlaceNameNormalizer}에 있다 - 이 값을 만드는 쪽(여기)과
+     * 쓰는 쪽({@link CongestionIngestService})이 <b>반드시 같은 규칙</b>이어야 하기 때문이다.
      */
     private String normalize(String name) {
-        return name.replaceAll("[\\s\\-_·,()\\[\\]]", "");
+        return PlaceNameNormalizer.normalize(name);
     }
 
     /**

@@ -2,6 +2,7 @@ package com.example.hangat.map.repository;
 
 import com.example.hangat.map.model.entity.CongestionForecast;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -40,4 +41,17 @@ public interface CongestionForecastRepository extends JpaRepository<CongestionFo
 
     /** 같은 버전을 다시 적재하려는지 판정한다 - 배치를 하루에 두 번 돌렸을 때. */
     boolean existsByBaseAt(LocalDateTime baseAt);
+
+    /**
+     * 같은 발표 버전만 지운다. 재적재용이다.
+     *
+     * <p>파생 삭제({@code deleteByBaseAt} 이름 규칙)를 쓰면 7,600행을 전부 엔티티로 로드한 뒤
+     * 한 건씩 지운다. 벌크 DELETE 한 방으로 끝낸다.
+     *
+     * <p>⚠️ 벌크 연산은 영속성 컨텍스트를 건너뛰므로 <b>같은 트랜잭션에서 이미 읽어 둔 엔티티가
+     * 있으면 그 캐시가 낡는다</b>. 여기는 지우고 새로 넣기만 해서 문제가 없다.
+     */
+    @Modifying
+    @Query("delete from CongestionForecast f where f.baseAt = :baseAt")
+    int deleteVersion(@Param("baseAt") LocalDateTime baseAt);
 }
