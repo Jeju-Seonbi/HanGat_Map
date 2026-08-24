@@ -68,11 +68,6 @@ public class User {
     @Column(name = "password_changed_at")
     private LocalDateTime passwordChangedAt;
 
-    /** 임시 비밀번호 받은 회원에게 변경을 강제함 (USER_003) */
-    @Builder.Default
-    @Column(name = "must_change_password", nullable = false)
-    private boolean mustChangePassword = false;
-
     /** 로그인 성공 시 갱신 (USER_001) */
     @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;
@@ -137,18 +132,10 @@ public class User {
         }
     }
 
-    /** 비밀번호 변경. 이미 인코딩된 값을 받음 */
+    /** 비밀번호 변경. 이미 인코딩된 값을 받음. 재설정도 사용자가 직접 정하므로 이거 하나로 끝 */
     public void changePassword(String encodedPassword) {
         this.password = encodedPassword;
         this.passwordChangedAt = DateTimes.nowUtc();
-        this.mustChangePassword = false;
-    }
-
-    /** 임시 비밀번호 발급. 다음 로그인 때 변경 강제 (USER_003) */
-    public void issueTemporaryPassword(String encodedTemporaryPassword) {
-        this.password = encodedTemporaryPassword;
-        this.passwordChangedAt = DateTimes.nowUtc();
-        this.mustChangePassword = true;
     }
 
     /** 소셜 전용 계정이 비밀번호를 처음 설정하는 경우 */
