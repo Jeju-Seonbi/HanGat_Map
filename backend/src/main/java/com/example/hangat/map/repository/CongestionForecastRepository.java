@@ -43,6 +43,21 @@ public interface CongestionForecastRepository extends JpaRepository<CongestionFo
     boolean existsByBaseAt(LocalDateTime baseAt);
 
     /**
+     * 화면용 전체 조회 - 한 발표 버전의 (place_id, forecast_at, rate) 전부.
+     *
+     * <p>엔티티가 아니라 <b>필요한 세 값만</b> 뽑는다. 7,000행을 엔티티로 읽으면
+     * 영속성 컨텍스트에 그만큼 쌓이는데, 조회 전용이라 하나도 쓸 데가 없다.
+     * {@code f.place.id}는 FK 컬럼이라 join 없이 나온다.
+     */
+    @Query("""
+            select f.place.id, f.forecastAt, f.rate
+            from CongestionForecast f
+            where f.baseAt = :baseAt
+            order by f.place.id, f.forecastAt
+            """)
+    List<Object[]> findVersionRows(@Param("baseAt") LocalDateTime baseAt);
+
+    /**
      * 같은 발표 버전만 지운다. 재적재용이다.
      *
      * <p>파생 삭제({@code deleteByBaseAt} 이름 규칙)를 쓰면 7,600행을 전부 엔티티로 로드한 뒤
