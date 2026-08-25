@@ -6,10 +6,8 @@ services:
     ports:
       - "3306:3306"
     environment:
-      MARIADB_ROOT_PASSWORD: root
-      MARIADB_DATABASE: hangat
-      MARIADB_USER: hangat
-      MARIADB_PASSWORD: hangat
+      MARIADB_ROOT_PASSWORD: qwer1234
+      MARIADB_DATABASE: hangatmap
     volumes:
       - hangat-db:/var/lib/mysql
     healthcheck:

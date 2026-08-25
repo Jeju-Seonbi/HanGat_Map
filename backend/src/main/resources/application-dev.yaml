@@ -4,9 +4,9 @@ spring:
 
   # 기본값은 backend/docker-compose.yml 의 MariaDB와 일치 - .env 없이도 부팅된다
   datasource:
-    url: ${DB_URL:jdbc:mariadb://localhost:3306/hangat}
-    username: ${DB_USER:hangat}
-    password: ${DB_PASS:hangat}
+    url: ${DB_URL:jdbc:mariadb://localhost:3306/hangatmap}
+    username: ${DB_USER:root}
+    password: ${DB_PASS:qwer1234}
     driver-class-name: org.mariadb.jdbc.Driver
     hikari:
       maximum-pool-size: 10
