@@ -25,6 +25,12 @@ public class TourPlaceDto {
     @JsonProperty("cat1")
     private String category;
 
+    @JsonProperty("cat2")
+    private String category2;
+
+    @JsonProperty("cat3")
+    private String category3;
+
     @JsonProperty("firstimage")
     private String imageUrl;
 }
