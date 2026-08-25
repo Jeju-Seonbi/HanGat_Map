@@ -16,6 +16,8 @@ import CongestionBadge from '../../components/common/CongestionBadge.vue'
 const { places } = usePlaces()
 const store = useTravelStore()
 const weeklyWeather = ref<DailyWeather[]>([])
+// true = 기상청 실데이터, false = 백엔드 미가동 시 시연용 샘플 폴백
+const weatherLive = ref(false)
 
 const todayLabel = new Date().toLocaleDateString('ko-KR', {
   month: 'long',
@@ -80,7 +82,9 @@ onMounted(async () => {
   window.addEventListener('resize', updateArrows)
   await nextTick()
   updateArrows()
-  weeklyWeather.value = await WeatherService.getWeeklyForecast()
+  const forecast = await WeatherService.getWeeklyForecast()
+  weeklyWeather.value = forecast.days
+  weatherLive.value = forecast.live
 })
 onBeforeUnmount(() => window.removeEventListener('resize', updateArrows))
 </script>
@@ -144,7 +148,7 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateArrows))
           <span class="eyebrow">WEEKLY JEJU</span>
           <h2>제주 일주일 날씨</h2>
           <p class="muted">
-            시연용 예상 데이터 · 기상청 단기·중기예보 연동 예정
+            {{ weatherLive ? '기상청 단기·중기예보 (날짜 단위)' : '시연용 예상 데이터 · 백엔드 연결 대기' }}
           </p>
         </div>
       </div>
