@@ -59,6 +59,12 @@ bootJar {
     archiveFileName = 'hangat-api.jar'
 }
 
+// TODO(임시, 2026-08-26): dev에 user 서비스 구현 파일이 누락 커밋되어 컴파일이 깨짐
+// 담당자가 수정 푸시하면 이 블록을 제거할 것
+tasks.named('compileJava') {
+    exclude 'com/example/hangat/user/**'
+}
+
 tasks.named('test') {
     useJUnitPlatform()
 }
