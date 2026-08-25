@@ -97,7 +97,11 @@ public class CourseService {
                     coursePlacePreferences
             );
 
-            if (preferenceType == PreferenceType.AVOID) {
+            if (!CourseCandidateRegionFilter.shouldInclude(
+                    place.getAddress(),
+                    preferenceType,
+                    courseRegions
+            )) {
                 continue;
             }
 
