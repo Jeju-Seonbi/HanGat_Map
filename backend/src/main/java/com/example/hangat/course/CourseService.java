@@ -105,6 +105,9 @@ public class CourseService {
                 continue;
             }
 
+            List<String> confirmedStyleHints =
+                    TourPlaceStyleHintResolver.resolve(place);
+
             String signguCd;
 
             if (place.getAddress() != null && place.getAddress().contains("제주시")) {
@@ -115,7 +118,8 @@ public class CourseService {
                 courseCandidates.add(new CourseCandidateDto(
                         place,
                         Collections.emptyList(),
-                        preferenceType
+                        preferenceType,
+                        confirmedStyleHints
                 ));
                 continue;
             }
@@ -131,7 +135,8 @@ public class CourseService {
                 courseCandidates.add(new CourseCandidateDto(
                         place,
                         Collections.emptyList(),
-                        preferenceType
+                        preferenceType,
+                        confirmedStyleHints
                 ));
                 continue;
             }
@@ -151,7 +156,8 @@ public class CourseService {
             courseCandidates.add(new CourseCandidateDto(
                     place,
                     filteredCongestionData,
-                    preferenceType
+                    preferenceType,
+                    confirmedStyleHints
             ));
         }
 

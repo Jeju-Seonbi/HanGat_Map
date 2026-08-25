@@ -12,4 +12,5 @@ public class CourseCandidateDto {
     private final TourPlaceDto place;
     private final List<CongestionDto> congestionData;
     private final PreferenceType preferenceType;
+    private final List<String> confirmedStyleHints;
 }

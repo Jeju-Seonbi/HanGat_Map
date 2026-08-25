@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
+
 @Getter
 @NoArgsConstructor
 public class CourseStyleDto {
@@ -13,5 +15,5 @@ public class CourseStyleDto {
 
     private String code;
     private String name;
-    private Integer weight;
+    private BigDecimal weight;
 }
