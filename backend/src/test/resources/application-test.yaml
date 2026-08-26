@@ -22,3 +22,10 @@ tour-api:
 congestion-api:
   base-url: http://localhost
   service-key: test-key
+
+gemini:
+  base-url: http://localhost
+  api-key: test-gemini-key
+  model: gemini-3.7-flash
+  connect-timeout: 1s
+  read-timeout: 1s

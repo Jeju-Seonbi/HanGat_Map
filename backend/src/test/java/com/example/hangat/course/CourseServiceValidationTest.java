@@ -1,6 +1,8 @@
 package com.example.hangat.course;
 
 import com.example.hangat.course.model.CongestionDto;
+import com.example.hangat.course.ai.CourseAiGenerationService;
+import com.example.hangat.course.ai.CourseAiResultValidator;
 import com.example.hangat.course.model.CourseRequestDto;
 import com.example.hangat.course.model.TourPlaceDto;
 import com.example.hangat.course.travel.CourseTravelService;
@@ -24,7 +26,10 @@ class CourseServiceValidationTest {
             new CourseAiPreparationService(
                     new CourseAiInputAssembler(),
                     new CourseTravelService(new StraightLineDistanceCalculator()),
-                    Optional.empty()));
+                    Optional.empty()),
+            new CourseAiGenerationService(
+                    input -> { throw new AssertionError("provider must not run in validation test"); },
+                    new CourseAiResultValidator()));
 
     @Test
     void rejectsDuplicateWantByInternalId() throws Exception {
@@ -60,7 +65,7 @@ class CourseServiceValidationTest {
 
     @Test
     void doesNotCrossCompareInternalAndExternalIds() throws Exception {
-        assertThatCode(() -> courseService.createCourse(preferences("""
+        assertThatCode(() -> courseService.prepareAiInput(preferences("""
                 {"place_id": 125266, "place_name": "내부 장소", "preference_type": "WANT"},
                 {"source_code": "KTO", "source_place_id": "125266", "place_name": "외부 장소", "preference_type": "WANT"}
                 """))).doesNotThrowAnyException();
@@ -76,7 +81,7 @@ class CourseServiceValidationTest {
 
     @Test
     void acceptsDifferentPlaces() throws Exception {
-        assertThatCode(() -> courseService.createCourse(preferences("""
+        assertThatCode(() -> courseService.prepareAiInput(preferences("""
                 {"place_id": 1, "place_name": "비자림", "preference_type": "WANT"},
                 {"place_id": 2, "place_name": "성산일출봉", "preference_type": "AVOID"}
                 """))).doesNotThrowAnyException();
@@ -84,7 +89,7 @@ class CourseServiceValidationTest {
 
     @Test
     void acceptsFixedDateAtTripBoundaries() throws Exception {
-        assertThatCode(() -> courseService.createCourse(preferences("""
+        assertThatCode(() -> courseService.prepareAiInput(preferences("""
                 {"place_id": 1, "place_name": "비자림", "preference_type": "WANT", "fixed_date": "2026-08-27"},
                 {"place_id": 2, "place_name": "성산일출봉", "preference_type": "WANT", "fixed_date": "2026-08-29", "fixed_time": "10:30"}
                 """))).doesNotThrowAnyException();
@@ -92,7 +97,7 @@ class CourseServiceValidationTest {
 
     @Test
     void acceptsWantWithoutFixedSchedule() throws Exception {
-        assertThatCode(() -> courseService.createCourse(preferences("""
+        assertThatCode(() -> courseService.prepareAiInput(preferences("""
                 {"place_id": 1, "place_name": "비자림", "preference_type": "WANT"}
                 """))).doesNotThrowAnyException();
     }
@@ -125,7 +130,7 @@ class CourseServiceValidationTest {
     }
 
     private void assertInvalid(CourseRequestDto request) {
-        assertThatThrownBy(() -> courseService.createCourse(request))
+        assertThatThrownBy(() -> courseService.prepareAiInput(request))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 

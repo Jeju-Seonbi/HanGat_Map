@@ -1,6 +1,7 @@
 package com.example.hangat.course;
 
 import com.example.hangat.course.ai.CourseAiInputDto;
+import com.example.hangat.course.ai.CourseAiGenerationService;
 import com.example.hangat.course.model.AccommodationDto;
 import com.example.hangat.course.model.CongestionDto;
 import com.example.hangat.course.model.CourseCandidateDto;
@@ -28,9 +29,11 @@ public class CourseService {
     private final TourApiService tourApiService;
     private final CongestionApiService congestionApiService;
     private final CourseAiPreparationService courseAiPreparationService;
+    private final CourseAiGenerationService courseAiGenerationService;
 
     public void createCourse(CourseRequestDto request) {
-        prepareAiInput(request);
+        CourseAiInputDto input = prepareAiInput(request);
+        courseAiGenerationService.generate(input);
     }
 
     CourseAiInputDto prepareAiInput(CourseRequestDto request) {

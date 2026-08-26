@@ -1,0 +1,86 @@
+package com.example.hangat.course;
+
+import com.example.hangat.course.ai.CourseAiGenerationService;
+import com.example.hangat.course.ai.CourseAiResultDto;
+import com.example.hangat.course.ai.CourseAiResultValidator;
+import com.example.hangat.course.model.CongestionDto;
+import com.example.hangat.course.model.CourseRequestDto;
+import com.example.hangat.course.model.TourPlaceDto;
+import com.example.hangat.course.travel.CourseTravelService;
+import com.example.hangat.course.travel.StraightLineDistanceCalculator;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import org.junit.jupiter.api.Test;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class CourseServiceAiGenerationFlowTest {
+
+    private final ObjectMapper objectMapper = new ObjectMapper()
+            .registerModule(new JavaTimeModule());
+
+    @Test
+    void createCoursePreparesInputThenInvokesProviderAndValidator() throws Exception {
+        AtomicBoolean providerCalled = new AtomicBoolean();
+        CourseAiGenerationService generationService = new CourseAiGenerationService(
+                input -> {
+                    assertThat(input.candidates()).hasSize(1);
+                    assertThat(input.candidates().get(0).identity().candidateId()).isEqualTo("candidate-1");
+                    providerCalled.set(true);
+                    return new CourseAiResultDto(input.contractVersion(), List.of());
+                },
+                new CourseAiResultValidator());
+        CourseService service = new CourseService(
+                new StubTourApiService(),
+                new StubCongestionApiService(),
+                new CourseAiPreparationService(
+                        new CourseAiInputAssembler(),
+                        new CourseTravelService(new StraightLineDistanceCalculator()),
+                        Optional.empty()),
+                generationService);
+
+        service.createCourse(request());
+
+        assertThat(providerCalled).isTrue();
+    }
+
+    private CourseRequestDto request() throws Exception {
+        return objectMapper.readValue("""
+                {
+                  "start_date": "2026-08-27",
+                  "end_date": "2026-08-29",
+                  "people": 2,
+                  "budget_total": 500000,
+                  "transport": "RENTAL_CAR",
+                  "course_regions": [],
+                  "course_styles": [{"code": "NATURE", "weight": 1}],
+                  "course_place_preferences": []
+                }
+                """, CourseRequestDto.class);
+    }
+
+    private final class StubTourApiService extends TourApiService {
+        @Override
+        public List<TourPlaceDto> getTourPlaces() {
+            try {
+                return List.of(objectMapper.readValue("""
+                        {"contentid":"candidate-1","title":"만장굴","addr1":"주소 미상",
+                         "mapy":33.529,"mapx":126.771,"cat1":"A01"}
+                        """, TourPlaceDto.class));
+            } catch (Exception exception) {
+                throw new RuntimeException(exception);
+            }
+        }
+    }
+
+    private static final class StubCongestionApiService extends CongestionApiService {
+        @Override
+        public List<CongestionDto> getCongestionData(String signguCd, String name) {
+            return List.of();
+        }
+    }
+}

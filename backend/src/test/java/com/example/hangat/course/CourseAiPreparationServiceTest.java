@@ -1,6 +1,8 @@
 package com.example.hangat.course;
 
 import com.example.hangat.course.ai.CourseAiInputDto;
+import com.example.hangat.course.ai.CourseAiGenerationService;
+import com.example.hangat.course.ai.CourseAiResultValidator;
 import com.example.hangat.course.model.CongestionDto;
 import com.example.hangat.course.model.CourseCandidateDto;
 import com.example.hangat.course.model.CourseRequestDto;
@@ -55,7 +57,10 @@ class CourseAiPreparationServiceTest {
                 new CourseTravelService(new StraightLineDistanceCalculator()),
                 Optional.empty());
         CourseService courseService = new CourseService(
-                tourApiService, congestionApiService, preparationService);
+                tourApiService, congestionApiService, preparationService,
+                new CourseAiGenerationService(
+                        input -> { throw new AssertionError("provider must not run in preparation test"); },
+                        new CourseAiResultValidator()));
 
         CourseAiInputDto result = courseService.prepareAiInput(request());
 
