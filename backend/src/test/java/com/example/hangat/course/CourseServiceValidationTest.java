@@ -3,11 +3,14 @@ package com.example.hangat.course;
 import com.example.hangat.course.model.CongestionDto;
 import com.example.hangat.course.model.CourseRequestDto;
 import com.example.hangat.course.model.TourPlaceDto;
+import com.example.hangat.course.travel.CourseTravelService;
+import com.example.hangat.course.travel.StraightLineDistanceCalculator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -17,7 +20,11 @@ class CourseServiceValidationTest {
     private final ObjectMapper objectMapper = new ObjectMapper()
             .registerModule(new JavaTimeModule());
     private final CourseService courseService = new CourseService(
-            new StubTourApiService(), new StubCongestionApiService());
+            new StubTourApiService(), new StubCongestionApiService(),
+            new CourseAiPreparationService(
+                    new CourseAiInputAssembler(),
+                    new CourseTravelService(new StraightLineDistanceCalculator()),
+                    Optional.empty()));
 
     @Test
     void rejectsDuplicateWantByInternalId() throws Exception {

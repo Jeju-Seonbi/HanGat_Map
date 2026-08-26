@@ -1,5 +1,6 @@
 package com.example.hangat.course;
 
+import com.example.hangat.course.ai.CourseAiInputDto;
 import com.example.hangat.course.model.AccommodationDto;
 import com.example.hangat.course.model.CongestionDto;
 import com.example.hangat.course.model.CourseCandidateDto;
@@ -26,8 +27,13 @@ public class CourseService {
 
     private final TourApiService tourApiService;
     private final CongestionApiService congestionApiService;
+    private final CourseAiPreparationService courseAiPreparationService;
 
     public void createCourse(CourseRequestDto request) {
+        prepareAiInput(request);
+    }
+
+    CourseAiInputDto prepareAiInput(CourseRequestDto request) {
         LocalDate startDate = request.getStartDate();
         LocalDate endDate = request.getEndDate();
         Integer people = request.getPeople();
@@ -162,6 +168,7 @@ public class CourseService {
         }
 
         System.out.println("코스 추천 후보 개수 = " + courseCandidates.size());
+        return courseAiPreparationService.prepare(request, courseCandidates);
     }
 
     private void validatePlacePreferences(
