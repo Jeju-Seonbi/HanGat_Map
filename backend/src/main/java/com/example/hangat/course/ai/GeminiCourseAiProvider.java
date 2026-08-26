@@ -2,14 +2,23 @@ package com.example.hangat.course.ai;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
+import org.springframework.web.client.ResourceAccessException;
 
+import java.net.ConnectException;
+import java.net.URI;
+import java.net.UnknownHostException;
+import java.net.http.HttpConnectTimeoutException;
+import java.net.http.HttpTimeoutException;
+import java.net.SocketTimeoutException;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @Component
@@ -69,22 +78,31 @@ public class GeminiCourseAiProvider implements CourseAiProvider {
         } catch (CourseAiException exception) {
             throw exception;
         } catch (RestClientResponseException exception) {
+            ProviderErrorDetails details = providerErrorDetails(exception.getResponseBodyAsString());
             if (exception.getStatusCode().value() == 429) {
                 throw new CourseAiException(
                         CourseAiFailureType.RATE_LIMIT,
-                        "Gemini API 요청 한도를 초과했습니다.",
-                        exception
+                        "Gemini API 요청 한도를 초과했습니다. "
+                                + diagnosticContext(exception.getStatusCode(), details)
                 );
             }
             throw new CourseAiException(
                     CourseAiFailureType.PROVIDER_ERROR,
-                    providerErrorMessage(exception.getStatusCode()),
+                    providerErrorMessage(exception.getStatusCode(), details)
+            );
+        } catch (ResourceAccessException exception) {
+            throw new CourseAiException(
+                    CourseAiFailureType.PROVIDER_ERROR,
+                    "Gemini API 통신에 실패했습니다. NETWORK=" + networkFailureType(exception)
+                            + ", HOST=" + endpointHost()
+                            + ", MODEL=" + safeToken(properties.model()),
                     exception
             );
         } catch (Exception exception) {
             throw new CourseAiException(
                     CourseAiFailureType.PROVIDER_ERROR,
-                    "Gemini API 호출에 실패했습니다.",
+                    "Gemini API 호출에 실패했습니다. HOST=" + endpointHost()
+                            + ", MODEL=" + safeToken(properties.model()),
                     exception
             );
         }
@@ -158,11 +176,97 @@ public class GeminiCourseAiProvider implements CourseAiProvider {
         );
     }
 
-    private String providerErrorMessage(HttpStatusCode status) {
-        return status.is5xxServerError()
+    private String providerErrorMessage(HttpStatusCode status, ProviderErrorDetails details) {
+        String summary = status.is5xxServerError()
                 ? "Gemini API 서버 오류가 발생했습니다."
-                : "Gemini API 요청이 거부되었습니다."
-                ;
+                : "Gemini API 요청이 거부되었습니다.";
+        return summary + " " + diagnosticContext(status, details);
+    }
+
+    private ProviderErrorDetails providerErrorDetails(String responseBody) {
+        if (isBlank(responseBody)) {
+            return ProviderErrorDetails.empty();
+        }
+        try {
+            JsonNode root = objectMapper.readTree(responseBody);
+            if (root == null) {
+                return ProviderErrorDetails.empty();
+            }
+            JsonNode error = root.path("error");
+            String status = safeToken(error.path("status").asText(null));
+            String reason = null;
+            JsonNode details = error.path("details");
+            if (details.isArray()) {
+                for (JsonNode detail : details) {
+                    String candidate = safeToken(detail.path("reason").asText(null));
+                    if (candidate != null) {
+                        reason = candidate;
+                        break;
+                    }
+                }
+            }
+            return new ProviderErrorDetails(status, reason);
+        } catch (JsonProcessingException ignored) {
+            return ProviderErrorDetails.empty();
+        }
+    }
+
+    private String diagnosticContext(HttpStatusCode status, ProviderErrorDetails details) {
+        StringBuilder diagnostic = new StringBuilder("HTTP_STATUS=")
+                .append(status.value());
+        if (details.status() != null) {
+            diagnostic.append(", GOOGLE_STATUS=").append(details.status());
+        }
+        if (details.reason() != null) {
+            diagnostic.append(", GOOGLE_REASON=").append(details.reason());
+        }
+        return diagnostic
+                .append(", HOST=").append(endpointHost())
+                .append(", MODEL=").append(safeToken(properties.model()))
+                .toString();
+    }
+
+    private String endpointHost() {
+        try {
+            String host = URI.create(properties.baseUrl()).getHost();
+            return host == null ? "unknown" : safeToken(host);
+        } catch (RuntimeException ignored) {
+            return "unknown";
+        }
+    }
+
+    private String networkFailureType(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (current instanceof UnknownHostException) {
+                return "DNS";
+            }
+            if (current instanceof HttpConnectTimeoutException) {
+                return "CONNECT_TIMEOUT";
+            }
+            if (current instanceof HttpTimeoutException) {
+                return "READ_TIMEOUT";
+            }
+            if (current instanceof SocketTimeoutException) {
+                String message = current.getMessage();
+                return message != null && message.toLowerCase(Locale.ROOT).contains("connect")
+                        ? "CONNECT_TIMEOUT"
+                        : "READ_TIMEOUT";
+            }
+            if (current instanceof ConnectException) {
+                return "CONNECT";
+            }
+            current = current.getCause();
+        }
+        return "IO";
+    }
+
+    private String safeToken(String value) {
+        if (isBlank(value)) {
+            return null;
+        }
+        String sanitized = value.replaceAll("[^A-Za-z0-9._-]", "_");
+        return sanitized.substring(0, Math.min(sanitized.length(), 100));
     }
 
     private boolean isBlank(String value) {
@@ -223,5 +327,11 @@ public class GeminiCourseAiProvider implements CourseAiProvider {
     }
 
     record GeminiCandidate(GeminiContent content) {
+    }
+
+    private record ProviderErrorDetails(String status, String reason) {
+        private static ProviderErrorDetails empty() {
+            return new ProviderErrorDetails(null, null);
+        }
     }
 }
