@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class CourseAiInputAssemblerTest {
 
@@ -159,6 +160,37 @@ class CourseAiInputAssemblerTest {
         assertThat(result.candidates().get(0).congestion().get(0).date()).isNull();
         assertThat(result.candidates().get(0).congestion().get(0).rate()).isNull();
         assertThat(result.candidates().get(0).congestion().get(0).level()).isNull();
+    }
+
+    @Test
+    void rejectsTravelFactWithUnknownFromCandidate() throws Exception {
+        assertUnknownTravelReference("missing", "125266");
+    }
+
+    @Test
+    void rejectsTravelFactWithUnknownToCandidate() throws Exception {
+        assertUnknownTravelReference("125266", "missing");
+    }
+
+    @Test
+    void rejectsTravelFactWithMissingCandidateId() throws Exception {
+        assertUnknownTravelReference(null, "125266");
+    }
+
+    private void assertUnknownTravelReference(String fromCandidateId, String toCandidateId)
+            throws Exception {
+        CourseCandidateDto candidate = new CourseCandidateDto(
+                tourPlace("125266", "비자림", "제주특별자치도 제주시 구좌읍 비자숲길 55"),
+                List.of(), null, List.of("NATURE"));
+        CourseTravelLegDto travel = new CourseTravelLegDto(
+                fromCandidateId, "출발지", toCandidateId, "도착지",
+                new BigDecimal("1.0"), DistanceCalculationMethod.HAVERSINE,
+                null, null, Transport.RENTAL_CAR, null, null);
+
+        assertThatThrownBy(() -> assembler.assemble(
+                request(), List.of(candidate), Map.of(), List.of(travel),
+                new GenerationMetadataDto(GenerationReason.INITIAL, null, null)))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     private CourseRequestDto request() throws Exception {

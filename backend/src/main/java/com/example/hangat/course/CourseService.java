@@ -66,7 +66,7 @@ public class CourseService {
             throw new IllegalArgumentException("권역 정보가 필요합니다.");
         }
 
-        validatePreferenceConflict(coursePlacePreferences);
+        validatePlacePreferences(coursePlacePreferences, startDate, endDate);
 
         List<TourPlaceDto> tourPlaces = tourApiService.getTourPlaces();
 
@@ -164,7 +164,11 @@ public class CourseService {
         System.out.println("코스 추천 후보 개수 = " + courseCandidates.size());
     }
 
-    private void validatePreferenceConflict(List<PlacePreferenceDto> preferences) {
+    private void validatePlacePreferences(
+            List<PlacePreferenceDto> preferences,
+            LocalDate startDate,
+            LocalDate endDate
+    ) {
         if (preferences == null || preferences.isEmpty()) {
             return;
         }
@@ -176,21 +180,52 @@ public class CourseService {
                 continue;
             }
 
+            validateFixedSchedule(first, startDate, endDate);
+
             for (int j = i + 1; j < preferences.size(); j++) {
                 PlacePreferenceDto second = preferences.get(j);
 
-                if (second == null
-                        || second.getPreferenceType() == null
-                        || first.getPreferenceType() == second.getPreferenceType()) {
+                if (second == null || second.getPreferenceType() == null) {
                     continue;
                 }
 
                 if (isSamePreferredPlace(first, second)) {
+                    if (first.getPreferenceType() == second.getPreferenceType()) {
+                        throw new IllegalArgumentException(
+                                "동일한 장소를 중복 지정할 수 없습니다."
+                        );
+                    }
                     throw new IllegalArgumentException(
                             "동일한 장소를 WANT와 AVOID에 동시에 지정할 수 없습니다."
                     );
                 }
             }
+        }
+    }
+
+    private void validateFixedSchedule(
+            PlacePreferenceDto preference,
+            LocalDate startDate,
+            LocalDate endDate
+    ) {
+        LocalDate fixedDate = preference.getFixedDate();
+
+        if (preference.getPreferenceType() == PreferenceType.AVOID
+                && (fixedDate != null || preference.getFixedTime() != null)) {
+            throw new IllegalArgumentException(
+                    "AVOID 장소에는 고정 날짜나 시간을 지정할 수 없습니다."
+            );
+        }
+
+        if (preference.getFixedTime() != null && fixedDate == null) {
+            throw new IllegalArgumentException(
+                    "고정 시간은 고정 날짜와 함께 지정해야 합니다."
+            );
+        }
+
+        if (fixedDate != null
+                && (fixedDate.isBefore(startDate) || fixedDate.isAfter(endDate))) {
+            throw new IllegalArgumentException("고정 방문일은 여행기간 내여야 합니다.");
         }
     }
 

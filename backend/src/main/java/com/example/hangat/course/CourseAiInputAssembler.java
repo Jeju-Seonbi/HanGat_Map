@@ -67,12 +67,14 @@ public class CourseAiInputAssembler {
                 ? Collections.emptyMap()
                 : weatherByCandidateId;
 
+        List<CandidateFactDto> candidateFacts = toCandidateFacts(safeCandidates, safeWeather);
+
         return new CourseAiInputDto(
                 CONTRACT_VERSION,
                 toTripCondition(request),
                 toUserPreferences(request),
-                toCandidateFacts(safeCandidates, safeWeather),
-                toTravelFacts(travelFacts),
+                candidateFacts,
+                toTravelFacts(travelFacts, candidateFacts),
                 generationMetadata
         );
     }
@@ -228,21 +230,41 @@ public class CourseAiInputAssembler {
                 .toList();
     }
 
-    private List<TravelFactDto> toTravelFacts(List<CourseTravelLegDto> travelFacts) {
+    private List<TravelFactDto> toTravelFacts(
+            List<CourseTravelLegDto> travelFacts,
+            List<CandidateFactDto> candidates
+    ) {
         if (travelFacts == null) {
             return List.of();
         }
+        Set<String> candidateIds = candidates.stream()
+                .map(candidate -> candidate.identity().candidateId())
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
         // The caller supplies only useful pairs. The assembler intentionally does not create an
         // unconditional N x N matrix.
         return travelFacts.stream()
                 .filter(fact -> fact != null)
-                .map(fact -> new TravelFactDto(
-                        fact.fromCandidateId(), fact.fromTitle(),
-                        fact.toCandidateId(), fact.toTitle(),
-                        fact.straightDistanceKm(), fact.straightDistanceMethod(),
-                        fact.routeDistanceKm(), fact.durationMinutes(),
-                        fact.transport(), fact.routeSourceCode(), fact.routeCalculatedAt()))
+                .map(fact -> {
+                    requireTravelCandidate(fact.fromCandidateId(), candidateIds);
+                    requireTravelCandidate(fact.toCandidateId(), candidateIds);
+                    return new TravelFactDto(
+                            fact.fromCandidateId(), fact.fromTitle(),
+                            fact.toCandidateId(), fact.toTitle(),
+                            fact.straightDistanceKm(), fact.straightDistanceMethod(),
+                            fact.routeDistanceKm(), fact.durationMinutes(),
+                            fact.transport(), fact.routeSourceCode(), fact.routeCalculatedAt());
+                })
                 .toList();
+    }
+
+    private void requireTravelCandidate(String candidateId, Set<String> candidateIds) {
+        if (candidateId == null || candidateId.isBlank()) {
+            throw new IllegalArgumentException("이동정보의 후보 식별자가 필요합니다.");
+        }
+        if (!candidateIds.contains(candidateId)) {
+            throw new IllegalArgumentException(
+                    "이동정보가 존재하지 않는 후보를 참조합니다: " + candidateId);
+        }
     }
 
     private String requireCandidateId(String candidateId) {
