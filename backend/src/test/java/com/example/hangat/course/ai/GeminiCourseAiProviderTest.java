@@ -10,6 +10,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
 import java.time.Duration;
 import java.time.LocalDate;
@@ -17,6 +18,8 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.client.ExpectedCount.once;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
@@ -112,6 +115,25 @@ class GeminiCourseAiProviderTest {
     @Test
     void mapsMissingApiKeyToConfigurationError() {
         assertFailure(provider(RestClient.create(), ""), CourseAiFailureType.CONFIGURATION_ERROR);
+    }
+
+    @Test
+    void mapsUnhandledExceptionWithSafeTypeOnly() {
+        RestClient restClient = mock(RestClient.class);
+        when(restClient.post()).thenThrow(new RestClientException("sensitive request detail"));
+
+        assertThatThrownBy(() -> provider(restClient, "test-secret").generate(input()))
+                .isInstanceOfSatisfying(CourseAiException.class, exception -> {
+                    assertThat(exception.getFailureType())
+                            .isEqualTo(CourseAiFailureType.PROVIDER_ERROR);
+                    assertThat(exception.getCause()).isNull();
+                    assertThat(exception.getMessage())
+                            .contains("EXCEPTION_TYPE=RestClientException")
+                            .contains("HOST=gemini.test")
+                            .contains("MODEL=gemini-test")
+                            .doesNotContain("sensitive request detail")
+                            .doesNotContain("test-secret");
+                });
     }
 
     private void assertFailureForStatus(

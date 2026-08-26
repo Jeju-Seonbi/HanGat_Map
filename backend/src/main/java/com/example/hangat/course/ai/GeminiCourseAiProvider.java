@@ -101,9 +101,10 @@ public class GeminiCourseAiProvider implements CourseAiProvider {
         } catch (Exception exception) {
             throw new CourseAiException(
                     CourseAiFailureType.PROVIDER_ERROR,
-                    "Gemini API 호출에 실패했습니다. HOST=" + endpointHost()
-                            + ", MODEL=" + safeToken(properties.model()),
-                    exception
+                    "Gemini API 호출에 실패했습니다. EXCEPTION_TYPE="
+                            + safeExceptionType(exception)
+                            + ", HOST=" + endpointHost()
+                            + ", MODEL=" + safeToken(properties.model())
             );
         }
     }
@@ -267,6 +268,11 @@ public class GeminiCourseAiProvider implements CourseAiProvider {
         }
         String sanitized = value.replaceAll("[^A-Za-z0-9._-]", "_");
         return sanitized.substring(0, Math.min(sanitized.length(), 100));
+    }
+
+    private String safeExceptionType(Exception exception) {
+        String simpleName = exception.getClass().getSimpleName();
+        return isBlank(simpleName) ? "UnknownException" : safeToken(simpleName);
     }
 
     private boolean isBlank(String value) {
