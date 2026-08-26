@@ -6,20 +6,28 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.http.converter.HttpMessageNotWritableException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.UnknownContentTypeException;
 
+import java.io.IOException;
 import java.net.ConnectException;
 import java.net.URI;
 import java.net.UnknownHostException;
 import java.net.http.HttpConnectTimeoutException;
 import java.net.http.HttpTimeoutException;
 import java.net.SocketTimeoutException;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 @Component
 public class GeminiCourseAiProvider implements CourseAiProvider {
@@ -65,16 +73,22 @@ public class GeminiCourseAiProvider implements CourseAiProvider {
     @Override
     public CourseAiResultDto generate(CourseAiInputDto input) {
         validateConfiguration();
+        GeminiCallPhase phase = GeminiCallPhase.BUILD_REQUEST;
 
         try {
+            GeminiGenerateRequest request = buildRequest(input);
+            phase = GeminiCallPhase.HTTP_EXCHANGE;
             String responseBody = restClient.post()
                     .uri("/models/{model}:generateContent", properties.model())
                     .header("x-goog-api-key", properties.apiKey())
-                    .body(buildRequest(input))
+                    .body(request)
                     .retrieve()
                     .body(String.class);
 
-            return parseResult(parseResponseEnvelope(responseBody));
+            phase = GeminiCallPhase.PARSE_ENVELOPE;
+            GeminiGenerateResponse response = parseResponseEnvelope(responseBody);
+            phase = GeminiCallPhase.PARSE_RESULT;
+            return parseResult(response);
         } catch (CourseAiException exception) {
             throw exception;
         } catch (RestClientResponseException exception) {
@@ -82,18 +96,19 @@ public class GeminiCourseAiProvider implements CourseAiProvider {
             if (exception.getStatusCode().value() == 429) {
                 throw new CourseAiException(
                         CourseAiFailureType.RATE_LIMIT,
-                        "Gemini API 요청 한도를 초과했습니다. "
+                        "Gemini API 요청 한도를 초과했습니다. PHASE=" + phase + ", "
                                 + diagnosticContext(exception.getStatusCode(), details)
                 );
             }
             throw new CourseAiException(
                     CourseAiFailureType.PROVIDER_ERROR,
-                    providerErrorMessage(exception.getStatusCode(), details)
+                    providerErrorMessage(exception.getStatusCode(), details, phase)
             );
         } catch (ResourceAccessException exception) {
             throw new CourseAiException(
                     CourseAiFailureType.PROVIDER_ERROR,
-                    "Gemini API 통신에 실패했습니다. NETWORK=" + networkFailureType(exception)
+                    "Gemini API 통신에 실패했습니다. PHASE=" + phase
+                            + ", NETWORK=" + networkFailureType(exception)
                             + ", HOST=" + endpointHost()
                             + ", MODEL=" + safeToken(properties.model()),
                     exception
@@ -101,8 +116,9 @@ public class GeminiCourseAiProvider implements CourseAiProvider {
         } catch (Exception exception) {
             throw new CourseAiException(
                     CourseAiFailureType.PROVIDER_ERROR,
-                    "Gemini API 호출에 실패했습니다. EXCEPTION_TYPE="
-                            + safeExceptionType(exception)
+                    "Gemini API 호출에 실패했습니다. PHASE="
+                            + diagnosticPhase(phase, exception)
+                            + ", " + exceptionTypeDiagnostics(exception)
                             + ", HOST=" + endpointHost()
                             + ", MODEL=" + safeToken(properties.model())
             );
@@ -177,11 +193,15 @@ public class GeminiCourseAiProvider implements CourseAiProvider {
         );
     }
 
-    private String providerErrorMessage(HttpStatusCode status, ProviderErrorDetails details) {
+    private String providerErrorMessage(
+            HttpStatusCode status,
+            ProviderErrorDetails details,
+            GeminiCallPhase phase
+    ) {
         String summary = status.is5xxServerError()
                 ? "Gemini API 서버 오류가 발생했습니다."
                 : "Gemini API 요청이 거부되었습니다.";
-        return summary + " " + diagnosticContext(status, details);
+        return summary + " PHASE=" + phase + ", " + diagnosticContext(status, details);
     }
 
     private ProviderErrorDetails providerErrorDetails(String responseBody) {
@@ -270,9 +290,64 @@ public class GeminiCourseAiProvider implements CourseAiProvider {
         return sanitized.substring(0, Math.min(sanitized.length(), 100));
     }
 
-    private String safeExceptionType(Exception exception) {
+    private String safeExceptionType(Throwable exception) {
         String simpleName = exception.getClass().getSimpleName();
         return isBlank(simpleName) ? "UnknownException" : safeToken(simpleName);
+    }
+
+    private String exceptionTypeDiagnostics(Exception exception) {
+        StringBuilder diagnostics = new StringBuilder("EXCEPTION_TYPE=")
+                .append(safeExceptionType(exception));
+        Throwable directCause = exception.getCause();
+        if (directCause == null || directCause == exception) {
+            return diagnostics.toString();
+        }
+
+        diagnostics.append(", CAUSE_TYPE=").append(safeExceptionType(directCause));
+        Set<Throwable> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+        visited.add(exception);
+        Throwable rootCause = directCause;
+        int depth = 0;
+        while (rootCause.getCause() != null
+                && visited.add(rootCause)
+                && depth++ < 32) {
+            Throwable next = rootCause.getCause();
+            if (visited.contains(next)) {
+                break;
+            }
+            rootCause = next;
+        }
+        if (rootCause != directCause) {
+            diagnostics.append(", ROOT_CAUSE_TYPE=")
+                    .append(safeExceptionType(rootCause));
+        }
+        return diagnostics.toString();
+    }
+
+    private GeminiCallPhase diagnosticPhase(GeminiCallPhase phase, Exception exception) {
+        if (hasCause(exception, HttpMessageNotWritableException.class)) {
+            return GeminiCallPhase.REQUEST_SERIALIZATION;
+        }
+        if (exception instanceof UnknownContentTypeException
+                || hasCause(exception, HttpMessageNotReadableException.class)
+                || (exception.getClass() == RestClientException.class
+                && hasCause(exception, IOException.class))) {
+            return GeminiCallPhase.RESPONSE_EXTRACTION;
+        }
+        return phase;
+    }
+
+    private boolean hasCause(Throwable throwable, Class<? extends Throwable> type) {
+        Set<Throwable> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+        Throwable current = throwable;
+        int depth = 0;
+        while (current != null && visited.add(current) && depth++ < 32) {
+            if (type.isInstance(current)) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private boolean isBlank(String value) {
@@ -339,5 +414,14 @@ public class GeminiCourseAiProvider implements CourseAiProvider {
         private static ProviderErrorDetails empty() {
             return new ProviderErrorDetails(null, null);
         }
+    }
+
+    private enum GeminiCallPhase {
+        BUILD_REQUEST,
+        REQUEST_SERIALIZATION,
+        HTTP_EXCHANGE,
+        RESPONSE_EXTRACTION,
+        PARSE_ENVELOPE,
+        PARSE_RESULT
     }
 }
