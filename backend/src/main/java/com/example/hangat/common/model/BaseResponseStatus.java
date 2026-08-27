@@ -19,6 +19,7 @@ public enum BaseResponseStatus {
     REQUEST_ERROR(false, 3000, "입력값을 확인해주세요."),
     JWT_EXPIRED(false, 3001, "JWT 토큰 만료"),
     JWT_INVALID(false, 3002, "JWT 토큰 유효하지 않음"),
+    TOO_MANY_REQUESTS(false, 3003, "요청이 너무 많습니다. 잠시 후 다시 시도해주세요."),
 
     // 3100번대 회원
     USER_NOT_FOUND(false, 3101, "존재하지 않는 사용자입니다."),
@@ -27,9 +28,10 @@ public enum BaseResponseStatus {
     EMAIL_NOT_VERIFIED(false, 3105, "이메일 인증을 완료해주세요."),
     ACCOUNT_SUSPENDED(false, 3106, "이용이 제한된 계정입니다. 고객센터로 문의해주세요."),
     ACCOUNT_WITHDRAWN(false, 3107, "탈퇴한 계정입니다. 새로 가입해주세요."),
-    PASSWORD_TOO_SHORT(false, 3108, "비밀번호는 12자 이상이어야 합니다."),
-    PASSWORD_TOO_LONG(false, 3109, "비밀번호가 너무 깁니다. 한글은 24자까지 가능합니다."),
-    PASSWORD_CONFIRM_MISMATCH(false, 3110, "비밀번호가 일치하지 않습니다."),
+    PASSWORD_WRONG(false, 3108, "이메일 또는 비밀번호가 올바르지 않습니다."),
+    PASSWORD_TOO_SHORT(false, 3109, "비밀번호는 12자 이상이어야 합니다."),
+    PASSWORD_TOO_LONG(false, 3110, "비밀번호가 너무 깁니다. 한글은 24자까지 가능합니다."),
+    PASSWORD_CONFIRM_MISMATCH(false, 3111, "비밀번호가 일치하지 않습니다."),
 
     // 3200번대 장소
     PLACE_NOT_FOUND(false, 3201, "존재하지 않는 장소입니다."),

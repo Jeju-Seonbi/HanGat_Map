@@ -10,7 +10,30 @@ spring:
     hibernate:
       ddl-auto: create-drop
 
+  # 실제 발송은 안 함. host가 없으면 JavaMailSender 빈 자체가 안 생겨서 컨텍스트가 죽는다
+  mail:
+    host: localhost
+    port: 3025
+    username: test@hangat.local
+    password: test
+
 # 테스트용 더미 - 실제 호출 없음 (WeatherClient 테스트는 목으로 대체)
 weather:
   base-url: http://localhost
   service-key: test-key
+
+# HS256이라 32바이트 이상이어야 함. 테스트 전용 값
+jwt:
+  secret: hangat-test-only-secret-key-not-for-production-0123456789
+  access-ttl-ms: 600000
+
+app:
+  frontend-url: http://localhost:5173
+  cookie:
+    secure: false
+
+# 가짜 SMTP라 접속이 안 됨. 켜두면 /health가 DOWN(503)이 되어 스모크 테스트가 깨진다
+management:
+  health:
+    mail:
+      enabled: false

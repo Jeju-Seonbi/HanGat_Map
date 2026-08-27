@@ -21,6 +21,27 @@ spring:
       hibernate:
         default_batch_fetch_size: 100
 
+  # 메일 발송
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
+# JWT
+jwt:
+  secret: ${JWT_SECRET}
+  access-ttl-ms: 600000 # 10분 - 프론트와 맞춤.
+
 server:
   port: ${SERVER_PORT:8080}
 
@@ -34,3 +55,6 @@ management:
 weather:
   base-url: https://apis.data.go.kr/1360000
   service-key: ${SERVICE_KEY}
+
+app:
+  frontend-url: ${FRONTEND_URL:http://localhost:5173}
