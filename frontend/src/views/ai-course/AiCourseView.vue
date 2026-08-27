@@ -10,19 +10,7 @@ import CongestionRescheduleModal from '../../components/course/CongestionResched
 import AccommodationRecommendations from '../../components/course/AccommodationRecommendations.vue'
 import { courseMockService } from '../../services/courseMockService'
 import { accommodationMockService } from '../../services/accommodationMockService'
-import { courseApiService, courseGenerationErrorMessage } from '../../services/courseApiService'
-import { adaptCourseGenerationResponse } from '../../services/courseGenerationAdapter'
-import type {
-  AccommodationInput,
-  AccommodationRecommendation,
-  AlternativePlace,
-  CongestionRescheduleOption,
-  CourseCondition,
-  CourseItem,
-  CourseItemView,
-  CourseResult,
-  CourseResultView,
-} from '../../assets/types/course'
+import type { AccommodationInput, AccommodationRecommendation, AlternativePlace, CongestionRescheduleOption, CourseCondition, CourseItem, CourseResult } from '../../assets/types/course'
 
 const now = new Date()
 const later = new Date(now)
@@ -40,7 +28,7 @@ const condition = reactive<CourseCondition>({
   course_place_preferences: [],
 })
 
-const result = ref<CourseResultView>()
+const result = ref<CourseResult>()
 const loading = ref(false)
 const error = ref('')
 const editing = ref(true)
@@ -77,22 +65,15 @@ const estimatedCost = computed(() => {
   return `${result.value.estimated_cost_min.toLocaleString()} ~ ${result.value.estimated_cost_max.toLocaleString()}원`
 })
 const congestionLabel = (rate?: number) => rate == null ? '-' : rate < 35 ? '한산' : rate < 65 ? '보통' : '혼잡'
-const isPersistedCourse = (course: CourseResultView): course is CourseResult => typeof course.id === 'number'
-const isPersistedItem = (item: CourseItemView): item is CourseItem => typeof item.id === 'number'
 
-function showUnavailable(message: string) {
-  toast.value = message
-  setTimeout(() => { toast.value = '' }, 3000)
-}
-
-async function generate(next: CourseCondition, _regenerate = false) {
-  if (loading.value) return false
+async function generate(next: CourseCondition, regenerate = false) {
   Object.assign(condition, JSON.parse(JSON.stringify(next)) as CourseCondition)
   loading.value = true
   error.value = ''
   try {
-    const response = await courseApiService.createCourse(condition)
-    result.value = adaptCourseGenerationResponse(response, condition)
+    result.value = regenerate
+      ? await courseMockService.regenerateCourse(condition)
+      : await courseMockService.generateCourse(condition)
     recommendedAccommodations.value = []
     editing.value = false
     if (!condition.accommodation) {
@@ -104,26 +85,30 @@ async function generate(next: CourseCondition, _regenerate = false) {
       })
     }
     requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'smooth' }))
-    return true
-  } catch (failure) {
-    error.value = courseGenerationErrorMessage(failure)
-    return false
+  } catch {
+    error.value = '코스를 생성하지 못했어요. 다시 시도해 주세요.'
   } finally {
     loading.value = false
   }
 }
 
 async function selectRecommendedAccommodation(accommodation: AccommodationInput) {
-  Object.assign(condition, accommodationMockService.selectAccommodation(condition, accommodation))
-  const generated = await generate(condition)
-  if (!generated) delete condition.accommodation
+  loading.value = true
+  error.value = ''
+  try {
+    Object.assign(condition, accommodationMockService.selectAccommodation(condition, accommodation))
+    result.value = await courseMockService.recalculateRouteWithAccommodation(condition, accommodation)
+    recommendedAccommodations.value = []
+  } catch {
+    delete condition.accommodation
+    error.value = '숙소를 반영한 동선을 계산하지 못했어요. 다시 시도해 주세요.'
+  } finally {
+    loading.value = false
+  }
 }
 
-async function openAlternatives(item: CourseItemView) {
-  if (!result.value || !isPersistedCourse(result.value) || !isPersistedItem(item)) {
-    showUnavailable('대안 장소 기능은 코스 저장 API 연결 후 사용할 수 있어요.')
-    return
-  }
+async function openAlternatives(item: CourseItem) {
+  if (!result.value) return
   selected.value = item
   alternatives.value = []
   altLoading.value = true
@@ -135,7 +120,7 @@ async function openAlternatives(item: CourseItemView) {
 }
 
 async function replace(alternative: AlternativePlace) {
-  if (!result.value || !isPersistedCourse(result.value) || !selected.value) return
+  if (!result.value || !selected.value) return
   const previousAverage = result.value.average_congestion_rate
   const replacementName = alternative.place_name
   result.value = await courseMockService.replaceCourseItem(result.value, selected.value.id, alternative)
@@ -146,11 +131,8 @@ async function replace(alternative: AlternativePlace) {
   setTimeout(() => { toast.value = '' }, 2600)
 }
 
-async function openReschedule(item: CourseItemView) {
-  if (!result.value || !isPersistedCourse(result.value) || !isPersistedItem(item)) {
-    showUnavailable('재배치 기능은 코스 저장 API 연결 후 사용할 수 있어요.')
-    return
-  }
+async function openReschedule(item: CourseItem) {
+  if (!result.value) return
   rescheduleSelected.value = item
   rescheduleOptions.value = []
   rescheduleLoading.value = true
@@ -162,7 +144,7 @@ async function openReschedule(item: CourseItemView) {
 }
 
 async function reschedule(option: CongestionRescheduleOption) {
-  if (!result.value || !isPersistedCourse(result.value) || !rescheduleSelected.value) return
+  if (!result.value || !rescheduleSelected.value) return
   const item = rescheduleSelected.value
   result.value = await courseMockService.rescheduleCourseItem(result.value, item.id, option)
   rescheduleSelected.value = undefined
@@ -171,23 +153,19 @@ async function reschedule(option: CongestionRescheduleOption) {
 }
 
 function openSave() {
-  if (!result.value || !isPersistedCourse(result.value)) {
-    showUnavailable('코스 저장 기능은 저장 API 연결 후 사용할 수 있어요.')
-    return
-  }
   if (!auth.isAuthenticated) {
     alert('코스를 저장하려면 로그인이 필요해요.')
     router.push({ path: '/login', query: { redirect: '/ai-course' } })
     return
   }
-  title.value = result.value.title || ''
+  title.value = result.value?.title || ''
   saveError.value = ''
   saveOpen.value = true
 }
 
 async function save() {
   const clean = title.value.trim()
-  if (!result.value || !isPersistedCourse(result.value) || clean.length < 1 || clean.length > 100 || saveLoading.value) return
+  if (!result.value || clean.length < 1 || clean.length > 100 || saveLoading.value) return
   saveLoading.value = true
   saveError.value = ''
   try {
@@ -236,7 +214,7 @@ const formatDistance = (metres?: number) => metres == null ? '' : `${(metres / 1
 
     <section v-else-if="editing" class="course-shell">
       <CourseConditionForm :initial="condition" :loading="loading" @submit="generate" />
-      <p v-if="error" class="course-error" role="alert">{{ error }} <button class="text-link" :disabled="loading" @click="generate(condition)">다시 시도</button></p>
+      <p v-if="error" class="course-error">{{ error }} <button class="text-link" @click="generate(condition)">다시 시도</button></p>
     </section>
 
     <section v-else-if="result" class="course-shell result-shell">
@@ -254,7 +232,7 @@ const formatDistance = (metres?: number) => metres == null ? '' : `${(metres / 1
             <span>예상 비용 <b>{{ estimatedCost }}</b></span>
           </div>
         </div>
-        <button class="btn result-save" :disabled="!isPersistedCourse(result) || result.status === 'SAVED'" @click="openSave">{{ result.status === 'SAVED' ? '저장 완료' : '코스 저장' }}</button>
+        <button class="btn result-save" :disabled="result.status === 'SAVED'" @click="openSave">{{ result.status === 'SAVED' ? '저장 완료' : '코스 저장' }}</button>
       </header>
 
       <div class="course-result-grid">
@@ -263,7 +241,7 @@ const formatDistance = (metres?: number) => metres == null ? '' : `${(metres / 1
             <header><b>DAY {{ day.day_no }}</b><span>{{ formatDate(day.visit_date) }}</span></header>
             <div class="day-timeline">
               <div v-if="result.accommodation" class="travel-line"><span>↓</span> 숙소 출발 · {{ result.accommodation.place_name }}<template v-if="day.accommodation_departure_travel_minutes"> · {{ transportLabel[result.transport] }} {{ day.accommodation_departure_travel_minutes }}분 · {{ formatDistance(day.accommodation_departure_distance_m) }}</template></div>
-              <CourseItemCard v-for="item in day.items" :key="item.id ?? item.candidate_id" :item="item" :transport="result.transport" :actions-available="isPersistedCourse(result)" @alternative="openAlternatives" @reschedule="openReschedule" />
+              <CourseItemCard v-for="item in day.items" :key="item.id" :item="item" :transport="result.transport" @alternative="openAlternatives" @reschedule="openReschedule" />
               <div v-if="result.accommodation" class="travel-line"><span>↓</span> 숙소 복귀 · {{ result.accommodation.place_name }}<template v-if="day.accommodation_return_travel_minutes"> · {{ transportLabel[result.transport] }} {{ day.accommodation_return_travel_minutes }}분 · {{ formatDistance(day.accommodation_return_distance_m) }}</template></div>
             </div>
           </section>

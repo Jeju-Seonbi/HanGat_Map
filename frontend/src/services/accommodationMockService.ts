@@ -1,4 +1,4 @@
-import type { AccommodationInput, AccommodationRecommendation, CourseCondition, CourseResultView, RegionRef } from '../assets/types/course'
+import type { AccommodationInput, AccommodationRecommendation, CourseCondition, CourseResult, RegionRef } from '../assets/types/course'
 
 type RegionCode = RegionRef['code']
 
@@ -32,7 +32,7 @@ function regionOfPlace(placeName: string): RegionCode {
   return 'NORTH'
 }
 
-function analyseCourse(course: CourseResultView) {
+function analyseCourse(course: CourseResult) {
   const counts: Record<RegionCode, number> = { EAST: 0, WEST: 0, SOUTH: 0, NORTH: 0 }
   const regions = course.days.flatMap(day => day.items.map(item => regionOfPlace(item.place_name)))
   regions.forEach(region => { counts[region] += 1 })
@@ -53,7 +53,7 @@ function distanceKm(first: { lat: number; lng: number }, second: { lat: number; 
   return 6371 * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value))
 }
 
-function recommendationScore(accommodation: AccommodationInput, mainRegion: RegionCode, centre: { lat: number; lng: number }, course: CourseResultView) {
+function recommendationScore(accommodation: AccommodationInput, mainRegion: RegionCode, centre: { lat: number; lng: number }, course: CourseResult) {
   const routeDistance = distanceKm(centre, { lat: accommodation.latitude, lng: accommodation.longitude })
   let score = routeDistance != null && routeDistance <= 35 ? 3 : 0
   if (accommodation.region === mainRegion) score += 3
@@ -63,7 +63,7 @@ function recommendationScore(accommodation: AccommodationInput, mainRegion: Regi
 }
 
 export const accommodationMockService = {
-  async getRecommendedAccommodations(course: CourseResultView): Promise<AccommodationRecommendation[]> {
+  async getRecommendedAccommodations(course: CourseResult): Promise<AccommodationRecommendation[]> {
     await pause()
     const { mainRegion, centre } = analyseCourse(course)
     return mockAccommodations

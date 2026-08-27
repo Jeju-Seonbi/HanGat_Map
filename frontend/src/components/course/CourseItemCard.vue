@@ -1,12 +1,8 @@
 <script setup lang="ts">
-import type { CourseItemView, Transport } from '../../assets/types/course'
+import type { CourseItem, Transport } from '../../assets/types/course'
 
-const props = withDefaults(defineProps<{
-  item: CourseItemView
-  transport: Transport
-  actionsAvailable?: boolean
-}>(), { actionsAvailable: true })
-defineEmits<{ alternative: [CourseItemView]; reschedule: [CourseItemView] }>()
+const props = defineProps<{ item: CourseItem; transport: Transport }>()
+defineEmits<{ alternative: [CourseItem]; reschedule: [CourseItem] }>()
 
 const level = { QUIET: '한산', NORMAL: '보통', CROWDED: '혼잡' }
 const accuracy = { VERIFIED: '검증가', ESTIMATED: '추정', UNKNOWN: '가격 정보 없음' }
@@ -18,7 +14,7 @@ const distance = (metres?: number) => metres ? metres >= 1000 ? `${(metres / 100
 const gapDuration = (minutes: number) => minutes % 60
   ? `약 ${Math.floor(minutes / 60)}시간 ${minutes % 60}분`
   : `약 ${minutes / 60}시간`
-const costLabel = (cost: CourseItemView['costs'][number]) => {
+const costLabel = (cost: CourseItem['costs'][number]) => {
   if (cost.accuracy_type === 'UNKNOWN') return accuracy.UNKNOWN
   if (cost.amount_min == null && cost.amount_max == null) return accuracy[cost.accuracy_type]
   const amount = cost.amount_min === cost.amount_max
@@ -55,8 +51,8 @@ const costLabel = (cost: CourseItemView['costs'][number]) => {
       <p v-if="item.weather_warning" class="fixed-warning">{{ item.weather_warning }}</p>
       <p v-if="item.operating_hours_warning" class="fixed-warning">선택한 방문 시간이 일반 운영시간과 다를 수 있어요.</p>
       <p v-if="item.item_source === 'USER_FIXED' && item.congestion_level === 'CROWDED'" class="fixed-warning">사용자 지정 일정이에요. 해당 시간대는 혼잡할 것으로 예상돼요.</p>
-      <button v-if="item.item_source !== 'USER_FIXED'" class="btn small alternative-button" :disabled="!actionsAvailable" :title="actionsAvailable ? undefined : '코스 저장 API 연결 후 사용할 수 있어요.'" @click="$emit('alternative', item)">{{ item.congestion_level === 'CROWDED' ? '한산한 대안 보기' : '다른 장소 보기' }}</button>
-      <button v-if="item.congestion_level === 'CROWDED'" class="btn small alternative-button reschedule-button" :disabled="!actionsAvailable" :title="actionsAvailable ? undefined : '코스 저장 API 연결 후 사용할 수 있어요.'" @click="$emit('reschedule', item)"><span class="reschedule-label-desktop">이 장소를 더 한산한 시간으로 옮기기</span><span class="reschedule-label-mobile">한산한 시간 찾기</span></button>
+      <button v-if="item.item_source !== 'USER_FIXED'" class="btn small alternative-button" @click="$emit('alternative', item)">{{ item.congestion_level === 'CROWDED' ? '한산한 대안 보기' : '다른 장소 보기' }}</button>
+      <button v-if="item.congestion_level === 'CROWDED'" class="btn small alternative-button reschedule-button" @click="$emit('reschedule', item)"><span class="reschedule-label-desktop">이 장소를 더 한산한 시간으로 옮기기</span><span class="reschedule-label-mobile">한산한 시간 찾기</span></button>
     </div>
   </article>
 </template>
