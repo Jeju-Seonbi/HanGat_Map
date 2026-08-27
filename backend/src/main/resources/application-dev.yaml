@@ -17,9 +17,17 @@ spring:
     hibernate:
       ddl-auto: update
     show-sql: false
+    # 테이블 생성(ddl-auto) 후에 시드 SQL을 실행하기 위한 지연 설정
+    defer-datasource-initialization: true
     properties:
       hibernate:
         default_batch_fetch_size: 100
+
+  # dev 전용 시드 - INSERT IGNORE 라 매 부팅 재실행돼도 안전 (생성: scripts/build_seed_sql.py)
+  sql:
+    init:
+      mode: always
+      data-locations: classpath:seed-dev.sql
 
 server:
   port: ${SERVER_PORT:8080}
