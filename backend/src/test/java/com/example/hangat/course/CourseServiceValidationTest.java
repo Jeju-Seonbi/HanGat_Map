@@ -24,6 +24,7 @@ class CourseServiceValidationTest {
             .registerModule(new JavaTimeModule());
     private final CourseService courseService = new CourseService(
             new StubTourApiService(), new StubCongestionApiService(),
+            new CourseCandidateShortlistService(),
             new CourseAiPreparationService(
                     new CourseAiInputAssembler(),
                     new CourseTravelService(new StraightLineDistanceCalculator()),

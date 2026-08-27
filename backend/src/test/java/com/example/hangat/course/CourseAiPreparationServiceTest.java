@@ -57,7 +57,8 @@ class CourseAiPreparationServiceTest {
                 new CourseTravelService(new StraightLineDistanceCalculator()),
                 Optional.empty());
         CourseService courseService = new CourseService(
-                tourApiService, congestionApiService, preparationService,
+                tourApiService, congestionApiService,
+                new CourseCandidateShortlistService(), preparationService,
                 new CourseAiGenerationService(
                         input -> { throw new AssertionError("provider must not run in preparation test"); },
                         new CourseAiResultValidator()),

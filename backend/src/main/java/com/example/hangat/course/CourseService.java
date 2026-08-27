@@ -30,6 +30,7 @@ public class CourseService {
 
     private final TourApiService tourApiService;
     private final CongestionApiService congestionApiService;
+    private final CourseCandidateShortlistService courseCandidateShortlistService;
     private final CourseAiPreparationService courseAiPreparationService;
     private final CourseAiGenerationService courseAiGenerationService;
     private final CoursePersistenceService coursePersistenceService;
@@ -95,20 +96,6 @@ public class CourseService {
 
         List<TourPlaceDto> tourPlaces = tourApiService.getTourPlaces();
 
-        System.out.println("관광지 개수 = " + tourPlaces.size());
-
-        for (TourPlaceDto place : tourPlaces) {
-            System.out.println(
-                    place.getTitle()
-                            + " / "
-                            + place.getAddress()
-                            + " / "
-                            + place.getLatitude()
-                            + " / "
-                            + place.getLongitude()
-            );
-        }
-
         if (tourPlaces.isEmpty()) {
             throw new IllegalArgumentException("조회된 관광지가 없습니다.");
         }
@@ -116,23 +103,13 @@ public class CourseService {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
         List<CourseCandidateDto> courseCandidates = new ArrayList<>();
 
-        for (TourPlaceDto place : tourPlaces) {
-            PreferenceType preferenceType = findPreferenceType(
-                    place,
-                    coursePlacePreferences
-            );
+        List<CourseCandidateShortlistService.ShortlistedPlace> shortlistedPlaces =
+                courseCandidateShortlistService.select(request, tourPlaces);
 
-            if (!CourseCandidateRegionFilter.shouldInclude(
-                    place.getAddress(),
-                    preferenceType,
-                    courseRegions
-            )) {
-                continue;
-            }
-
-            List<String> confirmedStyleHints =
-                    TourPlaceStyleHintResolver.resolve(place);
-
+        for (CourseCandidateShortlistService.ShortlistedPlace shortlisted : shortlistedPlaces) {
+            TourPlaceDto place = shortlisted.place();
+            PreferenceType preferenceType = shortlisted.preferenceType();
+            List<String> confirmedStyleHints = shortlisted.confirmedStyleHints();
             String signguCd;
 
             if (place.getAddress() != null && place.getAddress().contains("제주시")) {
@@ -153,8 +130,6 @@ public class CourseService {
                     signguCd,
                     place.getTitle()
             );
-
-            System.out.println("전체 혼잡도 데이터 개수 = " + congestionData.size());
 
             if (congestionData.isEmpty()) {
                 courseCandidates.add(new CourseCandidateDto(
@@ -186,7 +161,6 @@ public class CourseService {
             ));
         }
 
-        System.out.println("코스 추천 후보 개수 = " + courseCandidates.size());
         return new PreparedCourse(
                 courseAiPreparationService.prepare(request, courseCandidates),
                 List.copyOf(courseCandidates));
@@ -287,43 +261,6 @@ public class CourseService {
                 && !preference.getSourceCode().isBlank()
                 && preference.getSourcePlaceId() != null
                 && !preference.getSourcePlaceId().isBlank();
-    }
-
-    private PreferenceType findPreferenceType(
-            TourPlaceDto place,
-            List<PlacePreferenceDto> preferences
-    ) {
-        if (preferences == null || preferences.isEmpty()) {
-            return null;
-        }
-
-        PreferenceType matchedPreferenceType = null;
-
-        for (PlacePreferenceDto preference : preferences) {
-            if (preference == null
-                    || preference.getPreferenceType() == null
-                    || !matchesTourPlace(place, preference)) {
-                continue;
-            }
-
-            if (preference.getPreferenceType() == PreferenceType.AVOID) {
-                return PreferenceType.AVOID;
-            }
-
-            matchedPreferenceType = PreferenceType.WANT;
-        }
-
-        return matchedPreferenceType;
-    }
-
-    private boolean matchesTourPlace(
-            TourPlaceDto place,
-            PlacePreferenceDto preference
-    ) {
-        String placeTitle = normalizePlaceName(place.getTitle());
-        String preferenceName = normalizePlaceName(preference.getPlaceName());
-
-        return !placeTitle.isEmpty() && placeTitle.equals(preferenceName);
     }
 
     private String normalizePlaceName(String value) {
