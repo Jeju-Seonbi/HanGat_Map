@@ -47,7 +47,7 @@ function htmlCspPlugin () {
           "img-src 'self' data: blob: http://*.daumcdn.net https://*.daumcdn.net http://*.kakaocdn.net https://*.kakaocdn.net",
           /* 개발 모드는 백엔드(hangat-api)를 직접 호출한다.
              운영 빌드는 같은 도메인 /api 프록시 경유라 'self' 로 충분하다. */
-          `connect-src 'self' https://api.pwnedpasswords.com https://dapi.kakao.com${dev ? ' http://localhost:8080 ws: wss:' : ''}`,
+          `connect-src 'self' https://api.pwnedpasswords.com https://dapi.kakao.com http://dapi.kakao.com${dev ? ' http://localhost:8080 ws: wss:' : ''}`,
           "font-src 'self' https://fonts.gstatic.com",
           "form-action 'self'",
           "base-uri 'none'",
