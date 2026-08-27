@@ -129,6 +129,32 @@ class GeminiCourseAiProviderTest {
     }
 
     @Test
+    void buildsCorrectionRequestWithFailureReasonAndOriginalCandidates() throws Exception {
+        GeminiCourseAiProvider provider = provider(RestClient.create(), "test-secret");
+
+        String requestJson = objectMapper.writeValueAsString(provider.buildCorrectionRequest(
+                smokeInput(),
+                "AI 코스 결과에 같은 candidateId가 중복 배치되었습니다."));
+        JsonNode request = objectMapper.readTree(requestJson);
+        String correctionPrompt = request.path("contents").path(0)
+                .path("parts").path(0).path("text").asText();
+
+        assertThat(correctionPrompt)
+                .contains("실패 사유: AI 코스 결과에 같은 candidateId가 중복 배치되었습니다.")
+                .contains("동일 candidateId를 재사용하지 않는다")
+                .contains("후보가 부족하면 중복해서 채우지 말고")
+                .contains("\"candidateId\":\"want-1\"")
+                .contains("\"candidateId\":\"normal-1\"")
+                .doesNotContain("test-secret");
+        assertThat(request.path("generationConfig").path("responseJsonSchema")
+                .path("properties").path("days").path("items")
+                .path("properties").path("items").path("items")
+                .path("properties").path("candidateId").path("enum"))
+                .extracting(JsonNode::asText)
+                .containsExactly("want-1", "normal-1", "normal-2");
+    }
+
+    @Test
     void parsesOfficialEnvelopeWithUnknownFields() {
         RestClient.Builder builder = RestClient.builder().baseUrl("http://gemini.test/v1beta");
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();

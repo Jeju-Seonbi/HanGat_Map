@@ -78,11 +78,28 @@ public class GeminiCourseAiProvider implements CourseAiProvider {
 
     @Override
     public CourseAiResultDto generate(CourseAiInputDto input) {
+        return generate(input, null);
+    }
+
+    @Override
+    public CourseAiResultDto generateCorrection(
+            CourseAiInputDto input,
+            String validationFailureReason
+    ) {
+        return generate(input, validationFailureReason);
+    }
+
+    private CourseAiResultDto generate(
+            CourseAiInputDto input,
+            String validationFailureReason
+    ) {
         validateConfiguration();
         GeminiCallPhase phase = GeminiCallPhase.BUILD_REQUEST;
 
         try {
-            GeminiGenerateRequest request = buildRequest(input);
+            GeminiGenerateRequest request = validationFailureReason == null
+                    ? buildRequest(input)
+                    : buildCorrectionRequest(input, validationFailureReason);
             phase = GeminiCallPhase.HTTP_EXCHANGE;
             ResponseEntity<String> httpResponse = restClient.post()
                     .uri("/models/{model}:generateContent", properties.model())
@@ -138,6 +155,21 @@ public class GeminiCourseAiProvider implements CourseAiProvider {
         return new GeminiGenerateRequest(
                 new GeminiContent(null, List.of(new GeminiPart(prompt.systemInstruction()))),
                 List.of(new GeminiContent("user", List.of(new GeminiPart(prompt.userPrompt(input))))),
+                new GeminiGenerationConfig(
+                        JSON_MIME_TYPE,
+                        responseJsonSchema(input),
+                        new GeminiThinkingConfig(THINKING_LEVEL_LOW))
+        );
+    }
+
+    GeminiGenerateRequest buildCorrectionRequest(
+            CourseAiInputDto input,
+            String validationFailureReason
+    ) {
+        return new GeminiGenerateRequest(
+                new GeminiContent(null, List.of(new GeminiPart(prompt.systemInstruction()))),
+                List.of(new GeminiContent("user", List.of(new GeminiPart(
+                        prompt.correctionUserPrompt(input, validationFailureReason))))),
                 new GeminiGenerationConfig(
                         JSON_MIME_TYPE,
                         responseJsonSchema(input),

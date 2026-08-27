@@ -14,8 +14,10 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class CourseAiGenerationServiceTest {
 
@@ -36,6 +38,119 @@ class CourseAiGenerationServiceTest {
 
         assertThat(service.generate(input)).isSameAs(result);
         assertThat(providerCalled).isTrue();
+    }
+
+    @Test
+    void correctsOneValidationFailureAndReturnsValidResult() {
+        CourseAiInputDto input = input();
+        CourseAiResultDto duplicate = duplicateResult();
+        CourseAiResultDto corrected = validResult();
+        AtomicInteger calls = new AtomicInteger();
+        CourseAiProvider provider = new CourseAiProvider() {
+            @Override
+            public CourseAiResultDto generate(CourseAiInputDto actualInput) {
+                calls.incrementAndGet();
+                return duplicate;
+            }
+
+            @Override
+            public CourseAiResultDto generateCorrection(
+                    CourseAiInputDto actualInput,
+                    String validationFailureReason
+            ) {
+                calls.incrementAndGet();
+                assertThat(actualInput).isSameAs(input);
+                assertThat(validationFailureReason).contains("중복 배치");
+                return corrected;
+            }
+        };
+        CourseAiGenerationService service = new CourseAiGenerationService(
+                provider, new CourseAiResultValidator());
+
+        assertThat(service.generate(input)).isSameAs(corrected);
+        assertThat(calls).hasValue(2);
+    }
+
+    @Test
+    void failsAfterOneCorrectionWhenCorrectedResultIsStillInvalid() {
+        CourseAiInputDto input = input();
+        AtomicInteger calls = new AtomicInteger();
+        CourseAiProvider provider = new CourseAiProvider() {
+            @Override
+            public CourseAiResultDto generate(CourseAiInputDto actualInput) {
+                calls.incrementAndGet();
+                return duplicateResult();
+            }
+
+            @Override
+            public CourseAiResultDto generateCorrection(
+                    CourseAiInputDto actualInput,
+                    String validationFailureReason
+            ) {
+                calls.incrementAndGet();
+                return duplicateResult();
+            }
+        };
+        CourseAiGenerationService service = new CourseAiGenerationService(
+                provider, new CourseAiResultValidator());
+
+        assertThatThrownBy(() -> service.generate(input))
+                .isInstanceOfSatisfying(CourseAiException.class, exception ->
+                        assertThat(exception.getFailureType())
+                                .isEqualTo(CourseAiFailureType.VALIDATION_ERROR));
+        assertThat(calls).hasValue(2);
+    }
+
+    @Test
+    void doesNotRetryProviderFailure() {
+        AtomicInteger calls = new AtomicInteger();
+        CourseAiGenerationService service = new CourseAiGenerationService(
+                actualInput -> {
+                    calls.incrementAndGet();
+                    throw new CourseAiException(
+                            CourseAiFailureType.PROVIDER_ERROR,
+                            "Gemini provider failure");
+                },
+                new CourseAiResultValidator());
+
+        assertThatThrownBy(() -> service.generate(input()))
+                .isInstanceOfSatisfying(CourseAiException.class, exception ->
+                        assertThat(exception.getFailureType())
+                                .isEqualTo(CourseAiFailureType.PROVIDER_ERROR));
+        assertThat(calls).hasValue(1);
+    }
+
+    @Test
+    void doesNotRetryRateLimitFailure() {
+        AtomicInteger calls = new AtomicInteger();
+        CourseAiGenerationService service = new CourseAiGenerationService(
+                actualInput -> {
+                    calls.incrementAndGet();
+                    throw new CourseAiException(
+                            CourseAiFailureType.RATE_LIMIT,
+                            "Gemini rate limit");
+                },
+                new CourseAiResultValidator());
+
+        assertThatThrownBy(() -> service.generate(input()))
+                .isInstanceOfSatisfying(CourseAiException.class, exception ->
+                        assertThat(exception.getFailureType())
+                                .isEqualTo(CourseAiFailureType.RATE_LIMIT));
+        assertThat(calls).hasValue(1);
+    }
+
+    private CourseAiResultDto validResult() {
+        return new CourseAiResultDto("1.0", List.of(
+                new DayDto(LocalDate.parse("2026-08-28"), List.of(
+                        new ItemDto("want-1", LocalTime.parse("09:00"), "입력 근거")))));
+    }
+
+    private CourseAiResultDto duplicateResult() {
+        return new CourseAiResultDto("1.0", List.of(
+                new DayDto(LocalDate.parse("2026-08-28"), List.of(
+                        new ItemDto("want-1", LocalTime.parse("09:00"), "입력 근거"))),
+                new DayDto(LocalDate.parse("2026-08-29"), List.of(
+                        new ItemDto("want-1", LocalTime.parse("11:00"), "중복 근거")))));
     }
 
     private CourseAiInputDto input() {

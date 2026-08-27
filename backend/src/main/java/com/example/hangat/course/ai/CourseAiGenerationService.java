@@ -18,7 +18,22 @@ public class CourseAiGenerationService {
 
     public CourseAiResultDto generate(CourseAiInputDto input) {
         CourseAiResultDto result = provider.generate(input);
-        validator.validate(input, result);
-        return result;
+        CourseAiException validationFailure;
+        try {
+            validator.validate(input, result);
+            return result;
+        } catch (CourseAiException exception) {
+            if (exception.getFailureType() != CourseAiFailureType.VALIDATION_ERROR) {
+                throw exception;
+            }
+            validationFailure = exception;
+        }
+
+        CourseAiResultDto corrected = provider.generateCorrection(
+                input,
+                validationFailure.getMessage()
+        );
+        validator.validate(input, corrected);
+        return corrected;
     }
 }

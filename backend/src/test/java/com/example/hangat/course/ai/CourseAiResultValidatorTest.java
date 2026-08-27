@@ -36,6 +36,13 @@ class CourseAiResultValidatorTest {
     }
 
     @Test
+    void rejectsSameCandidateAcrossDifferentDatesAndTimes() {
+        assertInvalid(result(
+                day("2026-08-28", item("want-1", "09:00")),
+                day("2026-08-29", item("want-1", "11:00"))));
+    }
+
+    @Test
     void rejectsMissingWantAndForbiddenPlace() {
         assertInvalid(result(day("2026-08-28", item("normal-1", "11:00"))));
         CourseAiInputDto forbiddenInput = withForbiddenCandidate();

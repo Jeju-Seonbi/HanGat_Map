@@ -18,16 +18,17 @@ public class CourseAiPrompt {
             5. fixedDate를 변경하지 않는다.
             6. fixedTime을 변경하지 않는다.
             7. 여행기간 밖 날짜를 생성하지 않는다.
-            8. 같은 candidateId를 중복 배치하지 않는다.
-            9. 제공되지 않은 혼잡도 숫자나 단계를 생성하지 않는다.
-            10. 제공되지 않은 날씨를 생성하지 않는다.
-            11. 제공되지 않은 routeDistanceKm 또는 durationMinutes를 생성하거나 추정하지 않는다.
-            12. straightDistanceKm는 직선거리이며 도로거리나 이동시간으로 해석하지 않는다.
-            13. 스타일은 Hard Filter가 아닌 Soft Preference다.
-            14. 혼잡도, 날씨, 거리도 Soft 판단 데이터다.
-            15. WANT와 고정 일정은 모든 Soft Preference보다 우선한다.
-            16. 지역 조건은 백엔드가 이미 적용했으므로 제공된 candidates만 사용한다.
-            17. 추천 이유는 입력 JSON에서 실제로 확인할 수 있는 근거만 사용한다.
+            8. 하나의 candidateId는 전체 여행 일정에서 최대 1회만 사용한다. 날짜나 시간이 달라도 같은 candidateId를 다시 사용하지 않는다. WANT 장소도 정확히 1회만 배치한다.
+            9. 후보가 부족하면 같은 candidateId로 일정을 채우지 말고 더 적은 장소를 선택한다.
+            10. 제공되지 않은 혼잡도 숫자나 단계를 생성하지 않는다.
+            11. 제공되지 않은 날씨를 생성하지 않는다.
+            12. 제공되지 않은 routeDistanceKm 또는 durationMinutes를 생성하거나 추정하지 않는다.
+            13. straightDistanceKm는 직선거리이며 도로거리나 이동시간으로 해석하지 않는다.
+            14. 스타일은 Hard Filter가 아닌 Soft Preference다.
+            15. 혼잡도, 날씨, 거리도 Soft 판단 데이터다.
+            16. WANT와 고정 일정은 모든 Soft Preference보다 우선한다.
+            17. 지역 조건은 백엔드가 이미 적용했으므로 제공된 candidates만 사용한다.
+            18. 추천 이유는 입력 JSON에서 실제로 확인할 수 있는 근거만 사용한다.
 
             응답의 startTime은 반드시 24시간제 HH:mm 형식으로 작성한다.
 
@@ -72,5 +73,29 @@ public class CourseAiPrompt {
                     exception
             );
         }
+    }
+
+    public String correctionUserPrompt(
+            CourseAiInputDto input,
+            String validationFailureReason
+    ) {
+        String inputJson = userPrompt(input);
+        String reason = validationFailureReason == null || validationFailureReason.isBlank()
+                ? "AI 출력 계약 위반"
+                : validationFailureReason;
+        return """
+                이전 응답이 백엔드 검증에 실패했다. 아래 실패 사유를 교정하여 새 결과 전체를 반환한다.
+                실패 사유: %s
+
+                교정 절대 규칙:
+                - 하나의 candidateId는 전체 여행 일정에서 최대 1회만 사용한다.
+                - 날짜나 시간이 달라도 동일 candidateId를 재사용하지 않는다.
+                - WANT 장소는 정확히 1회만 배치한다.
+                - 후보가 부족하면 중복해서 채우지 말고 더 적은 장소를 선택한다.
+                - candidateId는 아래 입력 candidates[].identity.candidateId 중 하나를 그대로 사용한다.
+
+                원본 입력 JSON:
+                %s
+                """.formatted(reason, inputJson);
     }
 }
