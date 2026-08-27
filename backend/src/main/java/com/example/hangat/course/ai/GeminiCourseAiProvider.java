@@ -1,10 +1,13 @@
 package com.example.hangat.course.ai;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.http.converter.HttpMessageNotWritableException;
@@ -33,6 +36,7 @@ import java.util.Set;
 public class GeminiCourseAiProvider implements CourseAiProvider {
 
     private static final String JSON_MIME_TYPE = "application/json";
+    private static final String THINKING_LEVEL_LOW = "low";
 
     private final RestClient restClient;
     private final GeminiProperties properties;
@@ -78,15 +82,18 @@ public class GeminiCourseAiProvider implements CourseAiProvider {
         try {
             GeminiGenerateRequest request = buildRequest(input);
             phase = GeminiCallPhase.HTTP_EXCHANGE;
-            String responseBody = restClient.post()
+            ResponseEntity<String> httpResponse = restClient.post()
                     .uri("/models/{model}:generateContent", properties.model())
                     .header("x-goog-api-key", properties.apiKey())
+                    .accept(MediaType.APPLICATION_JSON)
+                    .contentType(MediaType.APPLICATION_JSON)
                     .body(request)
                     .retrieve()
-                    .body(String.class);
+                    .toEntity(String.class);
 
             phase = GeminiCallPhase.PARSE_ENVELOPE;
-            GeminiGenerateResponse response = parseResponseEnvelope(responseBody);
+            GeminiResponseMetadata metadata = responseMetadata(httpResponse);
+            GeminiGenerateResponse response = parseResponseEnvelope(httpResponse.getBody(), metadata);
             phase = GeminiCallPhase.PARSE_RESULT;
             return parseResult(response);
         } catch (CourseAiException exception) {
@@ -129,7 +136,10 @@ public class GeminiCourseAiProvider implements CourseAiProvider {
         return new GeminiGenerateRequest(
                 new GeminiContent(null, List.of(new GeminiPart(prompt.systemInstruction()))),
                 List.of(new GeminiContent("user", List.of(new GeminiPart(prompt.userPrompt(input))))),
-                new GeminiGenerationConfig(JSON_MIME_TYPE, responseJsonSchema())
+                new GeminiGenerationConfig(
+                        JSON_MIME_TYPE,
+                        responseJsonSchema(),
+                        new GeminiThinkingConfig(THINKING_LEVEL_LOW))
         );
     }
 
@@ -146,19 +156,100 @@ public class GeminiCourseAiProvider implements CourseAiProvider {
         }
     }
 
-    private GeminiGenerateResponse parseResponseEnvelope(String responseBody) {
-        if (isBlank(responseBody)) {
-            throw invalidResponse();
+    private GeminiGenerateResponse parseResponseEnvelope(
+            String responseBody,
+            GeminiResponseMetadata metadata
+    ) {
+        if (!metadata.bodyPresent()) {
+            throw invalidEnvelope("Gemini API가 빈 응답을 반환했습니다.", metadata, null);
+        }
+        if (!isJsonContentType(metadata.contentType())) {
+            throw invalidEnvelope("Gemini API가 JSON이 아닌 응답을 반환했습니다.", metadata, null);
+        }
+        if (metadata.firstCharType() != BodyFirstCharType.JSON_OBJECT) {
+            throw invalidEnvelope("Gemini API 응답이 JSON 객체 형식이 아닙니다.", metadata, null);
         }
         try {
             return objectMapper.readValue(responseBody, GeminiGenerateResponse.class);
         } catch (JsonProcessingException exception) {
-            throw new CourseAiException(
-                    CourseAiFailureType.INVALID_RESPONSE,
-                    "Gemini API 응답 JSON이 유효하지 않습니다.",
-                    exception
-            );
+            throw invalidEnvelope(
+                    "Gemini API 응답 JSON이 유효하지 않습니다.", metadata, exception);
         }
+    }
+
+    private GeminiResponseMetadata responseMetadata(ResponseEntity<String> response) {
+        String body = response.getBody();
+        boolean bodyPresent = !isBlank(body);
+        return new GeminiResponseMetadata(
+                response.getStatusCode().value(),
+                response.getHeaders().getContentType(),
+                bodyPresent,
+                bodyLengthCategory(body),
+                bodyFirstCharType(body));
+    }
+
+    private CourseAiException invalidEnvelope(
+            String summary,
+            GeminiResponseMetadata metadata,
+            Exception exception
+    ) {
+        String message = summary + " PHASE=" + GeminiCallPhase.PARSE_ENVELOPE
+                + ", " + responseMetadataDiagnostics(metadata);
+        if (exception != null) {
+            message += ", EXCEPTION_TYPE=" + safeExceptionType(exception);
+        }
+        return new CourseAiException(CourseAiFailureType.INVALID_RESPONSE, message);
+    }
+
+    private String responseMetadataDiagnostics(GeminiResponseMetadata metadata) {
+        return "HTTP_STATUS=" + metadata.httpStatus()
+                + ", CONTENT_TYPE=" + safeContentType(metadata.contentType())
+                + ", BODY_PRESENT=" + metadata.bodyPresent()
+                + ", BODY_LENGTH_CATEGORY=" + metadata.lengthCategory()
+                + ", BODY_FIRST_CHAR_TYPE=" + metadata.firstCharType()
+                + ", HOST=" + endpointHost()
+                + ", MODEL=" + safeToken(properties.model());
+    }
+
+    private String safeContentType(MediaType contentType) {
+        return contentType == null ? "NONE" : safeToken(contentType.toString());
+    }
+
+    private boolean isJsonContentType(MediaType contentType) {
+        return contentType != null && (MediaType.APPLICATION_JSON.isCompatibleWith(contentType)
+                || contentType.getSubtype().toLowerCase(Locale.ROOT).endsWith("+json"));
+    }
+
+    private BodyLengthCategory bodyLengthCategory(String body) {
+        if (isBlank(body)) {
+            return BodyLengthCategory.EMPTY;
+        }
+        if (body.length() <= 1_024) {
+            return BodyLengthCategory.SHORT;
+        }
+        if (body.length() <= 65_536) {
+            return BodyLengthCategory.NORMAL;
+        }
+        return BodyLengthCategory.LARGE;
+    }
+
+    private BodyFirstCharType bodyFirstCharType(String body) {
+        if (isBlank(body)) {
+            return BodyFirstCharType.NONE;
+        }
+        for (int index = 0; index < body.length(); index++) {
+            char character = body.charAt(index);
+            if (Character.isWhitespace(character)) {
+                continue;
+            }
+            return switch (character) {
+                case '{' -> BodyFirstCharType.JSON_OBJECT;
+                case '[' -> BodyFirstCharType.JSON_ARRAY;
+                case '<' -> BodyFirstCharType.HTML_LIKE;
+                default -> BodyFirstCharType.OTHER;
+            };
+        }
+        return BodyFirstCharType.NONE;
     }
 
     private void validateConfiguration() {
@@ -400,20 +491,60 @@ public class GeminiCourseAiProvider implements CourseAiProvider {
 
     record GeminiGenerationConfig(
             String responseMimeType,
-            Map<String, Object> responseJsonSchema
+            Map<String, Object> responseJsonSchema,
+            GeminiThinkingConfig thinkingConfig
     ) {
     }
 
+    record GeminiThinkingConfig(
+            String thinkingLevel
+    ) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
     record GeminiGenerateResponse(List<GeminiCandidate> candidates) {
     }
 
-    record GeminiCandidate(GeminiContent content) {
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record GeminiCandidate(GeminiResponseContent content) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record GeminiResponseContent(List<GeminiResponsePart> parts) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record GeminiResponsePart(String text) {
     }
 
     private record ProviderErrorDetails(String status, String reason) {
         private static ProviderErrorDetails empty() {
             return new ProviderErrorDetails(null, null);
         }
+    }
+
+    private record GeminiResponseMetadata(
+            int httpStatus,
+            MediaType contentType,
+            boolean bodyPresent,
+            BodyLengthCategory lengthCategory,
+            BodyFirstCharType firstCharType
+    ) {
+    }
+
+    private enum BodyLengthCategory {
+        EMPTY,
+        SHORT,
+        NORMAL,
+        LARGE
+    }
+
+    private enum BodyFirstCharType {
+        JSON_OBJECT,
+        JSON_ARRAY,
+        HTML_LIKE,
+        OTHER,
+        NONE
     }
 
     private enum GeminiCallPhase {

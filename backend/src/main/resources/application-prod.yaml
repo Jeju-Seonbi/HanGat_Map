@@ -47,6 +47,6 @@ congestion-api:
 gemini:
   base-url: https://generativelanguage.googleapis.com/v1beta
   api-key: ${GEMINI_API_KEY:}
-  model: gemini-3.7-flash
+  model: gemini-3.5-flash
   connect-timeout: 3s
-  read-timeout: 30s
+  read-timeout: 60s

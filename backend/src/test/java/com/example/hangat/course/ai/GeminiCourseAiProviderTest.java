@@ -65,11 +65,13 @@ class GeminiCourseAiProviderTest {
         server.expect(once(), requestTo("http://gemini.test/v1beta/models/gemini-test:generateContent"))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(header("x-goog-api-key", "test-secret"))
+                .andExpect(header("Accept", MediaType.APPLICATION_JSON_VALUE))
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.systemInstruction.parts[0].text").isNotEmpty())
                 .andExpect(jsonPath("$.contents[0].role").value("user"))
                 .andExpect(jsonPath("$.generationConfig.responseMimeType").value("application/json"))
                 .andExpect(jsonPath("$.generationConfig.responseJsonSchema.type").value("object"))
+                .andExpect(jsonPath("$.generationConfig.thinkingConfig.thinkingLevel").value("low"))
                 .andExpect(jsonPath("$.contents[0].parts[0].text").value(
                         org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("test-secret"))))
                 .andExpect(jsonPath("$.contents[0].parts[0].text").value(
@@ -99,12 +101,35 @@ class GeminiCourseAiProviderTest {
                 .isEqualTo("application/json");
         assertThat(request.path("generationConfig").path("responseJsonSchema").path("type").asText())
                 .isEqualTo("object");
+        assertThat(request.path("generationConfig").path("thinkingConfig")
+                .path("thinkingLevel").asText()).isEqualTo("low");
         assertThat(input.path("tripCondition").path("startDate").asText())
                 .isEqualTo("2026-09-10");
         assertThat(input.path("userPreferences").path("requiredPlaces")
                 .path(0).path("fixedTime").asText()).isEqualTo("09:00:00");
         assertThat(input.path("candidates").size()).isEqualTo(3);
         assertThat(requestJson).doesNotContain("test-secret");
+    }
+
+    @Test
+    void parsesOfficialEnvelopeWithUnknownFields() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://gemini.test/v1beta");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        GeminiCourseAiProvider provider = provider(builder.build(), "test-secret");
+        server.expect(once(), requestTo("http://gemini.test/v1beta/models/gemini-test:generateContent"))
+                .andRespond(withSuccess("""
+                        {"candidates":[{"content":{"role":"model","parts":[{
+                        "text":"{\\\"contractVersion\\\":\\\"1.0\\\",\\\"days\\\":[]}",
+                        "thoughtSignature":"opaque-signature"}]},"finishReason":"STOP"}],
+                        "usageMetadata":{"promptTokenCount":1},
+                        "modelVersion":"gemini-3.5-flash","responseId":"response-id"}
+                        """, MediaType.APPLICATION_JSON));
+
+        CourseAiResultDto result = provider.generate(smokeInput());
+
+        assertThat(result.contractVersion()).isEqualTo("1.0");
+        assertThat(result.days()).isEmpty();
+        server.verify();
     }
 
     @Test
@@ -158,8 +183,90 @@ class GeminiCourseAiProviderTest {
         MockRestServiceServer malformedServer = MockRestServiceServer.bindTo(malformedBuilder).build();
         GeminiCourseAiProvider malformedProvider = provider(malformedBuilder.build(), "test-secret");
         malformedServer.expect(once(), requestTo("http://gemini.test/v1beta/models/gemini-test:generateContent"))
-                .andRespond(withSuccess("not-json", MediaType.APPLICATION_JSON));
-        assertFailure(malformedProvider, CourseAiFailureType.INVALID_RESPONSE);
+                .andRespond(withSuccess("{sensitive-malformed", MediaType.APPLICATION_JSON));
+        assertThatThrownBy(() -> malformedProvider.generate(input()))
+                .isInstanceOfSatisfying(CourseAiException.class, exception -> {
+                    assertThat(exception.getFailureType())
+                            .isEqualTo(CourseAiFailureType.INVALID_RESPONSE);
+                    assertThat(exception.getMessage())
+                            .contains("PHASE=PARSE_ENVELOPE")
+                            .contains("HTTP_STATUS=200")
+                            .contains("CONTENT_TYPE=application_json")
+                            .contains("BODY_PRESENT=true")
+                            .contains("BODY_LENGTH_CATEGORY=SHORT")
+                            .contains("BODY_FIRST_CHAR_TYPE=JSON_OBJECT")
+                            .contains("EXCEPTION_TYPE=JsonParseException")
+                            .doesNotContain("sensitive-malformed")
+                            .doesNotContain("test-secret");
+                });
+    }
+
+    @Test
+    void mapsEmptyEnvelopeWithSafeMetadata() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://gemini.test/v1beta");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        GeminiCourseAiProvider provider = provider(builder.build(), "test-secret");
+        server.expect(once(), requestTo("http://gemini.test/v1beta/models/gemini-test:generateContent"))
+                .andRespond(withSuccess("", MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> provider.generate(input()))
+                .isInstanceOfSatisfying(CourseAiException.class, exception -> {
+                    assertThat(exception.getFailureType())
+                            .isEqualTo(CourseAiFailureType.INVALID_RESPONSE);
+                    assertThat(exception.getMessage())
+                            .contains("PHASE=PARSE_ENVELOPE")
+                            .contains("HTTP_STATUS=200")
+                            .contains("CONTENT_TYPE=application_json")
+                            .contains("BODY_PRESENT=false")
+                            .contains("BODY_LENGTH_CATEGORY=EMPTY")
+                            .contains("BODY_FIRST_CHAR_TYPE=NONE")
+                            .doesNotContain("test-secret");
+                });
+    }
+
+    @Test
+    void mapsHtmlEnvelopeWithoutExposingBody() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://gemini.test/v1beta");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        GeminiCourseAiProvider provider = provider(builder.build(), "test-secret");
+        server.expect(once(), requestTo("http://gemini.test/v1beta/models/gemini-test:generateContent"))
+                .andRespond(withSuccess("<html>sensitive-body</html>", MediaType.TEXT_HTML));
+
+        assertThatThrownBy(() -> provider.generate(input()))
+                .isInstanceOfSatisfying(CourseAiException.class, exception -> {
+                    assertThat(exception.getFailureType())
+                            .isEqualTo(CourseAiFailureType.INVALID_RESPONSE);
+                    assertThat(exception.getMessage())
+                            .contains("HTTP_STATUS=200")
+                            .contains("CONTENT_TYPE=text_html")
+                            .contains("BODY_PRESENT=true")
+                            .contains("BODY_LENGTH_CATEGORY=SHORT")
+                            .contains("BODY_FIRST_CHAR_TYPE=HTML_LIKE")
+                            .doesNotContain("sensitive-body")
+                            .doesNotContain("test-secret");
+                });
+    }
+
+    @Test
+    void mapsNonJsonContentTypeWithoutParsingBody() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://gemini.test/v1beta");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        GeminiCourseAiProvider provider = provider(builder.build(), "test-secret");
+        server.expect(once(), requestTo("http://gemini.test/v1beta/models/gemini-test:generateContent"))
+                .andRespond(withSuccess("{\"sensitive\":true}", MediaType.TEXT_PLAIN));
+
+        assertThatThrownBy(() -> provider.generate(input()))
+                .isInstanceOfSatisfying(CourseAiException.class, exception -> {
+                    assertThat(exception.getFailureType())
+                            .isEqualTo(CourseAiFailureType.INVALID_RESPONSE);
+                    assertThat(exception.getMessage())
+                            .contains("HTTP_STATUS=200")
+                            .contains("CONTENT_TYPE=text_plain")
+                            .contains("BODY_PRESENT=true")
+                            .contains("BODY_FIRST_CHAR_TYPE=JSON_OBJECT")
+                            .doesNotContain("sensitive")
+                            .doesNotContain("test-secret");
+                });
     }
 
     @Test
