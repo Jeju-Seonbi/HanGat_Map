@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { courseMockService } from './courseMockService'
+import { courseMockService, generateMockCourseForTest } from './courseMockService'
 import type { CourseCondition, CourseItem, PlacePreference } from '../assets/types/course'
 
 const east = { region_id: 1, code: 'EAST' as const, name: '동부' }
@@ -36,7 +36,7 @@ describe('courseMockService logical Mock generation', () => {
       { place_id: 101, place_name: '비자림', preference_type: 'WANT', fixed_date: '2026-08-14', fixed_time: '13:00' },
     ])
 
-    const result = await courseMockService.generateCourse(condition)
+    const result = await generateMockCourseForTest(condition, 'INITIAL')
     const fixedDay = result.days[1]
     const fixed = fixedDay.items.find(item => item.place_name === '비자림')
 
@@ -51,7 +51,7 @@ describe('courseMockService logical Mock generation', () => {
   })
 
   it('prioritizes EAST recommendations when EAST is preferred', async () => {
-    const result = await courseMockService.generateCourse(makeCondition())
+    const result = await generateMockCourseForTest(makeCondition(), 'INITIAL')
     const recommendations = result.days.flatMap(day => day.items).filter(item => item.item_source === 'AI_RECOMMENDED')
     const eastCount = recommendations.filter(item => eastPlaceNames.has(item.place_name)).length
     const otherRegionCount = recommendations.length - eastCount
@@ -61,17 +61,17 @@ describe('courseMockService logical Mock generation', () => {
   })
 
   it('excludes an AVOID place by both name matching and candidate selection', async () => {
-    const result = await courseMockService.generateCourse(makeCondition([
+    const result = await generateMockCourseForTest(makeCondition([
       { place_id: -10, place_name: '성산일출봉', preference_type: 'AVOID' },
-    ]))
+    ]), 'INITIAL')
 
     expect(result.days.flatMap(day => day.items).some(item => item.place_name === '성산일출봉')).toBe(false)
   })
 
   it('always includes a non-fixed WANT place', async () => {
-    const result = await courseMockService.generateCourse(makeCondition([
+    const result = await generateMockCourseForTest(makeCondition([
       { place_id: 101, place_name: '비자림', preference_type: 'WANT' },
-    ]))
+    ]), 'INITIAL')
     const want = result.days.flatMap(day => day.items).find(item => item.place_name === '비자림')
 
     expect(want).toBeDefined()
@@ -84,7 +84,7 @@ describe('courseMockService logical Mock generation', () => {
     cafeCondition.course_place_preferences = [
       { place_id: 109, place_name: '애월 해안도로', preference_type: 'WANT', fixed_date: '2026-08-13', fixed_time: '12:00' },
     ]
-    const result = await courseMockService.generateCourse(cafeCondition)
+    const result = await generateMockCourseForTest(cafeCondition, 'INITIAL')
     const westItems = result.days.flatMap(day => day.items).filter(item => westPlaceNames.has(item.place_name) && item.item_source === 'AI_RECOMMENDED')
 
     expect(westItems.length).toBeGreaterThan(0)
@@ -102,7 +102,7 @@ describe('courseMockService logical Mock generation', () => {
     ])
     condition.end_date = condition.start_date
 
-    const result = await courseMockService.generateCourse(condition)
+    const result = await generateMockCourseForTest(condition, 'INITIAL')
     const fixed = result.days[0].items.find(item => item.place_name === '비자림')
 
     expect(fixed).toMatchObject({
@@ -115,7 +115,7 @@ describe('courseMockService logical Mock generation', () => {
   })
 
   it('places operating-hours-aware AI recommendations only in valid slots', async () => {
-    const result = await courseMockService.generateCourse(makeCondition())
+    const result = await generateMockCourseForTest(makeCondition(), 'INITIAL')
     const items = result.days.flatMap(day => day.items)
     const abuOreum = items.find(item => item.place_name === '아부오름')
 
@@ -132,8 +132,8 @@ describe('courseMockService logical Mock generation', () => {
       { place_id: -2, place_name: '협재해수욕장', preference_type: 'WANT' },
       { place_id: 103, place_name: '성산일출봉', preference_type: 'AVOID' },
     ])
-    const initial = await courseMockService.generateCourse(condition)
-    const regenerated = await courseMockService.regenerateCourse(condition)
+    const initial = await generateMockCourseForTest(condition, 'INITIAL')
+    const regenerated = await generateMockCourseForTest(condition, 'USER_REGENERATE')
     const initialRecommendations = initial.days.flatMap(day => day.items).filter(item => item.place_id > 0 && item.place_name !== '비자림').map(item => item.place_name)
     const regeneratedItems = regenerated.days.flatMap(day => day.items)
     const regeneratedRecommendations = regeneratedItems.filter(item => item.place_id > 0 && item.place_name !== '비자림').map(item => item.place_name)
@@ -154,7 +154,7 @@ describe('courseMockService logical Mock generation', () => {
   })
 
   it('generates the existing course normally when accommodation is undefined', async () => {
-    const result = await courseMockService.generateCourse(makeCondition())
+    const result = await generateMockCourseForTest(makeCondition(), 'INITIAL')
 
     expect(result.accommodation).toBeUndefined()
     expect(result.days).toHaveLength(3)
@@ -173,7 +173,7 @@ describe('courseMockService logical Mock generation', () => {
       longitude: 126.9360,
     }
 
-    const result = await courseMockService.generateCourse(condition)
+    const result = await generateMockCourseForTest(condition, 'INITIAL')
     expect(result.accommodation).toEqual(condition.accommodation)
     for (const day of result.days) {
       expect(eastPlaceNames.has(day.items[0].place_name)).toBe(true)
@@ -188,7 +188,7 @@ describe('courseMockService logical Mock generation', () => {
     ])
     condition.accommodation = { source_code: 'KAKAO_LOCAL', source_place_id: 'MOCK_KAKAO_9005', place_name: '애월 호텔', latitude: 33.4622, longitude: 126.3098 }
 
-    const result = await courseMockService.generateCourse(condition)
+    const result = await generateMockCourseForTest(condition, 'INITIAL')
     const fixed = result.days.flatMap(day => day.items).find(item => item.place_name === '성산일출봉')
 
     expect(fixed).toMatchObject({ visit_date: '2026-08-14', start_time: '13:00', item_source: 'USER_FIXED' })
@@ -201,7 +201,7 @@ describe('courseMockService logical Mock generation', () => {
     ])
     condition.accommodation = { source_code: 'KAKAO_LOCAL', source_place_id: 'MOCK_KAKAO_9003', place_name: '성산 호텔', latitude: 33.4580, longitude: 126.9360 }
 
-    const result = await courseMockService.generateCourse(condition)
+    const result = await generateMockCourseForTest(condition, 'INITIAL')
     const want = result.days.flatMap(day => day.items).find(item => item.place_name === '산방산')
 
     expect(want).toBeDefined()
@@ -229,7 +229,7 @@ describe('courseMockService logical Mock generation', () => {
     const condition = makeCondition([
       { place_id: 103, place_name: '성산일출봉', preference_type: 'WANT', fixed_date: '2026-08-13', fixed_time: '09:00' },
     ])
-    const course = await courseMockService.generateCourse(condition)
+    const course = await generateMockCourseForTest(condition, 'INITIAL')
     const target = course.days[0].items.find(item => item.place_name === '성산일출봉')!
 
     const alternatives = await courseMockService.getAlternativePlaces(course, target.id, condition)
@@ -242,7 +242,7 @@ describe('courseMockService logical Mock generation', () => {
 
   it('returns preference and route-scored alternatives for a non-crowded AI item', async () => {
     const condition = makeCondition()
-    const course = await courseMockService.generateCourse(condition)
+    const course = await generateMockCourseForTest(condition, 'INITIAL')
     const scheduledIds = new Set(course.days.flatMap(day => day.items.map(item => item.place_id)))
     const candidates = course.days.flatMap(day => day.items).filter(item => item.item_source === 'AI_RECOMMENDED' && item.congestion_level !== 'CROWDED')
     let alternatives: Awaited<ReturnType<typeof courseMockService.getAlternativePlaces>> = []
@@ -268,7 +268,7 @@ describe('courseMockService logical Mock generation', () => {
       { place_id: 103, place_name: '성산일출봉', preference_type: 'WANT', fixed_date: '2026-08-13', fixed_time: '09:00' },
       { place_id: 120, place_name: '대수산봉', preference_type: 'AVOID' },
     ])
-    const course = await courseMockService.generateCourse(condition)
+    const course = await generateMockCourseForTest(condition, 'INITIAL')
     const target = course.days[0].items.find(item => item.place_name === '성산일출봉')!
     const duplicateSource = course.days.flatMap(day => day.items).find(item => item.id !== target.id)!
     duplicateSource.place_id = 121
@@ -285,7 +285,7 @@ describe('courseMockService logical Mock generation', () => {
       { place_id: 103, place_name: '성산일출봉', preference_type: 'WANT', fixed_date: '2026-08-13', fixed_time: '09:00' },
     ])
     condition.accommodation = { source_code: 'KAKAO_LOCAL', source_place_id: 'MOCK_KAKAO_9003', place_name: '성산 마리나 호텔', region: 'EAST', latitude: 33.4612, longitude: 126.9324 }
-    const course = await courseMockService.generateCourse(condition)
+    const course = await generateMockCourseForTest(condition, 'INITIAL')
     const target = course.days[0].items.find(item => item.place_name === '성산일출봉')!
     const alternatives = await courseMockService.getAlternativePlaces(course, target.id, condition)
     const replacement = alternatives[0]

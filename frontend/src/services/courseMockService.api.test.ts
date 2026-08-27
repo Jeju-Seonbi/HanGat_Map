@@ -1,0 +1,97 @@
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { CourseCondition, CourseResult } from '../assets/types/course'
+import { courseMockService } from './courseMockService'
+
+const condition: CourseCondition = {
+  start_date: '2026-08-28',
+  end_date: '2026-08-29',
+  people: 2,
+  budget_total: 400000,
+  transport: 'RENTAL_CAR',
+  course_regions: [{ region_id: 1, code: 'EAST', name: '동부' }],
+  course_styles: [{ tag_id: 1, code: 'NATURE', name: '자연', weight: 1 }],
+  course_place_preferences: [],
+  accommodation: {
+    source_code: 'KAKAO_LOCAL',
+    source_place_id: 'accommodation-1',
+    place_name: '제주 숙소',
+    latitude: 33.45,
+    longitude: 126.55,
+  },
+}
+
+const response: CourseResult = {
+  id: 101,
+  course_type: 'USER',
+  generation_reason: 'INITIAL',
+  status: 'READY',
+  start_date: condition.start_date,
+  end_date: condition.end_date,
+  people: condition.people,
+  budget_total: condition.budget_total,
+  transport: condition.transport,
+  accommodation: condition.accommodation,
+  days: [{
+    day_no: 1,
+    visit_date: condition.start_date,
+    items: [{
+      id: 201,
+      course_id: 101,
+      place_id: 301,
+      place_name: '비자림',
+      category_name: '관광지',
+      day_no: 1,
+      position: 1,
+      visit_date: condition.start_date,
+      start_time: '09:00',
+      item_source: 'AI_RECOMMENDED',
+      congestion_rate: 22.5,
+      congestion_level: 'QUIET',
+      recommendation_reason: '혼잡도가 낮고 자연 취향에 잘 맞아요.',
+      costs: [],
+    }],
+  }],
+}
+
+afterEach(() => vi.unstubAllGlobals())
+
+describe('courseMockService Backend generation', () => {
+  it('posts the unchanged CourseCondition and returns the Backend CourseResult without fabricating data', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue(response),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await courseMockService.generateCourse(condition)
+
+    expect(fetchMock).toHaveBeenCalledOnce()
+    expect(fetchMock).toHaveBeenCalledWith('http://localhost:8080/courses', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(condition),
+    })
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual(condition)
+    expect(result).toBe(response)
+    expect(result.days[0].items[0]).toMatchObject({ id: 201, course_id: 101, place_id: 301, costs: [] })
+    expect(result.days[0].items[0].end_time).toBeUndefined()
+    expect(result.estimated_cost_min).toBeUndefined()
+  })
+
+  it('rejects HTTP failures without falling back to mock generation', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 503 })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(courseMockService.generateCourse(condition)).rejects.toThrow('HTTP 503')
+    expect(fetchMock).toHaveBeenCalledOnce()
+  })
+
+  it('keeps regeneration unavailable instead of sending an INITIAL request or returning mock data', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(courseMockService.regenerateCourse(condition)).rejects.toThrow('재생성은 아직 지원되지 않습니다')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+})

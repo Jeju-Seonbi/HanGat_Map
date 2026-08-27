@@ -18,6 +18,7 @@ import { getMockWeather, weatherRecommendationAdjustment, weatherWarning } from 
 import { savedCourseMockService } from './savedCourseMockService'
 
 const pause = (ms = 650) => new Promise(resolve => setTimeout(resolve, ms))
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080'
 const RECOMMENDED_ITEMS_PER_DAY = 3
 const FIXED_STAY_MINUTES = 90
 const LONG_GAP_MINUTES = 240
@@ -534,7 +535,7 @@ function placeFlexibleWants(days: CourseDay[], dayRegions: RegionCode[], prefere
   })
 }
 
-async function generate(condition: CourseCondition, generationReason: CourseResult['generation_reason']): Promise<CourseResult> {
+async function generateMockCourse(condition: CourseCondition, generationReason: CourseResult['generation_reason']): Promise<CourseResult> {
   await pause()
   const courseId = ++sequence
   const dayCount = Math.max(1, Math.round((new Date(condition.end_date).getTime() - new Date(condition.start_date).getTime()) / 86400000) + 1)
@@ -620,10 +621,23 @@ async function generate(condition: CourseCondition, generationReason: CourseResu
   })
 }
 
+async function generate(condition: CourseCondition): Promise<CourseResult> {
+  const response = await fetch(`${API_BASE_URL}/courses`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(condition),
+  })
+
+  if (!response.ok) throw new Error(`코스 생성 API 요청에 실패했습니다. (HTTP ${response.status})`)
+  return await response.json() as CourseResult
+}
+
+export const generateMockCourseForTest = generateMockCourse
+
 export const courseMockService = {
-  generateCourse: (condition: CourseCondition) => generate(condition, 'INITIAL'),
-  regenerateCourse: (condition: CourseCondition) => generate(condition, 'USER_REGENERATE'),
-  recalculateRouteWithAccommodation: (condition: CourseCondition, accommodation: AccommodationInput) => generate({
+  generateCourse: (condition: CourseCondition) => generate(condition),
+  regenerateCourse: (_condition: CourseCondition): Promise<CourseResult> => Promise.reject(new Error('코스 재생성은 아직 지원되지 않습니다.')),
+  recalculateRouteWithAccommodation: (condition: CourseCondition, accommodation: AccommodationInput) => generateMockCourse({
     ...JSON.parse(JSON.stringify(condition)) as CourseCondition,
     accommodation: { ...accommodation },
   }, 'USER_REGENERATE'),
