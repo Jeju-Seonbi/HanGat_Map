@@ -1,6 +1,7 @@
 package com.example.hangat.domain.congestion;
 
 import com.example.hangat.domain.congestion.model.CongestionLevel;
+import com.example.hangat.map.repository.CongestionForecastRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;

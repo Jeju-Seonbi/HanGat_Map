@@ -4,32 +4,23 @@ spring:
 
   # 기본값은 backend/docker-compose.yml 의 MariaDB와 일치 - .env 없이도 부팅된다
   datasource:
-    url: ${DB_URL:jdbc:mariadb://localhost:3306/hangatmap}
-    username: ${DB_USER:root}
-    password: ${DB_PASS:qwer1234}
+    url: ${DB_URL:jdbc:mariadb://localhost:3306/hangat}
+    username: ${DB_USER:hangat}
+    password: ${DB_PASS:hangat}
     driver-class-name: org.mariadb.jdbc.Driver
     hikari:
       maximum-pool-size: 10
       minimum-idle: 2
       connection-timeout: 30000
 
+
   jpa:
     hibernate:
       ddl-auto: update
     show-sql: false
-    # 테이블 생성(ddl-auto) 후에 시드 SQL을 실행하기 위한 지연 설정
-    defer-datasource-initialization: true
     properties:
       hibernate:
         default_batch_fetch_size: 100
-
-  # dev 전용 시드 - INSERT IGNORE 라 매 부팅 재실행돼도 안전 (생성: scripts/build_seed_sql.py)
-  sql:
-    init:
-      mode: always
-      data-locations: classpath:seed-dev.sql
-      # Java 17의 기본 파일 인코딩이 OS 종속(한국 윈도우 CP949)이라 명시 필수 - 없으면 한글 시드가 깨진다
-      encoding: UTF-8
 
 server:
   port: ${SERVER_PORT:8080}
@@ -44,3 +35,9 @@ management:
 weather:
   base-url: https://apis.data.go.kr/1360000
   service-key: ${SERVICE_KEY}
+
+# 공공데이터포털 - 한국관광공사 계열 (KorService2 / 집중률 / 방문자수)
+# ★ service-key 는 Decoding 키. 계정당 인증키 1개가 활용신청한 모든 API에 통하므로 weather와 같은 값을 쓴다
+public-api:
+  service-key: ${SERVICE_KEY}
+  tour-base-url: https://apis.data.go.kr/B551011
