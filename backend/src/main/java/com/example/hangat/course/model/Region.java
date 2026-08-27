@@ -11,6 +11,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 
@@ -26,6 +28,7 @@ public class Region extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @JdbcTypeCode(SqlTypes.SMALLINT)
     private Long id;
 
     @Column(name = "code", nullable = false, unique = true, length = 20)
@@ -40,12 +43,15 @@ public class Region extends BaseEntity {
     @Column(name = "center_lng", precision = 10, scale = 7)
     private BigDecimal centerLongitude;
 
+    @JdbcTypeCode(SqlTypes.SMALLINT)
     @Column(name = "kma_grid_x")
     private Integer kmaGridX;
 
+    @JdbcTypeCode(SqlTypes.SMALLINT)
     @Column(name = "kma_grid_y")
     private Integer kmaGridY;
 
+    @JdbcTypeCode(SqlTypes.TINYINT)
     @Column(name = "display_order", nullable = false, unique = true)
     private Integer displayOrder;
 

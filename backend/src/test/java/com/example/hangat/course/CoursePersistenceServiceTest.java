@@ -2,6 +2,7 @@ package com.example.hangat.course;
 
 import com.example.hangat.course.ai.CourseAiInputDto;
 import com.example.hangat.course.ai.CourseAiResultDto;
+import com.example.hangat.course.model.Course;
 import com.example.hangat.course.model.CourseCandidateDto;
 import com.example.hangat.course.model.CourseItem;
 import com.example.hangat.course.model.CourseItemSource;
@@ -82,6 +83,7 @@ class CoursePersistenceServiceTest {
         assertThat(persisted.course().getId()).isNotNull();
         assertThat(persisted.course().getStatus()).isEqualTo(CourseStatus.READY);
         assertThat(persisted.course().getGenerationReason()).isEqualTo(GenerationReason.INITIAL);
+        assertThat(persisted.course().getParentCourse()).isNull();
         assertThat(persisted.course().getUserId()).isNull();
         assertThat(persisted.course().getSavedAt()).isNull();
 
@@ -91,6 +93,7 @@ class CoursePersistenceServiceTest {
         assertThat(item.getPlace().getId()).isNotNull();
         assertThat(item.getDayNo()).isEqualTo(1);
         assertThat(item.getPosition()).isEqualTo(1);
+        assertThat(item.getRecommendationScore()).isNull();
         assertThat(item.getItemSource()).isEqualTo(CourseItemSource.USER_FIXED);
         assertThat(mappingRepository.findBySourceCodeAndSourcePlaceId("KTO", "KTO-1001"))
                 .get()
@@ -131,6 +134,32 @@ class CoursePersistenceServiceTest {
                 .isEqualTo(GenerationReason.USER_REGENERATE);
         assertThat(first.itemsByCandidateId().get("KTO-2001").getPlace().getId())
                 .isEqualTo(second.itemsByCandidateId().get("KTO-2001").getPlace().getId());
+    }
+
+    @Test
+    void persistsNullableSelfReferenceForRegeneratedCourse() {
+        Course parent = courseRepository.save(Course.ready(
+                LocalDate.of(2026, 8, 27),
+                LocalDate.of(2026, 8, 29),
+                2,
+                500000,
+                Transport.RENTAL_CAR,
+                GenerationReason.INITIAL,
+                "course-ai-1"));
+        Course child = courseRepository.save(Course.ready(
+                LocalDate.of(2026, 8, 27),
+                LocalDate.of(2026, 8, 29),
+                2,
+                500000,
+                Transport.RENTAL_CAR,
+                GenerationReason.USER_REGENERATE,
+                "course-ai-1",
+                parent));
+
+        courseRepository.flush();
+
+        assertThat(child.getParentCourse()).isSameAs(parent);
+        assertThat(child.getParentCourse().getId()).isEqualTo(parent.getId());
     }
 
     @Test

@@ -4,6 +4,8 @@ import com.example.hangat.common.model.BaseEntity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -33,6 +35,10 @@ public class Course extends BaseEntity {
     @Column(name = "preset_id")
     private Long presetId;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_course_id")
+    private Course parentCourse;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "course_type", nullable = false)
     private CourseType courseType;
@@ -54,6 +60,7 @@ public class Course extends BaseEntity {
     @Column(name = "end_date", nullable = false)
     private LocalDate endDate;
 
+    @JdbcTypeCode(SqlTypes.SMALLINT)
     @Column(name = "people", nullable = false)
     private Integer people;
 
@@ -101,7 +108,29 @@ public class Course extends BaseEntity {
             GenerationReason generationReason,
             String algorithmVersion
     ) {
+        return ready(
+                startDate,
+                endDate,
+                people,
+                budgetTotal,
+                transport,
+                generationReason,
+                algorithmVersion,
+                null);
+    }
+
+    public static Course ready(
+            LocalDate startDate,
+            LocalDate endDate,
+            Integer people,
+            Integer budgetTotal,
+            Transport transport,
+            GenerationReason generationReason,
+            String algorithmVersion,
+            Course parentCourse
+    ) {
         Course course = new Course();
+        course.parentCourse = parentCourse;
         course.courseType = CourseType.USER;
         course.generationReason = generationReason == null
                 ? GenerationReason.INITIAL

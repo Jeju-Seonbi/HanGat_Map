@@ -11,6 +11,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "place_categories")
@@ -24,6 +26,7 @@ public class PlaceCategory extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @JdbcTypeCode(SqlTypes.SMALLINT)
     private Long id;
 
     @Column(name = "code", nullable = false, unique = true, length = 30)
@@ -32,6 +35,7 @@ public class PlaceCategory extends BaseEntity {
     @Column(name = "name", nullable = false, unique = true, length = 50)
     private String name;
 
+    @JdbcTypeCode(SqlTypes.SMALLINT)
     @Column(name = "display_order", nullable = false)
     private Integer displayOrder;
 

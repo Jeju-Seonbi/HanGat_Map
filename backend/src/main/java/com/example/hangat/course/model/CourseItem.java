@@ -17,7 +17,10 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
@@ -48,9 +51,11 @@ public class CourseItem extends BaseEntity {
     @JoinColumn(name = "place_id", nullable = false)
     private Place place;
 
+    @JdbcTypeCode(SqlTypes.SMALLINT)
     @Column(name = "day_no", nullable = false)
     private Integer dayNo;
 
+    @JdbcTypeCode(SqlTypes.SMALLINT)
     @Column(name = "position", nullable = false)
     private Integer position;
 
@@ -70,6 +75,7 @@ public class CourseItem extends BaseEntity {
     @Column(name = "inbound_distance_m")
     private Integer inboundDistanceMeters;
 
+    @JdbcTypeCode(SqlTypes.SMALLINT)
     @Column(name = "inbound_travel_minutes")
     private Integer inboundTravelMinutes;
 
@@ -78,6 +84,9 @@ public class CourseItem extends BaseEntity {
 
     @Column(name = "planned_weather_forecast_id")
     private Long plannedWeatherForecastId;
+
+    @Column(name = "recommendation_score", precision = 8, scale = 4)
+    private BigDecimal recommendationScore;
 
     @Column(name = "recommendation_reason_code", length = 30)
     private String recommendationReasonCode;
