@@ -3,7 +3,14 @@ package com.example.hangat.course;
 import com.example.hangat.course.ai.CourseAiInputDto;
 import com.example.hangat.course.ai.CourseAiResultDto;
 import com.example.hangat.course.model.CongestionLevel;
+import com.example.hangat.course.model.Course;
 import com.example.hangat.course.model.CourseCandidateDto;
+import com.example.hangat.course.model.CourseItem;
+import com.example.hangat.course.model.CourseItemSource;
+import com.example.hangat.course.model.CourseStatus;
+import com.example.hangat.course.model.CourseType;
+import com.example.hangat.course.model.GenerationReason;
+import com.example.hangat.course.model.Place;
 import com.example.hangat.course.model.CourseResponseDto;
 import com.example.hangat.course.model.PreferenceType;
 import com.example.hangat.course.model.TourPlaceDto;
@@ -19,6 +26,8 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class CourseResponseAssemblerTest {
 
@@ -82,6 +91,68 @@ class CourseResponseAssemblerTest {
                 input, result, List.of(original("known", "장소", null))))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("unknown");
+    }
+
+    @Test
+    void exposesOriginalFrontendInitialDisplayContractFromPersistedFacts() throws Exception {
+        CourseAiInputDto input = input(List.of(fact(
+                "first",
+                "첫 장소",
+                PreferenceType.WANT,
+                List.of(new CourseAiInputDto.CongestionFactDto(
+                        LocalDate.of(2026, 8, 28),
+                        new BigDecimal("72.50"),
+                        CongestionLevel.CROWDED)),
+                null)));
+        CourseAiResultDto result = new CourseAiResultDto(
+                "1.0",
+                List.of(day("2026-08-28", item("first", "09:00", "한글 추천 이유"))));
+
+        Course course = mock(Course.class);
+        when(course.getId()).thenReturn(101L);
+        when(course.getCourseType()).thenReturn(CourseType.USER);
+        when(course.getGenerationReason()).thenReturn(GenerationReason.INITIAL);
+        when(course.getStatus()).thenReturn(CourseStatus.READY);
+        when(course.getPeople()).thenReturn(2);
+        when(course.getBudgetTotal()).thenReturn(500000);
+        when(course.getTransport()).thenReturn(Transport.RENTAL_CAR);
+
+        Place place = mock(Place.class);
+        when(place.getId()).thenReturn(301L);
+        CourseItem persistedItem = mock(CourseItem.class);
+        when(persistedItem.getId()).thenReturn(201L);
+        when(persistedItem.getCourse()).thenReturn(course);
+        when(persistedItem.getPlace()).thenReturn(place);
+        when(persistedItem.getItemSource()).thenReturn(CourseItemSource.USER_FIXED);
+
+        var accommodation = objectMapper.readValue("""
+                {"source_code":"KAKAO_LOCAL","source_place_id":"stay-1",
+                 "place_name":"제주 숙소","address":"제주 주소",
+                 "latitude":33.4,"longitude":126.8}
+                """, com.example.hangat.course.model.AccommodationDto.class);
+        CourseResponseDto response = assembler.assemble(
+                input,
+                result,
+                List.of(original("first", "첫 장소", "first.jpg")),
+                new CoursePersistenceResult(
+                        course,
+                        java.util.Map.of("first", persistedItem),
+                        java.util.Map.of("first", "관광지")),
+                accommodation);
+
+        assertThat(response.id()).isEqualTo(101L);
+        assertThat(response.accommodation()).isSameAs(accommodation);
+        CourseResponseDto.ItemDto responseItem = response.days().get(0).items().get(0);
+        assertThat(responseItem.id()).isEqualTo(201L);
+        assertThat(responseItem.courseId()).isEqualTo(101L);
+        assertThat(responseItem.placeId()).isEqualTo(301L);
+        assertThat(responseItem.dayNo()).isEqualTo(1);
+        assertThat(responseItem.visitDate()).isEqualTo(LocalDate.of(2026, 8, 28));
+        assertThat(responseItem.categoryName()).isEqualTo("관광지");
+        assertThat(responseItem.costs()).isEmpty();
+        assertThat(responseItem.congestionRate()).isEqualByComparingTo("72.50");
+        assertThat(responseItem.congestionLevel()).isEqualTo(CongestionLevel.CROWDED);
+        assertThat(responseItem.weather()).isNull();
     }
 
     private CourseAiInputDto input(List<CourseAiInputDto.CandidateFactDto> candidates) {

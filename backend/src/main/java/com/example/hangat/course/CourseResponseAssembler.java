@@ -2,6 +2,7 @@ package com.example.hangat.course;
 
 import com.example.hangat.course.ai.CourseAiInputDto;
 import com.example.hangat.course.ai.CourseAiResultDto;
+import com.example.hangat.course.model.AccommodationDto;
 import com.example.hangat.course.model.CourseCandidateDto;
 import com.example.hangat.course.model.Course;
 import com.example.hangat.course.model.CourseItem;
@@ -36,6 +37,16 @@ public class CourseResponseAssembler {
             CourseAiResultDto result,
             List<CourseCandidateDto> originalCandidates,
             CoursePersistenceResult persistence
+    ) {
+        return assemble(input, result, originalCandidates, persistence, null);
+    }
+
+    public CourseResponseDto assemble(
+            CourseAiInputDto input,
+            CourseAiResultDto result,
+            List<CourseCandidateDto> originalCandidates,
+            CoursePersistenceResult persistence,
+            AccommodationDto accommodation
     ) {
         if (input == null || input.tripCondition() == null) {
             throw new IllegalArgumentException("AI 코스 입력이 필요합니다.");
@@ -82,6 +93,7 @@ public class CourseResponseAssembler {
                 course == null ? input.tripCondition().people() : course.getPeople(),
                 course == null ? input.tripCondition().budgetTotal() : course.getBudgetTotal(),
                 course == null ? input.tripCondition().transport() : course.getTransport(),
+                accommodation,
                 days);
     }
 
@@ -95,6 +107,7 @@ public class CourseResponseAssembler {
     ) {
         List<ItemDto> items = java.util.stream.IntStream.range(0, day.items().size())
                 .mapToObj(itemIndex -> toItem(
+                        dayNo,
                         itemIndex + 1,
                         day,
                         day.items().get(itemIndex),
@@ -107,6 +120,7 @@ public class CourseResponseAssembler {
     }
 
     private ItemDto toItem(
+            int dayNo,
             int position,
             CourseAiResultDto.DayDto day,
             CourseAiResultDto.ItemDto item,
@@ -126,6 +140,12 @@ public class CourseResponseAssembler {
         CourseItem persistedItem = persistence == null
                 ? null
                 : persistence.itemsByCandidateId().get(item.candidateId());
+        List<CongestionFactDto> congestion = fact.congestion().stream()
+                .filter(congestionFact -> day.date().equals(congestionFact.date()))
+                .map(congestionFact -> new CongestionFactDto(
+                        congestionFact.date(), congestionFact.rate(), congestionFact.level()))
+                .toList();
+        CongestionFactDto displayedCongestion = congestion.stream().findFirst().orElse(null);
         return new ItemDto(
                 persistedItem == null ? null : persistedItem.getId(),
                 persistedItem == null ? null : persistedItem.getCourse().getId(),
@@ -136,12 +156,17 @@ public class CourseResponseAssembler {
                 fact.latitude(),
                 fact.longitude(),
                 original.getPlace().getImageUrl(),
+                persistence == null
+                        ? null
+                        : persistence.categoryNamesByCandidateId().get(item.candidateId()),
                 category == null ? null : new TourCategoryDto(
                         category.category1(), category.category2(), category.category3()),
                 fact.regionCode(),
                 fact.preferenceType(),
                 fact.confirmedStyleHints(),
+                dayNo,
                 position,
+                day.date(),
                 item.startTime(),
                 persistedItem == null
                         ? (isFixedSchedule(day, item, fact, input)
@@ -149,11 +174,10 @@ public class CourseResponseAssembler {
                                 : ItemSource.AI_RECOMMENDED)
                         : ItemSource.valueOf(persistedItem.getItemSource().name()),
                 item.recommendationReason(),
-                fact.congestion().stream()
-                        .filter(congestion -> day.date().equals(congestion.date()))
-                        .map(congestion -> new CongestionFactDto(
-                                congestion.date(), congestion.rate(), congestion.level()))
-                        .toList(),
+                List.of(),
+                displayedCongestion == null ? null : displayedCongestion.rate(),
+                displayedCongestion == null ? null : displayedCongestion.level(),
+                congestion,
                 fact.weather() == null ? null : fact.weather().stream()
                         .filter(weather -> day.date().equals(weather.forecastDate()))
                         .map(weather -> new WeatherFactDto(

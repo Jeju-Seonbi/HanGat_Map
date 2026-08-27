@@ -88,6 +88,8 @@ class CoursePersistenceServiceTest {
         assertThat(persisted.course().getSavedAt()).isNull();
 
         CourseItem item = persisted.itemsByCandidateId().get("KTO-1001");
+        assertThat(persisted.categoryNamesByCandidateId().get("KTO-1001"))
+                .isEqualTo("관광지");
         assertThat(item.getId()).isNotNull();
         assertThat(item.getCourse().getId()).isEqualTo(persisted.course().getId());
         assertThat(item.getPlace().getId()).isNotNull();
@@ -108,6 +110,8 @@ class CoursePersistenceServiceTest {
                 .isEqualTo(persisted.course().getId());
         assertThat(response.days().get(0).items().get(0).placeId())
                 .isEqualTo(item.getPlace().getId());
+        assertThat(response.days().get(0).items().get(0).categoryName())
+                .isEqualTo("관광지");
     }
 
     @Test

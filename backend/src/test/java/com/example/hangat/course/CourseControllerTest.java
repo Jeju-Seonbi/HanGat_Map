@@ -1,6 +1,10 @@
 package com.example.hangat.course;
 
 import com.example.hangat.course.model.CourseResponseDto;
+import com.example.hangat.course.model.CourseStatus;
+import com.example.hangat.course.model.CourseType;
+import com.example.hangat.course.model.GenerationReason;
+import com.example.hangat.course.model.Transport;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -62,7 +66,18 @@ class CourseControllerTest {
                 .andExpect(jsonPath("$.days[0].day_no").value(1))
                 .andExpect(jsonPath("$.days[0].visit_date").value("2026-08-28"))
                 .andExpect(jsonPath("$.days[0].items[0].candidate_id").value("candidate-1"))
+                .andExpect(jsonPath("$.days[0].items[0].id").value(201))
+                .andExpect(jsonPath("$.days[0].items[0].course_id").value(101))
+                .andExpect(jsonPath("$.days[0].items[0].place_id").value(301))
                 .andExpect(jsonPath("$.days[0].items[0].place_name").value("성산일출봉"))
+                .andExpect(jsonPath("$.days[0].items[0].day_no").value(1))
+                .andExpect(jsonPath("$.days[0].items[0].visit_date").value("2026-08-28"))
+                .andExpect(jsonPath("$.days[0].items[0].category_name").value("관광지"))
+                .andExpect(jsonPath("$.days[0].items[0].costs").isArray())
+                .andExpect(jsonPath("$.days[0].items[0].costs").isEmpty())
+                .andExpect(jsonPath("$.days[0].items[0].congestion_rate").value(22.5))
+                .andExpect(jsonPath("$.days[0].items[0].congestion_level").value("QUIET"))
+                .andExpect(jsonPath("$.accommodation.place_name").value("제주 숙소"))
                 .andExpect(jsonPath("$.days[0].items[0].recommendation_reason")
                         .value("혼잡도가 낮고 동선이 좋아요."))
                 .andExpect(jsonPath("$.days[0].items[0].congestion[0].rate").value(22.5))
@@ -76,13 +91,29 @@ class CourseControllerTest {
     }
 
     private CourseResponseDto response() {
+        com.example.hangat.course.model.AccommodationDto accommodation;
+        try {
+            accommodation = objectMapper.readValue("""
+                    {"source_code":"KAKAO_LOCAL","source_place_id":"stay-1",
+                     "place_name":"제주 숙소","address":"제주 주소",
+                     "latitude":33.4,"longitude":126.8}
+                    """, com.example.hangat.course.model.AccommodationDto.class);
+        } catch (Exception exception) {
+            throw new IllegalStateException(exception);
+        }
         CourseResponseDto.ItemDto item = new CourseResponseDto.ItemDto(
+                201L, 101L, 301L,
                 "candidate-1", "성산일출봉", "제주특별자치도 서귀포시 성산읍",
                 33.458, 126.942, null,
+                "관광지",
                 new CourseResponseDto.TourCategoryDto("A01", null, null),
-                "EAST", null, List.of("NATURE"), 1,
+                "EAST", null, List.of("NATURE"), 1, 1,
+                LocalDate.of(2026, 8, 28),
                 LocalTime.of(9, 0), CourseResponseDto.ItemSource.AI_RECOMMENDED,
                 "혼잡도가 낮고 동선이 좋아요.",
+                List.of(),
+                new BigDecimal("22.5"),
+                com.example.hangat.course.model.CongestionLevel.QUIET,
                 List.of(new CourseResponseDto.CongestionFactDto(
                         LocalDate.of(2026, 8, 28), new BigDecimal("22.5"),
                         com.example.hangat.course.model.CongestionLevel.QUIET)),
@@ -91,7 +122,9 @@ class CourseControllerTest {
                         new BigDecimal("27.5"), 20, "0", "1",
                         new BigDecimal("2.1"), 65)));
         return new CourseResponseDto(
-                "1.0", LocalDate.of(2026, 8, 27), LocalDate.of(2026, 8, 29),
+                101L, "1.0", CourseType.USER, GenerationReason.INITIAL, CourseStatus.READY,
+                LocalDate.of(2026, 8, 27), LocalDate.of(2026, 8, 29),
+                2, 500000, Transport.RENTAL_CAR, accommodation,
                 List.of(new CourseResponseDto.DayDto(
                         1, LocalDate.of(2026, 8, 28), List.of(item))));
     }

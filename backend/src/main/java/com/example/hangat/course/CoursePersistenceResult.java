@@ -7,11 +7,22 @@ import java.util.Map;
 
 public record CoursePersistenceResult(
         Course course,
-        Map<String, CourseItem> itemsByCandidateId
+        Map<String, CourseItem> itemsByCandidateId,
+        Map<String, String> categoryNamesByCandidateId
 ) {
     public CoursePersistenceResult {
         itemsByCandidateId = itemsByCandidateId == null
                 ? Map.of()
                 : Map.copyOf(itemsByCandidateId);
+        categoryNamesByCandidateId = categoryNamesByCandidateId == null
+                ? Map.of()
+                : Map.copyOf(categoryNamesByCandidateId);
+    }
+
+    public CoursePersistenceResult(
+            Course course,
+            Map<String, CourseItem> itemsByCandidateId
+    ) {
+        this(course, itemsByCandidateId, Map.of());
     }
 }

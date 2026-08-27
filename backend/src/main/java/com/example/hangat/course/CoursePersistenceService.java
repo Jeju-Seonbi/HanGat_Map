@@ -95,6 +95,7 @@ public class CoursePersistenceService {
                         : input.generationMetadata().algorithmVersion()));
 
         Map<String, CourseItem> itemsByCandidateId = new LinkedHashMap<>();
+        Map<String, String> categoryNamesByCandidateId = new LinkedHashMap<>();
         for (int dayIndex = 0; dayIndex < result.days().size(); dayIndex++) {
             CourseAiResultDto.DayDto day = result.days().get(dayIndex);
             int dayNo = dayIndex + 1;
@@ -119,10 +120,16 @@ public class CoursePersistenceService {
                         resolveItemSource(input, fact, day, resultItem),
                         resultItem.recommendationReason()));
                 itemsByCandidateId.put(resultItem.candidateId(), item);
+                categoryNamesByCandidateId.put(
+                        resultItem.candidateId(),
+                        place.getPrimaryCategory().getName());
             }
         }
 
-        return new CoursePersistenceResult(course, itemsByCandidateId);
+        return new CoursePersistenceResult(
+                course,
+                itemsByCandidateId,
+                categoryNamesByCandidateId);
     }
 
     private Place resolvePlace(

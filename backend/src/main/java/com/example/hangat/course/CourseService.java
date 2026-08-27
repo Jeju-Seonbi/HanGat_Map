@@ -44,7 +44,8 @@ public class CourseService {
                 result,
                 prepared.candidates());
         return courseResponseAssembler.assemble(
-                prepared.input(), result, prepared.candidates(), persistence);
+                prepared.input(), result, prepared.candidates(), persistence,
+                request.getAccommodation());
     }
 
     CourseAiInputDto prepareAiInput(CourseRequestDto request) {

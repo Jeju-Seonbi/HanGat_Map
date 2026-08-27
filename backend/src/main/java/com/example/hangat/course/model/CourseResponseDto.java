@@ -22,6 +22,7 @@ public record CourseResponseDto(
         Integer people,
         Integer budgetTotal,
         Transport transport,
+        AccommodationDto accommodation,
         List<DayDto> days
 ) {
     public CourseResponseDto {
@@ -42,6 +43,7 @@ public record CourseResponseDto(
                 null,
                 startDate,
                 endDate,
+                null,
                 null,
                 null,
                 null,
@@ -76,62 +78,45 @@ public record CourseResponseDto(
             Double latitude,
             Double longitude,
             String imageUrl,
+            String categoryName,
             TourCategoryDto tourCategory,
             String regionCode,
             PreferenceType preferenceType,
             List<String> confirmedStyleHints,
+            int dayNo,
             int position,
+            LocalDate visitDate,
             LocalTime startTime,
             ItemSource itemSource,
             String recommendationReason,
+            List<CourseItemCostDto> costs,
+            BigDecimal congestionRate,
+            CongestionLevel congestionLevel,
             List<CongestionFactDto> congestion,
             List<WeatherFactDto> weather
     ) {
         public ItemDto {
             confirmedStyleHints = immutableList(confirmedStyleHints);
+            costs = immutableList(costs);
             congestion = immutableList(congestion);
             weather = weather == null ? null : List.copyOf(weather);
         }
 
-        public ItemDto(
-                String candidateId,
-                String placeName,
-                String address,
-                Double latitude,
-                Double longitude,
-                String imageUrl,
-                TourCategoryDto tourCategory,
-                String regionCode,
-                PreferenceType preferenceType,
-                List<String> confirmedStyleHints,
-                int position,
-                LocalTime startTime,
-                ItemSource itemSource,
-                String recommendationReason,
-                List<CongestionFactDto> congestion,
-                List<WeatherFactDto> weather
-        ) {
-            this(
-                    null,
-                    null,
-                    null,
-                    candidateId,
-                    placeName,
-                    address,
-                    latitude,
-                    longitude,
-                    imageUrl,
-                    tourCategory,
-                    regionCode,
-                    preferenceType,
-                    confirmedStyleHints,
-                    position,
-                    startTime,
-                    itemSource,
-                    recommendationReason,
-                    congestion,
-                    weather);
-        }
+    }
+
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record CourseItemCostDto(
+            Long id,
+            Long courseId,
+            Long courseItemId,
+            String category,
+            String accuracyType,
+            BigDecimal amountMin,
+            BigDecimal amountMax,
+            String currency,
+            String basisText
+    ) {
     }
 
     @JsonInclude(JsonInclude.Include.ALWAYS)
