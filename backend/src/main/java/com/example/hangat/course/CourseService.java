@@ -2,11 +2,13 @@ package com.example.hangat.course;
 
 import com.example.hangat.course.ai.CourseAiInputDto;
 import com.example.hangat.course.ai.CourseAiGenerationService;
+import com.example.hangat.course.ai.CourseAiResultDto;
 import com.example.hangat.course.model.AccommodationDto;
 import com.example.hangat.course.model.CongestionDto;
 import com.example.hangat.course.model.CourseCandidateDto;
 import com.example.hangat.course.model.CourseRegionDto;
 import com.example.hangat.course.model.CourseRequestDto;
+import com.example.hangat.course.model.CourseResponseDto;
 import com.example.hangat.course.model.CourseStyleDto;
 import com.example.hangat.course.model.PlacePreferenceDto;
 import com.example.hangat.course.model.PreferenceType;
@@ -30,13 +32,20 @@ public class CourseService {
     private final CongestionApiService congestionApiService;
     private final CourseAiPreparationService courseAiPreparationService;
     private final CourseAiGenerationService courseAiGenerationService;
+    private final CourseResponseAssembler courseResponseAssembler;
 
-    public void createCourse(CourseRequestDto request) {
-        CourseAiInputDto input = prepareAiInput(request);
-        courseAiGenerationService.generate(input);
+    public CourseResponseDto createCourse(CourseRequestDto request) {
+        PreparedCourse prepared = prepareCourse(request);
+        CourseAiResultDto result = courseAiGenerationService.generate(prepared.input());
+        return courseResponseAssembler.assemble(
+                prepared.input(), result, prepared.candidates());
     }
 
     CourseAiInputDto prepareAiInput(CourseRequestDto request) {
+        return prepareCourse(request).input();
+    }
+
+    private PreparedCourse prepareCourse(CourseRequestDto request) {
         LocalDate startDate = request.getStartDate();
         LocalDate endDate = request.getEndDate();
         Integer people = request.getPeople();
@@ -171,7 +180,15 @@ public class CourseService {
         }
 
         System.out.println("코스 추천 후보 개수 = " + courseCandidates.size());
-        return courseAiPreparationService.prepare(request, courseCandidates);
+        return new PreparedCourse(
+                courseAiPreparationService.prepare(request, courseCandidates),
+                List.copyOf(courseCandidates));
+    }
+
+    private record PreparedCourse(
+            CourseAiInputDto input,
+            List<CourseCandidateDto> candidates
+    ) {
     }
 
     private void validatePlacePreferences(

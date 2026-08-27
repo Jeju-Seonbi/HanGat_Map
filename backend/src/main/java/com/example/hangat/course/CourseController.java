@@ -1,6 +1,7 @@
 package com.example.hangat.course;
 
 import com.example.hangat.course.model.CourseRequestDto;
+import com.example.hangat.course.model.CourseResponseDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -13,7 +14,7 @@ public class CourseController {
     private final CourseService courseService;
 
     @PostMapping("/courses")
-    public void createCourse(@RequestBody CourseRequestDto request) {
-        courseService.createCourse(request);
+    public CourseResponseDto createCourse(@RequestBody CourseRequestDto request) {
+        return courseService.createCourse(request);
     }
 }

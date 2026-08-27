@@ -60,7 +60,8 @@ class CourseAiPreparationServiceTest {
                 tourApiService, congestionApiService, preparationService,
                 new CourseAiGenerationService(
                         input -> { throw new AssertionError("provider must not run in preparation test"); },
-                        new CourseAiResultValidator()));
+                        new CourseAiResultValidator()),
+                new CourseResponseAssembler());
 
         CourseAiInputDto result = courseService.prepareAiInput(request());
 

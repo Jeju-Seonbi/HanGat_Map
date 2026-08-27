@@ -14,6 +14,8 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Optional;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -31,7 +33,13 @@ class CourseServiceAiGenerationFlowTest {
                     assertThat(input.candidates()).hasSize(1);
                     assertThat(input.candidates().get(0).identity().candidateId()).isEqualTo("candidate-1");
                     providerCalled.set(true);
-                    return new CourseAiResultDto(input.contractVersion(), List.of());
+                    return new CourseAiResultDto(input.contractVersion(), List.of(
+                            new CourseAiResultDto.DayDto(
+                                    LocalDate.of(2026, 8, 27),
+                                    List.of(new CourseAiResultDto.ItemDto(
+                                            "candidate-1",
+                                            LocalTime.of(9, 0),
+                                            "한글 추천 이유")))));
                 },
                 new CourseAiResultValidator());
         CourseService service = new CourseService(
@@ -41,11 +49,16 @@ class CourseServiceAiGenerationFlowTest {
                         new CourseAiInputAssembler(),
                         new CourseTravelService(new StraightLineDistanceCalculator()),
                         Optional.empty()),
-                generationService);
+                generationService,
+                new CourseResponseAssembler());
 
-        service.createCourse(request());
+        var response = service.createCourse(request());
 
         assertThat(providerCalled).isTrue();
+        assertThat(response.days()).hasSize(1);
+        assertThat(response.days().get(0).items().get(0).placeName()).isEqualTo("만장굴");
+        assertThat(response.days().get(0).items().get(0).recommendationReason())
+                .isEqualTo("한글 추천 이유");
     }
 
     private CourseRequestDto request() throws Exception {

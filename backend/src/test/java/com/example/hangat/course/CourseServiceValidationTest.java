@@ -29,7 +29,8 @@ class CourseServiceValidationTest {
                     Optional.empty()),
             new CourseAiGenerationService(
                     input -> { throw new AssertionError("provider must not run in validation test"); },
-                    new CourseAiResultValidator()));
+                    new CourseAiResultValidator()),
+            new CourseResponseAssembler());
 
     @Test
     void rejectsDuplicateWantByInternalId() throws Exception {
