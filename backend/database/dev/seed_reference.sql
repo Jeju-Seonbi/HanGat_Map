@@ -20,4 +20,6 @@ INSERT INTO `data_sources`
     (`code`, `display_name`, `provider_name`, `attribution_text`, `display_order`, `is_active`)
 VALUES
     ('KTO', '한국관광공사 TourAPI', '한국관광공사',
-     '관광정보·사진: 한국관광공사 TourAPI', 1, 1);
+     '관광정보·사진: 한국관광공사 TourAPI', 1, 1),
+    ('KAKAO_LOCAL', '카카오 로컬', '카카오',
+     '장소정보: 카카오 로컬', 2, 1);

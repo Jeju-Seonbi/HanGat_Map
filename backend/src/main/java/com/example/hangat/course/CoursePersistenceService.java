@@ -26,6 +26,7 @@ import java.util.stream.Collectors;
 public class CoursePersistenceService {
 
     static final String KTO_SOURCE_CODE = "KTO";
+    static final String KAKAO_SOURCE_CODE = "KAKAO_LOCAL";
 
     private final CourseRepository courseRepository;
     private final CourseItemRepository courseItemRepository;
@@ -104,12 +105,13 @@ public class CoursePersistenceService {
                 CourseAiResultDto.ItemDto resultItem = day.items().get(itemIndex);
                 CourseAiInputDto.CandidateFactDto fact = factsById.get(resultItem.candidateId());
                 CourseCandidateDto original = originalsById.get(resultItem.candidateId());
-                if (fact == null || original == null) {
+                if (fact == null) {
                     throw new IllegalStateException(
                             "저장할 수 없는 AI 후보 식별자입니다: " + resultItem.candidateId());
                 }
 
-                Place place = resolvePlace(fact, original.getPlace());
+                Place place = resolvePlace(
+                        fact, original == null ? null : original.getPlace(), input);
                 CourseItem item = courseItemRepository.save(CourseItem.generated(
                         course,
                         place,
@@ -134,7 +136,8 @@ public class CoursePersistenceService {
 
     private Place resolvePlace(
             CourseAiInputDto.CandidateFactDto fact,
-            TourPlaceDto original
+            TourPlaceDto original,
+            CourseAiInputDto input
     ) {
         CourseAiInputDto.PlaceIdentityDto identity = fact.identity();
         if (identity.placeId() != null) {
@@ -143,43 +146,52 @@ public class CoursePersistenceService {
                             "내부 장소를 찾을 수 없습니다: " + identity.placeId()));
         }
 
-        String sourceCode = firstNonBlank(identity.sourceCode(), KTO_SOURCE_CODE)
-                .trim().toUpperCase(Locale.ROOT);
-        String sourcePlaceId = firstNonBlank(identity.sourcePlaceId(), original.getContentId());
+        String rawSourceCode = firstNonBlank(
+                identity.sourceCode(), original == null ? null : KTO_SOURCE_CODE);
+        if (rawSourceCode == null || rawSourceCode.isBlank()) {
+            throw new IllegalStateException("외부 장소 출처 코드가 없는 후보는 저장할 수 없습니다.");
+        }
+        String sourceCode = rawSourceCode.trim().toUpperCase(Locale.ROOT);
+        String sourcePlaceId = firstNonBlank(
+                identity.sourcePlaceId(), original == null ? null : original.getContentId());
         if (sourcePlaceId == null || sourcePlaceId.isBlank()) {
             throw new IllegalStateException("외부 장소 식별자가 없는 후보는 저장할 수 없습니다.");
         }
 
         return mappingRepository.findBySourceCodeAndSourcePlaceId(sourceCode, sourcePlaceId)
                 .map(PlaceSourceMapping::getPlace)
-                .orElseGet(() -> createMappedPlace(fact, sourceCode, sourcePlaceId));
+                .orElseGet(() -> createMappedPlace(
+                        fact, original, input, sourceCode, sourcePlaceId));
     }
 
     private Place createMappedPlace(
             CourseAiInputDto.CandidateFactDto fact,
+            TourPlaceDto original,
+            CourseAiInputDto input,
             String sourceCode,
             String sourcePlaceId
     ) {
-        if (!KTO_SOURCE_CODE.equals(sourceCode)) {
+        if (KAKAO_SOURCE_CODE.equals(sourceCode) && original != null) {
+            Place place = resolveKtoBackingPlace(original);
+            mappingRepository.save(PlaceSourceMapping.active(
+                    place, sourceCode, sourcePlaceId));
+            return place;
+        }
+        if (!KTO_SOURCE_CODE.equals(sourceCode) && !KAKAO_SOURCE_CODE.equals(sourceCode)) {
             throw new IllegalStateException(
                     "기존 매핑이 없는 외부 출처 장소는 생성할 수 없습니다: " + sourceCode);
         }
         if (fact.name() == null || fact.name().isBlank()) {
-            throw new IllegalStateException("장소명이 없는 KTO 후보는 저장할 수 없습니다.");
+            throw new IllegalStateException("장소명이 없는 외부 후보는 저장할 수 없습니다.");
         }
         if (fact.regionCode() == null || "UNKNOWN".equalsIgnoreCase(fact.regionCode())) {
-            throw new IllegalStateException("권역을 확인할 수 없는 KTO 후보는 저장할 수 없습니다.");
-        }
-        if (fact.tourCategory() == null) {
-            throw new IllegalStateException("관광 카테고리가 없는 KTO 후보는 저장할 수 없습니다.");
+            throw new IllegalStateException("권역을 확인할 수 없는 외부 후보는 저장할 수 없습니다.");
         }
 
         Region region = regionRepository.findByCodeIgnoreCaseAndActiveTrue(fact.regionCode())
                 .orElseThrow(() -> new IllegalStateException(
                         "등록된 권역 코드를 찾을 수 없습니다: " + fact.regionCode()));
-        String categoryCode = KtoPlaceCategoryResolver.resolve(
-                fact.tourCategory().category1(),
-                fact.tourCategory().category3());
+        String categoryCode = resolveCategoryCode(fact, input, sourceCode);
         PlaceCategory category = placeCategoryRepository
                 .findByCodeIgnoreCaseAndActiveTrue(categoryCode)
                 .orElseThrow(() -> new IllegalStateException(
@@ -198,6 +210,67 @@ public class CoursePersistenceService {
                 sourceCode,
                 sourcePlaceId));
         return place;
+    }
+
+    private Place resolveKtoBackingPlace(TourPlaceDto original) {
+        return mappingRepository.findBySourceCodeAndSourcePlaceId(
+                        KTO_SOURCE_CODE, original.getContentId())
+                .map(PlaceSourceMapping::getPlace)
+                .orElseGet(() -> createKtoBackingPlace(original));
+    }
+
+    private Place createKtoBackingPlace(TourPlaceDto original) {
+        String regionCode = TourPlaceRegionResolver.resolve(original.getAddress())
+                .map(Enum::name)
+                .orElseThrow(() -> new IllegalStateException(
+                        "권역을 확인할 수 없는 KTO 후보는 저장할 수 없습니다."));
+        Region region = regionRepository.findByCodeIgnoreCaseAndActiveTrue(regionCode)
+                .orElseThrow(() -> new IllegalStateException(
+                        "등록된 권역 코드를 찾을 수 없습니다: " + regionCode));
+        String categoryCode = KtoPlaceCategoryResolver.resolve(
+                original.getCategory(), original.getCategory3());
+        PlaceCategory category = placeCategoryRepository
+                .findByCodeIgnoreCaseAndActiveTrue(categoryCode)
+                .orElseThrow(() -> new IllegalStateException(
+                        "등록된 장소 카테고리를 찾을 수 없습니다: " + categoryCode));
+        Place place = placeRepository.save(Place.fromExternalCandidate(
+                region,
+                category,
+                original.getTitle(),
+                normalizeName(original.getTitle()),
+                original.getAddress(),
+                original.getLatitude(),
+                original.getLongitude()));
+        mappingRepository.save(PlaceSourceMapping.active(
+                place, KTO_SOURCE_CODE, original.getContentId()));
+        return place;
+    }
+
+    private String resolveCategoryCode(
+            CourseAiInputDto.CandidateFactDto fact,
+            CourseAiInputDto input,
+            String sourceCode
+    ) {
+        if (KTO_SOURCE_CODE.equals(sourceCode)) {
+            if (fact.tourCategory() == null) {
+                throw new IllegalStateException(
+                        "관광 카테고리가 없는 KTO 후보는 저장할 수 없습니다.");
+            }
+            return KtoPlaceCategoryResolver.resolve(
+                    fact.tourCategory().category1(), fact.tourCategory().category3());
+        }
+
+        String categoryName = input.userPreferences().requiredPlaces().stream()
+                .filter(required -> required.identity() != null
+                        && fact.identity().candidateId().equals(
+                                required.identity().candidateId()))
+                .map(CourseAiInputDto.PlaceConstraintDto::categoryName)
+                .filter(value -> value != null && !value.isBlank())
+                .findFirst()
+                .orElse(null);
+        return KakaoPlaceCategoryResolver.resolve(categoryName)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Kakao 장소 카테고리를 공식 카테고리로 판별할 수 없습니다."));
     }
 
     private CourseItemSource resolveItemSource(

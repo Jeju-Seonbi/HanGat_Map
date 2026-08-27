@@ -269,6 +269,90 @@ class CoursePersistenceServiceTest {
         assertThat(courseItemRepository.count()).isZero();
     }
 
+    @Test
+    void persistsUnmatchedKakaoWantWithActualSourceIdentityAndFixedSchedule()
+            throws Exception {
+        CourseRequestDto request = kakaoRequest(
+                "카카오 숲길",
+                "KAKAO-9001",
+                "제주특별자치도 제주시 구좌읍 비자숲길 1");
+        CourseAiInputDto input = new CourseAiInputAssembler().assemble(
+                request,
+                List.of(),
+                java.util.Map.of(),
+                List.of(),
+                new CourseAiInputDto.GenerationMetadataDto(
+                        GenerationReason.INITIAL, "course-ai-1", null));
+        String candidateId = input.candidates().get(0).identity().candidateId();
+        CourseAiResultDto result = result(candidateId, "2026-08-27", "10:30");
+
+        new com.example.hangat.course.ai.CourseAiResultValidator()
+                .validate(input, result);
+        CoursePersistenceResult persisted = persistenceService.persist(
+                request, input, result, List.of());
+
+        CourseItem item = persisted.itemsByCandidateId().get(candidateId);
+        assertThat(persisted.course().getId()).isNotNull();
+        assertThat(item.getId()).isNotNull();
+        assertThat(item.getPlace().getId()).isNotNull();
+        assertThat(item.getItemSource()).isEqualTo(CourseItemSource.USER_FIXED);
+        assertThat(item.getVisitDate()).isEqualTo(LocalDate.of(2026, 8, 27));
+        assertThat(item.getStartTime()).isEqualTo(LocalTime.of(10, 30));
+        assertThat(persisted.categoryNamesByCandidateId().get(candidateId))
+                .isEqualTo("관광지");
+        assertThat(mappingRepository.findBySourceCodeAndSourcePlaceId(
+                "KAKAO_LOCAL", "KAKAO-9001"))
+                .get()
+                .extracting(mapping -> mapping.getPlace().getId())
+                .isEqualTo(item.getPlace().getId());
+        assertThat(mappingRepository.findBySourceCodeAndSourcePlaceId(
+                "KTO", "KAKAO-9001")).isEmpty();
+
+        CourseResponseDto response = new CourseResponseAssembler().assemble(
+                input, result, List.of(), persisted);
+        CourseResponseDto.ItemDto responseItem = response.days().get(0).items().get(0);
+        assertThat(responseItem.placeId()).isEqualTo(item.getPlace().getId());
+        assertThat(responseItem.placeName()).isEqualTo("카카오 숲길");
+        assertThat(responseItem.categoryName()).isEqualTo("관광지");
+        assertThat(responseItem.imageUrl()).isNull();
+        assertThat(responseItem.tourCategory()).isNull();
+        assertThat(responseItem.congestion()).isEmpty();
+        assertThat(responseItem.weather()).isNull();
+    }
+
+    @Test
+    void reusesCanonicalPlaceWhenKakaoWantMatchesKtoCandidate() throws Exception {
+        CourseRequestDto request = kakaoRequest(
+                "비자림",
+                "KAKAO-125266",
+                "제주특별자치도 제주시 구좌읍 비자숲길 55");
+        CourseCandidateDto ktoCandidate = candidate(
+                "125266", "비자림", "제주특별자치도 제주시 구좌읍 비자숲길 55", "A01");
+        CourseAiInputDto input = new CourseAiInputAssembler().assemble(
+                request,
+                List.of(ktoCandidate),
+                java.util.Map.of(),
+                List.of(),
+                new CourseAiInputDto.GenerationMetadataDto(
+                        GenerationReason.INITIAL, "course-ai-1", null));
+        String candidateId = input.candidates().get(0).identity().candidateId();
+
+        CoursePersistenceResult persisted = persistenceService.persist(
+                request,
+                input,
+                result(candidateId, "2026-08-27", "10:30"),
+                List.of(ktoCandidate));
+
+        Long placeId = persisted.itemsByCandidateId().get(candidateId).getPlace().getId();
+        assertThat(placeRepository.count()).isEqualTo(1);
+        assertThat(mappingRepository.count()).isEqualTo(2);
+        assertThat(mappingRepository.findBySourceCodeAndSourcePlaceId("KTO", "125266"))
+                .get().extracting(mapping -> mapping.getPlace().getId()).isEqualTo(placeId);
+        assertThat(mappingRepository.findBySourceCodeAndSourcePlaceId(
+                "KAKAO_LOCAL", "KAKAO-125266"))
+                .get().extracting(mapping -> mapping.getPlace().getId()).isEqualTo(placeId);
+    }
+
     private CourseRequestDto request() throws Exception {
         return objectMapper.readValue("""
                 {
@@ -282,6 +366,36 @@ class CoursePersistenceServiceTest {
                   "course_place_preferences":[]
                 }
                 """, CourseRequestDto.class);
+    }
+
+    private CourseRequestDto kakaoRequest(
+            String placeName,
+            String sourcePlaceId,
+            String address
+    ) throws Exception {
+        return objectMapper.readValue("""
+                {
+                  "start_date":"2026-08-27",
+                  "end_date":"2026-08-29",
+                  "people":2,
+                  "budget_total":500000,
+                  "transport":"RENTAL_CAR",
+                  "course_regions":[{"region_id":1,"code":"EAST","name":"동부"}],
+                  "course_styles":[{"code":"NATURE","weight":1}],
+                  "course_place_preferences":[{
+                    "source_code":"KAKAO_LOCAL",
+                    "source_place_id":"%s",
+                    "place_name":"%s",
+                    "road_address":"%s",
+                    "latitude":33.458,
+                    "longitude":126.942,
+                    "category_name":"여행 > 관광,명소 > 자연명소",
+                    "preference_type":"WANT",
+                    "fixed_date":"2026-08-27",
+                    "fixed_time":"10:30"
+                  }]
+                }
+                """.formatted(sourcePlaceId, placeName, address), CourseRequestDto.class);
     }
 
     private CourseCandidateDto candidate(

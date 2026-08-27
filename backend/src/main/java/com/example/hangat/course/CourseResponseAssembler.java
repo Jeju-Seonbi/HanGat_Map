@@ -131,7 +131,7 @@ public class CourseResponseAssembler {
     ) {
         CourseAiInputDto.CandidateFactDto fact = factsById.get(item.candidateId());
         CourseCandidateDto original = originalsById.get(item.candidateId());
-        if (fact == null || original == null) {
+        if (fact == null) {
             throw new IllegalArgumentException(
                     "응답으로 변환할 수 없는 AI 후보 식별자입니다: " + item.candidateId());
         }
@@ -155,9 +155,9 @@ public class CourseResponseAssembler {
                 fact.address(),
                 fact.latitude(),
                 fact.longitude(),
-                original.getPlace().getImageUrl(),
+                original == null ? null : original.getPlace().getImageUrl(),
                 persistence == null
-                        ? null
+                        ? sourceCategoryName(input, item.candidateId())
                         : persistence.categoryNamesByCandidateId().get(item.candidateId()),
                 category == null ? null : new TourCategoryDto(
                         category.category1(), category.category2(), category.category3()),
@@ -186,6 +186,16 @@ public class CourseResponseAssembler {
                                 weather.precipitationTypeCode(), weather.skyConditionCode(),
                                 weather.windSpeed(), weather.humidity()))
                         .toList());
+    }
+
+    private String sourceCategoryName(CourseAiInputDto input, String candidateId) {
+        return input.userPreferences().requiredPlaces().stream()
+                .filter(required -> required.identity() != null
+                        && candidateId.equals(required.identity().candidateId()))
+                .map(CourseAiInputDto.PlaceConstraintDto::categoryName)
+                .filter(value -> value != null && !value.isBlank())
+                .findFirst()
+                .orElse(null);
     }
 
     private boolean isFixedSchedule(

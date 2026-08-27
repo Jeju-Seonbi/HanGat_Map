@@ -163,6 +163,72 @@ class CourseAiInputAssemblerTest {
     }
 
     @Test
+    void addsUnmatchedKakaoWantAsRequestScopedCandidateWithoutInventingFacts()
+            throws Exception {
+        CourseRequestDto request = kakaoWantRequest(
+                "카카오 비자림 입구",
+                "KAKAO-777",
+                "제주특별자치도 제주시 애월읍 애월로 1");
+        CourseCandidateDto ktoCandidate = new CourseCandidateDto(
+                tourPlace("125266", "비자림", "제주특별자치도 제주시 구좌읍 비자숲길 55"),
+                List.of(), null, List.of("NATURE"));
+
+        CourseAiInputDto result = assembler.assemble(
+                request, List.of(ktoCandidate), Map.of(), List.of(),
+                new GenerationMetadataDto(GenerationReason.INITIAL, null, null));
+
+        assertThat(result.candidates()).hasSize(2);
+        CourseAiInputDto.CandidateFactDto kakao = result.candidates().stream()
+                .filter(candidate -> "KAKAO_LOCAL".equals(candidate.identity().sourceCode()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(kakao.identity().candidateId()).isEqualTo("request-want-1");
+        assertThat(kakao.identity().sourcePlaceId()).isEqualTo("KAKAO-777");
+        assertThat(kakao.name()).isEqualTo("카카오 비자림 입구");
+        assertThat(kakao.regionCode()).isEqualTo("WEST");
+        assertThat(kakao.preferenceType()).isEqualTo(PreferenceType.WANT);
+        assertThat(kakao.tourCategory()).isNull();
+        assertThat(kakao.confirmedStyleHints()).isEmpty();
+        assertThat(kakao.congestion()).isEmpty();
+        assertThat(kakao.weather()).isNull();
+
+        CourseAiInputDto.PlaceConstraintDto required =
+                result.userPreferences().requiredPlaces().get(0);
+        assertThat(required.identity().candidateId()).isEqualTo("request-want-1");
+        assertThat(required.identity().sourceCode()).isEqualTo("KAKAO_LOCAL");
+        assertThat(required.categoryName()).isEqualTo("여행 > 관광,명소 > 자연명소");
+        assertThat(required.fixedDate()).isEqualTo(LocalDate.of(2026, 8, 27));
+        assertThat(required.fixedTime()).isEqualTo(LocalTime.of(10, 30));
+    }
+
+    @Test
+    void replacesEquivalentKtoCandidateWithKakaoWantWithoutDuplicateCandidate()
+            throws Exception {
+        CourseRequestDto request = kakaoWantRequest(
+                "비자림",
+                "KAKAO-125266",
+                "제주특별자치도 제주시 구좌읍 비자숲길 55");
+        CourseCandidateDto ktoCandidate = new CourseCandidateDto(
+                tourPlace("125266", "비자림", "제주특별자치도 제주시 구좌읍 비자숲길 55"),
+                List.of(congestion("20260827", "22.5")), null, List.of("NATURE"));
+
+        CourseAiInputDto result = assembler.assemble(
+                request, List.of(ktoCandidate), Map.of(), List.of(),
+                new GenerationMetadataDto(GenerationReason.INITIAL, null, null));
+
+        assertThat(result.candidates()).hasSize(1);
+        CourseAiInputDto.CandidateFactDto candidate = result.candidates().get(0);
+        assertThat(candidate.identity().candidateId()).isEqualTo("125266");
+        assertThat(candidate.identity().sourceCode()).isEqualTo("KAKAO_LOCAL");
+        assertThat(candidate.identity().sourcePlaceId()).isEqualTo("KAKAO-125266");
+        assertThat(candidate.tourCategory()).isNull();
+        assertThat(candidate.congestion()).isEmpty();
+        assertThat(candidate.weather()).isNull();
+        assertThat(result.userPreferences().requiredPlaces().get(0)
+                .identity().candidateId()).isEqualTo("125266");
+    }
+
+    @Test
     void rejectsTravelFactWithUnknownFromCandidate() throws Exception {
         assertUnknownTravelReference("missing", "125266");
     }
@@ -232,6 +298,42 @@ class CourseAiInputAssemblerTest {
                   }
                 }
                 """, CourseRequestDto.class);
+    }
+
+    private CourseRequestDto kakaoWantRequest(
+            String placeName,
+            String sourcePlaceId,
+            String address
+    ) throws Exception {
+        return objectMapper.readValue("""
+                {
+                  "start_date": "2026-08-27",
+                  "end_date": "2026-08-29",
+                  "people": 2,
+                  "budget_total": 500000,
+                  "transport": "RENTAL_CAR",
+                  "course_regions": [
+                    {"region_id": 2, "code": "EAST", "name": "동부"}
+                  ],
+                  "course_styles": [
+                    {"tag_id": 1, "code": "NATURE", "name": "자연", "weight": 0.8}
+                  ],
+                  "course_place_preferences": [
+                    {
+                      "source_code": "KAKAO_LOCAL",
+                      "source_place_id": "%s",
+                      "place_name": "%s",
+                      "road_address": "%s",
+                      "latitude": 33.485,
+                      "longitude": 126.811,
+                      "category_name": "여행 > 관광,명소 > 자연명소",
+                      "preference_type": "WANT",
+                      "fixed_date": "2026-08-27",
+                      "fixed_time": "10:30"
+                    }
+                  ]
+                }
+                """.formatted(sourcePlaceId, placeName, address), CourseRequestDto.class);
     }
 
     private TourPlaceDto tourPlace(String contentId, String title, String address) throws Exception {

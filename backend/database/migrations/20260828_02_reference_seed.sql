@@ -16,6 +16,20 @@ WHERE NOT EXISTS (
     SELECT 1 FROM data_sources WHERE code = 'KTO'
 );
 
+INSERT INTO data_sources (
+    code, display_name, provider_name, attribution_text, display_order, is_active
+)
+SELECT
+    'KAKAO_LOCAL',
+    '카카오 로컬',
+    '카카오',
+    '장소정보: 카카오 로컬',
+    2,
+    1
+WHERE NOT EXISTS (
+    SELECT 1 FROM data_sources WHERE code = 'KAKAO_LOCAL'
+);
+
 INSERT INTO regions (
     code, name, center_lat, center_lng, kma_grid_x, kma_grid_y,
     display_order, is_active

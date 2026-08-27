@@ -20,7 +20,7 @@
 -- WHERE code IN ('TOURIST', 'CAFE', 'FOOD', 'LODGING');
 -- DELETE FROM regions
 -- WHERE code IN ('EAST', 'WEST', 'SOUTH', 'NORTH');
--- DELETE FROM data_sources WHERE code = 'KTO';
+-- DELETE FROM data_sources WHERE code IN ('KTO', 'KAKAO_LOCAL');
 
 -- ---------------------------------------------------------------------------
 -- B. Drop newly added explicit FKs before reversing types

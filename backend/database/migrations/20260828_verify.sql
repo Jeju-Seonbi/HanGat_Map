@@ -187,7 +187,7 @@ SELECT expected.code,
            WHEN actual.display_name = expected.display_name
             AND actual.provider_name = expected.provider_name
             AND actual.attribution_text = expected.attribution_text
-            AND actual.display_order = 1
+            AND actual.display_order = expected.display_order
             AND actual.is_active = 1 THEN 'MATCH'
            ELSE 'MISMATCH'
        END AS status,
@@ -200,7 +200,14 @@ FROM (
     SELECT 'KTO' AS code,
            '한국관광공사 TourAPI' AS display_name,
            '한국관광공사' AS provider_name,
-           '관광정보·사진: 한국관광공사 TourAPI' AS attribution_text
+           '관광정보·사진: 한국관광공사 TourAPI' AS attribution_text,
+           1 AS display_order
+    UNION ALL
+    SELECT 'KAKAO_LOCAL',
+           '카카오 로컬',
+           '카카오',
+           '장소정보: 카카오 로컬',
+           2
 ) expected
 LEFT JOIN data_sources actual ON actual.code = expected.code;
 
