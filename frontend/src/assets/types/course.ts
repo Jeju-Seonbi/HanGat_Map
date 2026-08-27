@@ -97,3 +97,60 @@ export interface SavedCourseSummary {
   estimated_cost_max?: number
 }
 export interface SavedCourseRecord { summary: SavedCourseSummary; course: CourseResult }
+
+export type CourseGenerationItemSource = 'USER_FIXED' | 'AI_RECOMMENDED'
+
+export interface CourseGenerationTourCategory {
+  category1: string | null
+  category2: string | null
+  category3: string | null
+}
+
+export interface CourseGenerationCongestionFact {
+  date: string | null
+  rate: number | null
+  level: CongestionLevel | null
+}
+
+export interface CourseGenerationWeatherFact {
+  forecast_date: string
+  forecast_time: string
+  temperature: number | null
+  precipitation_probability: number | null
+  precipitation_type_code: string | null
+  sky_condition_code: string | null
+  wind_speed: number | null
+  humidity: number | null
+}
+
+export interface CourseGenerationItem {
+  candidate_id: string
+  place_name: string
+  address: string | null
+  latitude: number | null
+  longitude: number | null
+  image_url: string | null
+  tour_category: CourseGenerationTourCategory | null
+  region_code: RegionRef['code'] | 'UNKNOWN'
+  preference_type: PreferenceType | null
+  confirmed_style_hints: string[]
+  position: number
+  start_time: string | null
+  item_source: CourseGenerationItemSource
+  recommendation_reason: string | null
+  congestion: CourseGenerationCongestionFact[]
+  weather: CourseGenerationWeatherFact[] | null
+}
+
+export interface CourseGenerationDay {
+  day_no: number
+  visit_date: string
+  items: CourseGenerationItem[]
+}
+
+export interface CourseGenerationResponse {
+  contract_version: string
+  start_date: string
+  end_date: string
+  days: CourseGenerationDay[]
+}

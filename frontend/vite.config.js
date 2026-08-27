@@ -77,6 +77,10 @@ export default defineConfig(() => ({
     port: 4173,
     // 포트를 못 잡으면 조용히 다른 번호로 옮기지 말고 실패시킨다
     strictPort: true,
+    proxy: {
+      // 운영은 동일 origin을 사용하고, 개발 중 /courses만 로컬 Spring Boot로 전달한다.
+      '/courses': 'http://127.0.0.1:8080'
+    },
     headers: {
       // 개발 서버에도 배포와 같은 헤더를 걸어 두면 로컬에서 미리 깨진다
       'X-Frame-Options': 'DENY',
