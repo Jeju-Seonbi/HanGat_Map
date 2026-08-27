@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -43,6 +44,7 @@ public class GeminiCourseAiProvider implements CourseAiProvider {
     private final CourseAiPrompt prompt;
     private final ObjectMapper objectMapper;
 
+    @Autowired
     public GeminiCourseAiProvider(
             GeminiProperties properties,
             CourseAiPrompt prompt,
