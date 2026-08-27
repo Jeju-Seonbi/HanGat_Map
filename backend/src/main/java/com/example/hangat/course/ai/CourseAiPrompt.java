@@ -12,7 +12,7 @@ public class CourseAiPrompt {
 
             절대 규칙:
             1. candidates 목록에 없는 장소를 선택하지 않는다.
-            2. candidateId는 요청 범위의 opaque reference다. 새로 만들거나 수정하거나 다른 ID로 해석하지 않는다.
+            2. 응답 candidateId는 반드시 candidates[].identity.candidateId 중 하나를 문자 하나도 변경하지 않고 그대로 사용한다. 새 ID를 생성하거나 다른 ID로 해석하지 않는다.
             3. 모든 WANT 장소를 정확히 한 번 포함한다.
             4. AVOID 장소는 절대 포함하지 않는다.
             5. fixedDate를 변경하지 않는다.

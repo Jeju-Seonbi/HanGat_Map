@@ -140,7 +140,7 @@ public class GeminiCourseAiProvider implements CourseAiProvider {
                 List.of(new GeminiContent("user", List.of(new GeminiPart(prompt.userPrompt(input))))),
                 new GeminiGenerationConfig(
                         JSON_MIME_TYPE,
-                        responseJsonSchema(),
+                        responseJsonSchema(input),
                         new GeminiThinkingConfig(THINKING_LEVEL_LOW))
         );
     }
@@ -447,11 +447,21 @@ public class GeminiCourseAiProvider implements CourseAiProvider {
         return value == null || value.isBlank();
     }
 
-    private Map<String, Object> responseJsonSchema() {
+    private Map<String, Object> responseJsonSchema(CourseAiInputDto input) {
+        List<String> candidateIds = input.candidates().stream()
+                .map(candidate -> candidate.identity().candidateId())
+                .distinct()
+                .toList();
+        Map<String, Object> candidateId = candidateIds.isEmpty()
+                ? Map.of("type", "string")
+                : Map.of(
+                        "type", "string",
+                        "enum", candidateIds,
+                        "description", "candidates[].identity.candidateId 중 하나를 그대로 사용");
         Map<String, Object> item = Map.of(
                 "type", "object",
                 "properties", Map.of(
-                        "candidateId", Map.of("type", "string"),
+                        "candidateId", candidateId,
                         "startTime", Map.of(
                                 "type", "string",
                                 "description", "24시간제 HH:mm 형식의 방문 시작 시각"),

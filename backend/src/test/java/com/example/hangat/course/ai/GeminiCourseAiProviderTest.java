@@ -71,6 +71,15 @@ class GeminiCourseAiProviderTest {
                 .andExpect(jsonPath("$.contents[0].role").value("user"))
                 .andExpect(jsonPath("$.generationConfig.responseMimeType").value("application/json"))
                 .andExpect(jsonPath("$.generationConfig.responseJsonSchema.type").value("object"))
+                .andExpect(jsonPath("$.generationConfig.responseJsonSchema.properties.days"
+                        + ".items.properties.items.items.properties.candidateId.enum[0]")
+                        .value("want-1"))
+                .andExpect(jsonPath("$.generationConfig.responseJsonSchema.properties.days"
+                        + ".items.properties.items.items.properties.candidateId.enum[1]")
+                        .value("normal-1"))
+                .andExpect(jsonPath("$.generationConfig.responseJsonSchema.properties.days"
+                        + ".items.properties.items.items.properties.candidateId.enum[2]")
+                        .value("normal-2"))
                 .andExpect(jsonPath("$.generationConfig.thinkingConfig.thinkingLevel").value("low"))
                 .andExpect(jsonPath("$.contents[0].parts[0].text").value(
                         org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("test-secret"))))
@@ -96,11 +105,19 @@ class GeminiCourseAiProviderTest {
                 request.path("contents").path(0).path("parts").path(0).path("text").asText());
 
         assertThat(request.path("systemInstruction").path("parts").path(0).path("text").asText())
-                .isNotBlank();
+                .contains("candidateId는 반드시 candidates[].identity.candidateId 중 하나를")
+                .contains("새 ID를 생성");
         assertThat(request.path("generationConfig").path("responseMimeType").asText())
                 .isEqualTo("application/json");
         assertThat(request.path("generationConfig").path("responseJsonSchema").path("type").asText())
                 .isEqualTo("object");
+        assertThat(request.path("generationConfig").path("responseJsonSchema")
+                .path("properties").path("days")
+                .path("items").path("properties").path("items")
+                .path("items").path("properties").path("candidateId")
+                .path("enum"))
+                .extracting(JsonNode::asText)
+                .containsExactly("want-1", "normal-1", "normal-2");
         assertThat(request.path("generationConfig").path("thinkingConfig")
                 .path("thinkingLevel").asText()).isEqualTo("low");
         assertThat(input.path("tripCondition").path("startDate").asText())
