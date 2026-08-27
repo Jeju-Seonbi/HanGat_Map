@@ -19,6 +19,8 @@ import java.time.LocalTime;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 class CourseServiceAiGenerationFlowTest {
 
@@ -42,6 +44,7 @@ class CourseServiceAiGenerationFlowTest {
                                             "한글 추천 이유")))));
                 },
                 new CourseAiResultValidator());
+        CoursePersistenceService persistenceService = mock(CoursePersistenceService.class);
         CourseService service = new CourseService(
                 new StubTourApiService(),
                 new StubCongestionApiService(),
@@ -50,11 +53,17 @@ class CourseServiceAiGenerationFlowTest {
                         new CourseTravelService(new StraightLineDistanceCalculator()),
                         Optional.empty()),
                 generationService,
+                persistenceService,
                 new CourseResponseAssembler());
 
         var response = service.createCourse(request());
 
         assertThat(providerCalled).isTrue();
+        verify(persistenceService).persist(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyList());
         assertThat(response.days()).hasSize(1);
         assertThat(response.days().get(0).items().get(0).placeName()).isEqualTo("만장굴");
         assertThat(response.days().get(0).items().get(0).recommendationReason())

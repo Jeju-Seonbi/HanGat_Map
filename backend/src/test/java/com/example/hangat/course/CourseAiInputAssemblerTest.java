@@ -92,8 +92,8 @@ class CourseAiInputAssemblerTest {
         CourseAiInputDto.CandidateFactDto first = result.candidates().get(0);
         assertThat(first.identity().candidateId()).isEqualTo("125266");
         assertThat(first.identity().placeId()).isNull();
-        assertThat(first.identity().sourceCode()).isNull();
-        assertThat(first.identity().sourcePlaceId()).isNull();
+        assertThat(first.identity().sourceCode()).isEqualTo("KTO");
+        assertThat(first.identity().sourcePlaceId()).isEqualTo("125266");
         assertThat(first.preferenceType()).isEqualTo(PreferenceType.WANT);
         assertThat(first.regionCode()).isEqualTo("EAST");
         assertThat(first.confirmedStyleHints()).containsExactly("NATURE");

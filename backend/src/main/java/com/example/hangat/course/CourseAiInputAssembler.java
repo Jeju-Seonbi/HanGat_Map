@@ -42,6 +42,7 @@ public class CourseAiInputAssembler {
 
     public static final String CONTRACT_VERSION = "1.0";
     public static final String UNKNOWN_REGION = "UNKNOWN";
+    public static final String KTO_SOURCE_CODE = "KTO";
 
     private static final DateTimeFormatter CONGESTION_DATE_FORMATTER =
             DateTimeFormatter.BASIC_ISO_DATE;
@@ -198,7 +199,11 @@ public class CourseAiInputAssembler {
                     ? copyNullable(weatherByCandidateId.get(candidateId))
                     : null;
             results.add(new CandidateFactDto(
-                    new PlaceIdentityDto(candidateId, null, null, null),
+                    new PlaceIdentityDto(
+                            candidateId,
+                            null,
+                            KTO_SOURCE_CODE,
+                            place.getContentId()),
                     place.getTitle(),
                     place.getAddress(),
                     place.getLatitude(),

@@ -16,6 +16,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 
 class CourseServiceValidationTest {
 
@@ -30,6 +31,7 @@ class CourseServiceValidationTest {
             new CourseAiGenerationService(
                     input -> { throw new AssertionError("provider must not run in validation test"); },
                     new CourseAiResultValidator()),
+            mock(CoursePersistenceService.class),
             new CourseResponseAssembler());
 
     @Test

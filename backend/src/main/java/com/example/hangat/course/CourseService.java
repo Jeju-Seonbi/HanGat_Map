@@ -32,13 +32,19 @@ public class CourseService {
     private final CongestionApiService congestionApiService;
     private final CourseAiPreparationService courseAiPreparationService;
     private final CourseAiGenerationService courseAiGenerationService;
+    private final CoursePersistenceService coursePersistenceService;
     private final CourseResponseAssembler courseResponseAssembler;
 
     public CourseResponseDto createCourse(CourseRequestDto request) {
         PreparedCourse prepared = prepareCourse(request);
         CourseAiResultDto result = courseAiGenerationService.generate(prepared.input());
+        CoursePersistenceResult persistence = coursePersistenceService.persist(
+                request,
+                prepared.input(),
+                result,
+                prepared.candidates());
         return courseResponseAssembler.assemble(
-                prepared.input(), result, prepared.candidates());
+                prepared.input(), result, prepared.candidates(), persistence);
     }
 
     CourseAiInputDto prepareAiInput(CourseRequestDto request) {
