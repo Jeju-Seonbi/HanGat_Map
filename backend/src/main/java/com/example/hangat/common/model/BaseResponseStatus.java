@@ -24,6 +24,10 @@ public enum BaseResponseStatus {
     USER_NOT_FOUND(false, 3101, "존재하지 않는 사용자입니다."),
     DUPLICATE_EMAIL(false, 3102, "이미 사용중인 이메일입니다."),
     PASSWORD_WRONG(false, 3103, "비밀번호가 일치하지 않습니다."),
+    DUPLICATE_NICKNAME(false, 3104, "이미 사용중인 닉네임입니다."),
+    EMAIL_NOT_VERIFIED(false, 3105, "이메일 인증을 완료해주세요."),
+    ACCOUNT_SUSPENDED(false, 3106, "이용이 제한된 계정입니다. 고객센터로 문의해주세요."),
+    ACCOUNT_WITHDRAWN(false, 3107, "탈퇴한 계정입니다. 새로 가입해주세요."),
 
     // 3200번대 장소
     PLACE_NOT_FOUND(false, 3201, "존재하지 않는 장소입니다."),

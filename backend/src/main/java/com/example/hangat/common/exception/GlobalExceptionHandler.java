@@ -1,6 +1,8 @@
 package com.example.hangat.common.exception;
 
 import com.example.hangat.common.model.BaseResponse;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
 import com.example.hangat.common.model.BaseResponseStatus;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +24,19 @@ public class GlobalExceptionHandler {
         Map<String, String> errors = new HashMap<>();
         for (FieldError error : e.getBindingResult().getFieldErrors()) {
             errors.put(error.getField(), error.getDefaultMessage());
+        }
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(BaseResponse.fail(BaseResponseStatus.REQUEST_ERROR, errors));
+    }
+
+    /** @RequestParam·@PathVariable 검증 실패 → 필드별 메시지를 result에 담아 400 */
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<BaseResponse<Map<String, String>>> handleConstraintViolation(ConstraintViolationException e) {
+        Map<String, String> errors = new HashMap<>();
+        for (ConstraintViolation<?> violation : e.getConstraintViolations()) {
+            String path = violation.getPropertyPath().toString();
+            String field = path.contains(".") ? path.substring(path.lastIndexOf('.') + 1) : path;
+            errors.put(field, violation.getMessage());
         }
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(BaseResponse.fail(BaseResponseStatus.REQUEST_ERROR, errors));
