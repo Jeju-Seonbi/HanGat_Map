@@ -154,3 +154,26 @@ export interface CourseGenerationResponse {
   end_date: string
   days: CourseGenerationDay[]
 }
+
+/**
+ * POST /courses 생성 직후 화면용 모델.
+ * DB 저장 전이므로 course/item/place 내부 PK를 만들지 않는다.
+ */
+export interface GeneratedCourseItem extends Omit<CourseItem, 'id' | 'course_id' | 'place_id'> {
+  candidate_id: string
+  id?: never
+  course_id?: never
+  place_id?: never
+}
+
+export interface GeneratedCourseDay extends Omit<CourseDay, 'items'> {
+  items: GeneratedCourseItem[]
+}
+
+export interface GeneratedCourseResult extends Omit<CourseResult, 'id' | 'days'> {
+  id?: never
+  days: GeneratedCourseDay[]
+}
+
+export type CourseItemView = CourseItem | GeneratedCourseItem
+export type CourseResultView = CourseResult | GeneratedCourseResult

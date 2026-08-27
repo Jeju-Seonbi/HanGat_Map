@@ -6,6 +6,7 @@ import {
 import {
   CourseApiClient,
   CourseApiError,
+  courseGenerationErrorMessage,
   isCourseGenerationResponse,
   toCourseRequestPayload,
 } from './courseApiService'
@@ -60,5 +61,8 @@ describe('CourseApiClient', () => {
     await expect(invalidResponse).rejects.toMatchObject({
       failure: 'INVALID_RESPONSE',
     })
+
+    expect(courseGenerationErrorMessage(new CourseApiError('upstream detail', 'HTTP', 503)))
+      .toBe('AI 코스를 생성하지 못했어요. 잠시 후 다시 시도해 주세요.')
   })
 })

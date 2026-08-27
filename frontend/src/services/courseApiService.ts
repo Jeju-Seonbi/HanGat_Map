@@ -13,6 +13,16 @@ export class CourseApiError extends Error {
   }
 }
 
+export function courseGenerationErrorMessage(error: unknown) {
+  if (!(error instanceof CourseApiError)) return '코스를 생성하지 못했어요. 다시 시도해 주세요.'
+  if (error.failure === 'TIMEOUT') return '코스 생성 시간이 길어지고 있어요. 잠시 후 다시 시도해 주세요.'
+  if (error.failure === 'NETWORK') return '서버에 연결하지 못했어요. 네트워크 상태를 확인해 주세요.'
+  if (error.failure === 'INVALID_RESPONSE') return '생성된 코스 정보를 불러오지 못했어요. 다시 시도해 주세요.'
+  return error.status != null && error.status < 500
+    ? '입력한 여행 조건을 확인해 주세요.'
+    : 'AI 코스를 생성하지 못했어요. 잠시 후 다시 시도해 주세요.'
+}
+
 type CourseRequestPayload = Pick<
   CourseCondition,
   | 'start_date'
