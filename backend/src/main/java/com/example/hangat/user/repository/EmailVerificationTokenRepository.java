@@ -1,0 +1,16 @@
+package com.example.hangat.user.repository;
+
+import com.example.hangat.user.model.EmailVerificationToken;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+public interface EmailVerificationTokenRepository
+        extends JpaRepository<EmailVerificationToken, Long> {
+
+    Optional<EmailVerificationToken> findByTokenHash(String tokenHash);
+
+    List<EmailVerificationToken> findAllByUserIdAndUsedAtIsNull(Long userId);
+}
