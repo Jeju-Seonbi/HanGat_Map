@@ -26,6 +26,6 @@ congestion-api:
 gemini:
   base-url: http://localhost
   api-key: test-gemini-key
-  model: gemini-3.5-flash
+  model: gemini-3.6-flash
   connect-timeout: 1s
   read-timeout: 1s
