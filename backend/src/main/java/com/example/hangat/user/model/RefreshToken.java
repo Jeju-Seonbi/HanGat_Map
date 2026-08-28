@@ -32,7 +32,7 @@ import java.time.LocalDateTime;
 @Entity
 public class RefreshToken {
 
-    public static final Duration Absolute_TTL = Duration.ofDays(14);
+    public static final Duration ABSOLUTE_TTL = Duration.ofDays(14);
 
     public static final Duration IDLE_TTL = Duration.ofHours(12);
 
@@ -81,10 +81,20 @@ public class RefreshToken {
     // ────────────────────────── 발급 ──────────────────────────
 
     public static RefreshToken issue(User user, String tokenHash) {
+        return issue(user, tokenHash, DateTimes.nowUtc().plus(ABSOLUTE_TTL));
+    }
+
+    public static RefreshToken rotate(User user, String tokenHash,
+                                      LocalDateTime absoluteExpiresAt) {
+        return issue(user, tokenHash, absoluteExpiresAt);
+    }
+
+    private static RefreshToken issue(User user, String tokenHash,
+                                      LocalDateTime absoluteExpiresAt) {
         return RefreshToken.builder()
                 .user(user)
                 .tokenHash(tokenHash)
-                .expiresAt(DateTimes.nowUtc().plus(Absolute_TTL))
+                .expiresAt(absoluteExpiresAt)
                 .build();
     }
 

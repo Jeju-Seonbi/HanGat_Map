@@ -70,8 +70,7 @@ public final class AuthDto {
         }
         /**
          * 1단계 응답
-         * 실제 이메일이 있든 없든 형식을 똑같이 하게 했다
-         * 있을때만 응답을 보내게끔 하면 안된다능
+         * 계정 존재 여부를 추측할 수 없도록 항상 같은 형식으로 응답한다.
          */
         public record SendResetCodeResponse(
                 String requestId,

@@ -1,6 +1,7 @@
 package com.example.hangat.user.controller;
 
 import com.example.hangat.common.model.BaseResponse;
+import com.example.hangat.config.security.AuthRequestLimiter;
 import com.example.hangat.user.model.dto.AuthDto;
 import com.example.hangat.user.model.dto.TokenDto;
 import com.example.hangat.user.model.dto.UserDto;
@@ -11,6 +12,7 @@ import com.example.hangat.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
@@ -39,8 +41,9 @@ public class AuthController {
     private final AuthService authService;
     private final EmailVerificationService emailVerificationService;
     private final PasswordResetService passwordResetService;
+    private final AuthRequestLimiter requestLimiter;
 
-    /** 로컬 http에서는 false로 됌. Secure 쿠키는 https에서만 저장돼서 개발 중에 조용히 안 실림 */
+    /** 로컬 HTTP 환경에서는 Secure 쿠키를 사용할 수 없으므로 false로 설정한다. */
     @Value("${app.cookie.secure:true}")
     private boolean cookieSecure;
 
@@ -52,9 +55,11 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    @Operation(summary = "로그인", description = "로그인 합니다잉")
+    @Operation(summary = "로그인", description = "이메일과 비밀번호로 로그인한다.")
     public BaseResponse<TokenDto.LoginResponse> login(@Valid @RequestBody AuthDto.LoginRequest request,
-                                                      HttpServletResponse response) {
+                                                       HttpServletRequest httpRequest,
+                                                       HttpServletResponse response) {
+        requestLimiter.checkLogin(clientIp(httpRequest), request.email());
         AuthService.LoginResult result = authService.login(request);
         setRefreshCookie(response, result.rawRefreshToken());
         return BaseResponse.success(result.body());
@@ -89,9 +94,12 @@ public class AuthController {
     }
 
     @PostMapping("/resend-verification")
-    @Operation(summary = "인증 메일 재발송", description = "한번 더 보낸다잇. 추가로 기존 토큰 무효화.")
+    @Operation(summary = "인증 메일 재발송", description = "기존 인증 토큰을 무효화하고 새 메일을 발송한다.")
     public BaseResponse<Void> resendVerification(
-            @Valid @RequestBody AuthDto.ResendVerificationRequest request) {
+            @Valid @RequestBody AuthDto.ResendVerificationRequest request,
+            HttpServletRequest httpRequest) {
+        requestLimiter.checkEmailRequest(
+                "resend-verification", clientIp(httpRequest), request.email());
         emailVerificationService.resend(request);
         return BaseResponse.success(null);
     }
@@ -100,7 +108,10 @@ public class AuthController {
     @PostMapping("/password/code")
     @Operation(summary = "1단계 - 코드 발송", description = "계정이 없어도 같은 응답이 나간다")
     public BaseResponse<AuthDto.SendResetCodeResponse> sendResetCode(
-            @Valid @RequestBody AuthDto.SendResetCodeRequest request) {
+            @Valid @RequestBody AuthDto.SendResetCodeRequest request,
+            HttpServletRequest httpRequest) {
+        requestLimiter.checkEmailRequest(
+                "password-reset", clientIp(httpRequest), request.email());
         return BaseResponse.success(passwordResetService.sendCode(request));
     }
 
@@ -124,7 +135,7 @@ public class AuthController {
 
     /**
      * refresh는 body로 안 주고 HttpOnly 쿠키로만 준다.
-     * path를 /auth로 좁혀서 refresh는 일반 API를 요청할 떄 관여를 못하게 함.
+     * 쿠키 경로를 /auth로 제한해 일반 API 요청에는 포함되지 않도록 한다.
      */
     private void setRefreshCookie(HttpServletResponse response, String rawToken) {
         response.addHeader(HttpHeaders.SET_COOKIE,
@@ -136,14 +147,21 @@ public class AuthController {
                 buildRefreshCookie("", Duration.ZERO).toString());
     }
 
-    /** SameSite=None은 Secure가 필수라 둘을 같이 움직인다 */
     private ResponseCookie buildRefreshCookie(String value, Duration maxAge) {
         return ResponseCookie.from(REFRESH_COOKIE, value)
                 .httpOnly(true)
                 .secure(cookieSecure)
-                .sameSite(cookieSecure ? "None" : "Lax")
+                .sameSite("Lax")
                 .path("/auth")
                 .maxAge(maxAge)
                 .build();
+    }
+
+    private String clientIp(HttpServletRequest request) {
+        String cloudflareIp = request.getHeader("CF-Connecting-IP");
+        if (cloudflareIp != null && !cloudflareIp.isBlank()) {
+            return cloudflareIp.trim();
+        }
+        return request.getRemoteAddr();
     }
 }

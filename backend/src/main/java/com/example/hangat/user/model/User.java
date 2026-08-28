@@ -36,12 +36,10 @@ public class User {
     private Long id;
 
     /** 로그인 ID. EmailNormalizer 통과한 값만 넣음 */
-    @Setter
     @Column(nullable = false, length = 255)
     private String email;
 
     /** BCrypt 해시만 저장. 소셜 전용 계정은 null */
-    @Setter
     @Column(length = 255)
     private String password;
 
