@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Profile("dev")
 @Tag(name = "적재(개발용)", description = "공공 API에서 데이터를 받아 DB에 넣는다. 개발 프로필에서만 노출된다.")
 @RestController
-@RequestMapping("/api/admin/ingest")
+@RequestMapping("/admin/ingest")
 public class PlaceIngestController {
 
     private final PlaceIngestService placeIngestService;

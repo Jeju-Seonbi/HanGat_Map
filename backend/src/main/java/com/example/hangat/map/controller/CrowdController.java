@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @Tag(name = "혼잡", description = "관광지별 집중률 예보")
 @RestController
-@RequestMapping("/api/crowd")
+@RequestMapping("/crowd")
 public class CrowdController {
 
     private final CrowdForecastService crowdForecastService;
