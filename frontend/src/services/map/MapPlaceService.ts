@@ -65,6 +65,26 @@ interface BackendPlace {
   hiddenGem: boolean
 }
 
+/**
+ * 장소 상세에서만 오는 값 (MAP-07). 목록 응답에는 없다 -
+ * 입장료 원문이 최대 1,000자인데 값이 있는 곳은 27곳뿐이라 목록에 싣지 않았다.
+ */
+export interface PlaceDetail {
+  /** 휴무일 원문. null = 정보 없음(연중무휴가 아니다) */
+  rest: string | null
+  /** 입장료 원문. "[개인]- 일반 1,500원..." 처럼 요금표가 통째로 온다 */
+  feeText: string | null
+  /** '무료'만 뜻할 때 true. 조건부 무료("무료※ 단, 특별전시 제외")는 false다 */
+  free: boolean
+}
+
+/** 백엔드 PlaceDetailResponse 중 이 화면이 쓰는 부분 */
+interface BackendPlaceDetail {
+  restDayText: string | null
+  useFeeText: string | null
+  free: boolean
+}
+
 /** 화면 레이어 키 → 백엔드 type 파라미터 */
 export type LayerKey = 'spot' | 'food' | 'dine' | 'cafe' | 'cvs' | 'stay' | 'mart'
 
@@ -101,6 +121,19 @@ export const MapPlaceService = {
       return { live: true, layers }
     } catch {
       return { live: false, layers: mockLayers() }
+    }
+  },
+
+  /**
+   * 상세 패널을 열 때만 부른다. 실패하면 null - 패널은 목록 데이터로 계속 그려진다.
+   * 목업 모드는 id 가 null 이라 호출부에서 걸러진다.
+   */
+  async getDetail (id: number): Promise<PlaceDetail | null> {
+    try {
+      const row = await apiGet<BackendPlaceDetail>(`/places/${id}`)
+      return { rest: row.restDayText, feeText: row.useFeeText, free: row.free }
+    } catch {
+      return null
     }
   }
 }

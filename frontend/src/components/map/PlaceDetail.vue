@@ -9,6 +9,7 @@ import { crowd, tier, tierKo, rank30, bestDay, CROWD_KO } from '@/utils/crowd'
 import { at, fmtK } from '@/utils/date'
 import { wxOf, wxIcon } from '@/utils/weather'
 import { dist, won, shrink } from '@/utils/geo'
+import MapPlaceService from '@/services/map/MapPlaceService'
 
 const props = defineProps({ place: { type: Object, required: true } })
 const emit = defineEmits(['close', 'open-place', 'open-photo'])
@@ -16,6 +17,8 @@ const emit = defineEmits(['close', 'open-place', 'open-photo'])
 const view = ref('info')
 const hint = ref('')
 const imgInput = ref(null)
+/** 휴무일·입장료는 상세 API에만 있다. 못 받아오면 null - 해당 줄만 안 보인다 */
+const detail = ref(null)
 
 const s = computed(() => props.place)
 const c = computed(() => crowd(s.value, state.di))
@@ -43,13 +46,38 @@ const week = computed(() => {
   })
 })
 
+/**
+ * 입장료 배지. 모르면 배지를 안 그린다 -
+ * 전에는 값이 없을 때 '무료'로 떨어져 2,138곳 전부가 무료로 보였다(실제 무료는 11곳).
+ */
+const feeBadge = computed(() => {
+  if (s.value.fee != null) return `입장 ${won(s.value.fee)}원`   // 목업
+  if (detail.value?.free) return '입장 무료'
+  return null
+})
+/** 배지가 하나도 없으면 줄을 통째로 없앤다 - 빈 div 가 여백으로 남는다 */
+const hasAmen = computed(() =>
+  feeBadge.value || s.value.park != null || s.value.wc != null || s.value.in)
+
 const photos = computed(() => state.placeImgs[s.value.n] || [])
 const reviews = computed(() => reviewsOf(s.value.n))
 const rated = computed(() => reviews.value.filter(r => r.r > 0))
 const avg = computed(() => rated.value.length
   ? rated.value.reduce((a, b) => a + b.r, 0) / rated.value.length : 0)
 
-watch(() => props.place.n, () => { view.value = 'info'; hint.value = '' })
+watch(() => props.place.n, loadDetail, { immediate: true })
+
+async function loadDetail() {
+  view.value = 'info'
+  hint.value = ''
+  detail.value = null
+  // 목업 모드는 id 가 없다
+  if (s.value.id == null) return
+  const id = s.value.id
+  const d = await MapPlaceService.getDetail(id)
+  // 응답이 늦게 와도 그새 다른 장소를 열었으면 버린다
+  if (s.value.id === id) detail.value = d
+}
 
 function jumpToBest() {
   if (best.value.k !== state.di) state.di = best.value.k
@@ -164,10 +192,11 @@ function delImg(i) {
         </div>
       </div>
 
-      <div class="amen">
-        <span class="am">입장 {{ s.fee ? won(s.fee) + '원' : '무료' }}</span>
-        <span class="am" :class="{ no: !s.park }">주차</span>
-        <span class="am" :class="{ no: !s.wc }">화장실</span>
+      <!-- 없는 정보(null)는 배지를 그리지 않는다 - '주차 없음'과 '주차 정보 없음'은 다르다 -->
+      <div v-if="hasAmen" class="amen">
+        <span v-if="feeBadge" class="am">{{ feeBadge }}</span>
+        <span v-if="s.park != null" class="am" :class="{ no: !s.park }">주차</span>
+        <span v-if="s.wc != null" class="am" :class="{ no: !s.wc }">화장실</span>
         <span v-if="s.in" class="am">실내</span>
       </div>
 
@@ -183,7 +212,18 @@ function delImg(i) {
         <div v-if="s.hours" class="pi">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
             stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 1.9"/></svg>
-          <span class="tx">{{ s.hours }}<span class="sub2">운영시간</span></span>
+          <span class="tx multi">{{ s.hours }}<span class="sub2">운영시간</span></span>
+        </div>
+        <div v-if="detail?.rest" class="pi">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.8h17M8 3v3.6M16 3v3.6"/></svg>
+          <span class="tx multi">{{ detail.rest }}<span class="sub2">휴무일</span></span>
+        </div>
+        <!-- 무료는 위 배지가 이미 말한다 - 여기는 요금표가 있을 때만 -->
+        <div v-if="detail?.feeText && !detail.free" class="pi">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linejoin="round"><path d="M3 9.2V6.5A1.5 1.5 0 0 1 4.5 5h15A1.5 1.5 0 0 1 21 6.5v2.7a2.8 2.8 0 0 0 0 5.6v2.7a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5v-2.7a2.8 2.8 0 0 0 0-5.6Z"/><path d="M14 9.5v5" stroke-dasharray="1.6 2.2"/></svg>
+          <span class="tx multi">{{ detail.feeText }}<span class="sub2">입장료</span></span>
         </div>
         <div v-if="s.tel" class="pi">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
