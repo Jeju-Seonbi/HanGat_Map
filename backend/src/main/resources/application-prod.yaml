@@ -22,6 +22,26 @@ spring:
       hibernate:
         default_batch_fetch_size: 100
 
+  mail:
+    host: ${MAIL_HOST}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
+jwt:
+  secret: ${JWT_SECRET}
+  access-ttl-ms: 600000
+
 server:
   port: ${SERVER_PORT:8080}
 
@@ -35,3 +55,12 @@ management:
 weather:
   base-url: https://apis.data.go.kr/1360000
   service-key: ${SERVICE_KEY}
+
+app:
+  frontend-url: ${FRONTEND_URL}
+  cookie:
+    secure: true
+  mail:
+    from: ${MAIL_FROM}
+  auth:
+    code-hmac-secret: ${APP_AUTH_CODE_HMAC_SECRET}

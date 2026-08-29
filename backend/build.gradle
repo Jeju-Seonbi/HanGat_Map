@@ -56,6 +56,9 @@ dependencies {
 
     // SMTP 이메일 전송
     implementation 'org.springframework.boot:spring-boot-starter-mail'
+
+    // OAuth 추가
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
 }
 
 bootJar {

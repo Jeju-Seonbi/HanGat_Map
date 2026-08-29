@@ -31,6 +31,9 @@ app:
   frontend-url: http://localhost:5173
   cookie:
     secure: false
+  auth:
+    # 테스트 전용 32바이트 값을 Base64로 인코딩한 값
+    code-hmac-secret: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
 
 # 가짜 SMTP라 접속이 안 됨. 켜두면 /health가 DOWN(503)이 되어 스모크 테스트가 깨진다
 management:
