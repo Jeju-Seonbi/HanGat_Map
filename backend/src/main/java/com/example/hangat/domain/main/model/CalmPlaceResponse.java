@@ -26,9 +26,8 @@ public record CalmPlaceResponse(
                 place.getName(),
                 place.getRegion().getName(),
                 place.getPrimaryCategory().getName(),
-                // 사진은 place_images 테이블로 따로 적재한다(MAP-08, 미착수) - 그때까지 null.
-                // 빈 문자열로 두면 프론트가 깨진 이미지를 그린다
-                null,
+                // KTO 대표 이미지(places.image_url) - place_images(MAP-08) 구현 시 그쪽으로 교체
+                place.getImageUrl(),
                 rate,
                 level,
                 level.getLabel(),

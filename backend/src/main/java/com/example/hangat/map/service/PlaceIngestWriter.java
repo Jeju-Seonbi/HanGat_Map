@@ -69,7 +69,7 @@ public class PlaceIngestWriter {
     /** 저장 대상 한 건. 파싱·판정이 끝난 상태로 넘어온다. */
     public record Row(String sourcePlaceId, String regionCode, String categoryCode, String tagCode,
                       String name, String normalizedName, String roadAddress,
-                      BigDecimal latitude, BigDecimal longitude, String phone,
+                      BigDecimal latitude, BigDecimal longitude, String phone, String imageUrl,
                       String dataHash, String rawPayload, LocalDateTime sourceUpdatedAt) {
     }
 
@@ -114,6 +114,7 @@ public class PlaceIngestWriter {
                         .latitude(row.latitude())
                         .longitude(row.longitude())
                         .phone(row.phone())
+                        .imageUrl(row.imageUrl())
                         .isGoodPrice(false)
                         .isHiddenGem(false)
                         .reviewCount(0)
@@ -144,7 +145,7 @@ public class PlaceIngestWriter {
             }
 
             mapping.getPlace().updateFromSource(region, category, row.name(), row.normalizedName(),
-                    row.roadAddress(), row.latitude(), row.longitude(), row.phone());
+                    row.roadAddress(), row.latitude(), row.longitude(), row.phone(), row.imageUrl());
             mapping.markSynced(row.dataHash(), row.rawPayload(), row.sourceUpdatedAt());
             if (applyTag(mapping.getPlace(), row, tags, true)) {
                 tagged++;

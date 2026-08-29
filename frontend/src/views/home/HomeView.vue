@@ -250,7 +250,7 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateArrows))
               :to="`/places/${p.detailId}`"
             >
               <PlaceImage
-                :src="p.imageUrl ?? ''"
+                :src="p.imageUrl ?? '/images/placeholder.svg'"
                 :alt="`${p.name} 사진`"
               />
               <span class="poster-rank">{{ i + 1 }}</span>
@@ -260,7 +260,7 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateArrows))
               class="poster-frame"
             >
               <PlaceImage
-                :src="p.imageUrl ?? ''"
+                :src="p.imageUrl ?? '/images/placeholder.svg'"
                 :alt="`${p.name} 사진`"
               />
               <span class="poster-rank">{{ i + 1 }}</span>

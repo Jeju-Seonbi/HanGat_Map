@@ -94,6 +94,7 @@ class MainApiTest {
                 .region(east).primaryCategory(category)
                 .latitude(BigDecimal.valueOf(33.4))
                 .longitude(BigDecimal.valueOf(126.9))
+                .imageUrl("http://img.example/" + name + ".jpg")
                 .isGoodPrice(false).isHiddenGem(false).reviewCount(0)
                 .build());
         forecastRepository.save(CongestionForecast.of(
@@ -108,6 +109,7 @@ class MainApiTest {
                 .andExpect(jsonPath("$.result.length()").value(2))       // 혼잡 컷 + 카페 제외
                 .andExpect(jsonPath("$.result[0].name").value("혼인지"))
                 .andExpect(jsonPath("$.result[0].level").value("RELAXED"))
+                .andExpect(jsonPath("$.result[0].imageUrl").value("http://img.example/혼인지.jpg"))
                 .andExpect(jsonPath("$.result[1].name").value("새별오름"))
                 .andExpect(jsonPath("$.result[1].levelLabel").value("보통"));
     }
