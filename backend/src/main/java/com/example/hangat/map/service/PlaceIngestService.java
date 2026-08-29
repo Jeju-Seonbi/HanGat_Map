@@ -120,6 +120,7 @@ public class PlaceIngestService {
                     toDecimal(item.mapy(), LAT_MIN, LAT_MAX, "위도", item.title()),
                     toDecimal(item.mapx(), LNG_MIN, LNG_MAX, "경도", item.title()),
                     blankToNull(item.tel()),
+                    blankToNull(item.firstimage()),
                     hash(item), null, parseTime(item.modifiedtime())));
         }
 
@@ -213,7 +214,9 @@ public class PlaceIngestService {
      * 2,138건에 태그가 하나도 안 붙는다.
      */
     private String hash(KtoPlaceItem item) {
-        String seed = String.join("|",
+        // HASH_VERSION: 저장 스키마가 넓어질 때 올린다. 올리면 전 행의 해시가 달라져
+        // 다음 적재 때 1회 전체 UPDATE가 돌며 새 컬럼이 백필된다 (v2: image_url 추가)
+        String seed = String.join("|", "v2",
                 nz(item.title()), nz(item.addr1()), nz(item.addr2()), nz(item.tel()),
                 nz(item.mapx()), nz(item.mapy()), nz(item.contenttypeid()),
                 nz(item.firstimage()), nz(item.modifiedtime()), nz(item.lclsSystm3()));

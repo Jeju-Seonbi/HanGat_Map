@@ -94,6 +94,13 @@ public class Place {
     @Column(name = "phone", length = 30)
     private String phone;
 
+    /**
+     * KTO 대표 이미지(firstimage) 원본 URL. 없는 장소가 많아 null 허용.
+     * place_images(MAP-08) 정식 구현 전까지의 대표 1장 - 구현되면 그 테이블로 이관한다.
+     */
+    @Column(name = "image_url", length = 500)
+    private String imageUrl;
+
     /** 프론트 hours. null이면 상시 개방이라 상세 화면에서 운영시간 줄 자체가 나오지 않는다(설계서 §1.2). */
     @Column(name = "operating_hours_text", length = 500)
     private String operatingHoursText;
@@ -172,7 +179,7 @@ public class Place {
     public void updateFromSource(Region region, PlaceCategory primaryCategory,
                                  String name, String normalizedName,
                                  String roadAddress, BigDecimal latitude, BigDecimal longitude,
-                                 String phone) {
+                                 String phone, String imageUrl) {
         this.region = region;
         this.primaryCategory = primaryCategory;
         this.name = name;
@@ -181,6 +188,7 @@ public class Place {
         this.latitude = latitude;
         this.longitude = longitude;
         this.phone = phone;
+        this.imageUrl = imageUrl;
     }
 
     @PrePersist
