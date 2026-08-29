@@ -4,7 +4,6 @@ import com.example.hangat.course.model.CourseCandidateDto;
 import com.example.hangat.course.model.CourseRequestDto;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * Optional boundary for supplying already verified weather facts to AI input preparation.
@@ -12,7 +11,7 @@ import java.util.Map;
  */
 public interface CourseWeatherFactsProvider {
 
-    Map<String, List<CourseWeatherDto>> load(
+    CourseWeatherFacts load(
             CourseRequestDto request,
             List<CourseCandidateDto> candidates
     );

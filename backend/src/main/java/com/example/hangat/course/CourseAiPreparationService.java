@@ -7,14 +7,12 @@ import com.example.hangat.course.model.CourseRequestDto;
 import com.example.hangat.course.model.GenerationReason;
 import com.example.hangat.course.travel.CourseTravelLegDto;
 import com.example.hangat.course.travel.CourseTravelService;
-import com.example.hangat.course.weather.CourseWeatherDto;
+import com.example.hangat.course.weather.CourseWeatherFacts;
 import com.example.hangat.course.weather.CourseWeatherFactsProvider;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -41,19 +39,24 @@ public class CourseAiPreparationService {
         List<CourseCandidateDto> safeCandidates = candidates == null
                 ? List.of()
                 : List.copyOf(candidates);
-        Map<String, List<CourseWeatherDto>> weatherFacts = weatherFactsProvider
+        CourseWeatherFacts weatherFacts = weatherFactsProvider
                 .map(provider -> provider.load(request, safeCandidates))
-                .orElseGet(Collections::emptyMap);
+                .orElseGet(CourseWeatherFacts::empty);
 
         if (weatherFacts == null) {
-            weatherFacts = Collections.emptyMap();
+            weatherFacts = CourseWeatherFacts.empty();
         }
+
+        CourseGenerationFactsAssembler.Assembly generationFacts =
+                new CourseGenerationFactsAssembler().assemble(
+                        request,
+                        safeCandidates,
+                        weatherFacts,
+                        buildAdjacentTravelFacts(request, safeCandidates));
 
         return assembler.assemble(
                 request,
-                safeCandidates,
-                weatherFacts,
-                buildAdjacentTravelFacts(request, safeCandidates),
+                generationFacts,
                 new GenerationMetadataDto(GenerationReason.INITIAL, null, null)
         );
     }

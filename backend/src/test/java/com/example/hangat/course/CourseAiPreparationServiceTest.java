@@ -3,6 +3,8 @@ package com.example.hangat.course;
 import com.example.hangat.course.ai.CourseAiInputDto;
 import com.example.hangat.course.ai.CourseAiGenerationService;
 import com.example.hangat.course.ai.CourseAiResultValidator;
+import com.example.hangat.course.facts.WeatherFact;
+import com.example.hangat.course.facts.WeatherFactSet;
 import com.example.hangat.course.model.CongestionDto;
 import com.example.hangat.course.model.CourseCandidateDto;
 import com.example.hangat.course.model.CourseRequestDto;
@@ -10,6 +12,7 @@ import com.example.hangat.course.model.TourPlaceDto;
 import com.example.hangat.course.travel.CourseTravelService;
 import com.example.hangat.course.travel.StraightLineDistanceCalculator;
 import com.example.hangat.course.weather.CourseWeatherDto;
+import com.example.hangat.course.weather.CourseWeatherFacts;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -110,7 +113,17 @@ class CourseAiPreparationServiceTest {
         CourseAiPreparationService preparationService = new CourseAiPreparationService(
                 new CourseAiInputAssembler(),
                 new CourseTravelService(new StraightLineDistanceCalculator()),
-                Optional.of((request, candidates) -> Map.of("east-normal", List.of(weather))));
+                Optional.of((request, candidates) -> new CourseWeatherFacts(
+                        Map.of("east-normal", "kma-east-20260827-0500"),
+                        List.of(new WeatherFactSet(
+                                "kma-east-20260827-0500", "KMA", 55, 38,
+                                LocalDate.of(2026, 8, 27), LocalTime.of(5, 0),
+                                List.of(new WeatherFact(
+                                        null,
+                                        weather.forecastDate(), weather.forecastTime(),
+                                        weather.temperature(), weather.precipitationProbability(),
+                                        weather.precipitationTypeCode(), weather.skyConditionCode(),
+                                        weather.windSpeed(), weather.humidity())))))));
 
         CourseAiInputDto result = preparationService.prepare(
                 request(), List.of(candidate));

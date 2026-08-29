@@ -15,7 +15,11 @@ import com.example.hangat.course.ai.CourseAiInputDto.TripConditionDto;
 import com.example.hangat.course.ai.CourseAiInputDto.UserPreferencesDto;
 import com.example.hangat.course.facts.CongestionFact;
 import com.example.hangat.course.facts.CourseCandidate;
+import com.example.hangat.course.facts.CourseGenerationFacts;
 import com.example.hangat.course.facts.ExternalClassificationFact;
+import com.example.hangat.course.facts.TravelFact;
+import com.example.hangat.course.facts.WeatherFact;
+import com.example.hangat.course.facts.WeatherFactSet;
 import com.example.hangat.course.model.AccommodationDto;
 import com.example.hangat.course.model.CongestionDto;
 import com.example.hangat.course.model.CourseCandidateDto;
@@ -81,6 +85,33 @@ public class CourseAiInputAssembler {
                 toTravelFacts(travelFacts, candidateAssembly.candidates()),
                 generationMetadata
         );
+    }
+
+    CourseAiInputDto assemble(
+            CourseRequestDto request,
+            CourseGenerationFactsAssembler.Assembly generationFacts,
+            GenerationMetadataDto generationMetadata
+    ) {
+        if (request == null) {
+            throw new IllegalArgumentException("AI 코스 입력 요청이 필요합니다.");
+        }
+        if (generationFacts == null || generationFacts.facts() == null) {
+            throw new IllegalArgumentException("AI 코스 생성 사실이 필요합니다.");
+        }
+        if (generationMetadata == null || generationMetadata.generationReason() == null) {
+            throw new IllegalArgumentException("AI 코스 생성 사유가 필요합니다.");
+        }
+
+        CourseGenerationFacts facts = generationFacts.facts();
+        List<CandidateFactDto> candidates = toCandidateFacts(
+                facts.candidates(), facts.weatherFactSets());
+        return new CourseAiInputDto(
+                CONTRACT_VERSION,
+                toTripCondition(request),
+                toUserPreferences(request, generationFacts.candidateIdsByPreference()),
+                candidates,
+                toNormalizedTravelFacts(facts.travelFacts(), candidates),
+                generationMetadata);
     }
 
     private TripConditionDto toTripCondition(CourseRequestDto request) {
@@ -231,6 +262,53 @@ public class CourseAiInputAssembler {
                 List.copyOf(results), normalized.candidateIdsByPreference());
     }
 
+    private List<CandidateFactDto> toCandidateFacts(
+            List<CourseCandidate> candidates,
+            List<WeatherFactSet> weatherFactSets
+    ) {
+        Map<String, WeatherFactSet> weatherSetsById = weatherFactSets.stream()
+                .collect(java.util.stream.Collectors.toUnmodifiableMap(
+                        WeatherFactSet::weatherFactSetId,
+                        weatherFactSet -> weatherFactSet));
+        List<CandidateFactDto> results = new ArrayList<>();
+        for (CourseCandidate candidate : candidates) {
+            WeatherFactSet weatherFactSet = candidate.weatherFactSetId() == null
+                    ? null
+                    : weatherSetsById.get(candidate.weatherFactSetId());
+            results.add(new CandidateFactDto(
+                    new PlaceIdentityDto(
+                            candidate.identity().candidateId(),
+                            candidate.identity().placeId(),
+                            candidate.identity().sourceCode(),
+                            candidate.identity().sourcePlaceId()),
+                    candidate.place().name(),
+                    firstNonBlank(candidate.place().roadAddress(), candidate.place().address()),
+                    doubleValue(candidate.place().latitude()),
+                    doubleValue(candidate.place().longitude()),
+                    toTourCategory(candidate.externalClassifications()),
+                    candidate.regionCode(),
+                    candidate.userConstraint().preferenceType(),
+                    candidate.styleHints().stream().map(style -> style.styleCode()).toList(),
+                    toNormalizedCongestionFacts(candidate.congestionFacts()),
+                    weatherFactSet == null ? null : weatherFactSet.facts().stream()
+                            .map(this::toLegacyWeatherFact)
+                            .toList()));
+        }
+        return List.copyOf(results);
+    }
+
+    private CourseWeatherDto toLegacyWeatherFact(WeatherFact fact) {
+        return new CourseWeatherDto(
+                fact.forecastDate(),
+                fact.forecastTime(),
+                fact.temperature(),
+                fact.precipitationProbability(),
+                fact.precipitationTypeCode(),
+                fact.skyConditionCode(),
+                fact.windSpeed(),
+                fact.humidity());
+    }
+
     private Map<String, CourseCandidateDto> legacyCandidatesById(
             List<CourseCandidateDto> candidates
     ) {
@@ -303,6 +381,36 @@ public class CourseAiInputAssembler {
                             fact.transport(), fact.routeSourceCode(), fact.routeCalculatedAt());
                 })
                 .toList();
+    }
+
+    private List<TravelFactDto> toNormalizedTravelFacts(
+            List<TravelFact> travelFacts,
+            List<CandidateFactDto> candidates
+    ) {
+        if (travelFacts == null) {
+            return List.of();
+        }
+        Map<String, String> namesByCandidateId = candidates.stream()
+                .collect(java.util.stream.Collectors.toUnmodifiableMap(
+                        candidate -> candidate.identity().candidateId(),
+                        CandidateFactDto::name));
+        return travelFacts.stream()
+                .map(fact -> new TravelFactDto(
+                        fact.fromCandidateId(), namesByCandidateId.get(fact.fromCandidateId()),
+                        fact.toCandidateId(), namesByCandidateId.get(fact.toCandidateId()),
+                        metersToKilometers(fact.straightDistanceMeters()),
+                        com.example.hangat.course.travel.DistanceCalculationMethod.valueOf(
+                                fact.straightDistanceMethod()),
+                        metersToKilometers(fact.routeDistanceMeters()),
+                        fact.travelMinutes(),
+                        fact.transport(),
+                        fact.routeSourceCode(),
+                        fact.routeCalculatedAt()))
+                .toList();
+    }
+
+    private BigDecimal metersToKilometers(BigDecimal meters) {
+        return meters == null ? null : meters.movePointLeft(3);
     }
 
     private void requireTravelCandidate(String candidateId, Set<String> candidateIds) {
