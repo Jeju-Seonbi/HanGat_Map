@@ -108,6 +108,14 @@ public class Place {
     @Column(name = "rest_day_text", length = 300)
     private String restDayText;
 
+    /**
+     * ⚠️ 명세서 9.0에 없는 컬럼이다(설계서 §10-③ 미해결 - 재원님 확인 필요).
+     * KTO usefee 원문을 그대로 담는다 - "1,500원"이 아니라 대상별 요금표가 통째로 와서
+     * 숫자로 바꾸면 없는 가격을 만들어내게 된다.
+     */
+    @Column(name = "use_fee_text", length = 1000)
+    private String useFeeText;
+
     /** 명세서가 NULL 허용이므로 primitive가 아닌 Boolean. columnDefinition 필요 사유는 {@link Region#isActive()} 참고. */
     @Column(name = "parking_available", columnDefinition = "BOOLEAN")
     private Boolean parkingAvailable;
@@ -189,6 +197,24 @@ public class Place {
         this.longitude = longitude;
         this.phone = phone;
         this.imageUrl = imageUrl;
+    }
+
+    /**
+     * 상세 배치(detailIntro2)가 채우는 값들 - 목록 적재와 출처가 달라 따로 둔다.
+     * 목록 배치가 이 값들을 null로 덮어쓰면 안 되므로 updateFromSource 와 섞지 않는다.
+     */
+    public void updateDetail(String operatingHoursText, String restDayText,
+                             Boolean parkingAvailable, Boolean toiletAvailable, String useFeeText) {
+        this.operatingHoursText = operatingHoursText;
+        this.restDayText = restDayText;
+        // null 은 '모름'이라 기존 값을 지우지 않는다 - 타입에 따라 필드 자체가 없는 경우가 많다
+        if (parkingAvailable != null) {
+            this.parkingAvailable = parkingAvailable;
+        }
+        if (toiletAvailable != null) {
+            this.toiletAvailable = toiletAvailable;
+        }
+        this.useFeeText = useFeeText;
     }
 
     @PrePersist
