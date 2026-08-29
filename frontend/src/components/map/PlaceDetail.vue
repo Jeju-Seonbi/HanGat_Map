@@ -4,7 +4,7 @@ import { ref, computed, watch } from 'vue'
 import StarIcon from './StarIcon.vue'
 import ReviewSection from './ReviewSection.vue'
 import { state, reviewsOf, toggleFav, isFav, toast, savePlaceImgs } from '@/stores/mapStore'
-import { SPOTS } from '@/data/placesMap'
+
 import { crowd, tier, tierKo, rank30, bestDay, CROWD_KO } from '@/utils/crowd'
 import { at, fmtK } from '@/utils/date'
 import { wxOf, wxIcon } from '@/utils/weather'
@@ -71,7 +71,7 @@ function findCalmDay() {
 
 const nearby = ref([])
 function findNearby() {
-  nearby.value = SPOTS.filter(x => x.n !== s.value.n)
+  nearby.value = state.layers.spot.filter(x => x.n !== s.value.n)
     .map(x => ({ s: x, c: crowd(x, state.di), d: dist(s.value, x) }))
     .filter(o => o.d < 12 && o.c != null && o.c < 40)
     .sort((a, b) => a.c - b.c).slice(0, 3)

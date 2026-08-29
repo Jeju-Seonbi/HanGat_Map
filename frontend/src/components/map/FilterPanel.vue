@@ -3,7 +3,7 @@
 import { computed, ref, watch } from 'vue'
 import SearchBox from './SearchBox.vue'
 import LayerIcon from './LayerIcon.vue'
-import { state, rankedRows, CATEGORIES, REGIONS, LAYERS, FILTER_VISIBLE } from '@/stores/mapStore'
+import { state, rankedRows, CATEGORIES, REGIONS, LAYERS, FILTER_VISIBLE, isPendingLayer } from '@/stores/mapStore'
 import { at, fmtK } from '@/utils/date'
 import { mapBridge } from '@/composables/mapBridge'
 
@@ -86,9 +86,11 @@ function toggleCourse() {
           @click="moveFilter(-1)">‹</button>
         <div class="ftr-vp">
           <div class="ftr" :style="{ transform: shift }">
-            <button v-for="l in LAYERS" :key="l.k" :class="[l.k, { on: state.L[l.k] }]"
+            <button v-for="l in LAYERS" :key="l.k" :class="[l.k, { on: state.L[l.k], soon: isPendingLayer(l.k) }]"
               @click="state.L[l.k] ^= 1">
               <span class="ico"><LayerIcon :name="l.k" /></span>{{ l.t }}
+              <!-- 적재 전 레이어 - 켜도 빈 지도라 '고장'으로 보이지 않게 표시한다 -->
+              <em v-if="isPendingLayer(l.k)" class="soon-tag">준비중</em>
             </button>
           </div>
         </div>
@@ -98,13 +100,17 @@ function toggleCourse() {
 
       <select class="catsel" :class="{ on: state.F.cat }" v-model="state.F.cat">
         <option value="">모든 종류의 관광지</option>
-        <option v-for="c in CATEGORIES" :key="c" :value="c">{{ c }}</option>
+        <!-- 곳수를 함께 보여준다 - 110종 중 3분의 2가 5곳 미만이라 고르기 전에 규모를 알아야 한다 -->
+        <option v-for="c in CATEGORIES" :key="c.name" :value="c.name">{{ c.name }} ({{ c.n }})</option>
       </select>
 
       <div class="sect"><em>✦</em> <span>{{ sectionTitle }}</span></div>
 
       <div class="rows">
-        <div v-if="!rankedRows.length" class="empty">조건에 맞는 곳이 없어요</div>
+        <div v-if="state.loading" class="empty">장소를 불러오는 중이에요…</div>
+        <div v-else-if="!rankedRows.length" class="empty">
+          {{ state.live ? '이 조건에는 혼잡 예보가 있는 곳이 없어요' : '조건에 맞는 곳이 없어요' }}
+        </div>
         <!-- 혼잡 상태는 왼쪽 핀 색으로만 표시한다 (오른쪽 뱃지와 의미가 중복되어 제거) -->
         <div v-for="(o, i) in rankedRows" :key="o.s.n" class="row" :class="o.t"
           @click="openPlace(o.s.n)">

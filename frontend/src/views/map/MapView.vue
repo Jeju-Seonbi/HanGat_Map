@@ -7,8 +7,8 @@ import DatePicker from '@/components/map/DatePicker.vue'
 import PlaceDetail from '@/components/map/PlaceDetail.vue'
 import CoursePanel from '@/components/map/CoursePanel.vue'
 import PhotoLightbox from '@/components/map/PhotoLightbox.vue'
-import { state, toast } from '@/stores/mapStore'
-import { SPOTS } from '@/data/placesMap'
+import { state, toast, loadPlaces } from '@/stores/mapStore'
+
 import { buildCourse, refreshCourse, courseFromNames } from '@/utils/course'
 import { at, iso, D0, FORECAST_DAYS } from '@/utils/date'
 import { mapBridge } from '@/composables/mapBridge'
@@ -20,7 +20,7 @@ const lightbox = ref(null)
 const openCount = computed(() => (state.sel ? 1 : 0) + (state.course ? 1 : 0))
 
 function openPlace(nameOrSpot) {
-  const s = typeof nameOrSpot === 'string' ? SPOTS.find(x => x.n === nameOrSpot) : nameOrSpot
+  const s = typeof nameOrSpot === 'string' ? state.layers.spot.find(x => x.n === nameOrSpot) : nameOrSpot
   if (!s) return
   mapBridge.panTo(s.y, s.x)
   state.sel = s
@@ -80,7 +80,11 @@ watch(() => state.di, () => {
   }
 })
 
-onMounted(loadFromURL)
+onMounted(async () => {
+  // 장소·예보를 먼저 받아야 URL의 ?place= 로 들어온 장소를 찾을 수 있다
+  await loadPlaces()
+  loadFromURL()
+})
 </script>
 
 <template>
