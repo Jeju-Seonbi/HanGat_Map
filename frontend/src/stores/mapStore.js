@@ -1,8 +1,9 @@
 import { reactive, computed } from 'vue'
-import { SPOTS, FOOD } from '@/data/placesMap'
 import { useAuthStore } from '@/stores/auth'
 import { crowd, tier } from '@/utils/crowd'
 import { at, iso, ago, D0 } from '@/utils/date'
+import MapPlaceService, { PENDING_LAYERS } from '@/services/map/MapPlaceService'
+import CrowdService, { attachSeries } from '@/services/map/CrowdService'
 
 /* 지도 페이지 전역 상태.
    Pinia와 같은 모양(state + action)으로 두어 나중에 옮기기 쉽게 했다.
@@ -38,6 +39,16 @@ export const LAYERS = [
 export const FILTER_VISIBLE = 4
 
 export const state = reactive({
+  /* ── 서버에서 받아오는 장소 데이터 ──
+     하드코딩 시절엔 import 하는 순간 값이 있었지만 이제 비동기라 처음엔 비어 있다.
+     reactive 라서 loadPlaces() 가 채우면 화면이 알아서 다시 그려진다 */
+  layers: { spot: [], food: [], dine: [], cafe: [], cvs: [], stay: [], mart: [] },
+  loading: true,
+  /** false = 백엔드가 죽어 하드코딩 폴백으로 그리는 중 (화면에 표시할 근거) */
+  live: false,
+  /** 예보 일수. 화면은 30일 캘린더인데 실측은 21~22일이라 남는 날은 '정보 없음' */
+  forecastDays: 0,
+
   di: 0,                 // 선택한 날짜 (오늘로부터 며칠 뒤)
   sel: null,             // 상세를 연 장소
   sort: 'calm',
@@ -54,7 +65,45 @@ export const state = reactive({
 })
 
 /* ── 파생값 ── */
-export const CATEGORIES = [...new Set(SPOTS.map(s => s.c))].sort()
+
+/** 화면이 SPOTS/FOOD 를 직접 import 하던 자리를 대신한다 */
+export const spots = computed(() => state.layers.spot)
+export const foods = computed(() => state.layers.food)
+
+/**
+ * 세부분류 드롭다운 (MAP-01).
+ *
+ * 가나다순이 아니라 <b>장소가 많은 순</b>이다 - 실데이터 기준 110종인데 그중 67종이
+ * 5곳 미만이라, 가나다순으로 두면 1곳짜리 분류가 위에 오고 오름(92곳)이 한참 밑으로 간다.
+ */
+export const CATEGORIES = computed(() => {
+  const count = new Map()
+  for (const s of state.layers.spot) {
+    if (s.c) count.set(s.c, (count.get(s.c) ?? 0) + 1)
+  }
+  return [...count.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([name, n]) => ({ name, n }))
+})
+
+/** 아직 적재 전인 레이어 - 화면이 '빈 지도'와 '준비 중'을 구분해 표시한다 */
+export const isPendingLayer = key => state.live && PENDING_LAYERS.includes(key)
+
+/**
+ * 장소·예보를 받아 state에 채운다. 지도 화면 진입 시 한 번 호출한다.
+ * 예보는 장소보다 늦게 와도 되므로 따로 기다렸다가 붙인다 - 지도가 먼저 뜬다.
+ */
+export async function loadPlaces () {
+  state.loading = true
+  const { live, layers } = await MapPlaceService.getAll()
+  state.layers = layers
+  state.live = live
+  state.loading = false
+
+  const forecast = await CrowdService.getForecast()
+  state.forecastDays = forecast.days
+  attachSeries(state.layers.spot, forecast, iso(new Date()))
+}
 
 /** 지역·종류 필터를 함께 적용 */
 export const inFilter = s =>
@@ -64,7 +113,7 @@ export const inRegion = o => state.F.reg === '전체' || o.r === state.F.reg
 
 /** 좌측 목록 — 집중률 결측 장소는 순위에서 제외 (지도에는 회색 핀으로 남는다) */
 export const rankedRows = computed(() =>
-  SPOTS.filter(s => inFilter(s) && s.b != null)
+  state.layers.spot.filter(s => inFilter(s) && crowd(s, state.di) != null)
     .map(s => ({ s, c: crowd(s, state.di), t: tier(crowd(s, state.di)) }))
     .sort((a, b) => (state.sort === 'calm' ? a.c - b.c : b.c - a.c))
     .slice(0, 8))
@@ -135,4 +184,4 @@ export function saveCourse(title) {
   return true
 }
 
-export { SPOTS, FOOD, D0 }
+export { D0 }

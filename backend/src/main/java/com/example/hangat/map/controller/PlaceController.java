@@ -21,7 +21,7 @@ import java.util.List;
  */
 @Tag(name = "장소", description = "지도 마커·목록·상세")
 @RestController
-@RequestMapping("/api/places")
+@RequestMapping("/places")
 public class PlaceController {
 
     private final PlaceService placeService;

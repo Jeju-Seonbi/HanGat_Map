@@ -3,7 +3,8 @@ import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { loadKakaoMap } from '@/composables/useKakaoLoader'
 import { mapBridge } from '@/composables/mapBridge'
 import { state, inFilter, inRegion } from '@/stores/mapStore'
-import { SPOTS, FOOD, DINE, CAFE, CVS, STAY, MART } from '@/data/placesMap'
+import { hasCoords } from '@/services/map/MapPlaceService'
+
 import { crowd, tier } from '@/utils/crowd'
 import { cssVar } from '@/utils/geo'
 import { POI_MARKER_CLASS, shouldShowMapLabels } from './mapPresentation'
@@ -50,7 +51,8 @@ function draw() {
   const { di, sel, course, courseDay, L } = state
   const inCourse = n => course && course.stops.some(s => s.o && s.o.n === n)
 
-  if (L.spot) SPOTS.forEach(s => {
+  // 좌표 없는 장소는 지도에 못 찍는다 - KTO 원본에 좌표 오류가 있어 null로 저장된 건이 있다
+  if (L.spot) state.layers.spot.filter(hasCoords).forEach(s => {
     const c = crowd(s, di), on = inFilter(s), t = tier(c)
     const pick = inCourse(s.n) || (sel && sel.n === s.n)
     const sz = pick ? 20 : on ? 15 : 9
@@ -63,15 +65,15 @@ function draw() {
 
   const poi = (g, list) => {
     if (!L[g]) return
-    list.filter(inRegion).forEach(f => addPin(g, f.y, f.x,
+    list.filter(f => inRegion(f) && hasCoords(f)).forEach(f => addPin(g, f.y, f.x,
       `<div class="lb-t poi-label">${f.n}</div><div class="poi-marker ${POI_MARKER_CLASS[g]}"></div>`, null, 60))
   }
-  poi('food', FOOD)
-  poi('dine', DINE)
-  poi('cafe', CAFE)
-  poi('cvs', CVS)
-  poi('stay', STAY)
-  poi('mart', MART)
+  poi('food', state.layers.food)
+  poi('dine', state.layers.dine)
+  poi('cafe', state.layers.cafe)
+  poi('cvs', state.layers.cvs)
+  poi('stay', state.layers.stay)
+  poi('mart', state.layers.mart)
 
   if (course) {
     /* MAP_006: 일차 전환 시 해당 일차 경로만 강조 (번호는 일차 내 방문 순서) */
@@ -113,7 +115,7 @@ function fitPoints(pts, minLevel) {
 
 function fitRegion() {
   if (!map) return
-  const ss = SPOTS.filter(s => state.F.reg === '전체' || s.r === state.F.reg)
+  const ss = state.layers.spot.filter(s => (state.F.reg === '전체' || s.r === state.F.reg) && hasCoords(s))
   if (!ss.length) return
   if (state.F.reg === '전체') { map.setCenter(LL(33.383, 126.55)); map.setLevel(10); return }
   fitPoints(ss.map(s => [s.y, s.x]))
@@ -156,8 +158,15 @@ onBeforeUnmount(() => {
 })
 
 /* 상태가 바뀌면 다시 그린다. 지도 자체는 새로 만들지 않는다 */
+/* state.layers 를 함께 본다 - 장소는 API로 비동기로 오므로 지도가 먼저 뜨고 데이터가 나중에 도착한다.
+   이걸 빼면 첫 렌더 때 빈 배열로 그린 뒤 다시 그리지 않아 지도에 핀이 하나도 안 찍힌다.
+   레이어별 길이만 보면 되므로(내용 비교는 2천 건이라 비싸다) deep 감시 대상에서 분리한다 */
 watch(() => [state.di, state.sel, state.course, state.courseDay, state.F.reg, state.F.cat,
   ...Object.values(state.L)], draw, { deep: true })
+/* forecastDays 도 함께 본다 - 예보는 장소보다 늦게 도착해 series 를 뒤늦게 채운다.
+   배열 길이는 그대로라 이걸 빼면 핀이 첫 렌더 상태(전부 회색 '정보 없음')로 굳는다.
+   좌측 목록은 computed 라 알아서 갱신되므로 목록만 색이 맞고 지도는 회색인 상태가 되어 알아채기 어렵다 */
+watch(() => [Object.values(state.layers).map(list => list.length).join(','), state.forecastDays], draw)
 </script>
 
 <template>

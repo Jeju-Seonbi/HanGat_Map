@@ -2,7 +2,7 @@
 /* MAP_002 검색 — 관광지(이름·종류·권역)와 착한가격업소(상호·메뉴·권역)를 부분 일치로 찾는다 */
 import { ref, computed } from 'vue'
 import { state } from '@/stores/mapStore'
-import { SPOTS, FOOD } from '@/data/placesMap'
+
 import { crowd, tier } from '@/utils/crowd'
 import { won } from '@/utils/geo'
 import { mapBridge } from '@/composables/mapBridge'
@@ -18,9 +18,9 @@ const hits = computed(() => {
   const k = q.value.trim()
   if (!k) return []
   return [
-    ...SPOTS.filter(s => s.n.includes(k) || s.c.includes(k) || s.r.includes(k))
+    ...state.layers.spot.filter(s => s.n.includes(k) || s.c.includes(k) || s.r.includes(k))
       .map(s => ({ type: 'spot', o: s, c: crowd(s, state.di) })),
-    ...FOOD.filter(f => f.n.includes(k) || f.m.includes(k) || f.r.includes(k))
+    ...state.layers.food.filter(f => f.n.includes(k) || (f.c ?? '').includes(k) || f.r.includes(k))
       .map(f => ({ type: 'food', o: f })),
   ].slice(0, 8)
 })
