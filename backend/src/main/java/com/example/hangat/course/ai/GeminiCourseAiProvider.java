@@ -481,7 +481,7 @@ public class GeminiCourseAiProvider implements CourseAiProvider {
 
     private Map<String, Object> responseJsonSchema(CourseAiInputDto input) {
         List<String> candidateIds = input.candidates().stream()
-                .map(candidate -> candidate.identity().candidateId())
+                .map(CourseAiInputDto.CandidateFactDto::candidateId)
                 .distinct()
                 .toList();
         Map<String, Object> candidateId = candidateIds.isEmpty()

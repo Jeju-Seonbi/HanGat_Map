@@ -43,16 +43,10 @@ class CourseAiResultValidatorTest {
     }
 
     @Test
-    void rejectsMissingWantAndForbiddenPlace() {
+    void rejectsMissingWantAndAvoidIdThatIsOutsideCandidateAllowList() {
         assertInvalid(result(day("2026-08-28", item("normal-1", "11:00"))));
-        CourseAiInputDto forbiddenInput = withForbiddenCandidate();
-        assertThatThrownBy(() -> validator.validate(
-                forbiddenInput,
-                result(day("2026-08-28",
-                        item("want-1", "09:00"), item("normal-1", "11:00")))))
-                .isInstanceOfSatisfying(CourseAiException.class,
-                        exception -> org.assertj.core.api.Assertions.assertThat(exception.getFailureType())
-                                .isEqualTo(CourseAiFailureType.VALIDATION_ERROR));
+        assertInvalid(result(day("2026-08-28",
+                item("want-1", "09:00"), item("avoid-1", "11:00"))));
     }
 
     @Test
@@ -78,11 +72,11 @@ class CourseAiResultValidatorTest {
 
     private CourseAiInputDto input() {
         PlaceConstraintDto required = new PlaceConstraintDto(
-                new PlaceIdentityDto(null, 1L, null, null),
+                new PlaceIdentityDto("want-1", 1L, null, null),
                 "성산일출봉", "주소", null, null, null,
                 PreferenceType.WANT, LocalDate.parse("2026-08-28"), LocalTime.parse("09:00"));
         return new CourseAiInputDto(
-                "1.0",
+                "2.0",
                 new TripConditionDto(
                         LocalDate.parse("2026-08-27"), LocalDate.parse("2026-08-29"),
                         2, 500000, Transport.RENTAL_CAR),
@@ -92,19 +86,6 @@ class CourseAiResultValidatorTest {
                 List.of(),
                 null
         );
-    }
-
-    private CourseAiInputDto withForbiddenCandidate() {
-        CourseAiInputDto base = input();
-        PlaceConstraintDto forbidden = new PlaceConstraintDto(
-                new PlaceIdentityDto(null, 2L, null, null),
-                "만장굴", "주소", null, null, null,
-                PreferenceType.AVOID, null, null);
-        return new CourseAiInputDto(
-                base.contractVersion(), base.tripCondition(),
-                new UserPreferencesDto(List.of(), List.of(),
-                        base.userPreferences().requiredPlaces(), List.of(forbidden), null),
-                base.candidates(), base.travelFacts(), base.generationMetadata());
     }
 
     private CandidateFactDto candidate(String id, String name, PreferenceType preferenceType) {
@@ -119,7 +100,7 @@ class CourseAiResultValidatorTest {
     }
 
     private CourseAiResultDto result(DayDto... days) {
-        return new CourseAiResultDto("1.0", List.of(days));
+        return new CourseAiResultDto("2.0", List.of(days));
     }
 
     private DayDto day(String date, ItemDto... items) {

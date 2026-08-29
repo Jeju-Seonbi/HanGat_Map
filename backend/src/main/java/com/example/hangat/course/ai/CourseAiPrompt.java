@@ -12,7 +12,7 @@ public class CourseAiPrompt {
 
             절대 규칙:
             1. candidates 목록에 없는 장소를 선택하지 않는다.
-            2. 응답 candidateId는 반드시 candidates[].identity.candidateId 중 하나를 문자 하나도 변경하지 않고 그대로 사용한다. 새 ID를 생성하거나 다른 ID로 해석하지 않는다.
+            2. 응답 candidateId는 반드시 candidates[].candidateId 중 하나를 문자 하나도 변경하지 않고 그대로 사용한다. 새 ID를 생성하거나 다른 ID로 해석하지 않는다.
             3. 모든 WANT 장소를 정확히 한 번 포함한다.
             4. AVOID 장소는 절대 포함하지 않는다.
             5. fixedDate를 변경하지 않는다.
@@ -22,8 +22,8 @@ public class CourseAiPrompt {
             9. 후보가 부족하면 같은 candidateId로 일정을 채우지 말고 더 적은 장소를 선택한다.
             10. 제공되지 않은 혼잡도 숫자나 단계를 생성하지 않는다.
             11. 제공되지 않은 날씨를 생성하지 않는다.
-            12. 제공되지 않은 routeDistanceKm 또는 durationMinutes를 생성하거나 추정하지 않는다.
-            13. straightDistanceKm는 직선거리이며 도로거리나 이동시간으로 해석하지 않는다.
+            12. 제공되지 않은 routeDistanceMeters 또는 travelMinutes를 생성하거나 추정하지 않는다.
+            13. straightDistanceMeters는 직선거리이며 도로거리나 이동시간으로 해석하지 않는다.
             14. 스타일은 Hard Filter가 아닌 Soft Preference다.
             15. 혼잡도, 날씨, 거리도 Soft 판단 데이터다.
             16. WANT와 고정 일정은 모든 Soft Preference보다 우선한다.
@@ -35,8 +35,13 @@ public class CourseAiPrompt {
             travelFacts 규칙:
             - sparse adjacent pair일 수 있으며 배열 순서는 최종 방문 순서가 아니다.
             - pair가 있다는 사실은 두 장소를 반드시 방문하라는 뜻이 아니다.
-            - routeDistanceKm 또는 durationMinutes가 null이면 실제 경로거리 또는 이동시간 정보가 없는 것이다.
+            - routeDistanceMeters 또는 travelMinutes가 null이면 실제 경로거리 또는 이동시간 정보가 없는 것이다.
             - null인 사실값을 추정하지 않는다.
+
+            weatherFactSets 규칙:
+            - 후보의 weatherFactSetId로 최상위 weatherFactSets를 참조한다.
+            - weatherFactSetId가 null이면 해당 후보의 날씨가 제공되지 않은 것이다.
+            - 제공되지 않은 날짜나 시간의 날씨를 추정하지 않는다.
 
             목표:
             - DAY별 코스를 만들고 하루 동선의 불필요한 왕복을 줄인다.
@@ -92,7 +97,7 @@ public class CourseAiPrompt {
                 - 날짜나 시간이 달라도 동일 candidateId를 재사용하지 않는다.
                 - WANT 장소는 정확히 1회만 배치한다.
                 - 후보가 부족하면 중복해서 채우지 말고 더 적은 장소를 선택한다.
-                - candidateId는 아래 입력 candidates[].identity.candidateId 중 하나를 그대로 사용한다.
+                - candidateId는 아래 입력 candidates[].candidateId 중 하나를 그대로 사용한다.
 
                 원본 입력 JSON:
                 %s

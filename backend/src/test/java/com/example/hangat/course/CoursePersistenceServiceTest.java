@@ -284,7 +284,8 @@ class CoursePersistenceServiceTest {
                 new CourseAiInputDto.GenerationMetadataDto(
                         GenerationReason.INITIAL, "course-ai-1", null));
         String candidateId = input.candidates().get(0).identity().candidateId();
-        CourseAiResultDto result = result(candidateId, "2026-08-27", "10:30");
+        CourseAiResultDto result = result(
+                input.contractVersion(), candidateId, "2026-08-27", "10:30");
 
         new com.example.hangat.course.ai.CourseAiResultValidator()
                 .validate(input, result);
@@ -340,7 +341,7 @@ class CoursePersistenceServiceTest {
         CoursePersistenceResult persisted = persistenceService.persist(
                 request,
                 input,
-                result(candidateId, "2026-08-27", "10:30"),
+                result(input.contractVersion(), candidateId, "2026-08-27", "10:30"),
                 List.of(ktoCandidate));
 
         Long placeId = persisted.itemsByCandidateId().get(candidateId).getPlace().getId();
@@ -478,7 +479,16 @@ class CoursePersistenceServiceTest {
             String date,
             String startTime
     ) {
-        return new CourseAiResultDto("1.0", List.of(
+        return result("1.0", candidateId, date, startTime);
+    }
+
+    private CourseAiResultDto result(
+            String contractVersion,
+            String candidateId,
+            String date,
+            String startTime
+    ) {
+        return new CourseAiResultDto(contractVersion, List.of(
                 new CourseAiResultDto.DayDto(
                         LocalDate.parse(date),
                         List.of(item(candidateId, startTime)))));

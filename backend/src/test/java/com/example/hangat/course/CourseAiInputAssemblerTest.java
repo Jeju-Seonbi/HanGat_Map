@@ -2,6 +2,8 @@ package com.example.hangat.course;
 
 import com.example.hangat.course.ai.CourseAiInputDto;
 import com.example.hangat.course.ai.CourseAiInputDto.GenerationMetadataDto;
+import com.example.hangat.course.facts.WeatherFact;
+import com.example.hangat.course.facts.WeatherFactSet;
 import com.example.hangat.course.model.CongestionDto;
 import com.example.hangat.course.model.CourseCandidateDto;
 import com.example.hangat.course.model.CourseRequestDto;
@@ -12,6 +14,7 @@ import com.example.hangat.course.model.Transport;
 import com.example.hangat.course.travel.CourseTravelLegDto;
 import com.example.hangat.course.travel.DistanceCalculationMethod;
 import com.example.hangat.course.weather.CourseWeatherDto;
+import com.example.hangat.course.weather.CourseWeatherFacts;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -33,6 +36,112 @@ class CourseAiInputAssemblerTest {
             .registerModule(new JavaTimeModule())
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     private final CourseAiInputAssembler assembler = new CourseAiInputAssembler();
+
+    @Test
+    void serializesProviderNeutralProductionContractFromGenerationFacts() throws Exception {
+        CourseRequestDto request = kakaoWantRequest(
+                "사용자 지정 카페",
+                "KAKAO-777",
+                "제주특별자치도 제주시 구좌읍 월정리 1");
+        CourseCandidateDto ktoCandidate = new CourseCandidateDto(
+                tourPlace("125266", "비자림", "제주특별자치도 제주시 구좌읍 비자숲길 55"),
+                List.of(
+                        congestion("20260827", "42.50"),
+                        congestion("20260901", "99.00")),
+                null, List.of("NATURE"));
+        WeatherFactSet weatherSet = new WeatherFactSet(
+                "weather-east-1", "KMA", 55, 38,
+                LocalDate.of(2026, 8, 27), LocalTime.of(5, 0),
+                List.of(
+                        new WeatherFact(
+                                91L, LocalDate.of(2026, 8, 27), LocalTime.of(14, 0),
+                                new BigDecimal("27.0"), 30, "0", "3",
+                                new BigDecimal("2.5"), 65),
+                        new WeatherFact(
+                                92L, LocalDate.of(2026, 9, 1), LocalTime.of(14, 0),
+                                new BigDecimal("29.0"), 10, "0", "1",
+                                new BigDecimal("1.5"), 60)));
+        CourseTravelLegDto travel = new CourseTravelLegDto(
+                "125266", "비자림", "request-want-1", "사용자 지정 카페",
+                new BigDecimal("8.2"), DistanceCalculationMethod.HAVERSINE,
+                null, null, Transport.RENTAL_CAR, null, null);
+        CourseGenerationFactsAssembler.Assembly facts = new CourseGenerationFactsAssembler()
+                .assemble(
+                        request,
+                        List.of(ktoCandidate),
+                        new CourseWeatherFacts(
+                                Map.of(
+                                        "125266", "weather-east-1",
+                                        "request-want-1", "weather-east-1"),
+                                List.of(weatherSet)),
+                        List.of(travel));
+
+        CourseAiInputDto result = assembler.assemble(
+                request,
+                facts,
+                new GenerationMetadataDto(
+                        GenerationReason.INITIAL, "course-ai-v2", "request-secret-ref"));
+        JsonNode json = objectMapper.readTree(objectMapper.writeValueAsString(result));
+
+        assertThat(json.path("contractVersion").asText()).isEqualTo("2.0");
+        assertThat(json.path("trip").path("startDate").asText()).isEqualTo("2026-08-27");
+        assertThat(json.path("trip").path("endDate").asText()).isEqualTo("2026-08-29");
+        assertThat(json.path("trip").path("transport").asText()).isEqualTo("RENTAL_CAR");
+        assertThat(json.path("preferences").path("selectedRegionCodes").get(0).asText())
+                .isEqualTo("EAST");
+        assertThat(json.path("preferences").path("selectedStyleCodes").get(0).asText())
+                .isEqualTo("NATURE");
+        assertThat(json.path("hardConstraints").path("requiredCandidates").get(0)
+                .path("candidateId").asText()).isEqualTo("request-want-1");
+        assertThat(json.path("hardConstraints").path("requiredCandidates").get(0)
+                .path("fixedDate").asText()).isEqualTo("2026-08-27");
+        assertThat(json.path("hardConstraints").path("requiredCandidates").get(0)
+                .path("fixedTime").asText()).isEqualTo("10:30:00");
+        assertThat(json.path("candidates")).hasSize(2);
+        assertThat(json.path("candidates").get(0).path("candidateId").asText())
+                .isEqualTo("125266");
+        assertThat(json.path("candidates").get(0).path("name").asText()).isEqualTo("비자림");
+        assertThat(json.path("candidates").get(0).path("regionCode").asText())
+                .isEqualTo("EAST");
+        assertThat(json.path("candidates").get(0).path("internalCategoryCode").asText())
+                .isEqualTo("TOURIST");
+        assertThat(json.path("candidates").get(0).path("styleHintCodes").get(0).asText())
+                .isEqualTo("NATURE");
+        assertThat(json.path("candidates").get(0).path("congestionFacts").get(0)
+                .path("rate").decimalValue()).isEqualByComparingTo("42.50");
+        assertThat(json.path("candidates").get(0).path("congestionFacts")).hasSize(1);
+        assertThat(json.path("candidates").get(0).path("weatherFactSetId").asText())
+                .isEqualTo("weather-east-1");
+        assertThat(json.path("candidates").get(1).path("candidateId").asText())
+                .isEqualTo("request-want-1");
+        assertThat(json.path("candidates").get(1).path("internalCategoryCode").asText())
+                .isEqualTo("TOURIST");
+        assertThat(json.path("candidates").get(1).path("congestionFacts")).isEmpty();
+        assertThat(json.path("weatherFactSets")).hasSize(1);
+        assertThat(json.path("weatherFactSets").get(0).path("weatherFactSetId").asText())
+                .isEqualTo("weather-east-1");
+        assertThat(json.path("weatherFactSets").get(0).path("facts").get(0)
+                .path("forecastTime").asText()).isEqualTo("14:00:00");
+        assertThat(json.path("weatherFactSets").get(0).path("facts").get(0)
+                .path("temperature").decimalValue()).isEqualByComparingTo("27.0");
+        assertThat(json.path("weatherFactSets").get(0).path("facts")).hasSize(1);
+        assertThat(json.path("travelFacts")).hasSize(1);
+        assertThat(json.path("travelFacts").get(0).path("fromRef").asText())
+                .isEqualTo("125266");
+        assertThat(json.path("travelFacts").get(0).path("toRef").asText())
+                .isEqualTo("request-want-1");
+        assertThat(json.path("travelFacts").get(0).path("straightDistanceMeters")
+                .decimalValue()).isEqualByComparingTo("8200");
+        assertThat(json.path("travelFacts").get(0).path("routeDistanceMeters").isNull())
+                .isTrue();
+        assertThat(json.path("travelFacts").get(0).path("travelMinutes").isNull()).isTrue();
+        assertThat(json.toString()).doesNotContain(
+                "placeId", "sourceCode", "sourcePlaceId", "identity",
+                "externalClassifications", "tourCategory", "weather\"",
+                "straightDistanceKm", "routeDistanceKm", "durationMinutes",
+                "gridX", "gridY", "baseDate", "baseTime", "humidity",
+                "generationMetadata", "algorithmVersion", "request-secret-ref");
+    }
 
     @Test
     void assemblesSeparatedConditionsFactsAndMissingRouteData() throws Exception {
@@ -113,16 +222,22 @@ class CourseAiInputAssemblerTest {
         assertThat(result.travelFacts().get(0).durationMinutes()).isNull();
 
         JsonNode json = objectMapper.readTree(objectMapper.writeValueAsString(result));
-        assertThat(json.path("tripCondition").path("startDate").asText()).isEqualTo("2026-08-27");
-        assertThat(json.path("userPreferences").path("selectedStyles").get(0).path("code").asText())
+        assertThat(json.path("trip").path("startDate").asText()).isEqualTo("2026-08-27");
+        assertThat(json.path("preferences").path("selectedStyleCodes").get(0).asText())
                 .isEqualTo("NATURE");
-        assertThat(json.path("candidates").get(0).path("confirmedStyleHints").get(0).asText())
+        assertThat(json.path("hardConstraints").path("requiredCandidates")
+                .get(0).path("candidateId").asText()).isEqualTo("125266");
+        assertThat(json.path("candidates").get(0).path("styleHintCodes").get(0).asText())
                 .isEqualTo("NATURE");
-        assertThat(json.path("candidates").get(0).path("congestion").get(0).path("rate").decimalValue())
+        assertThat(json.path("candidates").get(0).path("congestionFacts")
+                .get(0).path("rate").decimalValue())
                 .isEqualByComparingTo("72.50");
-        assertThat(json.path("candidates").get(1).path("weather").isNull()).isTrue();
-        assertThat(json.path("travelFacts").get(0).path("routeDistanceKm").isNull()).isTrue();
-        assertThat(json.path("travelFacts").get(0).path("durationMinutes").isNull()).isTrue();
+        assertThat(json.path("candidates").get(1).path("weatherFactSetId").isNull()).isTrue();
+        assertThat(json.path("travelFacts").get(0).path("routeDistanceMeters").isNull()).isTrue();
+        assertThat(json.path("travelFacts").get(0).path("travelMinutes").isNull()).isTrue();
+        assertThat(json.has("tripCondition")).isFalse();
+        assertThat(json.has("userPreferences")).isFalse();
+        assertThat(json.has("generationMetadata")).isFalse();
     }
 
     @Test

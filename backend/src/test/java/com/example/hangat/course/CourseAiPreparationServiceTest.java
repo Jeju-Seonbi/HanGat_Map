@@ -72,29 +72,48 @@ class CourseAiPreparationServiceTest {
 
         assertThat(result.candidates()).extracting("name")
                 .containsExactly("성산일출봉", "만장굴");
-        assertThat(result.userPreferences().requiredPlaces()).hasSize(1);
-        assertThat(result.userPreferences().requiredPlaces().get(0).fixedDate().toString())
+        assertThat(result.contractVersion()).isEqualTo("2.0");
+        assertThat(result.trip().startDate()).isEqualTo(LocalDate.of(2026, 8, 27));
+        assertThat(result.trip().endDate()).isEqualTo(LocalDate.of(2026, 8, 29));
+        assertThat(result.trip().transport()).isEqualTo(com.example.hangat.course.model.Transport.RENTAL_CAR);
+        assertThat(result.preferences().selectedRegionCodes()).containsExactly("EAST");
+        assertThat(result.preferences().selectedStyleCodes()).containsExactly("NATURE");
+        assertThat(result.hardConstraints().requiredCandidates()).hasSize(1);
+        assertThat(result.hardConstraints().requiredCandidates().get(0).candidateId())
+                .isEqualTo("east-want");
+        assertThat(result.hardConstraints().requiredCandidates().get(0).fixedDate().toString())
                 .isEqualTo("2026-08-28");
-        assertThat(result.userPreferences().forbiddenPlaces()).hasSize(1);
-        assertThat(result.candidates().get(0).confirmedStyleHints()).containsExactly("NATURE");
-        assertThat(result.candidates().get(0).congestion().get(0).rate())
+        assertThat(result.hardConstraints().requiredCandidates().get(0).fixedTime())
+                .isEqualTo(LocalTime.of(9, 0));
+        assertThat(result.candidates()).extracting(CourseAiInputDto.CandidateFactDto::candidateId)
+                .doesNotContain("east-avoid");
+        assertThat(result.candidates().get(0).styleHintCodes()).containsExactly("NATURE");
+        assertThat(result.candidates().get(0).internalCategoryCode()).isEqualTo("TOURIST");
+        assertThat(result.candidates().get(0).congestionFacts().get(0).rate())
                 .isEqualByComparingTo("82.00");
-        assertThat(result.candidates()).allSatisfy(candidate -> assertThat(candidate.weather()).isNull());
+        assertThat(result.candidates()).allSatisfy(candidate ->
+                assertThat(candidate.weatherFactSetId()).isNull());
+        assertThat(result.weatherFactSets()).isEmpty();
 
         assertThat(result.travelFacts()).hasSize(1);
         CourseAiInputDto.TravelFactDto travel = result.travelFacts().get(0);
-        assertThat(travel.fromCandidateId()).isEqualTo("east-want");
-        assertThat(travel.toCandidateId()).isEqualTo("east-normal");
-        assertThat(travel.straightDistanceKm()).isPositive();
-        assertThat(travel.routeDistanceKm()).isNull();
-        assertThat(travel.durationMinutes()).isNull();
-        assertThat(result.candidates()).extracting(candidate -> candidate.identity().candidateId())
-                .contains(travel.fromCandidateId(), travel.toCandidateId());
+        assertThat(travel.fromRef()).isEqualTo("east-want");
+        assertThat(travel.toRef()).isEqualTo("east-normal");
+        assertThat(travel.straightDistanceMeters()).isPositive();
+        assertThat(travel.routeDistanceMeters()).isNull();
+        assertThat(travel.travelMinutes()).isNull();
+        assertThat(result.candidates()).extracting(CourseAiInputDto.CandidateFactDto::candidateId)
+                .contains(travel.fromRef(), travel.toRef());
 
         String json = objectMapper.writeValueAsString(result);
-        assertThat(json).contains("\"generationReason\":\"INITIAL\"");
-        assertThat(json).contains("\"algorithmVersion\":null");
-        assertThat(json).contains("\"requestReference\":null");
+        assertThat(json).contains("\"straightDistanceMeters\"");
+        assertThat(json).contains("\"routeDistanceMeters\":null");
+        assertThat(json).contains("\"travelMinutes\":null");
+        assertThat(json).doesNotContain(
+                "tripCondition", "userPreferences", "generationMetadata",
+                "identity", "placeId", "sourcePlaceId", "sourceCode",
+                "tourCategory", "weather\"", "straightDistanceKm",
+                "routeDistanceKm", "durationMinutes", "people", "budgetTotal");
         assertThat(json.toLowerCase())
                 .doesNotContain("servicekey", "authorization", "credential", "gemini");
     }
@@ -128,7 +147,17 @@ class CourseAiPreparationServiceTest {
         CourseAiInputDto result = preparationService.prepare(
                 request(), List.of(candidate));
 
-        assertThat(result.candidates().get(0).weather()).containsExactly(weather);
+        assertThat(result.candidates().get(0).weatherFactSetId())
+                .isEqualTo("kma-east-20260827-0500");
+        assertThat(result.weatherFactSets()).hasSize(1);
+        assertThat(result.weatherFactSets().get(0).weatherFactSetId())
+                .isEqualTo("kma-east-20260827-0500");
+        assertThat(result.weatherFactSets().get(0).facts()).hasSize(1);
+        assertThat(result.weatherFactSets().get(0).facts().get(0).temperature())
+                .isEqualByComparingTo("28.5");
+        String json = objectMapper.writeValueAsString(result);
+        assertThat(json).contains("\"weatherFactSets\"");
+        assertThat(json).doesNotContain("\"humidity\"", "\"gridX\"", "\"baseDate\"");
     }
 
     private CourseRequestDto request() throws Exception {

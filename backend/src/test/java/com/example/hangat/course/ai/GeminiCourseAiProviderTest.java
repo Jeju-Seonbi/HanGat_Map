@@ -105,7 +105,10 @@ class GeminiCourseAiProviderTest {
                 request.path("contents").path(0).path("parts").path(0).path("text").asText());
 
         assertThat(request.path("systemInstruction").path("parts").path(0).path("text").asText())
-                .contains("candidateId는 반드시 candidates[].identity.candidateId 중 하나를")
+                .contains("candidateId는 반드시 candidates[].candidateId 중 하나를")
+                .contains("straightDistanceMeters")
+                .contains("weather")
+                .doesNotContain("straightDistanceKm", "routeDistanceKm", "durationMinutes")
                 .contains("새 ID를 생성");
         assertThat(request.path("generationConfig").path("responseMimeType").asText())
                 .isEqualTo("application/json");
@@ -120,11 +123,18 @@ class GeminiCourseAiProviderTest {
                 .containsExactly("want-1", "normal-1", "normal-2");
         assertThat(request.path("generationConfig").path("thinkingConfig")
                 .path("thinkingLevel").asText()).isEqualTo("low");
-        assertThat(input.path("tripCondition").path("startDate").asText())
+        assertThat(input.path("trip").path("startDate").asText())
                 .isEqualTo("2026-09-10");
-        assertThat(input.path("userPreferences").path("requiredPlaces")
+        assertThat(input.path("hardConstraints").path("requiredCandidates")
                 .path(0).path("fixedTime").asText()).isEqualTo("09:00:00");
         assertThat(input.path("candidates").size()).isEqualTo(3);
+        assertThat(input.path("candidates").path(0).path("candidateId").asText())
+                .isEqualTo("want-1");
+        assertThat(input.path("travelFacts").path(0).path("straightDistanceMeters")
+                .decimalValue()).isEqualByComparingTo("18420");
+        assertThat(input.has("tripCondition")).isFalse();
+        assertThat(input.has("userPreferences")).isFalse();
+        assertThat(input.has("generationMetadata")).isFalse();
         assertThat(requestJson).doesNotContain("test-secret");
     }
 
