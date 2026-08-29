@@ -84,16 +84,12 @@ public final class AuthDto {
          * requestId가 있어야 남이 요청한 코드에서 무차별 대입하는걸 막음
          */
         public record VerifyResetCodeRequest(
-                @NotBlank(message = "이메일을 입력해주세요.")
-                @Email(message = "이메일 형식을 확인해주세요.")
-                @Size(max = 255)
-                String email,
-
                 @NotBlank(message = "인증 코드를 입력해주세요.")
-                @Size(min = 6, max = 6, message = "인증코드는 6자리 입니다.")
+                @Size(max = 16, message = "인증 코드 형식을 확인해주세요.")
                 String code,
 
-                @NotBlank
+                @NotBlank(message = "요청 식별자가 필요합니다.")
+                @Size(min = 32, max = 32, message = "요청 식별자 형식을 확인해주세요.")
                 String requestId
         ){
         }

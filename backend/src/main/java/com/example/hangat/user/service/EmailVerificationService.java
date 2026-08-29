@@ -4,7 +4,7 @@ import com.example.hangat.common.exception.BaseException;
 import com.example.hangat.common.model.BaseResponseStatus;
 import com.example.hangat.common.util.EmailNormalizer;
 import com.example.hangat.config.mail.AuthMailSender;
-import com.example.hangat.config.security.TokenHasher;
+import com.example.hangat.config.security.token.TokenHasher;
 import com.example.hangat.user.model.EmailVerificationToken;
 import com.example.hangat.user.model.User;
 import com.example.hangat.user.model.dto.AuthDto;

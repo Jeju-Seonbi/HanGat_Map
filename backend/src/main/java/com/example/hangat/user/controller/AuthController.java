@@ -1,14 +1,11 @@
 package com.example.hangat.user.controller;
 
 import com.example.hangat.common.model.BaseResponse;
-import com.example.hangat.config.security.AuthRequestLimiter;
+import com.example.hangat.config.security.ratelimit.AuthRequestLimiter;
 import com.example.hangat.user.model.dto.AuthDto;
 import com.example.hangat.user.model.dto.TokenDto;
 import com.example.hangat.user.model.dto.UserDto;
-import com.example.hangat.user.service.AuthService;
-import com.example.hangat.user.service.EmailVerificationService;
-import com.example.hangat.user.service.PasswordResetService;
-import com.example.hangat.user.service.UserService;
+import com.example.hangat.user.service.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
@@ -40,6 +37,7 @@ public class AuthController {
     private final UserService userService;
     private final AuthService authService;
     private final EmailVerificationService emailVerificationService;
+    private final PasswordResetCodeService passwordResetCodeService;
     private final PasswordResetService passwordResetService;
     private final AuthRequestLimiter requestLimiter;
 
@@ -112,14 +110,14 @@ public class AuthController {
             HttpServletRequest httpRequest) {
         requestLimiter.checkEmailRequest(
                 "password-reset", clientIp(httpRequest), request.email());
-        return BaseResponse.success(passwordResetService.sendCode(request));
+        return BaseResponse.success(passwordResetCodeService.sendCode(request));
     }
 
     @PostMapping("/password/verify")
     @Operation(summary = "2단계 - 코드 확인", description = "통과하면 일회용 티켓을 준다")
     public BaseResponse<AuthDto.VerifyResetCodeResponse> verifyResetCode(
             @Valid @RequestBody AuthDto.VerifyResetCodeRequest request) {
-        return BaseResponse.success(passwordResetService.verifyCode(request));
+        return BaseResponse.success(passwordResetCodeService.verifyCode(request));
     }
 
     @PostMapping("/password/reset")

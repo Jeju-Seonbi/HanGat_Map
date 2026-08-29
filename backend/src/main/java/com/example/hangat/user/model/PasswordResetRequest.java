@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 /**
  * 비밀번호 찾기 요청 모델 - 6자리 코드 3단계를 한 행으로 관리하기 위함 (USER_003).
  * 1단계 코드 발송 -> 2단계 코드 확인 후 티켓 발급 -> 3단계 티켓으로 새 비밀번호 설정.
- * 코드도 티켓도 원문은 메일로만 보내고 DB에는 SHA-256 해시만 저장함.
+ * 코드는 HMAC-SHA-256, 티켓은 SHA-256 해시로 DB에 저장함.
  */
 @Table(
         name = "password_reset_requests",
@@ -55,7 +55,7 @@ public class PasswordResetRequest {
     @Column(name = "request_id", nullable = false, length = 32)
     private String requestId;
 
-    /** 6자리 코드의 SHA-256 해시. 원문은 이메일로만 전달한다. */
+    /** 6자리 코드의 HMAC-SHA-256 해시. 원문은 이메일로만 전달한다. */
     @Column(name = "token_hash", nullable = false, length = 64)
     private String tokenHash;
 

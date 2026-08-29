@@ -3,7 +3,7 @@ package com.example.hangat.user.service;
 import com.example.hangat.common.exception.BaseException;
 import com.example.hangat.common.model.BaseResponseStatus;
 import com.example.hangat.common.util.EmailNormalizer;
-import com.example.hangat.config.security.PasswordHasher;
+import com.example.hangat.config.security.password.PasswordHasher;
 import com.example.hangat.user.model.User;
 import com.example.hangat.user.model.dto.AuthDto;
 import com.example.hangat.user.model.dto.UserDto;
