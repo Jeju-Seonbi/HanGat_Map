@@ -9,6 +9,7 @@ import { crowd, tier, tierKo, rank30, bestDay, CROWD_KO } from '@/utils/crowd'
 import { at, fmtK } from '@/utils/date'
 import { wxOf, wxIcon } from '@/utils/weather'
 import { dist, won, shrink } from '@/utils/geo'
+import MapPlaceService from '@/services/map/MapPlaceService'
 
 const props = defineProps({ place: { type: Object, required: true } })
 const emit = defineEmits(['close', 'open-place', 'open-photo'])
@@ -16,6 +17,8 @@ const emit = defineEmits(['close', 'open-place', 'open-photo'])
 const view = ref('info')
 const hint = ref('')
 const imgInput = ref(null)
+/** 휴무일·입장료는 상세 API에만 있다. 못 받아오면 null - 해당 줄만 안 보인다 */
+const detail = ref(null)
 
 const s = computed(() => props.place)
 const c = computed(() => crowd(s.value, state.di))
@@ -49,7 +52,19 @@ const rated = computed(() => reviews.value.filter(r => r.r > 0))
 const avg = computed(() => rated.value.length
   ? rated.value.reduce((a, b) => a + b.r, 0) / rated.value.length : 0)
 
-watch(() => props.place.n, () => { view.value = 'info'; hint.value = '' })
+watch(() => props.place.n, loadDetail, { immediate: true })
+
+async function loadDetail() {
+  view.value = 'info'
+  hint.value = ''
+  detail.value = null
+  // 목업 모드는 id 가 없다
+  if (s.value.id == null) return
+  const id = s.value.id
+  const d = await MapPlaceService.getDetail(id)
+  // 응답이 늦게 와도 그새 다른 장소를 열었으면 버린다
+  if (s.value.id === id) detail.value = d
+}
 
 function jumpToBest() {
   if (best.value.k !== state.di) state.di = best.value.k
