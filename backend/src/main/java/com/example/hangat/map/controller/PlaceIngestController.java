@@ -2,11 +2,13 @@ package com.example.hangat.map.controller;
 
 import com.example.hangat.common.model.BaseResponse;
 import com.example.hangat.map.service.CongestionIngestService;
+import com.example.hangat.map.detail.PlaceDetailIngestService;
 import com.example.hangat.map.service.PlaceIngestService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -29,11 +31,24 @@ public class PlaceIngestController {
 
     private final PlaceIngestService placeIngestService;
     private final CongestionIngestService congestionIngestService;
+    private final PlaceDetailIngestService placeDetailIngestService;
 
     public PlaceIngestController(PlaceIngestService placeIngestService,
-                                 CongestionIngestService congestionIngestService) {
+                                 CongestionIngestService congestionIngestService,
+                                 PlaceDetailIngestService placeDetailIngestService) {
         this.placeIngestService = placeIngestService;
         this.congestionIngestService = congestionIngestService;
+        this.placeDetailIngestService = placeDetailIngestService;
+    }
+
+    @Operation(summary = "장소 상세 정보 적재 (MAP-07)",
+            description = "운영시간·쉬는날·주차·입장료를 채운다. 장소당 1콜이라 일일 쿼터를 넘으므로 "
+                    + "상세가 비어 있는 곳부터 limit만큼 처리하고, remaining이 0이 될 때까지 다시 실행하면 이어진다.")
+    @PostMapping("/details")
+    public BaseResponse<PlaceDetailIngestService.DetailIngestResult> ingestDetails(
+            @RequestParam(name = "limit", required = false,
+                    defaultValue = "" + PlaceDetailIngestService.DEFAULT_LIMIT) int limit) {
+        return BaseResponse.success(placeDetailIngestService.ingest(limit));
     }
 
     @Operation(summary = "KTO 관광정보 적재",
