@@ -101,11 +101,18 @@ import { at } from './date.js'
 
 /**
  * 장소 s 의 i일 뒤 집중률.
- * @param {{n:string, b:number|null}} s  n=이름, b=기준 집중률. b:null = 예보 미제공
+ *
+ * 값의 출처가 둘이고 실데이터가 우선이다.
+ * 1. `s.series` — 관광공사 집중률 실측 (백엔드 `/crowd/forecast`). 실서비스 경로
+ * 2. `s.b` — 하드코딩 샘플에서 해시로 만든 값. 백엔드가 죽었을 때 화면을 유지하는 폴백 전용
+ *
+ * @param {{n:string, b:number|null, series:(number|null)[]|null}} s
  * @param {number} i  오늘(0)로부터의 일 오프셋
- * @returns {number|null} 6~99, 예보 미제공이면 null
+ * @returns {number|null} 집중률, 예보 미제공이면 null
  */
 export function crowd (s, i) {
+  // 실측 예보 일수(21~22일)가 화면 30일보다 짧다 — 범위를 넘으면 undefined라 null로 떨어진다
+  if (s.series) return s.series[i] ?? null
   // 예보 미제공 장소는 한산으로 취급하지 않는다 — tier() 가 'none'(회색)을 낸다 (MAP_004)
   if (s.b == null) return null
   return crowdOn(s, at(i))
