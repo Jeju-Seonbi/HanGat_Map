@@ -19,6 +19,9 @@ public interface PlaceSourceMappingRepository extends JpaRepository<PlaceSourceM
 
     Optional<PlaceSourceMapping> findBySourceCodeAndSourcePlaceId(String sourceCode, String sourcePlaceId);
 
+    /** 상세 배치용 - 장소에서 KTO contentId 를 거꾸로 찾는다. */
+    Optional<PlaceSourceMapping> findByPlaceIdAndSourceCode(Long placeId, String sourceCode);
+
     /**
      * 한 출처의 매핑을 한 번에 읽는다. 2,147건을 하나씩 조회하면 쿼리가 2,147번 나가므로,
      * 배치 시작 시 이 메서드로 전부 읽어 메모리에서 대조한다.

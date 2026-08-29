@@ -1,5 +1,6 @@
 package com.example.hangat.map.model.dto;
 
+import com.example.hangat.map.detail.DetailFieldMapper;
 import com.example.hangat.map.model.entity.Place;
 import com.example.hangat.map.model.enums.BusinessStatus;
 import lombok.AccessLevel;
@@ -27,6 +28,9 @@ import java.time.LocalDate;
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class PlaceDetailResponse {
 
+    /** 무료 판정만 쓴다. DTO라 빈 주입을 못 받아 직접 만든다 - 상태가 없어 안전하다. */
+    private static final DetailFieldMapper FEE_MAPPER = new DetailFieldMapper();
+
     private final Long id;
     private final String name;
 
@@ -50,6 +54,15 @@ public class PlaceDetailResponse {
     /** null = 상시 개방. */
     private final String operatingHoursText;
     private final String restDayText;
+
+    /**
+     * 입장료 원문. KTO usefee 를 그대로 준다 - "[개인]- 일반 1,500원..." 처럼 요금표가 통째로 온다.
+     * 숫자로 바꾸지 않는 이유는 DetailFieldMapper#useFee 참고. 실측상 문화시설에만 있어 대부분 null.
+     */
+    private final String useFeeText;
+
+    /** 입장료가 '무료'만 뜻할 때 true - 화면 배지용. 조건부 무료(※ 단, ...)는 false다. */
+    private final boolean free;
 
     private final Boolean parkingAvailable;
     private final Boolean toiletAvailable;
@@ -92,6 +105,8 @@ public class PlaceDetailResponse {
                 .phone(place.getPhone())
                 .operatingHoursText(place.getOperatingHoursText())
                 .restDayText(place.getRestDayText())
+                .useFeeText(place.getUseFeeText())
+                .free(FEE_MAPPER.isFree(place.getUseFeeText()))
                 .parkingAvailable(place.getParkingAvailable())
                 .toiletAvailable(place.getToiletAvailable())
                 .businessStatus(place.getBusinessStatus())

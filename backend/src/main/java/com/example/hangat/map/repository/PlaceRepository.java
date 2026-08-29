@@ -2,6 +2,7 @@ package com.example.hangat.map.repository;
 
 import com.example.hangat.map.model.dto.PlaceListResponse;
 import com.example.hangat.map.model.entity.Place;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -105,6 +106,21 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
               and pt.sourceType = com.example.hangat.map.model.enums.TagSourceType.API
             """)
     List<Object[]> findApiTagOf(@Param("placeId") Long placeId);
+
+    /**
+     * 상세(detailIntro2)를 아직 안 받은 장소. 쿼터가 하루 1,000콜이라 나눠 도는데,
+     * 커서를 따로 저장하지 않고 '비어 있는 것부터' 집어 자연히 이어지게 한다.
+     *
+     * <p>한계: KTO가 세 값을 다 안 주는 장소는 매번 다시 시도된다. 실측 후 조정할 것.
+     */
+    @Query("""
+            select p from Place p
+            where p.operatingHoursText is null
+              and p.restDayText is null
+              and p.useFeeText is null
+            order by p.id
+            """)
+    List<Place> findWithoutDetail(Pageable pageable);
 
     /**
      * 이름 매칭용 (id, normalized_name) 목록.
