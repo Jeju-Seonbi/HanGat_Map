@@ -13,6 +13,9 @@ import com.example.hangat.course.ai.CourseAiInputDto.TourCategoryDto;
 import com.example.hangat.course.ai.CourseAiInputDto.TravelFactDto;
 import com.example.hangat.course.ai.CourseAiInputDto.TripConditionDto;
 import com.example.hangat.course.ai.CourseAiInputDto.UserPreferencesDto;
+import com.example.hangat.course.facts.CongestionFact;
+import com.example.hangat.course.facts.CourseCandidate;
+import com.example.hangat.course.facts.ExternalClassificationFact;
 import com.example.hangat.course.model.AccommodationDto;
 import com.example.hangat.course.model.CongestionDto;
 import com.example.hangat.course.model.CourseCandidateDto;
@@ -21,7 +24,6 @@ import com.example.hangat.course.model.CourseRequestDto;
 import com.example.hangat.course.model.CourseStyleDto;
 import com.example.hangat.course.model.PlacePreferenceDto;
 import com.example.hangat.course.model.PreferenceType;
-import com.example.hangat.course.model.TourPlaceDto;
 import com.example.hangat.course.travel.CourseTravelLegDto;
 import com.example.hangat.course.weather.CourseWeatherDto;
 import org.springframework.stereotype.Component;
@@ -32,10 +34,8 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
-import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -46,8 +46,6 @@ public class CourseAiInputAssembler {
     public static final String UNKNOWN_REGION = "UNKNOWN";
     public static final String KTO_SOURCE_CODE = "KTO";
     public static final String KAKAO_SOURCE_CODE = "KAKAO_LOCAL";
-    private static final double SAME_PLACE_COORDINATE_EPSILON = 0.0002;
-
     private static final DateTimeFormatter CONGESTION_DATE_FORMATTER =
             DateTimeFormatter.BASIC_ISO_DATE;
 
@@ -194,195 +192,69 @@ public class CourseAiInputAssembler {
             List<CourseCandidateDto> candidates,
             Map<String, List<CourseWeatherDto>> weatherByCandidateId
     ) {
+        CourseCandidateNormalizer.NormalizationResult normalized =
+                new CourseCandidateNormalizer().normalize(request, candidates);
         List<CandidateFactDto> results = new ArrayList<>();
-        Set<String> candidateIds = new HashSet<>();
-        Map<PlacePreferenceDto, String> candidateIdsByPreference = new IdentityHashMap<>();
+        Map<String, CourseCandidateDto> legacyCandidatesById = legacyCandidatesById(candidates);
 
-        for (CourseCandidateDto candidate : candidates) {
-            if (candidate == null || candidate.getPlace() == null
-                    || candidate.getPreferenceType() == PreferenceType.AVOID) {
-                continue;
-            }
-            TourPlaceDto place = candidate.getPlace();
-            String candidateId = requireCandidateId(place.getContentId());
-            if (!candidateIds.add(candidateId)) {
-                throw new IllegalArgumentException("중복된 AI 후보 식별자입니다: " + candidateId);
-            }
+        for (CourseCandidate candidate : normalized.candidates()) {
+            String candidateId = candidate.identity().candidateId();
 
             List<CourseWeatherDto> weather = weatherByCandidateId.containsKey(candidateId)
                     ? copyNullable(weatherByCandidateId.get(candidateId))
                     : null;
+            CourseCandidateDto legacyCandidate = legacyCandidatesById.get(candidateId);
+            List<CongestionFactDto> congestion = KTO_SOURCE_CODE.equals(
+                    candidate.identity().sourceCode()) && legacyCandidate != null
+                    ? toCongestionFacts(legacyCandidate.getCongestionData())
+                    : toNormalizedCongestionFacts(candidate.congestionFacts());
             results.add(new CandidateFactDto(
                     new PlaceIdentityDto(
                             candidateId,
-                            null,
-                            KTO_SOURCE_CODE,
-                            place.getContentId()),
-                    place.getTitle(),
-                    place.getAddress(),
-                    place.getLatitude(),
-                    place.getLongitude(),
-                    new TourCategoryDto(
-                            place.getCategory(), place.getCategory2(), place.getCategory3()),
-                    TourPlaceRegionResolver.resolve(place.getAddress())
-                            .map(Enum::name)
-                            .orElse(UNKNOWN_REGION),
-                    candidate.getPreferenceType(),
-                    candidate.getConfirmedStyleHints(),
-                    toCongestionFacts(candidate.getCongestionData()),
+                            candidate.identity().placeId(),
+                            candidate.identity().sourceCode(),
+                            candidate.identity().sourcePlaceId()),
+                    candidate.place().name(),
+                    firstNonBlank(candidate.place().roadAddress(), candidate.place().address()),
+                    doubleValue(candidate.place().latitude()),
+                    doubleValue(candidate.place().longitude()),
+                    toTourCategory(candidate.externalClassifications()),
+                    candidate.regionCode(),
+                    candidate.userConstraint().preferenceType(),
+                    candidate.styleHints().stream().map(style -> style.styleCode()).toList(),
+                    congestion,
                     weather
             ));
         }
-        if (request.getCoursePlacePreferences() != null) {
-            int requestWantOrdinal = 1;
-            for (PlacePreferenceDto preference : request.getCoursePlacePreferences()) {
-                if (preference == null
-                        || preference.getPreferenceType() != PreferenceType.WANT) {
-                    continue;
-                }
-
-                int matchedIndex = findMatchingCandidateIndex(preference, results);
-                if (matchedIndex >= 0) {
-                    CandidateFactDto matched = results.get(matchedIndex);
-                    if (isKakaoPreference(preference)) {
-                        results.set(matchedIndex, toKakaoWantCandidate(
-                                matched.identity().candidateId(), preference));
-                    } else if (matched.preferenceType() != PreferenceType.WANT) {
-                        results.set(matchedIndex, withPreferenceType(
-                                matched, PreferenceType.WANT));
-                    }
-                    candidateIdsByPreference.put(
-                            preference, matched.identity().candidateId());
-                    continue;
-                }
-
-                if (!isKakaoPreference(preference)) {
-                    continue;
-                }
-                String candidateId;
-                do {
-                    candidateId = "request-want-" + requestWantOrdinal++;
-                } while (!candidateIds.add(candidateId));
-                results.add(toKakaoWantCandidate(candidateId, preference));
-                candidateIdsByPreference.put(preference, candidateId);
-            }
-        }
 
         return new CandidateAssembly(
-                List.copyOf(results), candidateIdsByPreference);
+                List.copyOf(results), normalized.candidateIdsByPreference());
     }
 
-    private int findMatchingCandidateIndex(
-            PlacePreferenceDto preference,
-            List<CandidateFactDto> candidates
+    private Map<String, CourseCandidateDto> legacyCandidatesById(
+            List<CourseCandidateDto> candidates
     ) {
-        for (int index = 0; index < candidates.size(); index++) {
-            CandidateFactDto candidate = candidates.get(index);
-            if (sameSourceIdentity(preference, candidate)
-                    || sameInternalIdentity(preference, candidate)
-                    || sameNameAndCoordinates(preference, candidate)) {
-                return index;
+        Map<String, CourseCandidateDto> result = new LinkedHashMap<>();
+        for (CourseCandidateDto candidate : candidates) {
+            if (candidate != null && candidate.getPlace() != null
+                    && candidate.getPlace().getContentId() != null) {
+                result.putIfAbsent(candidate.getPlace().getContentId(), candidate);
             }
         }
-        return -1;
+        return result;
     }
 
-    private boolean sameSourceIdentity(
-            PlacePreferenceDto preference,
-            CandidateFactDto candidate
+    private TourCategoryDto toTourCategory(
+            List<ExternalClassificationFact> classifications
     ) {
-        return !isBlank(preference.getSourceCode())
-                && !isBlank(preference.getSourcePlaceId())
-                && candidate.identity() != null
-                && !isBlank(candidate.identity().sourceCode())
-                && !isBlank(candidate.identity().sourcePlaceId())
-                && preference.getSourceCode().trim().equalsIgnoreCase(
-                        candidate.identity().sourceCode())
-                && preference.getSourcePlaceId().trim().equals(
-                        candidate.identity().sourcePlaceId());
-    }
-
-    private boolean sameInternalIdentity(
-            PlacePreferenceDto preference,
-            CandidateFactDto candidate
-    ) {
-        return preference.getPlaceId() != null
-                && candidate.identity() != null
-                && preference.getPlaceId().equals(candidate.identity().placeId());
-    }
-
-    private boolean sameNameAndCoordinates(
-            PlacePreferenceDto preference,
-            CandidateFactDto candidate
-    ) {
-        String preferenceName = normalizeName(preference.getPlaceName());
-        if (preferenceName.isEmpty()
-                || !preferenceName.equals(normalizeName(candidate.name()))) {
-            return false;
-        }
-        if (preference.getLatitude() == null || preference.getLongitude() == null
-                || candidate.latitude() == null || candidate.longitude() == null) {
-            return true;
-        }
-        return Math.abs(preference.getLatitude() - candidate.latitude())
-                <= SAME_PLACE_COORDINATE_EPSILON
-                && Math.abs(preference.getLongitude() - candidate.longitude())
-                <= SAME_PLACE_COORDINATE_EPSILON;
-    }
-
-    private CandidateFactDto toKakaoWantCandidate(
-            String candidateId,
-            PlacePreferenceDto preference
-    ) {
-        String address = firstNonBlank(
-                preference.getRoadAddress(), preference.getAddress());
-        return new CandidateFactDto(
-                new PlaceIdentityDto(
-                        candidateId,
-                        preference.getPlaceId(),
-                        preference.getSourceCode().trim().toUpperCase(Locale.ROOT),
-                        preference.getSourcePlaceId().trim()),
-                preference.getPlaceName(),
-                address,
-                preference.getLatitude(),
-                preference.getLongitude(),
-                null,
-                TourPlaceRegionResolver.resolve(address)
-                        .map(Enum::name)
-                        .orElse(UNKNOWN_REGION),
-                PreferenceType.WANT,
-                List.of(),
-                List.of(),
-                null
-        );
-    }
-
-    private CandidateFactDto withPreferenceType(
-            CandidateFactDto candidate,
-            PreferenceType preferenceType
-    ) {
-        return new CandidateFactDto(
-                candidate.identity(), candidate.name(), candidate.address(),
-                candidate.latitude(), candidate.longitude(), candidate.tourCategory(),
-                candidate.regionCode(), preferenceType, candidate.confirmedStyleHints(),
-                candidate.congestion(), candidate.weather());
-    }
-
-    private boolean isKakaoPreference(PlacePreferenceDto preference) {
-        return KAKAO_SOURCE_CODE.equalsIgnoreCase(preference.getSourceCode())
-                && !isBlank(preference.getSourcePlaceId())
-                && !isBlank(preference.getPlaceName());
-    }
-
-    private String normalizeName(String value) {
-        return value == null
-                ? ""
-                : value.replaceAll("[\\s\\p{P}\\p{S}]+", "")
-                        .toLowerCase(Locale.ROOT);
-    }
-
-    private boolean isBlank(String value) {
-        return value == null || value.isBlank();
+        return classifications.stream()
+                .filter(classification -> KTO_SOURCE_CODE.equals(classification.sourceCode()))
+                .findFirst()
+                .map(classification -> new TourCategoryDto(
+                        classification.level1Code(),
+                        classification.level2Code(),
+                        classification.level3Code()))
+                .orElse(null);
     }
 
     private List<CongestionFactDto> toCongestionFacts(List<CongestionDto> congestionData) {
@@ -395,6 +267,14 @@ public class CourseAiInputAssembler {
                         parseCongestionDate(congestion.getBaseYmd()),
                         parseRate(congestion.getCnctrRate()),
                         CongestionLevelResolver.resolve(congestion.getCnctrRate()).orElse(null)))
+                .toList();
+    }
+
+    private List<CongestionFactDto> toNormalizedCongestionFacts(
+            List<CongestionFact> congestionFacts
+    ) {
+        return congestionFacts.stream()
+                .map(fact -> new CongestionFactDto(fact.date(), fact.rate(), fact.level()))
                 .toList();
     }
 
@@ -435,11 +315,8 @@ public class CourseAiInputAssembler {
         }
     }
 
-    private String requireCandidateId(String candidateId) {
-        if (candidateId == null || candidateId.isBlank()) {
-            throw new IllegalArgumentException("AI 후보 식별자가 필요합니다.");
-        }
-        return candidateId;
+    private Double doubleValue(BigDecimal value) {
+        return value == null ? null : value.doubleValue();
     }
 
     private LocalDate parseCongestionDate(String value) {
