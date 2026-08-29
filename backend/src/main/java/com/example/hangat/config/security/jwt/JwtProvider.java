@@ -1,4 +1,4 @@
-package com.example.hangat.config.security;
+package com.example.hangat.config.security.jwt;
 
 import com.example.hangat.common.exception.BaseException;
 import com.example.hangat.common.model.BaseResponseStatus;

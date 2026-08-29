@@ -1,6 +1,9 @@
-package com.example.hangat.config.security;
+package com.example.hangat.config.security.ratelimit;
 
+import com.example.hangat.common.exception.BaseException;
+import com.example.hangat.common.model.BaseResponseStatus;
 import com.example.hangat.common.util.EmailNormalizer;
+import com.example.hangat.config.security.token.TokenHasher;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -37,7 +40,7 @@ public class AuthRequestLimiter {
         removeExpiredIfNeeded(now);
 
         if (counters.size() >= MAX_TRACKED_KEYS && !counters.containsKey(key)) {
-            throw new AuthRateLimitException();
+            throw new BaseException(BaseResponseStatus.TOO_MANY_REQUESTS);
         }
 
         AtomicBoolean rejected = new AtomicBoolean(false);
@@ -53,7 +56,7 @@ public class AuthRequestLimiter {
         });
 
         if (rejected.get()) {
-            throw new AuthRateLimitException();
+            throw new BaseException(BaseResponseStatus.TOO_MANY_REQUESTS);
         }
     }
 

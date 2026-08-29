@@ -1,6 +1,5 @@
 package com.example.hangat.config.mail;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
@@ -17,16 +16,20 @@ import org.springframework.stereotype.Component;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class AuthMailSender {
 
     private final JavaMailSender mailSender;
+    private final String from;
+    private final String frontendUrl;
 
-    @Value("${spring.mail.username}")
-    private String name;
-
-    @Value("${app.frontend-url}")
-    private String frontendUrl;
+    public AuthMailSender(
+            JavaMailSender mailSender,
+            @Value("${app.mail.from:${spring.mail.username}}") String from,
+            @Value("${app.frontend-url}") String frontendUrl) {
+        this.mailSender = mailSender;
+        this.from = from;
+        this.frontendUrl = frontendUrl;
+    }
 
     // 가입 인증 링크
     @Async
@@ -47,7 +50,7 @@ public class AuthMailSender {
     private void send(String to, String subject, String text) {
         try {
             SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(name);
+            message.setFrom(from);
             message.setTo(to);
             message.setSubject(subject);
             message.setText(text);

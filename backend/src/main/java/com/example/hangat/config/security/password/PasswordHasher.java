@@ -1,4 +1,4 @@
-package com.example.hangat.config.security;
+package com.example.hangat.config.security.password;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -30,6 +30,9 @@ public class PasswordHasher {
 
     // 로그인 대조 - 정책 검사는 안함.
     public boolean matches(String password, String hash) {
+        if(password == null || hash == null) {
+            return false;
+        }
         return passwordEncoder.matches(PasswordPolicy.normalize(password), hash);
     }
 }

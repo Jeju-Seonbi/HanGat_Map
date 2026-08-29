@@ -1,7 +1,9 @@
-package com.example.hangat.config.security;
+package com.example.hangat.config.security.password;
 
 import com.example.hangat.common.exception.BaseException;
 import com.example.hangat.common.model.BaseResponseStatus;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
@@ -10,6 +12,7 @@ import java.util.Objects;
 /**
  *  비밀번호 정책 - 가입 / 재설정 / 변경 때만 검사
  */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class PasswordPolicy {
 
     /** 비밀번호 최소 자리 */
