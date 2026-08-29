@@ -212,7 +212,18 @@ function delImg(i) {
         <div v-if="s.hours" class="pi">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
             stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 1.9"/></svg>
-          <span class="tx">{{ s.hours }}<span class="sub2">운영시간</span></span>
+          <span class="tx multi">{{ s.hours }}<span class="sub2">운영시간</span></span>
+        </div>
+        <div v-if="detail?.rest" class="pi">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.8h17M8 3v3.6M16 3v3.6"/></svg>
+          <span class="tx multi">{{ detail.rest }}<span class="sub2">휴무일</span></span>
+        </div>
+        <!-- 무료는 위 배지가 이미 말한다 - 여기는 요금표가 있을 때만 -->
+        <div v-if="detail?.feeText && !detail.free" class="pi">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linejoin="round"><path d="M3 9.2V6.5A1.5 1.5 0 0 1 4.5 5h15A1.5 1.5 0 0 1 21 6.5v2.7a2.8 2.8 0 0 0 0 5.6v2.7a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5v-2.7a2.8 2.8 0 0 0 0-5.6Z"/><path d="M14 9.5v5" stroke-dasharray="1.6 2.2"/></svg>
+          <span class="tx multi">{{ detail.feeText }}<span class="sub2">입장료</span></span>
         </div>
         <div v-if="s.tel" class="pi">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
