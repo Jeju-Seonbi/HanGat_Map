@@ -46,6 +46,19 @@ const week = computed(() => {
   })
 })
 
+/**
+ * 입장료 배지. 모르면 배지를 안 그린다 -
+ * 전에는 값이 없을 때 '무료'로 떨어져 2,138곳 전부가 무료로 보였다(실제 무료는 11곳).
+ */
+const feeBadge = computed(() => {
+  if (s.value.fee != null) return `입장 ${won(s.value.fee)}원`   // 목업
+  if (detail.value?.free) return '입장 무료'
+  return null
+})
+/** 배지가 하나도 없으면 줄을 통째로 없앤다 - 빈 div 가 여백으로 남는다 */
+const hasAmen = computed(() =>
+  feeBadge.value || s.value.park != null || s.value.wc != null || s.value.in)
+
 const photos = computed(() => state.placeImgs[s.value.n] || [])
 const reviews = computed(() => reviewsOf(s.value.n))
 const rated = computed(() => reviews.value.filter(r => r.r > 0))
@@ -179,10 +192,11 @@ function delImg(i) {
         </div>
       </div>
 
-      <div class="amen">
-        <span class="am">입장 {{ s.fee ? won(s.fee) + '원' : '무료' }}</span>
-        <span class="am" :class="{ no: !s.park }">주차</span>
-        <span class="am" :class="{ no: !s.wc }">화장실</span>
+      <!-- 없는 정보(null)는 배지를 그리지 않는다 - '주차 없음'과 '주차 정보 없음'은 다르다 -->
+      <div v-if="hasAmen" class="amen">
+        <span v-if="feeBadge" class="am">{{ feeBadge }}</span>
+        <span v-if="s.park != null" class="am" :class="{ no: !s.park }">주차</span>
+        <span v-if="s.wc != null" class="am" :class="{ no: !s.wc }">화장실</span>
         <span v-if="s.in" class="am">실내</span>
       </div>
 
