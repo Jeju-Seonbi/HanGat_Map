@@ -6,10 +6,11 @@ import com.example.hangat.common.util.EmailNormalizer;
 import com.example.hangat.config.security.jwt.JwtProvider;
 import com.example.hangat.config.security.password.PasswordHasher;
 import com.example.hangat.config.security.token.TokenHasher;
-import com.example.hangat.user.model.RefreshRevokeReason;
-import com.example.hangat.user.model.RefreshToken;
 import com.example.hangat.user.model.User;
+import com.example.hangat.user.model.auth.RefreshRevokeReason;
+import com.example.hangat.user.model.auth.RefreshToken;
 import com.example.hangat.user.model.dto.AuthDto;
+import com.example.hangat.user.model.dto.AuthInternalDto;
 import com.example.hangat.user.model.dto.TokenDto;
 import com.example.hangat.user.model.dto.UserDto;
 import com.example.hangat.user.repository.RefreshTokenRepository;
@@ -38,43 +39,70 @@ public class AuthService {
     private final PasswordHasher passwordHasher;
     private final JwtProvider jwtProvider;
 
-    /**
-     * 컨트롤러에서 쿠키를 설정할 수 있도록 Refresh 토큰 원문을 내부 결과에 포함한다.
-     * 응답 DTO와 분리해 토큰 원문이 응답 본문에 노출되는 실수를 방지한다.
-     */
-    public record LoginResult(TokenDto.LoginResponse body,
-                              String rawRefreshToken) {}
-    public record ReissueResult(TokenDto.AccessTokenResponse body,
-                                String rawRefreshToken) {}
-
     // ────────────────────────── 로그인 ──────────────────────────
     @Transactional
-    public LoginResult login(AuthDto.LoginRequest request) {
+    public AuthInternalDto.LoginResult login(
+            AuthDto.LoginRequest request) {
+
         User user = authenticate(request);
 
-        // 새 로그인 시 기존 세션을 종료한다.
-        revokeAll(user.getId(), RefreshRevokeReason.ROTATED);
+        return completeLogin(user);
+    }
+    /**
+     * 이메일 인증 또는 기존 계정 연결을 끝낸 소셜 사용자를 자동 로그인시킨다.
+     */
+    @Transactional
+    public AuthInternalDto.LoginResult loginSocial(
+            User user) {
+
+        if (!user.canLogin()) {
+            throw new BaseException(
+                    user.getStatus()
+                            .getLoginDeniedStatus()
+            );
+        }
+
+        return completeLogin(user);
+    }
+    /**
+     * 기존 refresh 세션을 폐기하고
+     * 새로운 access·refresh 토큰을 발급한다.
+     */
+    private AuthInternalDto.LoginResult completeLogin(
+            User user) {
+
+        revokeAll(
+                user.getId(),
+                RefreshRevokeReason.ROTATED
+        );
 
         user.recordLogin();
-        String rawRefresh = issueRefreshToken(user);
 
-        TokenDto.LoginResponse body = new TokenDto.LoginResponse(
-                UserDto.UserResponse.form(user),
-                accessToken(user)
-        );
-        return new LoginResult(body, rawRefresh);
+        String rawRefresh =
+                issueRefreshToken(user);
+
+        TokenDto.LoginResponse body =
+                new TokenDto.LoginResponse(
+                        UserDto.UserResponse.form(user),
+                        accessToken(user)
+                );
+
+        return new AuthInternalDto.LoginResult(body, rawRefresh);
     }
+
 
     /**
      * 비밀번호 확인 -> 그 후에 계정 상태 확인.
      */
     private User authenticate(AuthDto.LoginRequest request) {
+
         User user = userRepository.findByEmail(EmailNormalizer.normalize(request.email()))
                 .orElse(null);
 
         // 계정이 없거나 소셜 전용 계정이어도 더미를 이용해서 소요 시간 맞춤.
         String storedHash = (user != null && user.hasPassword()) ?
                 user.getPassword() : DUMMY_HASH;
+
         boolean matched = passwordHasher.matches(request.password(), storedHash);
 
         if (user == null || !user.hasPassword() || !matched) {
@@ -98,7 +126,7 @@ public class AuthService {
      * 이 메서드는 던지기 전에 한 쓰기가 전부 "남아야 하는" 것들이라 예외로 둠.
      */
     @Transactional(noRollbackFor = BaseException.class)
-    public ReissueResult reissue(String rawRefreshToken) {
+    public AuthInternalDto.ReissueResult reissue(String rawRefreshToken) {
         if(rawRefreshToken == null) {
             throw new BaseException(BaseResponseStatus.JWT_INVALID);
         }
@@ -124,7 +152,7 @@ public class AuthService {
         token.revoke(RefreshRevokeReason.ROTATED);
         String rawRefresh = issueRefreshToken(user, token.getExpiresAt());
 
-        return new ReissueResult(accessToken(user), rawRefresh);
+        return new AuthInternalDto.ReissueResult(accessToken(user), rawRefresh);
     }
 
     // ────────────────────────── 로그아웃 ──────────────────────────
@@ -138,8 +166,17 @@ public class AuthService {
         if(rawRefreshToken == null) {
             return;
         }
-        refreshRepository.findByTokenHashForUpdate(TokenHasher.hash(rawRefreshToken))
-                .ifPresent(token -> token.revoke(RefreshRevokeReason.LOGOUT));
+        refreshRepository
+                .findByTokenHashForUpdate(
+                        TokenHasher.hash(
+                                rawRefreshToken
+                        )
+                )
+                .ifPresent(token ->
+                        token.revoke(
+                                RefreshRevokeReason.LOGOUT
+                        )
+                );
     }
 
     // ────────────────────────── 공통 ──────────────────────────

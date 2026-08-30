@@ -1,6 +1,6 @@
 package com.example.hangat.user.repository;
 
-import com.example.hangat.user.model.PasswordResetRequest;
+import com.example.hangat.user.model.auth.PasswordResetRequest;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;

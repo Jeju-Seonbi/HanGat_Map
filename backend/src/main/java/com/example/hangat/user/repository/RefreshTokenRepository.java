@@ -1,6 +1,6 @@
 package com.example.hangat.user.repository;
 
-import com.example.hangat.user.model.RefreshToken;
+import com.example.hangat.user.model.auth.RefreshToken;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;

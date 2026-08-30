@@ -1,6 +1,6 @@
 package com.example.hangat.user.repository;
 
-import com.example.hangat.user.model.EmailVerificationToken;
+import com.example.hangat.user.model.auth.EmailVerificationToken;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDateTime;

@@ -8,7 +8,7 @@ import com.example.hangat.config.security.token.Purpose;
 import com.example.hangat.config.security.token.TokenHasher;
 import com.example.hangat.config.security.token.VerificationCodeGenerator;
 import com.example.hangat.config.security.token.VerificationCodeHasher;
-import com.example.hangat.user.model.PasswordResetRequest;
+import com.example.hangat.user.model.auth.PasswordResetRequest;
 import com.example.hangat.user.model.User;
 import com.example.hangat.user.model.dto.AuthDto;
 import com.example.hangat.user.repository.PasswordResetRequestRepository;
