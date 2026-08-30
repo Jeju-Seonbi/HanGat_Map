@@ -36,7 +36,7 @@ onMounted(async () => {
     await auth.verifyEmail(token)
     state.value = 'ok'
     ui.toast('이메일 인증을 마쳤어요')
-    setTimeout(() => router.replace('/home'), 900)
+    setTimeout(() => router.replace('/login'), 900)
   } catch (e) {
     state.value = 'fail'
     message.value = e instanceof ApiError ? e.message : '인증하지 못했어요'
@@ -51,7 +51,7 @@ onMounted(async () => {
     <p v-if="state === 'working'" class="body">잠시만 기다려 주세요.</p>
 
     <p v-else-if="state === 'ok'" class="body ok">
-      메인 화면으로 이동할게요.
+      로그인 화면으로 이동할게요.
     </p>
 
     <template v-else>

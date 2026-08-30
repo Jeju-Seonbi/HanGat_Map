@@ -3,7 +3,7 @@
  * 비밀번호 재설정 (요구사항 정의서 USER_003).
  *
  * 한 화면 3단계다. **URL 에 아무 값도 싣지 않는다** — 코드도 티켓도 메모리에만 둔다.
- *   1) 이메일 + 이름 입력 → 메일로 6자리 코드
+ *   1) 이메일 입력 → 메일로 6자리 영문·숫자 코드
  *   2) 코드 입력 → 확인되면 마스킹된 이메일 공개 + 재설정 티켓
  *   3) 새 비밀번호 설정
  *
@@ -16,19 +16,19 @@ import AuthLayout from '../../components/auth/AuthLayout.vue'
 import FieldText from '../../components/auth/FieldText.vue'
 import FieldPassword from '../../components/auth/FieldPassword.vue'
 import {
-  requestPasswordReset, verifyResetCode, resetPassword,
-  RESET_CODE_LENGTH, formatResetCode
-} from '../../api/auth.js'
+  sendResetCode, verifyResetCode, resetPassword
+} from '../../api/userAuth.js'
 import {
   isValidEmail, checkEmail,
-  EMAIL_INPUT_FILTER, EMAIL_INPUT_MESSAGE, NAME_INPUT_FILTER, NAME_INPUT_MESSAGE
+  EMAIL_INPUT_FILTER, EMAIL_INPUT_MESSAGE
 } from '../../utils/validators.js'
 import { checkPassword, normalizePassword } from '../../components/security/passwordPolicy.js'
 import { useUiStore } from '../../stores/ui.js'
 import { ApiError } from '../../api/errors.js'
 import { AUTH_HERO_IMAGES } from '../../data/authHeroImages.js'
 
-const IS_DEV = !!import.meta.env.DEV
+const RESET_CODE_LENGTH = 6
+const RESET_CODE_FILTER = /[^2-9A-HJ-NP-Za-hj-np-z]/g
 const router = useRouter()
 const ui = useUiStore()
 
@@ -36,14 +36,13 @@ const step = ref(1)
 const busy = ref(false)
 const serverError = ref('')
 
-const form = reactive({ email: '', name: '', code: '' })
+const form = reactive({ email: '', code: '' })
 const touched = reactive({})
 
 /* 코드·티켓은 화면 메모리에만 둔다. 새로고침하면 처음부터 다시. */
 const requestId = ref(null)
 const ticket = ref(null)
 const account = ref(null)
-const devCode = ref(null)
 
 /* 남은 시간 카운트다운 */
 const deadline = ref(0)
@@ -72,19 +71,16 @@ const emailError = computed(() => {
   // 허용 문자가 좁아진 만큼(@ . 만) 왜 막혔는지까지 알려준다
   return checkEmail(form.email).message
 })
-const nameError = computed(() => (touched.name && !form.name.trim() ? '이름을 입력해 주세요' : ''))
-const canRequest = computed(() => isValidEmail(form.email) && !!form.name.trim() && !busy.value)
+const canRequest = computed(() => isValidEmail(form.email) && !busy.value)
 
 async function sendCode () {
   touched.email = 1
-  touched.name = 1
   serverError.value = ''
   if (!canRequest.value) return
   busy.value = true
   try {
-    const res = await requestPasswordReset({ email: form.email.trim(), name: form.name.trim() })
+    const res = await sendResetCode(form.email.trim())
     requestId.value = res.requestId
-    devCode.value = res.devOnlyResetCode
     form.code = ''
     startCountdown(res.expiresInMs)
     step.value = 2
@@ -96,14 +92,16 @@ async function sendCode () {
 }
 
 /* ── 2단계 ── */
-const codeDigits = computed(() => form.code.replace(/\D/g, ''))
+const normalizedCode = computed(() => form.code.trim().toUpperCase())
 const canVerify = computed(() =>
-  codeDigits.value.length === RESET_CODE_LENGTH && !busy.value && !expired.value
+  normalizedCode.value.length === RESET_CODE_LENGTH && !busy.value && !expired.value
 )
 
 function onCodeInput (v) {
-  // 숫자만, 6자리까지. 공백·하이픈을 붙여 넣어도 걸러진다.
-  form.code = String(v).replace(/\D/g, '').slice(0, RESET_CODE_LENGTH)
+  form.code = String(v)
+    .replace(RESET_CODE_FILTER, '')
+    .toUpperCase()
+    .slice(0, RESET_CODE_LENGTH)
 }
 
 async function submitCode () {
@@ -112,8 +110,7 @@ async function submitCode () {
   busy.value = true
   try {
     const res = await verifyResetCode({
-      email: form.email.trim(),
-      code: codeDigits.value,
+      code: normalizedCode.value,
       requestId: requestId.value
     })
     ticket.value = res.ticket
@@ -133,7 +130,6 @@ function backToRequest () {
   serverError.value = ''
   form.code = ''
   requestId.value = null
-  devCode.value = null
   clearInterval(timer)
   deadline.value = 0
 }
@@ -143,7 +139,7 @@ const pwForm = reactive({ password: '', passwordConfirm: '' })
 const pwFields = reactive({})
 const breachState = ref({ breached: false })
 
-const pw = computed(() => checkPassword(pwForm.password, { nickname: account.value?.nickname }))
+const pw = computed(() => checkPassword(pwForm.password))
 const pwError = computed(() => {
   if (pwFields.password) return pwFields.password
   if (!touched.password || !pwForm.password) return ''
@@ -198,7 +194,7 @@ const TITLES = {
   4: '비밀번호를 바꿨어요'
 }
 const LEADS = {
-  1: '가입할 때 쓴 이메일과 이름을 입력하면 6자리 코드를 보내드려요.',
+  1: '가입할 때 쓴 이메일을 입력하면 6자리 코드를 보내드려요.',
   2: '',
   3: '앞으로 이 비밀번호로 로그인해요.',
   4: ''
@@ -223,20 +219,6 @@ const LEADS = {
         icon="mail"
         @blur="touched.email = 1"
       />
-      <FieldText
-        v-model="form.name"
-        label="이름"
-        required
-        placeholder="가입할 때 입력한 이름"
-        autocomplete="name"
-        :error="nameError"
-        :filter="NAME_INPUT_FILTER"
-        :filter-message="NAME_INPUT_MESSAGE"
-        icon="person"
-        @blur="touched.name = 1"
-        @enter="sendCode"
-      />
-
       <p v-if="serverError" class="srv" role="alert">{{ serverError }}</p>
 
       <button class="cta" type="submit" :disabled="!canRequest">
@@ -247,7 +229,7 @@ const LEADS = {
     <!-- ── 2단계: 코드 확인 ── -->
     <template v-else-if="step === 2">
       <p class="body">
-        입력하신 정보와 일치하는 계정이 있다면 그 주소로 <b>{{ RESET_CODE_LENGTH }}자리 숫자 코드</b>를 보냈어요.
+        입력하신 정보와 일치하는 계정이 있다면 그 주소로 <b>{{ RESET_CODE_LENGTH }}자리 영문·숫자 코드</b>를 보냈어요.
       </p>
       <p class="body muted">
         일치 여부는 알려드리지 않아요. 이 화면에서 계정 유무를 알 수 있으면
@@ -265,10 +247,10 @@ const LEADS = {
               class="code-in tnum"
               type="text"
               :value="form.code"
-              inputmode="numeric"
+              inputmode="text"
               autocomplete="one-time-code"
               :maxlength="RESET_CODE_LENGTH"
-              placeholder="000000"
+              placeholder="A2B3C4"
               spellcheck="false"
               :aria-describedby="serverError ? 'code-msg' : 'code-hint'"
               @input="onCodeInput($event.target.value)"
@@ -290,14 +272,6 @@ const LEADS = {
         <button class="btn2" type="button" @click="backToRequest">코드 다시 받기</button>
       </div>
 
-      <div v-if="IS_DEV" class="dev">
-        <div class="lbl">개발 빌드 · 메일 서버 없음</div>
-        <p v-if="devCode" class="code-out tnum">{{ formatResetCode(devCode) }}</p>
-        <p v-else class="note">
-          입력한 정보와 맞는 계정이 없어 코드를 만들지 않았어요.
-          실제 화면에서는 이 차이가 보이지 않아요.
-        </p>
-      </div>
     </template>
 
     <!-- ── 3단계: 새 비밀번호 ── -->
@@ -315,7 +289,6 @@ const LEADS = {
           autocomplete="new-password"
           show-guidance
           check-breach
-          :context="{ nickname: account.nickname }"
           :error="pwError"
           @blur="touched.password = 1"
           @breach="breachState = $event"
