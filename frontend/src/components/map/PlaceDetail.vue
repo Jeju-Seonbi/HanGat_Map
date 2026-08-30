@@ -186,8 +186,8 @@ function delImg(i) {
         <div v-for="w in week" :key="w.k" class="wxc" :class="{ on: w.k === state.di }"
           @click="state.di = w.k">
           <div class="wd">{{ w.label }}</div>
-          <div class="wi" v-html="wxIcon(w.w.k, 27)"></div>
-          <div class="wt">{{ w.w.t }}°</div>
+          <div class="wi" v-html="w.w ? wxIcon(w.w.k, 27) : ''"></div>
+          <div class="wt">{{ w.w ? w.w.t + '°' : '–' }}</div>
           <div class="wc" :style="{ background: `var(--${w.t})` }" :title="w.ko"></div>
         </div>
       </div>

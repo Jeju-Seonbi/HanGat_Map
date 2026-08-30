@@ -1,11 +1,9 @@
 import { at, iso } from './date'
-import { hash } from './crowd'
+import WeatherService from '../services/map/WeatherService'
 
-/* 기상청 단기예보(3일)·중기예보(10일) 자리 — 지금은 샘플 */
+/* MAP-05: 기상청 실데이터(7일). 로드는 loadPlaces()가 한다 - 범위 밖·실패면 null */
 export function wxOf(i) {
-  const d = iso(at(i)), h = hash('wx' + d) % 100, t = 28 + (hash('t' + d) % 6)
-  const w = h < 52 ? { k: '맑음', rain: 0 } : h < 80 ? { k: '구름', rain: 0 } : { k: '비', rain: 1 }
-  return { ...w, t: w.rain ? t - 3 : t, tmin: (w.rain ? t - 3 : t) - 4 }
+  return WeatherService.byDate(iso(at(i)))
 }
 
 /* 날씨 아이콘 — 텍스트 글자(☀☁☂)는 브라우저마다 다르게 그려져서 SVG로 직접 그린다 */
