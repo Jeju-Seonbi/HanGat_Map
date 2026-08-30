@@ -1,4 +1,4 @@
-package com.example.hangat.user.model;
+package com.example.hangat.user.model.oauth;
 
 /**
  * 소셜 로그인 제공자.

@@ -2,16 +2,12 @@ package com.example.hangat.user.model.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Past;
 import jakarta.validation.constraints.Size;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDate;
-
 /**
  * 인증 관련 Dto 모음 - 가입 / 로그인 / 비밀번호 찾기
- *
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class AuthDto {
@@ -47,10 +43,7 @@ public final class AuthDto {
 
                 @NotBlank(message = "닉네임을 입력해주세요.")
                 @Size(min = 2, max = 50, message = "닉네임은 2~50자여야 합니다.")
-                String nickname,
-
-                @Past(message = "생년월일을 확인해주세요.")
-                LocalDate birthDate
+                String nickname
         ) {
         }
 
@@ -70,8 +63,7 @@ public final class AuthDto {
         }
         /**
          * 1단계 응답
-         * 실제 이메일이 있든 없든 형식을 똑같이 하게 했다
-         * 있을때만 응답을 보내게끔 하면 안된다능
+         * 계정 존재 여부를 추측할 수 없도록 항상 같은 형식으로 응답한다.
          */
         public record SendResetCodeResponse(
                 String requestId,
@@ -85,16 +77,12 @@ public final class AuthDto {
          * requestId가 있어야 남이 요청한 코드에서 무차별 대입하는걸 막음
          */
         public record VerifyResetCodeRequest(
-                @NotBlank(message = "이메일을 입력해주세요.")
-                @Email(message = "이메일 형식을 확인해주세요.")
-                @Size(max = 255)
-                String email,
-
                 @NotBlank(message = "인증 코드를 입력해주세요.")
-                @Size(min = 6, max = 6, message = "인증코드는 6자리 입니다.")
+                @Size(max = 16, message = "인증 코드 형식을 확인해주세요.")
                 String code,
 
-                @NotBlank
+                @NotBlank(message = "요청 식별자가 필요합니다.")
+                @Size(min = 32, max = 32, message = "요청 식별자 형식을 확인해주세요.")
                 String requestId
         ){
         }

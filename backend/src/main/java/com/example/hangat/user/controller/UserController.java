@@ -32,7 +32,7 @@ public class UserController {
     @Operation(summary = "닉네임 중복확인", description = "가입 화면에서 쓰므로 비회원도 호출한다")
     public BaseResponse<NicknameAvailableResponse> checkNickname(
             @RequestParam @NotBlank @Size(min = 2, max = 50) String nickname) {
-        return BaseResponse.success(userService.checkNickname(nickname));
+        return BaseResponse.success(userService.isNicknameAvailable(nickname));
     }
 
     @GetMapping("/me")
@@ -45,6 +45,13 @@ public class UserController {
     @Operation(summary = "닉네임 변경")
     public BaseResponse<UserResponse> changeNickname(@AuthenticationPrincipal Long userId,
                                                      @Valid @RequestBody NicknameRequest request) {
-        return BaseResponse.success(userService.changeNickname(userId, request.nickname()));
+        return BaseResponse.success(userService.updateNickname(userId, request.nickname()));
+    }
+
+    @PatchMapping("/me/birth-date")
+    @Operation(summary = "생년월일 변경", description = "선택 정보이며 null을 보내면 삭제한다")
+    public BaseResponse<UserResponse> changeBirthDate(@AuthenticationPrincipal Long userId,
+                                                      @Valid @RequestBody BirthDateRequest request) {
+        return BaseResponse.success(userService.updateBirthDate(userId, request.birthDate()));
     }
 }
