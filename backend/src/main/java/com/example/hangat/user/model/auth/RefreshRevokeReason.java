@@ -1,4 +1,4 @@
-package com.example.hangat.user.model;
+package com.example.hangat.user.model.auth;
 
 
 /**

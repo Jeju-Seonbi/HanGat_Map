@@ -1,6 +1,7 @@
-package com.example.hangat.user.model;
+package com.example.hangat.user.model.oauth;
 
 import com.example.hangat.common.util.DateTimes;
+import com.example.hangat.user.model.User;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -44,7 +45,7 @@ public class UserSocialAccount {
     @Column(name = "provider_uid", nullable = false, length = 255)
     private String providerUid;
 
-    /** 제공자가 준 이메일. 참고용이고 신뢰 기준은 아님 */
+    /** 연결 당시 확인된 이메일. 참고용이며 로그인 식별 기준은 아님 */
     @Setter
     @Column(length = 255)
     private String email;

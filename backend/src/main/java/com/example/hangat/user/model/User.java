@@ -36,12 +36,10 @@ public class User {
     private Long id;
 
     /** 로그인 ID. EmailNormalizer 통과한 값만 넣음 */
-    @Setter
     @Column(nullable = false, length = 255)
     private String email;
 
     /** BCrypt 해시만 저장. 소셜 전용 계정은 null */
-    @Setter
     @Column(length = 255)
     private String password;
 
@@ -51,7 +49,6 @@ public class User {
     private String nickname;
 
     /** 프로필 선택 정보 (MY_009) */
-    @Setter
     @Column(name = "birth_date")
     private LocalDate birthDate;
 
@@ -90,27 +87,27 @@ public class User {
      * encodedPassword는 BCrypt 돌린 값만 넘길 것.
      */
     public static User signUpWithEmail(String email, String encodedPassword,
-                                       String nickname, LocalDate birthDate) {
+                                       String nickname) {
         return User.builder()
                 .email(EmailNormalizer.normalize(email))
                 .password(encodedPassword)
                 .nickname(nickname)
-                .birthDate(birthDate)
+                .birthDate(null)
                 .status(UserStatus.PENDING)
                 .build();
     }
 
     /**
      * 소셜 가입.
-     * 제공자가 이메일을 이미 확인해줘서 PENDING 건너뛰고 바로 ACTIVE로 만듬.
-     * 카카오는 미인증 이메일을 줄 수 있으니 그때는 이거 쓰면 안 됨.
+     * 공급자가 이메일을 검증했거나 한갓 인증 코드를 통과한 뒤에만 호출한다.
+     * 이메일 소유권이 확인됐으므로 PENDING을 건너뛰고 바로 ACTIVE로 만든다.
      */
-    public static User signUpWithSocial(String email, String nickname, LocalDate birthDate) {
+    public static User signUpWithSocial(String email, String nickname) {
         return User.builder()
                 .email(EmailNormalizer.normalize(email))
                 .password(null)
                 .nickname(nickname)
-                .birthDate(birthDate)
+                .birthDate(null)
                 .status(UserStatus.ACTIVE)
                 .emailVerifiedAt(DateTimes.nowUtc())
                 .build();
@@ -146,6 +143,11 @@ public class User {
     /** 로그인 성공 시 갱신 (USER_001) */
     public void recordLogin() {
         this.lastLoginAt = DateTimes.nowUtc();
+    }
+
+    /** 선택 프로필 생년월일 변경. null이면 값을 삭제한다. */
+    public void updateBirthDate(LocalDate birthDate) {
+        this.birthDate = birthDate;
     }
 
     /**
