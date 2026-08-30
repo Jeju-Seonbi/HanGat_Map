@@ -26,18 +26,26 @@ import java.net.UnknownHostException;
 import java.net.http.HttpConnectTimeoutException;
 import java.net.http.HttpTimeoutException;
 import java.net.SocketTimeoutException;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 @Component
 public class GeminiCourseAiProvider implements CourseAiProvider {
 
     private static final String JSON_MIME_TYPE = "application/json";
     private static final String THINKING_LEVEL_LOW = "low";
+    private static final Pattern LOCAL_TIME_PATTERN = Pattern.compile(
+            "(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d");
+    private static final DateTimeFormatter LOCAL_TIME_FORMATTER =
+            DateTimeFormatter.ofPattern("HH:mm:ss", Locale.ROOT);
 
     private final RestClient restClient;
     private final GeminiProperties properties;
@@ -188,7 +196,9 @@ public class GeminiCourseAiProvider implements CourseAiProvider {
     CourseAiResultDto parseResult(GeminiGenerateResponse response) {
         String text = responseText(response);
         try {
-            return objectMapper.readValue(text, CourseAiResultDto.class);
+            GeminiCourseAiResultWire wire = objectMapper.readValue(
+                    text, GeminiCourseAiResultWire.class);
+            return toDomainResult(wire);
         } catch (JsonProcessingException exception) {
             throw new CourseAiException(
                     CourseAiFailureType.INVALID_RESPONSE,
@@ -196,6 +206,56 @@ public class GeminiCourseAiProvider implements CourseAiProvider {
                     exception
             );
         }
+    }
+
+    private CourseAiResultDto toDomainResult(GeminiCourseAiResultWire wire) {
+        if (wire == null) {
+            return null;
+        }
+        List<CourseAiResultDto.DayDto> days = wire.days() == null
+                ? null
+                : wire.days().stream()
+                .map(this::toDomainDay)
+                .toList();
+        return new CourseAiResultDto(wire.contractVersion(), days);
+    }
+
+    private CourseAiResultDto.DayDto toDomainDay(GeminiCourseAiDayWire day) {
+        if (day == null) {
+            return null;
+        }
+        List<CourseAiResultDto.ItemDto> items = day.items() == null
+                ? null
+                : day.items().stream()
+                .map(this::toDomainItem)
+                .toList();
+        return new CourseAiResultDto.DayDto(day.date(), items);
+    }
+
+    private CourseAiResultDto.ItemDto toDomainItem(GeminiCourseAiItemWire item) {
+        if (item == null) {
+            return null;
+        }
+        return new CourseAiResultDto.ItemDto(
+                item.candidateId(),
+                parseLocalTime(item.startTime()),
+                item.recommendationReason());
+    }
+
+    private LocalTime parseLocalTime(String value) {
+        if (value == null) {
+            return null;
+        }
+        if (!LOCAL_TIME_PATTERN.matcher(value).matches()) {
+            throw invalidStartTimeFormat();
+        }
+        return LocalTime.parse(value, LOCAL_TIME_FORMATTER);
+    }
+
+    private CourseAiValidationException invalidStartTimeFormat() {
+        return new CourseAiValidationException(
+                CourseAiValidationCode.AI_RESULT_START_TIME_FORMAT_INVALID,
+                "AI 코스 결과의 startTime은 제주 현지 시각 HH:mm:ss 형식이어야 합니다.");
     }
 
     private GeminiGenerateResponse parseResponseEnvelope(
@@ -504,8 +564,7 @@ public class GeminiCourseAiProvider implements CourseAiProvider {
                         "candidateId", candidateId,
                         "startTime", Map.of(
                                 "type", "string",
-                                "format", "time",
-                                "description", "24시간제 HH:mm:ss 방문 시작 시각"),
+                                "description", "제주 현지 시각 HH:mm:ss; timezone, offset, Z, fractional seconds 금지"),
                         "recommendationReason", Map.of(
                                 "type", "string",
                                 "description", "입력 사실에 근거한 300자 이하의 한 줄 추천 이유")
@@ -575,6 +634,25 @@ public class GeminiCourseAiProvider implements CourseAiProvider {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     record GeminiResponsePart(String text) {
+    }
+
+    private record GeminiCourseAiResultWire(
+            String contractVersion,
+            List<GeminiCourseAiDayWire> days
+    ) {
+    }
+
+    private record GeminiCourseAiDayWire(
+            LocalDate date,
+            List<GeminiCourseAiItemWire> items
+    ) {
+    }
+
+    private record GeminiCourseAiItemWire(
+            String candidateId,
+            String startTime,
+            String recommendationReason
+    ) {
     }
 
     private record ProviderErrorDetails(String status, String reason) {

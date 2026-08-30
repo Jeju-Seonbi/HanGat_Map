@@ -133,8 +133,11 @@ class GeminiCourseAiProviderTest {
                 .isEqualTo(1);
         JsonNode itemSchema = daySchema.path("properties").path("items").path("items");
         assertThat(itemSchema.path("additionalProperties").asBoolean()).isFalse();
-        assertThat(itemSchema.path("properties").path("startTime").path("format").asText())
-                .isEqualTo("time");
+        JsonNode startTimeSchema = itemSchema.path("properties").path("startTime");
+        assertThat(startTimeSchema.has("format")).isFalse();
+        assertThat(startTimeSchema.path("description").asText())
+                .contains("제주 현지 시각 HH:mm:ss")
+                .contains("timezone", "offset", "Z", "fractional seconds");
         assertThat(itemSchema.path("properties").path("recommendationReason")
                 .path("description").asText()).contains("300자 이하");
         assertThat(itemSchema.path("properties").path("recommendationReason")
@@ -176,6 +179,8 @@ class GeminiCourseAiProviderTest {
                 .contains("\"contractVersion\":\"1.0\"")
                 .contains("동일 candidateId를 재사용하지 않는다")
                 .contains("후보가 부족하면 중복해서 채우지 말고")
+                .contains("제주 현지 시각의 HH:mm:ss")
+                .contains("timezone, UTC offset, Z, fractional seconds")
                 .contains("\"candidateId\":\"want-1\"")
                 .contains("\"candidateId\":\"normal-1\"")
                 .doesNotContain("test-secret");
@@ -185,6 +190,39 @@ class GeminiCourseAiProviderTest {
                 .path("properties").path("candidateId").path("enum"))
                 .extracting(JsonNode::asText)
                 .containsExactly("want-1", "normal-1", "normal-2");
+    }
+
+    @Test
+    void parsesOnlyExactJejuLocalTimeValues() {
+        GeminiCourseAiProvider provider = provider(RestClient.create(), "test-secret");
+
+        assertThat(parseStartTime(provider, "09:30:00")).isEqualTo(LocalTime.of(9, 30));
+        assertThat(parseStartTime(provider, "00:00:00")).isEqualTo(LocalTime.MIDNIGHT);
+        assertThat(parseStartTime(provider, "23:59:59")).isEqualTo(LocalTime.of(23, 59, 59));
+    }
+
+    @Test
+    void rejectsOffsetFractionalAndOutOfRangeWireTimesWithoutExposingThem() {
+        GeminiCourseAiProvider provider = provider(RestClient.create(), "test-secret");
+
+        for (String invalid : List.of(
+                "09:30",
+                "09:30:00.000",
+                "09:30:00.000Z",
+                "09:30:00Z",
+                "09:30:00+09:00",
+                "24:00:00")) {
+            assertThatThrownBy(() -> parseStartTime(provider, invalid))
+                    .isInstanceOfSatisfying(CourseAiValidationException.class, exception -> {
+                        assertThat(exception.getFailureType())
+                                .isEqualTo(CourseAiFailureType.VALIDATION_ERROR);
+                        assertThat(exception.getCode())
+                                .isEqualTo(CourseAiValidationCode.AI_RESULT_START_TIME_FORMAT_INVALID);
+                        assertThat(exception.getMessage())
+                                .contains("제주 현지 시각 HH:mm:ss")
+                                .doesNotContain(invalid);
+                    });
+        }
     }
 
     @Test
@@ -495,6 +533,20 @@ class GeminiCourseAiProviderTest {
         assertThatThrownBy(() -> provider.generate(input()))
                 .isInstanceOfSatisfying(CourseAiException.class,
                         exception -> assertThat(exception.getFailureType()).isEqualTo(expected));
+    }
+
+    private LocalTime parseStartTime(GeminiCourseAiProvider provider, String startTime) {
+        String resultJson = """
+                {"contractVersion":"1.0","days":[{"date":"2026-08-28","items":[{
+                "candidateId":"want-1","startTime":"%s","recommendationReason":"입력 근거"
+                }]}]}
+                """.formatted(startTime);
+        CourseAiResultDto result = provider.parseResult(
+                new GeminiCourseAiProvider.GeminiGenerateResponse(List.of(
+                        new GeminiCourseAiProvider.GeminiCandidate(
+                                new GeminiCourseAiProvider.GeminiResponseContent(List.of(
+                                        new GeminiCourseAiProvider.GeminiResponsePart(resultJson)))))));
+        return result.days().get(0).items().get(0).startTime();
     }
 
     private GeminiCourseAiProvider provider(RestClient restClient, String apiKey) {

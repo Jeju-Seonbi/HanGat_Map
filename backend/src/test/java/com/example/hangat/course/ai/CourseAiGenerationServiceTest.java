@@ -112,6 +112,72 @@ class CourseAiGenerationServiceTest {
     }
 
     @Test
+    void correctsOneWireTimeFormatFailureAndReturnsValidResult() {
+        CourseAiInputDto input = input();
+        CourseAiResultDto corrected = validResult();
+        AtomicInteger calls = new AtomicInteger();
+        CourseAiProvider provider = new CourseAiProvider() {
+            @Override
+            public CourseAiResultDto generate(CourseAiInputDto actualInput) {
+                calls.incrementAndGet();
+                throw invalidTimeFormat();
+            }
+
+            @Override
+            public CourseAiResultDto generateCorrection(
+                    CourseAiInputDto actualInput,
+                    CourseAiResultDto previousResult,
+                    CourseAiValidationCode validationCode,
+                    String validationMessage
+            ) {
+                calls.incrementAndGet();
+                assertThat(actualInput).isSameAs(input);
+                assertThat(previousResult).isNull();
+                assertThat(validationCode)
+                        .isEqualTo(CourseAiValidationCode.AI_RESULT_START_TIME_FORMAT_INVALID);
+                assertThat(validationMessage).contains("제주 현지 시각 HH:mm:ss");
+                return corrected;
+            }
+        };
+        CourseAiGenerationService service = new CourseAiGenerationService(
+                provider, new CourseAiResultValidator());
+
+        assertThat(service.generate(input)).isSameAs(corrected);
+        assertThat(calls).hasValue(2);
+    }
+
+    @Test
+    void failsAfterOneCorrectionWhenCorrectedWireTimeIsStillInvalid() {
+        AtomicInteger calls = new AtomicInteger();
+        CourseAiProvider provider = new CourseAiProvider() {
+            @Override
+            public CourseAiResultDto generate(CourseAiInputDto actualInput) {
+                calls.incrementAndGet();
+                throw invalidTimeFormat();
+            }
+
+            @Override
+            public CourseAiResultDto generateCorrection(
+                    CourseAiInputDto actualInput,
+                    CourseAiResultDto previousResult,
+                    CourseAiValidationCode validationCode,
+                    String validationMessage
+            ) {
+                calls.incrementAndGet();
+                throw invalidTimeFormat();
+            }
+        };
+        CourseAiGenerationService service = new CourseAiGenerationService(
+                provider, new CourseAiResultValidator());
+
+        assertThatThrownBy(() -> service.generate(input()))
+                .isInstanceOfSatisfying(CourseAiValidationException.class, exception ->
+                        assertThat(exception.getCode())
+                                .isEqualTo(CourseAiValidationCode.AI_RESULT_START_TIME_FORMAT_INVALID));
+        assertThat(calls).hasValue(2);
+    }
+
+    @Test
     void doesNotRetryProviderFailure() {
         AtomicInteger calls = new AtomicInteger();
         CourseAiGenerationService service = new CourseAiGenerationService(
@@ -119,7 +185,26 @@ class CourseAiGenerationServiceTest {
                     calls.incrementAndGet();
                     throw new CourseAiException(
                             CourseAiFailureType.PROVIDER_ERROR,
-                            "Gemini provider failure");
+                            "Gemini HTTP 503 failure");
+                },
+                new CourseAiResultValidator());
+
+        assertThatThrownBy(() -> service.generate(input()))
+                .isInstanceOfSatisfying(CourseAiException.class, exception ->
+                        assertThat(exception.getFailureType())
+                                .isEqualTo(CourseAiFailureType.PROVIDER_ERROR));
+        assertThat(calls).hasValue(1);
+    }
+
+    @Test
+    void doesNotRetryNetworkFailure() {
+        AtomicInteger calls = new AtomicInteger();
+        CourseAiGenerationService service = new CourseAiGenerationService(
+                actualInput -> {
+                    calls.incrementAndGet();
+                    throw new CourseAiException(
+                            CourseAiFailureType.PROVIDER_ERROR,
+                            "Gemini network timeout");
                 },
                 new CourseAiResultValidator());
 
@@ -161,6 +246,12 @@ class CourseAiGenerationServiceTest {
                         new ItemDto("want-1", LocalTime.parse("09:00"), "입력 근거"))),
                 new DayDto(LocalDate.parse("2026-08-29"), List.of(
                         new ItemDto("want-1", LocalTime.parse("11:00"), "중복 근거")))));
+    }
+
+    private CourseAiValidationException invalidTimeFormat() {
+        return new CourseAiValidationException(
+                CourseAiValidationCode.AI_RESULT_START_TIME_FORMAT_INVALID,
+                "AI 코스 결과의 startTime은 제주 현지 시각 HH:mm:ss 형식이어야 합니다.");
     }
 
     private CourseAiInputDto input() {

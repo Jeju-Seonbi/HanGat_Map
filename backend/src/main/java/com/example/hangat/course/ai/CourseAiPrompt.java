@@ -33,7 +33,8 @@ public class CourseAiPrompt {
             20. 각 DAY의 items는 startTime 오름차순이며 같은 시작 시간을 중복 사용하지 않는다.
             21. recommendationReason은 한 줄 근거로 작성하며 300자를 초과하지 않는다.
 
-            응답의 startTime은 반드시 24시간제 HH:mm:ss 형식으로 작성한다.
+            응답의 startTime은 반드시 제주 현지 시각의 24시간제 HH:mm:ss 형식으로 작성한다.
+            startTime에 timezone, UTC offset, Z, fractional seconds를 포함하지 않는다.
 
             travelFacts 규칙:
             - sparse adjacent pair일 수 있으며 배열 순서는 최종 방문 순서가 아니다.
@@ -109,6 +110,8 @@ public class CourseAiPrompt {
                 - 후보가 부족하면 중복해서 채우지 말고 더 적은 장소를 선택한다.
                 - candidateId는 아래 입력 candidates[].candidateId 중 하나를 그대로 사용한다.
                 - days와 각 DAY의 items는 각각 날짜와 startTime 오름차순으로 작성한다.
+                - startTime은 제주 현지 시각의 HH:mm:ss 형식만 사용한다.
+                - startTime에 timezone, UTC offset, Z, fractional seconds를 포함하지 않는다.
                 - recommendationReason은 입력 사실에 근거한 한 줄 문장으로 300자를 넘지 않는다.
 
                 이전 전체 결과 JSON:
