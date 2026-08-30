@@ -17,7 +17,7 @@ final class KtoPlaceCategoryResolver {
         if ("B02".equals(category1)) {
             return "LODGING";
         }
-        if ("A01".equals(category1) || "A02".equals(category1)) {
+        if ("A01".equals(category1) || "A02".equals(category1) || "A03".equals(category1)) {
             return "TOURIST";
         }
         throw new IllegalStateException(
