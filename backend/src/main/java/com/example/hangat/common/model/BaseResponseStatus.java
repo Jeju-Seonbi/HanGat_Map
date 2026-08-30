@@ -41,6 +41,11 @@ public enum BaseResponseStatus {
 
     // 3200번대 장소
     PLACE_NOT_FOUND(false, 3201, "존재하지 않는 장소입니다."),
+    REVIEW_NOT_FOUND(false, 3211, "존재하지 않는 후기입니다."),
+    REVIEW_FORBIDDEN(false, 3212, "본인이 작성한 후기만 삭제할 수 있습니다."),
+    REVIEW_RATING_OR_REPORT_REQUIRED(false, 3213, "별점 또는 혼잡 제보 중 하나는 필요합니다."),
+    REVIEW_TOO_MANY_IMAGES(false, 3214, "후기 사진은 최대 5장까지입니다."),
+    LOGIN_REQUIRED(false, 3215, "로그인이 필요합니다."),
 
     // 3300번대 코스
     COURSE_NOT_FOUND(false, 3301, "존재하지 않는 코스입니다."),
