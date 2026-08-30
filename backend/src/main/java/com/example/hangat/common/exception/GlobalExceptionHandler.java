@@ -1,7 +1,10 @@
 package com.example.hangat.common.exception;
 
 import com.example.hangat.common.model.BaseResponse;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
 import com.example.hangat.common.model.BaseResponseStatus;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -27,6 +30,19 @@ public class GlobalExceptionHandler {
                 .body(BaseResponse.fail(BaseResponseStatus.REQUEST_ERROR, errors));
     }
 
+    /** @RequestParam·@PathVariable 검증 실패 → 필드별 메시지를 result에 담아 400 */
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<BaseResponse<Map<String, String>>> handleConstraintViolation(ConstraintViolationException e) {
+        Map<String, String> errors = new HashMap<>();
+        for (ConstraintViolation<?> violation : e.getConstraintViolations()) {
+            String path = violation.getPropertyPath().toString();
+            String field = path.contains(".") ? path.substring(path.lastIndexOf('.') + 1) : path;
+            errors.put(field, violation.getMessage());
+        }
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(BaseResponse.fail(BaseResponseStatus.REQUEST_ERROR, errors));
+    }
+
     @ExceptionHandler(BaseException.class)
     public ResponseEntity<BaseResponse<Object>> handleBaseException(BaseException e) {
         BaseResponseStatus status = e.getStatus();
@@ -34,6 +50,19 @@ public class GlobalExceptionHandler {
                 ? BaseResponse.fail(status, e.getResult())
                 : BaseResponse.fail(status);
         return ResponseEntity.status(httpStatusOf(status.getCode())).body(response);
+    }
+
+    /**
+     * DB 제약 위반 (UNIQUE, NOT NULL 등).
+     * 중복 검사와 저장 사이에 다른 요청이 끼면 여기로 온다 - 가입 버튼 더블클릭이 대표적임.
+     * 어느 제약이 깨졌는지는 알 수 없어서 메시지는 일반적으로 나간다.
+     * 정상 경로에서는 서비스의 사전 검사가 정확한 메시지를 준다.
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<BaseResponse<Object>> handleDataIntegrityViolation(
+            DataIntegrityViolationException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(BaseResponse.fail(BaseResponseStatus.REQUEST_ERROR));
     }
 
     /** 3000번대 → 400, 5000번대 → 500 */

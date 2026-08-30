@@ -44,7 +44,9 @@ function htmlCspPlugin () {
           /* 지도 타일은 mts.daumcdn.net, 마커·아이콘은 t1.daumcdn.net 에서 온다.
              카카오 SDK 가 http 로 요청하므로 http 와일드카드도 필요하다
              (운영 빌드는 upgrade-insecure-requests 가 https 로 승격시킨다). */
-          "img-src 'self' data: blob: http://*.daumcdn.net https://*.daumcdn.net http://*.kakaocdn.net https://*.kakaocdn.net",
+          /* tong.visitkorea.or.kr: TourAPI 장소 사진(한산 장소 캐러셀 등) - 공사 이미지는 http 원본이라
+             http도 열되, 운영 빌드는 upgrade-insecure-requests 가 https 로 승격시킨다. */
+          "img-src 'self' data: blob: http://*.daumcdn.net https://*.daumcdn.net http://*.kakaocdn.net https://*.kakaocdn.net http://tong.visitkorea.or.kr https://tong.visitkorea.or.kr",
           /* 개발 모드는 백엔드(hangat-api)를 직접 호출한다.
              운영 빌드는 같은 도메인 /api 프록시 경유라 'self' 로 충분하다. */
           `connect-src 'self' https://api.pwnedpasswords.com https://dapi.kakao.com http://dapi.kakao.com${dev ? ' http://localhost:8080 ws: wss:' : ''}`,
@@ -76,7 +78,7 @@ export default defineConfig(() => ({
     }
   },
   server: {
-    port: 4173,
+    port: 5173,
     // 포트를 못 잡으면 조용히 다른 번호로 옮기지 말고 실패시킨다
     strictPort: true,
     headers: {
@@ -89,7 +91,7 @@ export default defineConfig(() => ({
     }
   },
   preview: {
-    port: 4173,
+    port: 5173,
     strictPort: true
   },
   test: {

@@ -229,6 +229,7 @@
 .pimg::-webkit-scrollbar{height:4px}
 .pimg::-webkit-scrollbar-thumb{background:var(--line2);border-radius:3px}
 .pimg img{height:96px;border-radius:12px;flex-shrink:0;object-fit:cover;max-width:170px}
+.pimg-src{margin:-8px 0 12px;font-size:10.5px;color:var(--tx3)}
 .pimg .add{flex-shrink:0;width:74px;height:96px;border:1.5px dashed var(--line2);border-radius:12px;
   color:var(--tx3);font-size:11px;font-weight:600;display:flex;flex-direction:column;
   align-items:center;justify-content:center;gap:4px;line-height:1.3}
@@ -239,6 +240,7 @@
 .pi{display:flex;align-items:flex-start;gap:8px;font-size:12.5px;line-height:1.55;padding:3px 0}
 .pi svg{flex-shrink:0;margin-top:2px;color:var(--tx3)}
 .pi .tx{flex:1;min-width:0}
+.tx.multi{white-space:pre-line}
 .pi .sub2{color:var(--tx3);font-size:11px;margin-left:5px}
 .pi .cp{font-size:10.5px;font-weight:700;color:var(--ac-dk);background:var(--ac-bg);
   border-radius:var(--rp);padding:2px 9px;flex-shrink:0}
@@ -406,6 +408,12 @@
   padding:8px 1px 7px;border-radius:12px;font-size:10.5px;font-weight:600;
   color:var(--tx3);letter-spacing:-.03em;white-space:nowrap;transition:color .15s}
 .ftr button:hover{background:var(--surf2)}
+/* 아직 적재 전인 레이어 - 켜도 빈 지도라 '고장'으로 보이지 않게 표시한다.
+   버튼을 막지는 않는다: 켜서 아무것도 없는 걸 확인하는 것도 정보다 */
+.ftr button{position:relative}
+.ftr button.soon{opacity:.72}
+.ftr .soon-tag{position:absolute;top:2px;right:3px;font-size:9px;font-style:normal;
+  line-height:1;padding:2px 4px;border-radius:6px;background:var(--surf2);color:var(--tx3)}
 .ftr .ico{width:34px;height:34px;border-radius:50%;background:var(--surf2);color:var(--tx3);
   display:flex;align-items:center;justify-content:center;line-height:0;
   transition:background .15s,color .15s,box-shadow .15s}

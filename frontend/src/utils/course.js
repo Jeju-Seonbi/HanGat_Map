@@ -25,7 +25,7 @@ export function slotsFor(n) {
  */
 export function buildCourse({ region, budget, dayIndex, useRain }) {
   const days = 2
-  const rain = useRain && wxOf(dayIndex).rain
+  const rain = useRain && !!wxOf(dayIndex)?.rain
   const pool = SPOTS.filter(s => (region === '전체' || s.r === region) && s.b != null)
   const fds = FOOD.filter(f => region === '전체' || f.r === region)
   if (pool.length < 2) return null

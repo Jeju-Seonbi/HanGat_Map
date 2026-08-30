@@ -45,6 +45,7 @@ export const routes = [
   { path: '/signup/done', name: 'signup-done', component: () => import('../views/auth/SignupDoneView.vue'), meta: { layout: 'bare', title: '인증 메일을 보냈어요' } },
   { path: '/verify', name: 'verify', component: () => import('../views/auth/VerifyEmailView.vue'), meta: { layout: 'bare', title: '이메일 인증' } },
   { path: '/find-password', name: 'find-password', component: () => import('../views/auth/FindPasswordView.vue'), meta: { layout: 'bare', guestOnly: true, title: '비밀번호 재설정' } },
+  { path: '/oauth/callback', name: 'oauth-callback', component: () => import('../views/auth/OAuthCallbackView.vue'), meta: { layout: 'bare', title: '소셜 로그인' } },
 
   /* ── 마이페이지 (MY_004~011) — 로그인 필요 ──
      '저장한 코스' 는 /courses 로 옮겼다. 옛 경로는 아래 리다이렉트로 살려 둔다. */

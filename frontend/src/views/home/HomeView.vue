@@ -7,9 +7,9 @@ import { usePlaces } from '../../composables/usePlaces'
 import { useTravelStore } from '../../app/stores/travel'
 import { homeCourses } from '../../data/courses'
 import { levelOf } from '../../utils/congestion'
-import { levelLabel } from '../../data/data'
 import type { DailyWeather } from '../../services/WeatherService'
 import { WeatherService } from '../../services/WeatherService'
+import CalmPlaceService, { type CalmPlaceCard } from '../../services/CalmPlaceService'
 import PlaceImage from '../../components/common/PlaceImage.vue'
 import CongestionBadge from '../../components/common/CongestionBadge.vue'
 
@@ -50,16 +50,9 @@ const courseCards = computed(() =>
   }),
 )
 
-// MAIN_001: 오늘 날짜 예보 기준 한적한 관광지 후보 (집중률 오름차순, 혼잡 등급 제외)
-const calmSpots = computed(() =>
-  [...places.value]
-    .filter(
-      (p) =>
-        p.categoryCode !== 'RESTAURANT' &&
-        (p.level === 'RELAXED' || p.level === 'MODERATE'),
-    )
-    .sort((a, b) => a.score - b.score),
-)
+// MAIN_001: 오늘 날짜 예보 기준 한적한 관광지 (백엔드 실데이터, 실패 시 목업 폴백)
+const calmPlaces = ref<CalmPlaceCard[]>([])
+const calmLive = ref(false)
 // 장소 추천 캐러셀: 화살표로 후보를 한 장씩 넘긴다
 const track = ref<HTMLElement | null>(null)
 const canPrev = ref(false)
@@ -85,6 +78,11 @@ onMounted(async () => {
   const forecast = await WeatherService.getWeeklyForecast()
   weeklyWeather.value = forecast.days
   weatherLive.value = forecast.live
+  const calm = await CalmPlaceService.getCalmPlaces()
+  calmPlaces.value = calm.cards
+  calmLive.value = calm.live
+  await nextTick()
+  updateArrows()
 })
 onBeforeUnmount(() => window.removeEventListener('resize', updateArrows))
 </script>
@@ -214,7 +212,7 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateArrows))
           <span class="eyebrow">TODAY'S CALM</span>
           <h2>오늘 한적한 곳부터 추천해요</h2>
           <p class="muted">
-            {{ todayLabel }} 예보 기준 집중률 낮은 순 · 화살표로 다음 후보를 넘겨보세요 · 시연용 데이터
+            {{ todayLabel }} 예보 기준 집중률 낮은 순 · {{ calmLive ? '한국관광공사 집중률 예보' : '시연용 데이터 · 백엔드 연결 대기' }}
           </p>
         </div>
         <RouterLink
@@ -240,28 +238,42 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateArrows))
           @scroll.passive="updateArrows"
         >
           <div
-            v-for="(p, i) in calmSpots"
-            :key="p.id"
+            v-for="(p, i) in calmPlaces"
+            :key="p.key"
             class="poster-item"
           >
+            <!-- 실데이터 장소는 아직 상세 페이지가 없어 링크 없이 렌더 (장소 상세 실연동 때 교체) -->
             <RouterLink
+              v-if="p.detailId"
               class="poster-frame"
-              :to="`/places/${p.id}`"
+              :to="`/places/${p.detailId}`"
             >
               <PlaceImage
-                :src="p.imageUrl ?? p.image"
+                :src="p.imageUrl ?? '/images/placeholder.svg'"
                 :alt="`${p.name} 사진`"
               />
               <span class="poster-rank">{{ i + 1 }}</span>
             </RouterLink>
+            <div
+              v-else
+              class="poster-frame"
+            >
+              <PlaceImage
+                :src="p.imageUrl ?? '/images/placeholder.svg'"
+                :alt="`${p.name} 사진`"
+              />
+              <span class="poster-rank">{{ i + 1 }}</span>
+            </div>
             <div class="poster-info">
               <h3>{{ p.name }}</h3>
               <p class="poster-stats">
-                <span :class="['lv', p.level.toLowerCase()]">{{ levelLabel[p.level] }}</span> · {{ p.region }}
+                <span :class="['lv', p.level.toLowerCase()]">{{ p.levelLabel }}</span> · {{ p.region }}
               </p>
+              <small class="poster-reason">{{ p.reason }}</small>
               <RouterLink
+                v-if="p.detailId"
                 class="poster-cta"
-                :to="`/places/${p.id}`"
+                :to="`/places/${p.detailId}`"
               >
                 자세히 보기
               </RouterLink>
@@ -282,7 +294,7 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateArrows))
     <!-- MAIN_003: 데이터 출처 고지 -->
     <p class="data-source">
       관광정보·사진: 한국관광공사 TourAPI · 착한가격업소: 행정안전부 · 날씨: 기상청 ·
-      혼잡도는 예측 데이터 기반 추정으로 실제와 다를 수 있습니다 (현재 화면은 시연용 데이터)
+      혼잡도는 한국관광공사 집중률 예보 기반으로 실제와 다를 수 있습니다 (일부 화면은 시연용 데이터)
     </p>
   </div>
 </template>
@@ -534,20 +546,24 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateArrows))
   font-size: 0.85rem;
   color: var(--sub);
 }
+.poster-reason {
+  color: var(--sub);
+  font-size: 0.78rem;
+}
 .poster-stats .lv {
   font-weight: 700;
 }
-.poster-stats .lv.relaxed {
-  color: var(--relaxed);
+.poster-stats .lv.quiet {
+  color: var(--quiet);
 }
-.poster-stats .lv.moderate {
+.poster-stats .lv.normal {
   color: #b8860b;
 }
 .poster-stats .lv.crowded {
   color: var(--crowded);
 }
-.poster-stats .lv.very_crowded {
-  color: var(--very);
+.poster-stats .lv.crowded {
+  color: var(--crowded);
 }
 .poster-cta {
   display: inline-flex;

@@ -1,9 +1,9 @@
 import { defineStore } from 'pinia'
-import * as authApi from '../api/auth.js'
+import * as authApi from '../api/userAuth.js'
 import { ApiError } from '../api/errors.js'
 import {
-  hasResumableSession, destroySession, accessTokenRemainSeconds
-} from '../api/session.js'
+  accessTokenRemainSeconds, clearBackendSession
+} from '../api/backendClient.js'
 
 /**
  * 인증 상태.
@@ -41,15 +41,11 @@ export const useAuthStore = defineStore('auth', {
     /** 앱 시작 시 리프레시 쿠키로 세션 복구 */
     async restore () {
       if (this.ready) return
-      if (!hasResumableSession()) {
-        this.user = null
-        this.ready = true
-        return
-      }
       try {
-        this.user = await authApi.me()
+        // HttpOnly refresh 쿠키는 JavaScript로 존재 여부를 읽을 수 없으므로 항상 조용히 시도한다.
+        this.user = await authApi.restoreSession()
       } catch (e) {
-        if (e instanceof ApiError && e.status === 401) {
+        if (e instanceof ApiError) {
           this.user = null
           // 조용한 복구 실패는 배너를 띄우지 않는다 (그냥 로그인 안 된 상태)
         } else {
@@ -73,10 +69,7 @@ export const useAuthStore = defineStore('auth', {
     },
 
     async verifyEmail (token) {
-      const res = await authApi.verifyEmail(token)
-      this.user = res.user
-      this.endedReason = null
-      return res
+      return authApi.verifyEmail(token)
     },
 
     async logout () {
@@ -84,7 +77,7 @@ export const useAuthStore = defineStore('auth', {
         await authApi.logout()
       } finally {
         // 서버 호출이 실패해도 클라이언트 상태는 반드시 비운다
-        destroySession()
+        clearBackendSession()
         this.user = null
         this.returnTo = null
         this.endedReason = null
@@ -96,8 +89,10 @@ export const useAuthStore = defineStore('auth', {
       return this.user
     },
 
-    async updateName (name) {
-      this.user = await authApi.updateName(name)
+    async restoreAfterOAuth () {
+      this.user = await authApi.restoreSession()
+      this.ready = true
+      this.endedReason = null
       return this.user
     },
 
@@ -113,7 +108,7 @@ export const useAuthStore = defineStore('auth', {
 
     /** 401 을 만난 화면들이 공통으로 부르는 처리 */
     handleUnauthorized (routePath = null, code = 'SESSION_EXPIRED') {
-      destroySession()
+      clearBackendSession()
       this.user = null
       this.endedReason = code
       if (routePath) this.returnTo = routePath

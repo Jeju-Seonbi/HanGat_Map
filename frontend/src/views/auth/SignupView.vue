@@ -17,10 +17,10 @@ import { useRouter } from 'vue-router'
 import AuthLayout from '../../components/auth/AuthLayout.vue'
 import FieldText from '../../components/auth/FieldText.vue'
 import FieldPassword from '../../components/auth/FieldPassword.vue'
-import { signup, checkNicknameAvailable } from '../../api/auth.js'
+import { signup, checkNicknameAvailable } from '../../api/userAuth.js'
 import {
-  checkNickname, isValidEmail, checkEmail, checkName,
-  EMAIL_INPUT_FILTER, EMAIL_INPUT_MESSAGE, NAME_INPUT_FILTER, NAME_INPUT_MESSAGE
+  checkNickname, isValidEmail, checkEmail,
+  EMAIL_INPUT_FILTER, EMAIL_INPUT_MESSAGE
 } from '../../utils/validators.js'
 import { checkPassword, normalizePassword } from '../../components/security/passwordPolicy.js'
 import { putHandoff } from '../../utils/handoff.js'
@@ -31,7 +31,7 @@ const router = useRouter()
 
 const form = reactive({
   email: '', password: '', passwordConfirm: '',
-  nickname: '', name: '', birthDate: ''
+  nickname: ''
 })
 const touched = reactive({})
 const serverFields = reactive({})
@@ -42,7 +42,7 @@ const breachState = ref({ status: 'idle', breached: false })
 const dupNick = reactive({ state: 'idle', message: '' })
 
 const pw = computed(() => checkPassword(form.password, {
-  email: form.email, nickname: form.nickname, name: form.name
+  email: form.email, nickname: form.nickname
 }))
 const nick = computed(() => checkNickname(form.nickname))
 
@@ -79,12 +79,6 @@ const nickError = computed(() => {
 })
 const nickOk = computed(() => (dupNick.state === 'ok' ? '쓸 수 있는 닉네임이에요' : ''))
 
-const nameError = computed(() => {
-  if (serverFields.name) return serverFields.name
-  if (!touched.name) return ''
-  return checkName(form.name).message
-})
-
 const canSubmit = computed(() =>
   isValidEmail(form.email) &&
   pw.value.ok &&
@@ -93,7 +87,6 @@ const canSubmit = computed(() =>
   normalizePassword(form.password) === normalizePassword(form.passwordConfirm) &&
   nick.value.ok &&
   dupNick.state !== 'taken' &&
-  checkName(form.name).ok &&
   !busy.value
 )
 
@@ -113,16 +106,16 @@ async function verifyNicknameDup () {
 }
 
 async function submit () {
-  Object.assign(touched, { email: 1, password: 1, passwordConfirm: 1, nickname: 1, name: 1 })
+  Object.assign(touched, { email: 1, password: 1, passwordConfirm: 1, nickname: 1 })
   Object.keys(serverFields).forEach(k => { serverFields[k] = '' })
   serverError.value = ''
   if (!canSubmit.value) return
 
   busy.value = true
   try {
-    const res = await signup({ ...form })
-    // 이메일·토큰을 URL 에 싣지 않는다 (utils/handoff.js 주석 참고)
-    putHandoff('signup', { email: form.email.trim(), token: res.devOnlyVerifyToken, note: res.devOnlyNote })
+    await signup({ ...form })
+    // 이메일은 URL에 싣지 않고 다음 화면이 한 번만 읽는 메모리 handoff로 넘긴다.
+    putHandoff('signup', { email: form.email.trim() })
     router.replace({ name: 'signup-done' })
   } catch (e) {
     if (e instanceof ApiError && e.detail) {
@@ -166,7 +159,7 @@ async function submit () {
         autocomplete="new-password"
         show-guidance
         check-breach
-        :context="{ email: form.email, nickname: form.nickname, name: form.name }"
+        :context="{ email: form.email, nickname: form.nickname }"
         :error="pwError"
         @blur="touched.password = 1"
         @breach="breachState = $event"
@@ -196,28 +189,6 @@ async function submit () {
           </button>
         </template>
       </FieldText>
-
-      <FieldText
-        v-model="form.name"
-        label="이름"
-        required
-        placeholder="비밀번호 재설정 확인에 쓰여요"
-        autocomplete="name"
-        :maxlength="30"
-        :error="nameError"
-        :filter="NAME_INPUT_FILTER"
-        :filter-message="NAME_INPUT_MESSAGE"
-        icon="person"
-        hint="숫자·특수문자 없이 문자만 넣어주세요."
-        @blur="touched.name = 1"
-      />
-
-      <FieldText
-        v-model="form.birthDate"
-        label="생년월일"
-        type="date"
-        hint="마이페이지에만 표시돼요. 넣지 않아도 가입할 수 있어요."
-      />
 
       <p v-if="serverError" class="srv" role="alert">{{ serverError }}</p>
 

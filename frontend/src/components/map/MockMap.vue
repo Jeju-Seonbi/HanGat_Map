@@ -15,7 +15,7 @@
     >
       <span>{{ p.score }}</span>{{ p.name }}
     </button><div class="map-legend">
-      <span><i class="dot relaxed" />여유</span><span><i class="dot moderate" />보통</span><span><i class="dot very_crowded" />매우 혼잡</span>
+      <span><i class="dot quiet" />여유</span><span><i class="dot normal" />보통</span><span><i class="dot crowded" />혼잡</span>
     </div>
   </div>
 </template>

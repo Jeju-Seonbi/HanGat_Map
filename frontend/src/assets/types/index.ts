@@ -1,4 +1,4 @@
-export type CongestionLevel='RELAXED'|'MODERATE'|'CROWDED'|'VERY_CROWDED'
+export type CongestionLevel='QUIET'|'NORMAL'|'CROWDED'
 /*
   통합(2026-08-17): 정동현님 data/data.ts 수정본이 아래 6개 필드를 추가했는데
   이 인터페이스에는 반영돼 오지 않아 type-check 가 깨졌다. 전부 optional 로 넣는다 —

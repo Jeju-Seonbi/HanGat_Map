@@ -17,6 +17,7 @@ import {
   currentUserId, refreshAccessToken, hasResumableSession,
   ACCESS_TTL_MS
 } from './session.js'
+import { getBackendDemoUserId } from './backendClient.js'
 
 export { ApiError, ACCESS_TTL_MS }
 export {
@@ -87,14 +88,15 @@ export async function call (handler, { auth = false } = {}) {
 
   let userId = null
   if (auth) {
-    userId = currentUserId()
+    // 실제 로그인 사용자는 목업 DB 계정과 섞지 않고 별도 소유자 키로만 사용한다.
+    userId = currentUserId() || getBackendDemoUserId()
     if (!userId) {
       // 액세스 토큰이 없거나 만료 → 리프레시 (여기서 실패하면 401 이 그대로 올라간다)
       if (!hasResumableSession()) {
         throw new ApiError(401, 'SESSION_EXPIRED', '로그인이 필요해요')
       }
       refreshAccessToken()
-      userId = currentUserId()
+      userId = currentUserId() || getBackendDemoUserId()
       if (!userId) throw new ApiError(401, 'SESSION_EXPIRED', '로그인이 필요해요')
     }
   }
