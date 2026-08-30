@@ -11,18 +11,15 @@
  */
 import { onMounted, ref } from 'vue'
 import AuthLayout from '../../components/auth/AuthLayout.vue'
-import { resendVerification } from '../../api/auth.js'
+import { resendVerification } from '../../api/userAuth.js'
 import { useUiStore } from '../../stores/ui.js'
 import { maskEmail } from '../../utils/validators.js'
 import { takeHandoff } from '../../utils/handoff.js'
 import { ApiError } from '../../api/errors.js'
 
-const IS_DEV = !!import.meta.env.DEV
 const ui = useUiStore()
 
 const email = ref('')
-const token = ref('')
-const devNote = ref('')
 const busy = ref(false)
 const error = ref('')
 
@@ -30,8 +27,6 @@ onMounted(() => {
   const data = takeHandoff('signup')
   if (data) {
     email.value = data.email || ''
-    token.value = data.token || ''
-    devNote.value = data.note || ''
   }
 })
 
@@ -39,8 +34,7 @@ async function resend () {
   busy.value = true
   error.value = ''
   try {
-    const res = await resendVerification(email.value)
-    if (res.devOnlyVerifyToken) token.value = res.devOnlyVerifyToken
+    await resendVerification(email.value)
     ui.toast('메일을 다시 보냈어요')
   } catch (e) {
     error.value = e instanceof ApiError ? e.message : '보내지 못했어요'
@@ -54,29 +48,17 @@ async function resend () {
   <AuthLayout title="메일함을 확인해 주세요">
     <p class="body">
       <b>{{ email ? maskEmail(email) : '입력하신 주소' }}</b> 로 인증 링크를 보냈어요.<br>
-      링크를 누르면 인증이 끝나고 바로 서비스로 들어가요.
+      링크를 누르면 인증이 끝나고 로그인할 수 있어요.
     </p>
     <p class="body muted">
       링크는 24시간 뒤에 만료되고, 한 번 쓰면 다시 쓸 수 없어요.
     </p>
 
-    <div v-if="IS_DEV" class="dev">
-      <div class="lbl">개발 빌드 · 메일 서버 없음</div>
-      <p v-if="devNote" class="note">{{ devNote }}</p>
-      <RouterLink v-if="token" class="cta" :to="{ name: 'verify', query: { token } }">
-        인증 링크 열기
-      </RouterLink>
-      <p v-else class="note">
-        이 화면에 링크가 없으면 이미 인증됐거나, 이미 가입된 주소예요.
-        어느 쪽인지는 화면에서 알려주지 않아요 — 계정 존재 여부가 새지 않게 하려는 거예요.
-      </p>
-    </div>
-
     <p v-if="error" class="srv" role="alert">{{ error }}</p>
 
     <template #footer>
       <div class="acts">
-        <button class="btn2" :disabled="busy" @click="resend">
+        <button class="btn2" :disabled="busy || !email" @click="resend">
           {{ busy ? '보내는 중…' : '메일 다시 보내기' }}
         </button>
         <RouterLink class="btn2" to="/login">로그인 화면으로</RouterLink>

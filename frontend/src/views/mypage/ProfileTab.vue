@@ -3,7 +3,7 @@
  * 설정 (요구사항 정의서 MY_009 · MY_010 · MY_011) + 보안 · 표시 설정.
  */
 import { computed, onMounted, onBeforeUnmount, reactive, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import BaseModal from '../../components/common/BaseModal.vue'
 import FieldText from '../../components/auth/FieldText.vue'
 import FieldPassword from '../../components/auth/FieldPassword.vue'
@@ -12,28 +12,21 @@ import { useAuthStore } from '../../stores/auth.js'
 import { useUiStore } from '../../stores/ui.js'
 import { useApiError } from '../../composables/useApiError.js'
 import { fmtFull, fmtDateTime } from '../../utils/format.js'
-import { resetDb } from '../../api/db.js'
-import { destroySession } from '../../api/session.js'
-import { changePassword, readRecentLogins, clearRecentLogins } from '../../api/auth.js'
+import { readRecentLogins, clearRecentLogins } from '../../api/auth.js'
+import { resetPassword, sendResetCode, verifyResetCode } from '../../api/userAuth.js'
 import { checkPassword, normalizePassword } from '../../components/security/passwordPolicy.js'
 import { checkBirthDate, todayISODate, BIRTH_MIN_YEAR, checkNickname } from '../../utils/validators.js'
 import { ApiError } from '../../api/errors.js'
 
-const IS_DEV = !!import.meta.env.DEV
-
 const auth = useAuthStore()
 const ui = useUiStore()
-const route = useRoute()
 const router = useRouter()
 const toMessage = useApiError()
 
 const user = computed(() => auth.user)
 const birth = computed(() => (user.value?.birthDate ? fmtFull(user.value.birthDate) : '등록하지 않았어요'))
 
-/* ── MY_011 닉네임 변경 ──
-   ⚠️ 2026-08-15 — 이름 변경 자리를 **닉네임 변경**으로 바꿨다.
-      이름은 비밀번호 재설정 본인 확인에 쓰이는 값이라 화면에서는 읽기 전용으로 남긴다.
-      API(`updateName`)와 테스트는 그대로다. */
+/* ── MY_011 닉네임 변경 ── */
 const editingNick = ref(false)
 const nickDraft = ref('')
 const nickError = ref('')
@@ -108,19 +101,29 @@ async function saveBirth () {
   }
 }
 
-/* ── 비밀번호 변경 ── */
-const pwOpen = ref(route.query.force === 'password' || auth.mustChangePassword)
+/* ── 이메일 코드 기반 비밀번호 재설정 ── */
+const pwOpen = ref(false)
+const pwStep = ref('code')
 const pwBusy = ref(false)
 const pwError = ref('')
 const pwFields = reactive({})
-const pwForm = reactive({ currentPassword: '', password: '', passwordConfirm: '' })
+const pwForm = reactive({ code: '', password: '', passwordConfirm: '' })
+const pwRequestId = ref(null)
+const pwTicket = ref(null)
+const pwMaskedEmail = ref('')
 const breachState = ref({ breached: false })
 
 const pwCheck = computed(() => checkPassword(pwForm.password, {
-  email: user.value?.email, nickname: user.value?.nickname, name: user.value?.name
+  email: user.value?.email, nickname: user.value?.nickname
 }))
-const canChangePw = computed(() =>
-  !!pwForm.currentPassword &&
+const normalizedPwCode = computed(() => String(pwForm.code || '')
+  .replace(/[^2-9A-HJ-NP-Za-hj-np-z]/g, '')
+  .toUpperCase()
+  .slice(0, 6))
+const canVerifyPwCode = computed(() =>
+  normalizedPwCode.value.length === 6 && !pwBusy.value
+)
+const canResetPw = computed(() =>
   pwCheck.value.ok &&
   !breachState.value.breached &&
   normalizePassword(pwForm.password) === normalizePassword(pwForm.passwordConfirm) &&
@@ -128,18 +131,66 @@ const canChangePw = computed(() =>
   !pwBusy.value
 )
 
-async function submitPassword () {
+async function openPasswordReset () {
+  pwOpen.value = true
+  pwStep.value = 'sending'
+  pwBusy.value = true
   pwError.value = ''
-  Object.keys(pwFields).forEach(k => { pwFields[k] = '' })
-  if (!canChangePw.value) return
+  Object.assign(pwForm, { code: '', password: '', passwordConfirm: '' })
+  try {
+    const result = await sendResetCode(user.value.email)
+    pwRequestId.value = result.requestId
+    pwStep.value = 'code'
+  } catch (e) {
+    pwStep.value = 'code'
+    pwError.value = e instanceof ApiError ? e.message : '인증 코드를 보내지 못했어요.'
+  } finally {
+    pwBusy.value = false
+  }
+}
+
+function onPasswordCodeInput (value) {
+  pwForm.code = String(value || '')
+    .replace(/[^2-9A-HJ-NP-Za-hj-np-z]/g, '')
+    .toUpperCase()
+    .slice(0, 6)
+}
+
+async function submitPasswordCode () {
+  pwError.value = ''
+  if (!canVerifyPwCode.value) return
   pwBusy.value = true
   try {
-    await changePassword({ ...pwForm })
-    await auth.refreshMe()
-    ui.toast('비밀번호를 바꿨어요')
+    const result = await verifyResetCode({
+      code: normalizedPwCode.value,
+      requestId: pwRequestId.value
+    })
+    pwTicket.value = result.ticket
+    pwMaskedEmail.value = result.maskedEmail
+    pwStep.value = 'password'
+  } catch (e) {
+    pwError.value = e instanceof ApiError ? e.message : '인증 코드를 확인하지 못했어요.'
+    pwForm.code = ''
+  } finally {
+    pwBusy.value = false
+  }
+}
+
+async function submitPasswordReset () {
+  pwError.value = ''
+  Object.keys(pwFields).forEach(k => { pwFields[k] = '' })
+  if (!canResetPw.value) return
+  pwBusy.value = true
+  try {
+    await resetPassword({
+      ticket: pwTicket.value,
+      password: pwForm.password,
+      passwordConfirm: pwForm.passwordConfirm
+    })
+    auth.handleUnauthorized(null, 'PASSWORD_RESET')
+    ui.toast('비밀번호를 바꿨어요. 새 비밀번호로 로그인해 주세요')
     pwOpen.value = false
-    Object.assign(pwForm, { currentPassword: '', password: '', passwordConfirm: '' })
-    if (route.query.force) router.replace({ name: 'my-profile' })
+    await router.replace({ name: 'login' })
   } catch (e) {
     if (e instanceof ApiError && e.detail) {
       Object.entries(e.detail).forEach(([k, v]) => { pwFields[k] = v })
@@ -180,31 +231,15 @@ async function onLogout () {
   router.push({ name: 'login' })
 }
 
-/* ── 개발 도구 ── */
-const resetting = ref(false)
-function onReset () {
-  resetting.value = false
-  resetDb()
-  destroySession()
-  auth.user = null
-  ui.toast('목 데이터를 처음 상태로 되돌렸어요')
-  router.push({ name: 'login' })
-}
 </script>
 
 <template>
   <section class="wrap">
-    <!-- 임시 비밀번호 강제 변경 -->
-    <p v-if="auth.mustChangePassword" class="force" role="alert">
-      임시 비밀번호로 접속했어요. 새 비밀번호로 바꿔야 다른 화면을 쓸 수 있어요.
-    </p>
-
     <!-- MY_009 프로필 -->
     <section class="blk">
       <h2 class="sect">프로필</h2>
       <dl class="defs">
         <div><dt>이메일</dt><dd>{{ user?.email }}</dd></div>
-        <div><dt>이름</dt><dd>{{ user?.name || '이름 없음' }}</dd></div>
         <div>
           <dt>생년월일</dt>
           <dd>
@@ -221,8 +256,7 @@ function onReset () {
         </div>
       </dl>
       <p class="note">
-        닉네임은 후기와 공유 화면에 보여요.
-        이름은 비밀번호 재설정에서 본인 확인에 쓰여서 여기서는 바꿀 수 없어요.
+        닉네임은 후기와 공유 화면에 보여요. 생년월일은 선택 정보라 비워 둘 수 있어요.
       </p>
     </section>
 
@@ -268,7 +302,9 @@ function onReset () {
       </p>
 
       <div class="acts">
-        <button class="btn2 primary" @click="pwOpen = true">비밀번호 변경</button>
+        <button class="btn2 primary" :disabled="pwBusy" @click="openPasswordReset">
+          비밀번호 변경
+        </button>
       </div>
     </section>
 
@@ -299,15 +335,6 @@ function onReset () {
       </p>
       <div class="acts">
         <button class="btn2 danger" @click="onLogout">로그아웃</button>
-      </div>
-    </section>
-
-    <!-- 개발 도구 -->
-    <section v-if="IS_DEV" class="blk dev">
-      <h2 class="sect">개발 도구</h2>
-      <p class="note">백엔드 없이 브라우저 저장소로 도는 목이에요. 데이터를 처음 상태로 되돌릴 수 있어요.</p>
-      <div class="acts">
-        <button class="btn2" @click="resetting = true">목 데이터 초기화</button>
       </div>
     </section>
 
@@ -359,49 +386,70 @@ function onReset () {
     <BaseModal
       v-if="pwOpen"
       title="비밀번호 변경"
-      @close="auth.mustChangePassword ? null : (pwOpen = false)"
+      @close="pwOpen = false"
     >
-      <p class="msub">
-        바꾸면 이 기기를 뺀 나머지 기기는 다시 로그인해야 해요.
-      </p>
-      <FieldPassword
-        v-model="pwForm.currentPassword"
-        label="지금 비밀번호"
-        autocomplete="current-password"
-        :error="pwFields.currentPassword || ''"
-      />
-      <FieldPassword
-        v-model="pwForm.password"
-        label="새 비밀번호"
-        autocomplete="new-password"
-        show-guidance
-        check-breach
-        :context="{ email: user?.email, nickname: user?.nickname, name: user?.name }"
-        :error="pwFields.password || ''"
-        @breach="breachState = $event"
-      />
-      <FieldPassword
-        v-model="pwForm.passwordConfirm"
-        label="새 비밀번호 확인"
-        autocomplete="new-password"
-        :error="pwFields.passwordConfirm || ''"
-        @enter="submitPassword"
-      />
-      <p v-if="pwError" class="srv" role="alert">{{ pwError }}</p>
-      <div class="macts">
-        <button v-if="!auth.mustChangePassword" class="btn2" :disabled="pwBusy" @click="pwOpen = false">취소</button>
-        <button class="btn2 primary" :disabled="!canChangePw" @click="submitPassword">
-          {{ pwBusy ? '바꾸는 중…' : '비밀번호 바꾸기' }}
-        </button>
-      </div>
-    </BaseModal>
+      <p v-if="pwStep === 'sending'" class="msub">계정 이메일로 인증 코드를 보내고 있어요.</p>
 
-    <BaseModal v-if="resetting" title="목 데이터를 초기화할까요?" @close="resetting = false">
-      <p class="msub">저장한 코스 · 리뷰 · 찜 · 알림이 모두 처음 상태로 돌아가고 로그아웃돼요.</p>
-      <div class="macts">
-        <button class="btn2" @click="resetting = false">취소</button>
-        <button class="btn2 danger" @click="onReset">초기화</button>
-      </div>
+      <template v-else-if="pwStep === 'code'">
+        <p class="msub">
+          <b>{{ user?.email }}</b>로 영문자·숫자 6자리 코드를 보냈어요.
+          계정 소유권을 확인한 뒤 새 비밀번호를 설정합니다.
+        </p>
+        <div class="fld">
+          <label class="fld-lab" for="profile-reset-code">인증 코드<span class="req">*</span></label>
+          <div class="fld-box code" :class="{ err: !!pwError }">
+            <input
+              id="profile-reset-code"
+              class="code-in tnum"
+              type="text"
+              :value="pwForm.code"
+              maxlength="6"
+              autocomplete="one-time-code"
+              placeholder="A2B3C4"
+              @input="onPasswordCodeInput($event.target.value)"
+              @keydown.enter="submitPasswordCode"
+            >
+          </div>
+        </div>
+        <p v-if="pwError" class="srv" role="alert">{{ pwError }}</p>
+        <div class="macts">
+          <button class="btn2" :disabled="pwBusy" @click="pwOpen = false">취소</button>
+          <button class="btn2 primary" :disabled="!canVerifyPwCode" @click="submitPasswordCode">
+            {{ pwBusy ? '확인하는 중…' : '코드 확인' }}
+          </button>
+        </div>
+      </template>
+
+      <template v-else>
+        <p class="msub">
+          <b>{{ pwMaskedEmail }}</b> 계정의 새 비밀번호를 입력해 주세요.
+          완료하면 현재 기기를 포함한 모든 세션이 끊겨 다시 로그인해야 합니다.
+        </p>
+        <FieldPassword
+          v-model="pwForm.password"
+          label="새 비밀번호"
+          autocomplete="new-password"
+          show-guidance
+          check-breach
+          :context="{ email: user?.email, nickname: user?.nickname }"
+          :error="pwFields.password || ''"
+          @breach="breachState = $event"
+        />
+        <FieldPassword
+          v-model="pwForm.passwordConfirm"
+          label="새 비밀번호 확인"
+          autocomplete="new-password"
+          :error="pwFields.passwordConfirm || ''"
+          @enter="submitPasswordReset"
+        />
+        <p v-if="pwError" class="srv" role="alert">{{ pwError }}</p>
+        <div class="macts">
+          <button class="btn2" :disabled="pwBusy" @click="pwOpen = false">취소</button>
+          <button class="btn2 primary" :disabled="!canResetPw" @click="submitPasswordReset">
+            {{ pwBusy ? '바꾸는 중…' : '비밀번호 바꾸기' }}
+          </button>
+        </div>
+      </template>
     </BaseModal>
   </section>
 </template>
@@ -453,6 +501,11 @@ function onReset () {
 .srv {
   border-left: 2px solid var(--busy); padding: 3px 0 3px 12px;
   color: var(--busy); font-size: 12px; font-weight: 600; margin-bottom: 12px;
+}
+.fld-box.code { padding: 6px 12px 6px 16px; }
+.code-in {
+  padding: 6px 0; font-size: 24px !important; font-weight: 800;
+  letter-spacing: .28em; text-transform: uppercase;
 }
 
 @media (max-width: 640px) {
