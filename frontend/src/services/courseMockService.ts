@@ -16,9 +16,9 @@ import type {
 } from '../assets/types/course'
 import { getMockWeather, weatherRecommendationAdjustment, weatherWarning } from './weatherMockService'
 import { savedCourseMockService } from './savedCourseMockService'
+import { apiRequest } from '../api/backendClient.js'
 
 const pause = (ms = 650) => new Promise(resolve => setTimeout(resolve, ms))
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080'
 const RECOMMENDED_ITEMS_PER_DAY = 3
 const FIXED_STAY_MINUTES = 90
 const LONG_GAP_MINUTES = 240
@@ -622,14 +622,11 @@ async function generateMockCourse(condition: CourseCondition, generationReason: 
 }
 
 async function generate(condition: CourseCondition): Promise<CourseResult> {
-  const response = await fetch(`${API_BASE_URL}/courses`, {
+  return await apiRequest('/courses', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(condition),
-  })
-
-  if (!response.ok) throw new Error(`코스 생성 API 요청에 실패했습니다. (HTTP ${response.status})`)
-  return await response.json() as CourseResult
+    body: condition,
+    auth: true,
+  }) as CourseResult
 }
 
 export const generateMockCourseForTest = generateMockCourse

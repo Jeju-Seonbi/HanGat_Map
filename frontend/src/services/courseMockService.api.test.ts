@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CourseCondition, CourseResult } from '../assets/types/course'
+import { apiRequest } from '../api/backendClient.js'
 import { courseMockService } from './courseMockService'
+
+vi.mock('../api/backendClient.js', () => ({ apiRequest: vi.fn() }))
 
 const condition: CourseCondition = {
   start_date: '2026-08-28',
@@ -58,26 +61,20 @@ const response: CourseResult = {
   }],
 }
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => vi.clearAllMocks())
 
 describe('courseMockService Backend generation', () => {
   it('posts the unchanged CourseCondition and returns the Backend CourseResult without fabricating data', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: vi.fn().mockResolvedValue(response),
-    })
-    vi.stubGlobal('fetch', fetchMock)
+    const requestMock = vi.mocked(apiRequest).mockResolvedValue(response)
 
     const result = await courseMockService.generateCourse(condition)
 
-    expect(fetchMock).toHaveBeenCalledOnce()
-    expect(fetchMock).toHaveBeenCalledWith('http://localhost:8080/courses', {
+    expect(requestMock).toHaveBeenCalledOnce()
+    expect(requestMock).toHaveBeenCalledWith('/courses', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(condition),
+      body: condition,
+      auth: true,
     })
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual(condition)
     expect(result).toBe(response)
     expect(result.days[0].items[0]).toMatchObject({
       id: 201,
@@ -93,19 +90,19 @@ describe('courseMockService Backend generation', () => {
     expect(result.estimated_cost_min).toBeUndefined()
   })
 
-  it('rejects HTTP failures without falling back to mock generation', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 503 })
-    vi.stubGlobal('fetch', fetchMock)
+  it('propagates common client failures without falling back to mock generation', async () => {
+    const requestMock = vi.mocked(apiRequest)
+            .mockRejectedValue(new Error('코스 생성 API 요청에 실패했습니다.'))
 
-    await expect(courseMockService.generateCourse(condition)).rejects.toThrow('HTTP 503')
-    expect(fetchMock).toHaveBeenCalledOnce()
+    await expect(courseMockService.generateCourse(condition))
+      .rejects.toThrow('코스 생성 API 요청에 실패했습니다.')
+    expect(requestMock).toHaveBeenCalledOnce()
   })
 
   it('keeps regeneration unavailable instead of sending an INITIAL request or returning mock data', async () => {
-    const fetchMock = vi.fn()
-    vi.stubGlobal('fetch', fetchMock)
+    const requestMock = vi.mocked(apiRequest)
 
     await expect(courseMockService.regenerateCourse(condition)).rejects.toThrow('재생성은 아직 지원되지 않습니다')
-    expect(fetchMock).not.toHaveBeenCalled()
+    expect(requestMock).not.toHaveBeenCalled()
   })
 })

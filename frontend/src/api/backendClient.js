@@ -147,7 +147,12 @@ export function reissueAccessToken () {
   return refreshPromise
 }
 
-/** 인증 API는 만료 시 한 번만 재발급하고 원 요청도 한 번만 다시 보낸다. */
+/**
+ * 인증 API는 만료 시 한 번만 재발급하고 원 요청도 한 번만 다시 보낸다.
+ *
+ * @param {string} path
+ * @param {{ method?: string, body?: unknown, auth?: boolean, retryAuth?: boolean }} [options]
+ */
 export async function apiRequest (path, {
   method = 'GET',
   body,
