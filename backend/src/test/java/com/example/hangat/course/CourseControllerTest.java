@@ -14,6 +14,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
@@ -39,9 +40,13 @@ class CourseControllerTest {
     @Test
     void postCoursesReturnsSnakeCaseUtf8JsonBody() throws Exception {
         CourseService courseService = mock(CourseService.class);
+        CourseClaimService claimService = mock(CourseClaimService.class);
+        CourseClaimTokenService tokenService = mock(CourseClaimTokenService.class);
         when(courseService.createCourse(any())).thenReturn(response());
+        when(tokenService.issue(101L)).thenReturn(new CourseClaimTokenService.ClaimProof(
+                "test-claim-token", java.time.Instant.parse("2026-08-31T12:30:00Z")));
         MockMvc mockMvc = MockMvcBuilders
-                .standaloneSetup(new CourseController(courseService))
+                .standaloneSetup(new CourseController(courseService, claimService, tokenService))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .build();
 
@@ -64,6 +69,8 @@ class CourseControllerTest {
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.result.contract_version").value("1.0"))
+                .andExpect(jsonPath("$.result.claim_token").value("test-claim-token"))
+                .andExpect(jsonPath("$.result.claim_expires_at").value("2026-08-31T12:30:00Z"))
                 .andExpect(jsonPath("$.result.days[0].day_no").value(1))
                 .andExpect(jsonPath("$.result.days[0].visit_date").value("2026-08-28"))
                 .andExpect(jsonPath("$.result.days[0].items[0].candidate_id").value("candidate-1"))
@@ -92,6 +99,23 @@ class CourseControllerTest {
         assertThat(responseBody).contains("성산일출봉", "혼잡도가 낮고 동선이 좋아요.");
         assertThat(objectMapper.readTree(responseBody)
                 .path("result").path("days").isArray()).isTrue();
+    }
+
+    @Test
+    void authenticatedCreationDoesNotIssueGuestClaimProof() {
+        CourseService courseService = mock(CourseService.class);
+        CourseClaimService claimService = mock(CourseClaimService.class);
+        CourseClaimTokenService tokenService = mock(CourseClaimTokenService.class);
+        when(courseService.createCourse(any())).thenReturn(response());
+        CourseController controller = new CourseController(courseService, claimService, tokenService);
+
+        CourseResponseDto response = controller.createCourse(
+                mock(com.example.hangat.course.model.CourseRequestDto.class),
+                new UsernamePasswordAuthenticationToken(7L, null, List.of()))
+                .getResult();
+
+        assertThat(response.claimToken()).isNull();
+        org.mockito.Mockito.verifyNoInteractions(tokenService);
     }
 
     private CourseResponseDto response() {

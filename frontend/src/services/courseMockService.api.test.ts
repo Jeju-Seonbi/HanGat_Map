@@ -104,4 +104,29 @@ describe('courseMockService Backend generation', () => {
     await expect(courseMockService.regenerateCourse(condition)).rejects.toThrow('재생성은 아직 지원되지 않습니다')
     expect(requestMock).not.toHaveBeenCalled()
   })
+
+  it('claims a generated guest course with authenticated API and removes the proof from the result', async () => {
+    const guestCourse: CourseResult = {
+      ...response,
+      claim_token: 'opaque-proof',
+      claim_expires_at: '2026-08-31T12:30:00Z',
+    }
+    const requestMock = vi.mocked(apiRequest).mockResolvedValue({
+      id: 101,
+      status: 'SAVED',
+      title: '제주 여행',
+      saved_at: '2026-08-31T12:00:00',
+    })
+
+    const result = await courseMockService.saveCourse(guestCourse, '제주 여행')
+
+    expect(requestMock).toHaveBeenCalledWith('/courses/101/claim', {
+      method: 'POST',
+      auth: true,
+      body: { claim_token: 'opaque-proof', title: '제주 여행' },
+    })
+    expect(result).toMatchObject({ id: 101, status: 'SAVED', title: '제주 여행' })
+    expect(result.claim_token).toBeUndefined()
+    expect(result.claim_expires_at).toBeUndefined()
+  })
 })

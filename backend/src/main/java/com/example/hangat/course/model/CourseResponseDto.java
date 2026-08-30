@@ -11,6 +11,7 @@ import com.example.hangat.course.model.enums.Transport;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.Instant;
 import java.util.List;
 
 @JsonInclude(JsonInclude.Include.ALWAYS)
@@ -27,7 +28,9 @@ public record CourseResponseDto(
         Integer budgetTotal,
         Transport transport,
         AccommodationDto accommodation,
-        List<DayDto> days
+        List<DayDto> days,
+        @JsonInclude(JsonInclude.Include.NON_NULL) String claimToken,
+        @JsonInclude(JsonInclude.Include.NON_NULL) Instant claimExpiresAt
 ) {
     public CourseResponseDto {
         days = immutableList(days);
@@ -51,7 +54,33 @@ public record CourseResponseDto(
                 null,
                 null,
                 null,
-                days);
+                days,
+                null,
+                null);
+    }
+
+    public CourseResponseDto(
+            Long id,
+            String contractVersion,
+            CourseType courseType,
+            GenerationReason generationReason,
+            CourseStatus status,
+            LocalDate startDate,
+            LocalDate endDate,
+            Short people,
+            Integer budgetTotal,
+            Transport transport,
+            AccommodationDto accommodation,
+            List<DayDto> days
+    ) {
+        this(id, contractVersion, courseType, generationReason, status, startDate, endDate,
+                people, budgetTotal, transport, accommodation, days, null, null);
+    }
+
+    public CourseResponseDto withClaimProof(String token, Instant expiresAt) {
+        return new CourseResponseDto(id, contractVersion, courseType, generationReason, status,
+                startDate, endDate, people, budgetTotal, transport, accommodation, days,
+                token, expiresAt);
     }
 
     private static <T> List<T> immutableList(List<T> values) {

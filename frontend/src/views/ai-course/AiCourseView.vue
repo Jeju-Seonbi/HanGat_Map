@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../app/stores/auth'
 import CourseConditionForm from '../../components/course/CourseConditionForm.vue'
@@ -10,6 +10,7 @@ import CongestionRescheduleModal from '../../components/course/CongestionResched
 import AccommodationRecommendations from '../../components/course/AccommodationRecommendations.vue'
 import { courseMockService } from '../../services/courseMockService'
 import { accommodationMockService } from '../../services/accommodationMockService'
+import { storePendingCourseClaim, takePendingCourseClaim } from '../../services/pendingCourseClaim'
 import type { AccommodationInput, AccommodationRecommendation, AlternativePlace, CongestionRescheduleOption, CourseCondition, CourseItem, CourseResult } from '../../assets/types/course'
 
 const now = new Date()
@@ -153,11 +154,6 @@ async function reschedule(option: CongestionRescheduleOption) {
 }
 
 function openSave() {
-  if (!auth.isAuthenticated) {
-    alert('코스를 저장하려면 로그인이 필요해요.')
-    router.push({ path: '/login', query: { redirect: '/ai-course' } })
-    return
-  }
   title.value = result.value?.title || ''
   saveError.value = ''
   saveOpen.value = true
@@ -169,6 +165,12 @@ async function save() {
   saveLoading.value = true
   saveError.value = ''
   try {
+    if (!auth.isAuthenticated) {
+      storePendingCourseClaim(result.value, condition, clean)
+      saveOpen.value = false
+      await router.push({ path: '/login', query: { redirect: '/ai-course' } })
+      return
+    }
     result.value = await courseMockService.saveCourse(result.value, clean)
     saveOpen.value = false
     toast.value = '코스를 저장했어요.'
@@ -178,6 +180,24 @@ async function save() {
     saveLoading.value = false
   }
 }
+
+onMounted(async () => {
+  if (!auth.isAuthenticated) return
+  const pending = takePendingCourseClaim()
+  if (!pending) return
+
+  saveLoading.value = true
+  try {
+    result.value = await courseMockService.saveCourse(pending.course, pending.title)
+    Object.assign(condition, pending.condition)
+    editing.value = false
+    toast.value = '코스를 저장했어요.'
+  } catch {
+    error.value = '로그인 전 생성한 코스를 저장하지 못했어요. 다시 생성해 주세요.'
+  } finally {
+    saveLoading.value = false
+  }
+})
 
 const formatDate = (value: string) => new Intl.DateTimeFormat('ko-KR', {
   month: 'long',

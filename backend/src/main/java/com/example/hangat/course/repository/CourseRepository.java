@@ -6,6 +6,11 @@ import com.example.hangat.course.model.enums.CourseType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import jakarta.persistence.LockModeType;
 
 import java.util.Optional;
 
@@ -14,6 +19,10 @@ import java.util.Optional;
  * 논리 삭제 테이블이라 <b>상태 조건 없는 목록 메서드를 만들지 않는다</b> - DELETED가 화면에 새는 사고 방지.
  */
 public interface CourseRepository extends JpaRepository<Course, Long> {
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select course from Course course where course.id = :courseId")
+    Optional<Course> findByIdForClaim(@Param("courseId") Long courseId);
 
     /**
      * 저장 코스 목록(MY_001). 상태를 조건으로 받는 이유: 같은 화면이 DELETED를 제외해야 하고,

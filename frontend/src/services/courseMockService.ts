@@ -795,6 +795,15 @@ export const courseMockService = {
     return recalc(copy)
   },
   async saveCourse(course: CourseResult, title: string) {
+    if (course.claim_token) {
+      const saved = await apiRequest(`/courses/${course.id}/claim`, {
+        method: 'POST',
+        auth: true,
+        body: { claim_token: course.claim_token, title },
+      }) as { id: number; status: 'SAVED'; title: string; saved_at: string }
+      const { claim_token: _claimToken, claim_expires_at: _claimExpiresAt, ...safeCourse } = course
+      return { ...safeCourse, id: saved.id, status: saved.status, title: saved.title }
+    }
     const saved = await savedCourseMockService.save(course, title)
     return saved.course
   },

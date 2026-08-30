@@ -69,6 +69,7 @@ export interface CourseDay {
 }
 export interface CourseResult {
   id: number; course_type: CourseType; generation_reason: GenerationReason; status: CourseStatus; title?: string
+  claim_token?: string; claim_expires_at?: string
   start_date: string; end_date: string; people: number; budget_total?: number; transport: Transport
   estimated_cost_min?: number; estimated_cost_max?: number; average_congestion_rate?: number
   cost_summary?: CourseCostSummary; generation_error_code?: string; accommodation?: AccommodationInput; days: CourseDay[]
