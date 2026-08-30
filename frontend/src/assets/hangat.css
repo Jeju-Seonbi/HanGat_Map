@@ -229,6 +229,7 @@
 .pimg::-webkit-scrollbar{height:4px}
 .pimg::-webkit-scrollbar-thumb{background:var(--line2);border-radius:3px}
 .pimg img{height:96px;border-radius:12px;flex-shrink:0;object-fit:cover;max-width:170px}
+.pimg-src{margin:-8px 0 12px;font-size:10.5px;color:var(--tx3)}
 .pimg .add{flex-shrink:0;width:74px;height:96px;border:1.5px dashed var(--line2);border-radius:12px;
   color:var(--tx3);font-size:11px;font-weight:600;display:flex;flex-direction:column;
   align-items:center;justify-content:center;gap:4px;line-height:1.3}
