@@ -33,6 +33,8 @@ public class JwtProvider {
         this.accessTokenTtlMs = accessTokenTtlMs;
     }
 
+    // ────────────────────────── Access 토큰 발급 ──────────────────────────
+
     // userId만 담음. JWT는 암호화가 아니라 서명이라 Base64만 풀면 다 보임.
     public String createAccessToken(Long userId) {
         Date now = new Date();
@@ -44,6 +46,8 @@ public class JwtProvider {
                 .signWith(key)
                 .compact();
     }
+
+    // ────────────────────────── Access 토큰 검증 ──────────────────────────
 
     // 만료랑 위조를 걸러서 BaseException으로 바꿔줌.
     public Long parseUserId(String token) {

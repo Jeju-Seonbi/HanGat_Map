@@ -22,6 +22,8 @@ public final class TokenHasher {
     private static final int TOKEN_BYTES = 32;
     private static final int ID_BYTES = 16;
 
+    // ────────────────────────── 안전한 난수 생성 ──────────────────────────
+
     /** URL이랑 쿠키에 넣을 수 있는 256비트 원문 토큰 */
     public static String generateToken() {
         byte[] bytes = new byte[TOKEN_BYTES];
@@ -38,6 +40,8 @@ public final class TokenHasher {
         RANDOM.nextBytes(bytes);
         return HexFormat.of().formatHex(bytes);
     }
+
+    // ────────────────────────── DB 저장용 SHA-256 ──────────────────────────
 
     public static String hash(String raw) {
         return HexFormat.of().formatHex(sha256(raw));
