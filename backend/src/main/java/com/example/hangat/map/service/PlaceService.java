@@ -6,6 +6,8 @@ import com.example.hangat.map.model.dto.PlaceDetailResponse;
 import com.example.hangat.map.model.dto.PlaceListResponse;
 import com.example.hangat.map.model.entity.Place;
 import com.example.hangat.map.model.enums.PlaceType;
+import com.example.hangat.map.model.dto.PlaceImageResponse;
+import com.example.hangat.map.repository.PlaceImageRepository;
 import com.example.hangat.map.repository.PlaceRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,10 +25,12 @@ import java.util.List;
 public class PlaceService {
 
     private final PlaceRepository placeRepository;
+    private final PlaceImageRepository placeImageRepository;
 
     /** 팀이 허용한 Lombok에 @RequiredArgsConstructor가 없어 직접 선언한다(§8). 단일 생성자라 Spring이 자동 주입한다. */
-    public PlaceService(PlaceRepository placeRepository) {
+    public PlaceService(PlaceRepository placeRepository, PlaceImageRepository placeImageRepository) {
         this.placeRepository = placeRepository;
+        this.placeImageRepository = placeImageRepository;
     }
 
     /** type이 없거나 비면 제주 전역 전체. 페이징 없음(수백 건 - §2.1). 리포지토리가 DTO를 주므로 변환 단계가 없다. */
@@ -39,7 +43,11 @@ public class PlaceService {
     public PlaceDetailResponse getPlace(Long placeId) {
         Place place = placeRepository.findDetailById(placeId)
                 .orElseThrow(() -> new BaseException(BaseResponseStatus.PLACE_NOT_FOUND));
-        return PlaceDetailResponse.from(place, findApiTag(placeId));
+        List<PlaceImageResponse> images = placeImageRepository
+                .findByPlaceIdOrderBySortOrder(placeId).stream()
+                .map(PlaceImageResponse::from)
+                .toList();
+        return PlaceDetailResponse.from(place, findApiTag(placeId), images);
     }
 
     /**

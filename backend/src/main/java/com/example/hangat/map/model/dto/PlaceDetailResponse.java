@@ -10,12 +10,12 @@ import lombok.Getter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 /**
  * 장소 상세 한 건 ({@code GET /api/places/{id}}) - 관광지 상세 화면(§1.1, §2.1)
  *
- * <p>목록 필드 + 소개글·휴무일·평점 요약. 사진(place_images)은 엔티티가 아직 없어 빠져 있고,
- * 생기면 {@code List<PlaceImageResponse>} 필드 + {@link #from(Place)} 한 줄로 붙는다.
+ * <p>목록 필드 + 소개글·휴무일·평점 요약 + 사진 목록.
  *
  * <p>변환은 팀 공통 {@code PageResponse.from(page)} 관용구를 따라 DTO 정적 팩터리에 둔다.
  * <b>fetch join으로 연관이 초기화된 엔티티만 넘길 것</b> - 트랜잭션 밖에서 부르면 지연로딩이 터진다.
@@ -78,6 +78,9 @@ public class PlaceDetailResponse {
     /** 아직 계산 전이면 null - 0점으로 채우지 않는다. */
     private final BigDecimal hiddenGemScore;
 
+    /** 사진 목록(sort_order 순). 없으면 빈 배열 - 화면이 사진 영역을 숨긴다 */
+    private final List<PlaceImageResponse> images;
+
     /** 별점 후기가 없으면 null. {@link #ratingAvgOrNull(Place)} 참고. */
     private final BigDecimal ratingAvg;
     private final int reviewCount;
@@ -87,8 +90,9 @@ public class PlaceDetailResponse {
      *               엔티티에서 못 꺼내는 이유는 place_tags를 {@code Place}의 컬렉션으로 매핑하지 않았기 때문이다
      *               (목록 쿼리에 {@code @OneToMany}가 끼면 행이 늘어난다 - PlaceRepository 주석 참고).
      */
-    public static PlaceDetailResponse from(Place place, Object[] apiTag) {
+    public static PlaceDetailResponse from(Place place, Object[] apiTag, List<PlaceImageResponse> images) {
         return PlaceDetailResponse.builder()
+                .images(images == null ? List.of() : images)
                 .tagCode(apiTag == null ? null : (String) apiTag[0])
                 .tagName(apiTag == null ? null : (String) apiTag[1])
                 .id(place.getId())
