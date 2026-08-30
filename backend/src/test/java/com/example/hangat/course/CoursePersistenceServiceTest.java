@@ -1,19 +1,23 @@
 package com.example.hangat.course;
 
-import com.example.hangat.course.ai.CourseAiInputDto;
 import com.example.hangat.course.ai.CourseAiResultDto;
+import com.example.hangat.course.facts.CandidateIdentity;
+import com.example.hangat.course.facts.CourseCandidate;
+import com.example.hangat.course.facts.CourseGenerationFacts;
+import com.example.hangat.course.facts.ExternalClassificationFact;
+import com.example.hangat.course.facts.InternalPlaceCategory;
+import com.example.hangat.course.facts.PlaceFact;
+import com.example.hangat.course.facts.UserConstraint;
 import com.example.hangat.course.model.Course;
-import com.example.hangat.course.model.CourseCandidateDto;
 import com.example.hangat.course.model.CourseItem;
 import com.example.hangat.course.model.CourseItemSource;
 import com.example.hangat.course.model.CourseRequestDto;
-import com.example.hangat.course.model.CourseResponseDto;
 import com.example.hangat.course.model.CourseStatus;
 import com.example.hangat.course.model.GenerationReason;
+import com.example.hangat.course.model.Place;
 import com.example.hangat.course.model.PlaceCategory;
-import com.example.hangat.course.model.PreferenceType;
+import com.example.hangat.course.model.PlaceSourceMapping;
 import com.example.hangat.course.model.Region;
-import com.example.hangat.course.model.TourPlaceDto;
 import com.example.hangat.course.model.Transport;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -26,6 +30,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
@@ -68,97 +73,333 @@ class CoursePersistenceServiceTest {
 
         regionRepository.save(Region.reference("EAST", "동부", 1));
         categoryRepository.save(PlaceCategory.reference("TOURIST", "관광지", 1));
+        categoryRepository.save(PlaceCategory.reference("CAFE", "카페", 2));
     }
 
     @Test
-    void savesReadyCourseMappedPlaceAndItemsWithActualDatabaseIds() throws Exception {
-        CourseCandidateDto candidate = candidate(
-                "KTO-1001", "성산일출봉", "제주특별자치도 서귀포시 성산읍", "A01");
-        CourseAiInputDto input = input(List.of(fact(candidate, PreferenceType.WANT)), true);
-        CourseAiResultDto result = result("KTO-1001", "2026-08-27", "09:00");
+    void persistsFactsDirectlyWithoutAiInputOrOriginalCandidates() throws Exception {
+        CourseCandidate candidate = candidate(
+                "candidate-kto-1001", null, "KTO", "1001",
+                "성산일출봉", "제주특별자치도 서귀포시 성산읍 일출로 284-12",
+                "제주특별자치도 서귀포시 성산읍 성산리 1", "EAST", "TOURIST",
+                UserConstraint.want(LocalDate.of(2026, 8, 27), LocalTime.of(9, 0)),
+                "A01");
+        CourseAiResultDto result = result(
+                "candidate-kto-1001", "2026-08-27", "09:00");
 
         CoursePersistenceResult persisted = persistenceService.persist(
-                request(), input, result, List.of(candidate));
+                request(), facts(candidate), result,
+                metadata(GenerationReason.INITIAL, "course-ai-2"));
 
         assertThat(persisted.course().getId()).isNotNull();
         assertThat(persisted.course().getStatus()).isEqualTo(CourseStatus.READY);
         assertThat(persisted.course().getGenerationReason()).isEqualTo(GenerationReason.INITIAL);
+        assertThat(persisted.course().getAlgorithmVersion()).isEqualTo("course-ai-2");
         assertThat(persisted.course().getParentCourse()).isNull();
-        assertThat(persisted.course().getUserId()).isNull();
-        assertThat(persisted.course().getSavedAt()).isNull();
 
-        CourseItem item = persisted.itemsByCandidateId().get("KTO-1001");
-        assertThat(persisted.categoryNamesByCandidateId().get("KTO-1001"))
-                .isEqualTo("관광지");
+        CourseItem item = persisted.itemsByCandidateId().get("candidate-kto-1001");
         assertThat(item.getId()).isNotNull();
-        assertThat(item.getCourse().getId()).isEqualTo(persisted.course().getId());
         assertThat(item.getPlace().getId()).isNotNull();
+        assertThat(item.getPlace().getRoadAddress())
+                .isEqualTo("제주특별자치도 서귀포시 성산읍 일출로 284-12");
+        assertThat(item.getPlace().getLotAddress())
+                .isEqualTo("제주특별자치도 서귀포시 성산읍 성산리 1");
         assertThat(item.getDayNo()).isEqualTo(1);
         assertThat(item.getPosition()).isEqualTo(1);
-        assertThat(item.getRecommendationScore()).isNull();
+        assertThat(item.getVisitDate()).isEqualTo(LocalDate.of(2026, 8, 27));
+        assertThat(item.getStartTime()).isEqualTo(LocalTime.of(9, 0));
         assertThat(item.getItemSource()).isEqualTo(CourseItemSource.USER_FIXED);
-        assertThat(mappingRepository.findBySourceCodeAndSourcePlaceId("KTO", "KTO-1001"))
-                .get()
-                .extracting(mapping -> mapping.getPlace().getId())
+        assertThat(item.getRecommendationReason()).isEqualTo("사실 데이터에 근거한 추천 이유");
+        assertThat(item.getInboundDistanceMeters()).isNull();
+        assertThat(item.getInboundTravelMinutes()).isNull();
+        assertThat(item.getPlannedCongestionForecastId()).isNull();
+        assertThat(item.getPlannedWeatherForecastId()).isNull();
+        assertThat(item.getRecommendationScore()).isNull();
+        assertThat(item.getRecommendationReasonCode()).isNull();
+        assertThat(mappingRepository.findBySourceCodeAndSourcePlaceId("KTO", "1001"))
+                .get().extracting(mapping -> mapping.getPlace().getId())
                 .isEqualTo(item.getPlace().getId());
-
-        CourseResponseDto response = new CourseResponseAssembler().assemble(
-                input, result, List.of(candidate), persisted);
-        assertThat(response.id()).isEqualTo(persisted.course().getId());
-        assertThat(response.days().get(0).items().get(0).id()).isEqualTo(item.getId());
-        assertThat(response.days().get(0).items().get(0).courseId())
-                .isEqualTo(persisted.course().getId());
-        assertThat(response.days().get(0).items().get(0).placeId())
-                .isEqualTo(item.getPlace().getId());
-        assertThat(response.days().get(0).items().get(0).categoryName())
+        assertThat(persisted.categoryNamesByCandidateId().get("candidate-kto-1001"))
                 .isEqualTo("관광지");
     }
 
     @Test
-    void reusesExistingKtoMappingWithoutDuplicatingPlace() throws Exception {
-        CourseCandidateDto candidate = candidate(
-                "KTO-2001", "비자림", "제주특별자치도 제주시 구좌읍", "A01");
-        CourseAiInputDto input = input(List.of(fact(candidate, null)), false);
-        CourseAiResultDto result = result("KTO-2001", "2026-08-27", "10:00");
+    void reusesExactSourceMappingWithoutDuplicatingPlace() throws Exception {
+        CourseCandidate candidate = candidate(
+                "candidate-2001", null, "KTO", "2001", "비자림",
+                null, "제주특별자치도 제주시 구좌읍 비자숲길 55",
+                "EAST", "TOURIST", UserConstraint.none(), "A01");
 
         CoursePersistenceResult first = persistenceService.persist(
-                request(), input, result, List.of(candidate));
+                request(), facts(candidate), result("candidate-2001", "2026-08-27", "10:00"),
+                metadata(GenerationReason.INITIAL, null));
         CoursePersistenceResult second = persistenceService.persist(
-                request(),
-                input(List.of(fact(candidate, null)), false, GenerationReason.USER_REGENERATE),
-                result,
-                List.of(candidate));
+                request(), facts(candidate), result("candidate-2001", "2026-08-27", "10:00"),
+                metadata(GenerationReason.USER_REGENERATE, null));
 
         assertThat(courseRepository.count()).isEqualTo(2);
-        assertThat(courseItemRepository.count()).isEqualTo(2);
         assertThat(placeRepository.count()).isEqualTo(1);
         assertThat(mappingRepository.count()).isEqualTo(1);
-        assertThat(second.course().getId()).isNotEqualTo(first.course().getId());
+        assertThat(first.itemsByCandidateId().get("candidate-2001").getPlace().getId())
+                .isEqualTo(second.itemsByCandidateId().get("candidate-2001").getPlace().getId());
         assertThat(second.course().getGenerationReason())
                 .isEqualTo(GenerationReason.USER_REGENERATE);
-        assertThat(first.itemsByCandidateId().get("KTO-2001").getPlace().getId())
-                .isEqualTo(second.itemsByCandidateId().get("KTO-2001").getPlace().getId());
     }
 
     @Test
-    void persistsNullableSelfReferenceForRegeneratedCourse() {
+    void reusesExistingPlaceIdAndAddsOnlyNonConflictingSourceMapping() throws Exception {
+        Place existing = savePlace("기존 장소", "기존 도로명", "EAST", "TOURIST");
+        CourseCandidate candidate = candidate(
+                "candidate-existing", existing.getId(), "KAKAO_LOCAL", "kakao-existing",
+                "외부 표시명", "외부 도로명", "외부 지번", "EAST", "TOURIST",
+                UserConstraint.none(), null);
+
+        CoursePersistenceResult persisted = persistenceService.persist(
+                request(), facts(candidate),
+                result("candidate-existing", "2026-08-27", "11:00"),
+                metadata(GenerationReason.INITIAL, null));
+
+        assertThat(persisted.itemsByCandidateId().get("candidate-existing").getPlace().getId())
+                .isEqualTo(existing.getId());
+        assertThat(placeRepository.count()).isEqualTo(1);
+        assertThat(mappingRepository.findBySourceCodeAndSourcePlaceId(
+                "KAKAO_LOCAL", "kakao-existing"))
+                .get().extracting(mapping -> mapping.getPlace().getId())
+                .isEqualTo(existing.getId());
+    }
+
+    @Test
+    void doesNotMergeSameNameAndCoordinatesAcrossProviders() throws Exception {
+        CourseCandidate kto = candidate(
+                "candidate-kto", null, "KTO", "125266", "비자림",
+                null, "제주특별자치도 제주시 구좌읍 비자숲길 55",
+                "EAST", "TOURIST", UserConstraint.none(), "A01");
+        CourseCandidate kakao = candidate(
+                "candidate-kakao", null, "KAKAO_LOCAL", "kakao-125266", "비자림",
+                null, "제주특별자치도 제주시 구좌읍 비자숲길 55",
+                "EAST", "TOURIST", UserConstraint.none(), null);
+
+        persistenceService.persist(
+                request(), facts(kto), result("candidate-kto", "2026-08-27", "09:00"),
+                metadata(GenerationReason.INITIAL, null));
+        persistenceService.persist(
+                request(), facts(kakao), result("candidate-kakao", "2026-08-27", "10:00"),
+                metadata(GenerationReason.INITIAL, null));
+
+        assertThat(placeRepository.count()).isEqualTo(2);
+        assertThat(mappingRepository.count()).isEqualTo(2);
+        Long ktoPlaceId = mappingRepository.findBySourceCodeAndSourcePlaceId("KTO", "125266")
+                .orElseThrow().getPlace().getId();
+        Long kakaoPlaceId = mappingRepository.findBySourceCodeAndSourcePlaceId(
+                "KAKAO_LOCAL", "kakao-125266").orElseThrow().getPlace().getId();
+        assertThat(kakaoPlaceId).isNotEqualTo(ktoPlaceId);
+    }
+
+    @Test
+    void rejectsConflictingInternalAndExternalIdentityAtomically() throws Exception {
+        Place mappedPlace = savePlace("매핑 장소", null, "EAST", "TOURIST");
+        Place requestedPlace = savePlace("내부 장소", null, "EAST", "TOURIST");
+        mappingRepository.save(PlaceSourceMapping.active(mappedPlace, "KTO", "conflict-1"));
+        CourseCandidate candidate = candidate(
+                "candidate-conflict", requestedPlace.getId(), "KTO", "conflict-1",
+                "내부 장소", null, null, "EAST", "TOURIST",
+                UserConstraint.none(), "A01");
+
+        assertThatThrownBy(() -> persistenceService.persist(
+                request(), facts(candidate),
+                result("candidate-conflict", "2026-08-27", "09:00"),
+                metadata(GenerationReason.INITIAL, null)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("충돌");
+
+        assertThat(courseRepository.count()).isZero();
+        assertThat(courseItemRepository.count()).isZero();
+        assertThat(mappingRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    void usesNormalizedInternalCategoryWithoutReinterpretingExternalClassification()
+            throws Exception {
+        CourseCandidate candidate = candidate(
+                "candidate-a04", null, "KTO", "a04-1", "내부 분류 장소",
+                null, null, "EAST", "TOURIST", UserConstraint.none(), "A04");
+
+        CoursePersistenceResult persisted = persistenceService.persist(
+                request(), facts(candidate), result("candidate-a04", "2026-08-27", "09:00"),
+                metadata(GenerationReason.INITIAL, null));
+
+        assertThat(persisted.itemsByCandidateId().get("candidate-a04")
+                .getPlace().getPrimaryCategory().getCode()).isEqualTo("TOURIST");
+    }
+
+    @Test
+    void rejectsMissingCategoryAndUnknownOrUnregisteredRegionBeforeCourseInsert()
+            throws Exception {
+        CourseCandidate missingCategory = candidate(
+                "candidate-no-category", null, "KTO", "no-category", "미분류 장소",
+                null, null, "EAST", null, UserConstraint.none(), "A04");
+        assertThatThrownBy(() -> persistenceService.persist(
+                request(), facts(missingCategory),
+                result("candidate-no-category", "2026-08-27", "09:00"),
+                metadata(GenerationReason.INITIAL, null)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("카테고리");
+
+        CourseCandidate unknownRegion = candidate(
+                "candidate-unknown", null, "KTO", "unknown", "권역 미상",
+                null, null, "UNKNOWN", "TOURIST", UserConstraint.none(), "A01");
+        assertThatThrownBy(() -> persistenceService.persist(
+                request(), facts(unknownRegion),
+                result("candidate-unknown", "2026-08-27", "09:00"),
+                metadata(GenerationReason.INITIAL, null)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("권역");
+
+        CourseCandidate missingReference = candidate(
+                "candidate-north", null, "KTO", "north", "북부 장소",
+                null, null, "NORTH", "TOURIST", UserConstraint.none(), "A01");
+        assertThatThrownBy(() -> persistenceService.persist(
+                request(), facts(missingReference),
+                result("candidate-north", "2026-08-27", "09:00"),
+                metadata(GenerationReason.INITIAL, null)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("등록된 권역");
+
+        assertThat(courseRepository.count()).isZero();
+        assertThat(courseItemRepository.count()).isZero();
+        assertThat(placeRepository.count()).isZero();
+        assertThat(mappingRepository.count()).isZero();
+    }
+
+    @Test
+    void projectsAiArrayOrderAndCandidateConstraintsToCourseItems() throws Exception {
+        CourseCandidate fixedWant = candidate(
+                "fixed-want", null, "KAKAO_LOCAL", "fixed-1", "고정 장소",
+                null, null, "EAST", "TOURIST",
+                UserConstraint.want(LocalDate.of(2026, 8, 28), null), null);
+        CourseCandidate flexibleWant = candidate(
+                "flexible-want", null, "KAKAO_LOCAL", "want-2", "유연 WANT",
+                null, null, "EAST", "CAFE", UserConstraint.want(null, null), null);
+        CourseCandidate general = candidate(
+                "general", null, "KTO", "general-3", "일반 장소",
+                null, null, "EAST", "TOURIST", UserConstraint.none(), "A01");
+        CourseAiResultDto result = new CourseAiResultDto("2.0", List.of(
+                new CourseAiResultDto.DayDto(
+                        LocalDate.of(2026, 8, 27),
+                        List.of(item("general", "09:00"))),
+                new CourseAiResultDto.DayDto(
+                        LocalDate.of(2026, 8, 28),
+                        List.of(
+                                item("fixed-want", "11:00"),
+                                item("flexible-want", "14:00")))));
+
+        CoursePersistenceResult persisted = persistenceService.persist(
+                request(), facts(fixedWant, flexibleWant, general), result,
+                metadata(GenerationReason.INITIAL, null));
+        List<CourseItem> items = courseItemRepository.findAllByCourseIdOrderByDayNoAscPositionAsc(
+                persisted.course().getId());
+
+        assertThat(items).extracting(CourseItem::getDayNo).containsExactly(1, 2, 2);
+        assertThat(items).extracting(CourseItem::getPosition).containsExactly(1, 1, 2);
+        assertThat(items).extracting(CourseItem::getVisitDate)
+                .containsExactly(
+                        LocalDate.of(2026, 8, 27),
+                        LocalDate.of(2026, 8, 28),
+                        LocalDate.of(2026, 8, 28));
+        assertThat(items).extracting(CourseItem::getItemSource)
+                .containsExactly(
+                        CourseItemSource.AI_RECOMMENDED,
+                        CourseItemSource.USER_FIXED,
+                        CourseItemSource.AI_RECOMMENDED);
+    }
+
+    @Test
+    void rejectsUnknownResultCandidateAndDuplicateFactCandidateIdsBeforeInsert()
+            throws Exception {
+        CourseCandidate candidate = candidate(
+                "candidate-known", null, "KTO", "known-1", "알려진 장소",
+                null, null, "EAST", "TOURIST", UserConstraint.none(), "A01");
+
+        assertThatThrownBy(() -> persistenceService.persist(
+                request(), facts(candidate),
+                result("candidate-unknown", "2026-08-27", "09:00"),
+                metadata(GenerationReason.INITIAL, null)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("저장할 수 없는 AI 후보");
+
+        assertThatThrownBy(() -> persistenceService.persist(
+                request(), facts(candidate, candidate),
+                result("candidate-known", "2026-08-27", "09:00"),
+                metadata(GenerationReason.INITIAL, null)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("중복 candidateId");
+
+        assertThat(courseRepository.count()).isZero();
+        assertThat(courseItemRepository.count()).isZero();
+    }
+
+    @Test
+    void persistsKakaoOnlyWantWithoutKtoFallbackAndKeepsIdentitySystemsSeparate()
+            throws Exception {
+        CourseCandidate candidate = candidate(
+                "request-want-1", null, "KAKAO_LOCAL", "kakao-document-9001",
+                "카카오 숲길", "제주특별자치도 제주시 구좌읍 비자숲길 1",
+                null, "EAST", "TOURIST",
+                UserConstraint.want(LocalDate.of(2026, 8, 27), LocalTime.of(10, 30)), null);
+
+        CoursePersistenceResult persisted = persistenceService.persist(
+                request(), facts(candidate),
+                result("request-want-1", "2026-08-27", "10:30"),
+                metadata(GenerationReason.INITIAL, null));
+
+        CourseItem item = persisted.itemsByCandidateId().get("request-want-1");
+        assertThat(item.getPlace().getId()).isNotNull();
+        assertThat(item.getPlace().getId().toString())
+                .isNotEqualTo("request-want-1")
+                .isNotEqualTo("kakao-document-9001");
+        assertThat(mappingRepository.findBySourceCodeAndSourcePlaceId(
+                "KAKAO_LOCAL", "kakao-document-9001"))
+                .get().extracting(mapping -> mapping.getPlace().getId())
+                .isEqualTo(item.getPlace().getId());
+        assertThat(mappingRepository.findBySourceCodeAndSourcePlaceId(
+                "KTO", "kakao-document-9001")).isEmpty();
+    }
+
+    @Test
+    void rejectsEmptyScheduleAndOverlongReasonWithoutPartialRows() throws Exception {
+        CourseCandidate candidate = candidate(
+                "candidate-reason", null, "KTO", "reason-1", "추천 장소",
+                null, null, "EAST", "TOURIST", UserConstraint.none(), "A01");
+
+        assertThatThrownBy(() -> persistenceService.persist(
+                request(), facts(candidate), new CourseAiResultDto("2.0", List.of()),
+                metadata(GenerationReason.INITIAL, null)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("방문 일정");
+
+        CourseAiResultDto overlong = new CourseAiResultDto("2.0", List.of(
+                new CourseAiResultDto.DayDto(LocalDate.of(2026, 8, 27), List.of(
+                        new CourseAiResultDto.ItemDto(
+                                "candidate-reason", LocalTime.of(9, 0), "가".repeat(301))))));
+        assertThatThrownBy(() -> persistenceService.persist(
+                request(), facts(candidate), overlong,
+                metadata(GenerationReason.INITIAL, null)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("300자");
+
+        assertThat(courseRepository.count()).isZero();
+        assertThat(courseItemRepository.count()).isZero();
+    }
+
+    @Test
+    void persistsNullableParentReferenceForRegeneratedCourse() {
         Course parent = courseRepository.save(Course.ready(
-                LocalDate.of(2026, 8, 27),
-                LocalDate.of(2026, 8, 29),
-                2,
-                500000,
-                Transport.RENTAL_CAR,
-                GenerationReason.INITIAL,
-                "course-ai-1"));
+                LocalDate.of(2026, 8, 27), LocalDate.of(2026, 8, 29), 2, 500000,
+                Transport.RENTAL_CAR, GenerationReason.INITIAL, "course-ai-1"));
         Course child = courseRepository.save(Course.ready(
-                LocalDate.of(2026, 8, 27),
-                LocalDate.of(2026, 8, 29),
-                2,
-                500000,
-                Transport.RENTAL_CAR,
-                GenerationReason.USER_REGENERATE,
-                "course-ai-1",
-                parent));
+                LocalDate.of(2026, 8, 27), LocalDate.of(2026, 8, 29), 2, 500000,
+                Transport.RENTAL_CAR, GenerationReason.USER_REGENERATE,
+                "course-ai-1", parent));
 
         courseRepository.flush();
 
@@ -166,192 +407,74 @@ class CoursePersistenceServiceTest {
         assertThat(child.getParentCourse().getId()).isEqualTo(parent.getId());
     }
 
-    @Test
-    void preservesAiDayAndPositionOrder() throws Exception {
-        CourseCandidateDto first = candidate(
-                "KTO-A", "첫 장소", "제주특별자치도 제주시 구좌읍", "A01");
-        CourseCandidateDto second = candidate(
-                "KTO-B", "둘째 장소", "제주특별자치도 제주시 구좌읍", "A01");
-        CourseAiInputDto input = input(
-                List.of(fact(first, null), fact(second, null)), false);
-        CourseAiResultDto result = new CourseAiResultDto("1.0", List.of(
-                new CourseAiResultDto.DayDto(
-                        LocalDate.of(2026, 8, 27),
-                        List.of(
-                                item("KTO-B", "09:00"),
-                                item("KTO-A", "11:00")))));
-
-        CoursePersistenceResult persisted = persistenceService.persist(
-                request(), input, result, List.of(first, second));
-        List<CourseItem> items = courseItemRepository.findAllByCourseIdOrderByDayNoAscPositionAsc(
-                persisted.course().getId());
-
-        assertThat(items).extracting(CourseItem::getId)
-                .containsExactly(
-                        persisted.itemsByCandidateId().get("KTO-B").getId(),
-                        persisted.itemsByCandidateId().get("KTO-A").getId());
-        assertThat(items).extracting(CourseItem::getDayNo).containsExactly(1, 1);
-        assertThat(items).extracting(CourseItem::getPosition).containsExactly(1, 2);
+    private Place savePlace(
+            String name,
+            String roadAddress,
+            String regionCode,
+            String categoryCode
+    ) {
+        Region region = regionRepository.findByCodeIgnoreCaseAndActiveTrue(regionCode)
+                .orElseThrow();
+        PlaceCategory category = categoryRepository
+                .findByCodeIgnoreCaseAndActiveTrue(categoryCode).orElseThrow();
+        return placeRepository.save(Place.fromExternalCandidate(
+                region, category, name, normalizeName(name), roadAddress, null,
+                new BigDecimal("33.4580000"), new BigDecimal("126.9420000")));
     }
 
-    @Test
-    void rollsBackCoursePlaceMappingAndItemsWhenRequiredReferenceIsUnavailable() throws Exception {
-        CourseCandidateDto valid = candidate(
-                "KTO-OK", "정상 장소", "제주특별자치도 제주시 구좌읍", "A01");
-        CourseCandidateDto unsupported = candidate(
-                "KTO-BAD", "미분류 장소", "제주특별자치도 제주시 구좌읍", "A04");
-        CourseAiInputDto input = input(
-                List.of(fact(valid, null), fact(unsupported, null)), false);
-        CourseAiResultDto result = new CourseAiResultDto("1.0", List.of(
-                new CourseAiResultDto.DayDto(
-                        LocalDate.of(2026, 8, 27),
-                        List.of(item("KTO-OK", "09:00"), item("KTO-BAD", "11:00")))));
-
-        assertThatThrownBy(() -> persistenceService.persist(
-                request(), input, result, List.of(valid, unsupported)))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("카테고리");
-
-        assertThat(courseRepository.count()).isZero();
-        assertThat(courseItemRepository.count()).isZero();
-        assertThat(placeRepository.count()).isZero();
-        assertThat(mappingRepository.count()).isZero();
+    private CourseGenerationFacts facts(CourseCandidate... candidates) {
+        return new CourseGenerationFacts(List.of(candidates), List.of(), List.of());
     }
 
-    @Test
-    void rollsBackEverythingWhenRegionReferenceIsUnavailable() throws Exception {
-        CourseCandidateDto candidate = candidate(
-                "KTO-NORTH", "북부 장소", "제주특별자치도 제주시", "A01");
-        CourseAiInputDto.CandidateFactDto northFact = new CourseAiInputDto.CandidateFactDto(
-                new CourseAiInputDto.PlaceIdentityDto(
-                        "KTO-NORTH", null, "KTO", "KTO-NORTH"),
-                "북부 장소",
-                "제주특별자치도 제주시",
-                33.50,
-                126.53,
-                new CourseAiInputDto.TourCategoryDto("A01", null, null),
-                "NORTH",
-                null,
+    private CourseCandidate candidate(
+            String candidateId,
+            Long placeId,
+            String sourceCode,
+            String sourcePlaceId,
+            String name,
+            String roadAddress,
+            String address,
+            String regionCode,
+            String internalCategoryCode,
+            UserConstraint constraint,
+            String externalCategoryCode
+    ) {
+        List<ExternalClassificationFact> classifications = externalCategoryCode == null
+                ? List.of()
+                : List.of(new ExternalClassificationFact(
+                        sourceCode, externalCategoryCode, null, null, null));
+        InternalPlaceCategory category = internalCategoryCode == null
+                ? null
+                : new InternalPlaceCategory(
+                        null, internalCategoryCode, categoryName(internalCategoryCode));
+        return new CourseCandidate(
+                new CandidateIdentity(candidateId, placeId, sourceCode, sourcePlaceId),
+                new PlaceFact(
+                        name, address, roadAddress,
+                        new BigDecimal("33.4580000"),
+                        new BigDecimal("126.9420000"), null),
+                constraint,
+                regionCode,
+                classifications,
+                category,
                 List.of(),
                 List.of(),
                 null);
-        CourseAiInputDto input = input(List.of(northFact), false);
-
-        assertThatThrownBy(() -> persistenceService.persist(
-                request(),
-                input,
-                result("KTO-NORTH", "2026-08-27", "09:00"),
-                List.of(candidate)))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("권역");
-
-        assertThat(courseRepository.count()).isZero();
-        assertThat(courseItemRepository.count()).isZero();
-        assertThat(placeRepository.count()).isZero();
-        assertThat(mappingRepository.count()).isZero();
     }
 
-    @Test
-    void doesNotCreateReadyCourseForEmptyAiSchedule() throws Exception {
-        CourseCandidateDto candidate = candidate(
-                "KTO-EMPTY", "빈 일정 후보", "제주특별자치도 제주시 구좌읍", "A01");
-        CourseAiInputDto input = input(List.of(fact(candidate, null)), false);
-
-        assertThatThrownBy(() -> persistenceService.persist(
-                request(),
-                input,
-                new CourseAiResultDto("1.0", List.of()),
-                List.of(candidate)))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("방문 일정");
-
-        assertThat(courseRepository.count()).isZero();
-        assertThat(courseItemRepository.count()).isZero();
+    private String categoryName(String code) {
+        return switch (code) {
+            case "TOURIST" -> "관광지";
+            case "CAFE" -> "카페";
+            default -> throw new IllegalArgumentException("지원하지 않는 테스트 카테고리");
+        };
     }
 
-    @Test
-    void persistsUnmatchedKakaoWantWithActualSourceIdentityAndFixedSchedule()
-            throws Exception {
-        CourseRequestDto request = kakaoRequest(
-                "카카오 숲길",
-                "KAKAO-9001",
-                "제주특별자치도 제주시 구좌읍 비자숲길 1");
-        CourseAiInputDto input = new CourseAiInputAssembler().assemble(
-                request,
-                List.of(),
-                java.util.Map.of(),
-                List.of(),
-                new CourseAiInputDto.GenerationMetadataDto(
-                        GenerationReason.INITIAL, "course-ai-1", null));
-        String candidateId = input.candidates().get(0).identity().candidateId();
-        CourseAiResultDto result = result(
-                input.contractVersion(), candidateId, "2026-08-27", "10:30");
-
-        new com.example.hangat.course.ai.CourseAiResultValidator()
-                .validate(input, result);
-        CoursePersistenceResult persisted = persistenceService.persist(
-                request, input, result, List.of());
-
-        CourseItem item = persisted.itemsByCandidateId().get(candidateId);
-        assertThat(persisted.course().getId()).isNotNull();
-        assertThat(item.getId()).isNotNull();
-        assertThat(item.getPlace().getId()).isNotNull();
-        assertThat(item.getItemSource()).isEqualTo(CourseItemSource.USER_FIXED);
-        assertThat(item.getVisitDate()).isEqualTo(LocalDate.of(2026, 8, 27));
-        assertThat(item.getStartTime()).isEqualTo(LocalTime.of(10, 30));
-        assertThat(persisted.categoryNamesByCandidateId().get(candidateId))
-                .isEqualTo("관광지");
-        assertThat(mappingRepository.findBySourceCodeAndSourcePlaceId(
-                "KAKAO_LOCAL", "KAKAO-9001"))
-                .get()
-                .extracting(mapping -> mapping.getPlace().getId())
-                .isEqualTo(item.getPlace().getId());
-        assertThat(mappingRepository.findBySourceCodeAndSourcePlaceId(
-                "KTO", "KAKAO-9001")).isEmpty();
-
-        CourseResponseDto response = new CourseResponseAssembler().assemble(
-                input, result, List.of(), persisted);
-        CourseResponseDto.ItemDto responseItem = response.days().get(0).items().get(0);
-        assertThat(responseItem.placeId()).isEqualTo(item.getPlace().getId());
-        assertThat(responseItem.placeName()).isEqualTo("카카오 숲길");
-        assertThat(responseItem.categoryName()).isEqualTo("관광지");
-        assertThat(responseItem.imageUrl()).isNull();
-        assertThat(responseItem.tourCategory()).isNull();
-        assertThat(responseItem.congestion()).isEmpty();
-        assertThat(responseItem.weather()).isNull();
-    }
-
-    @Test
-    void reusesCanonicalPlaceWhenKakaoWantMatchesKtoCandidate() throws Exception {
-        CourseRequestDto request = kakaoRequest(
-                "비자림",
-                "KAKAO-125266",
-                "제주특별자치도 제주시 구좌읍 비자숲길 55");
-        CourseCandidateDto ktoCandidate = candidate(
-                "125266", "비자림", "제주특별자치도 제주시 구좌읍 비자숲길 55", "A01");
-        CourseAiInputDto input = new CourseAiInputAssembler().assemble(
-                request,
-                List.of(ktoCandidate),
-                java.util.Map.of(),
-                List.of(),
-                new CourseAiInputDto.GenerationMetadataDto(
-                        GenerationReason.INITIAL, "course-ai-1", null));
-        String candidateId = input.candidates().get(0).identity().candidateId();
-
-        CoursePersistenceResult persisted = persistenceService.persist(
-                request,
-                input,
-                result(input.contractVersion(), candidateId, "2026-08-27", "10:30"),
-                List.of(ktoCandidate));
-
-        Long placeId = persisted.itemsByCandidateId().get(candidateId).getPlace().getId();
-        assertThat(placeRepository.count()).isEqualTo(1);
-        assertThat(mappingRepository.count()).isEqualTo(2);
-        assertThat(mappingRepository.findBySourceCodeAndSourcePlaceId("KTO", "125266"))
-                .get().extracting(mapping -> mapping.getPlace().getId()).isEqualTo(placeId);
-        assertThat(mappingRepository.findBySourceCodeAndSourcePlaceId(
-                "KAKAO_LOCAL", "KAKAO-125266"))
-                .get().extracting(mapping -> mapping.getPlace().getId()).isEqualTo(placeId);
+    private CourseGenerationMetadata metadata(
+            GenerationReason generationReason,
+            String algorithmVersion
+    ) {
+        return new CourseGenerationMetadata(generationReason, algorithmVersion, null);
     }
 
     private CourseRequestDto request() throws Exception {
@@ -369,129 +492,14 @@ class CoursePersistenceServiceTest {
                 """, CourseRequestDto.class);
     }
 
-    private CourseRequestDto kakaoRequest(
-            String placeName,
-            String sourcePlaceId,
-            String address
-    ) throws Exception {
-        return objectMapper.readValue("""
-                {
-                  "start_date":"2026-08-27",
-                  "end_date":"2026-08-29",
-                  "people":2,
-                  "budget_total":500000,
-                  "transport":"RENTAL_CAR",
-                  "course_regions":[{"region_id":1,"code":"EAST","name":"동부"}],
-                  "course_styles":[{"code":"NATURE","weight":1}],
-                  "course_place_preferences":[{
-                    "source_code":"KAKAO_LOCAL",
-                    "source_place_id":"%s",
-                    "place_name":"%s",
-                    "road_address":"%s",
-                    "latitude":33.458,
-                    "longitude":126.942,
-                    "category_name":"여행 > 관광,명소 > 자연명소",
-                    "preference_type":"WANT",
-                    "fixed_date":"2026-08-27",
-                    "fixed_time":"10:30"
-                  }]
-                }
-                """.formatted(sourcePlaceId, placeName, address), CourseRequestDto.class);
-    }
-
-    private CourseCandidateDto candidate(
-            String contentId,
-            String name,
-            String address,
-            String category1
-    ) throws Exception {
-        TourPlaceDto place = objectMapper.readValue("""
-                {"contentid":"%s","title":"%s","addr1":"%s",
-                 "mapy":33.458,"mapx":126.942,"cat1":"%s"}
-                """.formatted(contentId, name, address, category1), TourPlaceDto.class);
-        return new CourseCandidateDto(place, List.of(), null, List.of());
-    }
-
-    private CourseAiInputDto.CandidateFactDto fact(
-            CourseCandidateDto candidate,
-            PreferenceType preferenceType
-    ) {
-        TourPlaceDto place = candidate.getPlace();
-        return new CourseAiInputDto.CandidateFactDto(
-                new CourseAiInputDto.PlaceIdentityDto(
-                        place.getContentId(), null, "KTO", place.getContentId()),
-                place.getTitle(),
-                place.getAddress(),
-                place.getLatitude(),
-                place.getLongitude(),
-                new CourseAiInputDto.TourCategoryDto(
-                        place.getCategory(), place.getCategory2(), place.getCategory3()),
-                "EAST",
-                preferenceType,
-                List.of(),
-                List.of(),
-                null);
-    }
-
-    private CourseAiInputDto input(
-            List<CourseAiInputDto.CandidateFactDto> facts,
-            boolean fixedWant
-    ) {
-        return input(facts, fixedWant, GenerationReason.INITIAL);
-    }
-
-    private CourseAiInputDto input(
-            List<CourseAiInputDto.CandidateFactDto> facts,
-            boolean fixedWant,
-            GenerationReason generationReason
-    ) {
-        CourseAiInputDto.PlaceConstraintDto fixed = fixedWant
-                ? new CourseAiInputDto.PlaceConstraintDto(
-                        new CourseAiInputDto.PlaceIdentityDto(
-                                "KTO-1001", null, "KTO", "KTO-1001"),
-                        "성산일출봉", null, null, null, null,
-                        PreferenceType.WANT,
-                        LocalDate.of(2026, 8, 27),
-                        LocalTime.of(9, 0))
-                : null;
-        return new CourseAiInputDto(
-                "1.0",
-                new CourseAiInputDto.TripConditionDto(
-                        LocalDate.of(2026, 8, 27),
-                        LocalDate.of(2026, 8, 29),
-                        2,
-                        500000,
-                        Transport.RENTAL_CAR),
-                new CourseAiInputDto.UserPreferencesDto(
-                        List.of(),
-                        List.of(),
-                        fixed == null ? List.of() : List.of(fixed),
-                        List.of(),
-                        null),
-                facts,
-                List.of(),
-                new CourseAiInputDto.GenerationMetadataDto(
-                        generationReason, "course-ai-1", null));
-    }
-
     private CourseAiResultDto result(
             String candidateId,
             String date,
             String startTime
     ) {
-        return result("1.0", candidateId, date, startTime);
-    }
-
-    private CourseAiResultDto result(
-            String contractVersion,
-            String candidateId,
-            String date,
-            String startTime
-    ) {
-        return new CourseAiResultDto(contractVersion, List.of(
+        return new CourseAiResultDto("2.0", List.of(
                 new CourseAiResultDto.DayDto(
-                        LocalDate.parse(date),
-                        List.of(item(candidateId, startTime)))));
+                        LocalDate.parse(date), List.of(item(candidateId, startTime)))));
     }
 
     private CourseAiResultDto.ItemDto item(String candidateId, String startTime) {
@@ -499,5 +507,9 @@ class CoursePersistenceServiceTest {
                 candidateId,
                 LocalTime.parse(startTime),
                 "사실 데이터에 근거한 추천 이유");
+    }
+
+    private String normalizeName(String value) {
+        return value.replaceAll("[\\s\\p{P}\\p{S}]+", "").toLowerCase();
     }
 }

@@ -98,18 +98,20 @@ public class Place extends BaseEntity {
             PlaceCategory primaryCategory,
             String name,
             String normalizedName,
-            String address,
-            Double latitude,
-            Double longitude
+            String roadAddress,
+            String lotAddress,
+            BigDecimal latitude,
+            BigDecimal longitude
     ) {
         Place place = new Place();
         place.region = region;
         place.primaryCategory = primaryCategory;
         place.name = name;
         place.normalizedName = normalizedName;
-        place.roadAddress = address;
-        place.latitude = latitude == null ? null : BigDecimal.valueOf(latitude);
-        place.longitude = longitude == null ? null : BigDecimal.valueOf(longitude);
+        place.roadAddress = roadAddress;
+        place.lotAddress = lotAddress;
+        place.latitude = latitude;
+        place.longitude = longitude;
         place.businessStatus = BusinessStatus.UNKNOWN;
         place.goodPrice = false;
         place.hiddenGem = false;

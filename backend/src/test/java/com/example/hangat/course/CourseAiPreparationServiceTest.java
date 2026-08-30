@@ -144,11 +144,18 @@ class CourseAiPreparationServiceTest {
                                         weather.precipitationTypeCode(), weather.skyConditionCode(),
                                         weather.windSpeed(), weather.humidity())))))));
 
-        CourseAiInputDto result = preparationService.prepare(
-                request(), List.of(candidate));
+        CourseAiPreparationService.PreparedGeneration prepared =
+                preparationService.prepareGeneration(request(), List.of(candidate));
+        CourseAiInputDto result = prepared.input();
 
         assertThat(result.candidates().get(0).weatherFactSetId())
                 .isEqualTo("kma-east-20260827-0500");
+        assertThat(prepared.facts().candidates()).hasSize(1);
+        assertThat(prepared.facts().candidates().get(0).identity().candidateId())
+                .isEqualTo("east-normal");
+        assertThat(prepared.facts().weatherFactSets()).hasSize(1);
+        assertThat(prepared.metadata().generationReason())
+                .isEqualTo(com.example.hangat.course.model.GenerationReason.INITIAL);
         assertThat(result.weatherFactSets()).hasSize(1);
         assertThat(result.weatherFactSets().get(0).weatherFactSetId())
                 .isEqualTo("kma-east-20260827-0500");

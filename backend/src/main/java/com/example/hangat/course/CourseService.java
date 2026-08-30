@@ -3,6 +3,7 @@ package com.example.hangat.course;
 import com.example.hangat.course.ai.CourseAiInputDto;
 import com.example.hangat.course.ai.CourseAiGenerationService;
 import com.example.hangat.course.ai.CourseAiResultDto;
+import com.example.hangat.course.facts.CourseGenerationFacts;
 import com.example.hangat.course.model.AccommodationDto;
 import com.example.hangat.course.model.CongestionDto;
 import com.example.hangat.course.model.CourseCandidateDto;
@@ -41,9 +42,9 @@ public class CourseService {
         CourseAiResultDto result = courseAiGenerationService.generate(prepared.input());
         CoursePersistenceResult persistence = coursePersistenceService.persist(
                 request,
-                prepared.input(),
+                prepared.facts(),
                 result,
-                prepared.candidates());
+                prepared.metadata());
         return courseResponseAssembler.assemble(
                 prepared.input(), result, prepared.candidates(), persistence,
                 request.getAccommodation());
@@ -161,13 +162,19 @@ public class CourseService {
             ));
         }
 
+        CourseAiPreparationService.PreparedGeneration generation =
+                courseAiPreparationService.prepareGeneration(request, courseCandidates);
         return new PreparedCourse(
-                courseAiPreparationService.prepare(request, courseCandidates),
+                generation.input(),
+                generation.facts(),
+                generation.metadata(),
                 List.copyOf(courseCandidates));
     }
 
     private record PreparedCourse(
             CourseAiInputDto input,
+            CourseGenerationFacts facts,
+            CourseGenerationMetadata metadata,
             List<CourseCandidateDto> candidates
     ) {
     }

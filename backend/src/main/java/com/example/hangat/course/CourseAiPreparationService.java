@@ -2,6 +2,7 @@ package com.example.hangat.course;
 
 import com.example.hangat.course.ai.CourseAiInputDto;
 import com.example.hangat.course.ai.CourseAiInputDto.GenerationMetadataDto;
+import com.example.hangat.course.facts.CourseGenerationFacts;
 import com.example.hangat.course.model.CourseCandidateDto;
 import com.example.hangat.course.model.CourseRequestDto;
 import com.example.hangat.course.model.GenerationReason;
@@ -36,6 +37,13 @@ public class CourseAiPreparationService {
             CourseRequestDto request,
             List<CourseCandidateDto> candidates
     ) {
+        return prepareGeneration(request, candidates).input();
+    }
+
+    PreparedGeneration prepareGeneration(
+            CourseRequestDto request,
+            List<CourseCandidateDto> candidates
+    ) {
         List<CourseCandidateDto> safeCandidates = candidates == null
                 ? List.of()
                 : List.copyOf(candidates);
@@ -53,12 +61,17 @@ public class CourseAiPreparationService {
                         safeCandidates,
                         weatherFacts,
                         buildAdjacentTravelFacts(request, safeCandidates));
+        CourseGenerationMetadata metadata = new CourseGenerationMetadata(
+                GenerationReason.INITIAL, null, null);
 
-        return assembler.assemble(
+        CourseAiInputDto input = assembler.assemble(
                 request,
                 generationFacts,
-                new GenerationMetadataDto(GenerationReason.INITIAL, null, null)
-        );
+                new GenerationMetadataDto(
+                        metadata.generationReason(),
+                        metadata.algorithmVersion(),
+                        metadata.requestReference()));
+        return new PreparedGeneration(generationFacts.facts(), input, metadata);
     }
 
     private List<CourseTravelLegDto> buildAdjacentTravelFacts(
@@ -81,5 +94,12 @@ public class CourseAiPreparationService {
         }
 
         return List.copyOf(travelFacts);
+    }
+
+    record PreparedGeneration(
+            CourseGenerationFacts facts,
+            CourseAiInputDto input,
+            CourseGenerationMetadata metadata
+    ) {
     }
 }

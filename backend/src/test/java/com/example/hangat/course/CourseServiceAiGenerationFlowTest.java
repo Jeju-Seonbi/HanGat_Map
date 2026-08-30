@@ -21,6 +21,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.any;
 
 class CourseServiceAiGenerationFlowTest {
 
@@ -61,10 +62,15 @@ class CourseServiceAiGenerationFlowTest {
 
         assertThat(providerCalled).isTrue();
         verify(persistenceService).persist(
-                org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.anyList());
+                any(CourseRequestDto.class),
+                org.mockito.ArgumentMatchers.argThat(facts ->
+                        facts.candidates().size() == 1
+                                && "candidate-1".equals(
+                                facts.candidates().get(0).identity().candidateId())),
+                any(CourseAiResultDto.class),
+                org.mockito.ArgumentMatchers.argThat(metadata ->
+                        metadata.generationReason()
+                                == com.example.hangat.course.model.GenerationReason.INITIAL));
         assertThat(response.days()).hasSize(1);
         assertThat(response.days().get(0).items().get(0).placeName()).isEqualTo("만장굴");
         assertThat(response.days().get(0).items().get(0).recommendationReason())
