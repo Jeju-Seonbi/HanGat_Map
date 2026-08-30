@@ -73,13 +73,15 @@ public record CourseResponseDto(
             Long courseId,
             Long placeId,
             String candidateId,
+            String sourceCode,
+            String sourcePlaceId,
             String placeName,
             String address,
+            String roadAddress,
             Double latitude,
             Double longitude,
             String imageUrl,
             String categoryName,
-            TourCategoryDto tourCategory,
             String regionCode,
             PreferenceType preferenceType,
             List<String> confirmedStyleHints,
@@ -90,6 +92,8 @@ public record CourseResponseDto(
             ItemSource itemSource,
             String recommendationReason,
             List<CourseItemCostDto> costs,
+            BigDecimal inboundDistanceM,
+            Integer inboundTravelMinutes,
             BigDecimal congestionRate,
             CongestionLevel congestionLevel,
             List<CongestionFactDto> congestion,
@@ -116,15 +120,6 @@ public record CourseResponseDto(
             BigDecimal amountMax,
             String currency,
             String basisText
-    ) {
-    }
-
-    @JsonInclude(JsonInclude.Include.ALWAYS)
-    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-    public record TourCategoryDto(
-            String category1,
-            String category2,
-            String category3
     ) {
     }
 

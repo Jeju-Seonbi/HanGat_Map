@@ -46,7 +46,7 @@ public class CourseService {
                 result,
                 prepared.metadata());
         return courseResponseAssembler.assemble(
-                prepared.input(), result, prepared.candidates(), persistence,
+                prepared.facts(), result, persistence,
                 request.getAccommodation());
     }
 
@@ -167,15 +167,13 @@ public class CourseService {
         return new PreparedCourse(
                 generation.input(),
                 generation.facts(),
-                generation.metadata(),
-                List.copyOf(courseCandidates));
+                generation.metadata());
     }
 
     private record PreparedCourse(
             CourseAiInputDto input,
             CourseGenerationFacts facts,
-            CourseGenerationMetadata metadata,
-            List<CourseCandidateDto> candidates
+            CourseGenerationMetadata metadata
     ) {
     }
 

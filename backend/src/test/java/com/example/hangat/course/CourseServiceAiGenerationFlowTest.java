@@ -4,8 +4,16 @@ import com.example.hangat.course.ai.CourseAiGenerationService;
 import com.example.hangat.course.ai.CourseAiResultDto;
 import com.example.hangat.course.ai.CourseAiResultValidator;
 import com.example.hangat.course.model.CongestionDto;
+import com.example.hangat.course.model.Course;
+import com.example.hangat.course.model.CourseItem;
+import com.example.hangat.course.model.CourseItemSource;
 import com.example.hangat.course.model.CourseRequestDto;
+import com.example.hangat.course.model.CourseStatus;
+import com.example.hangat.course.model.CourseType;
+import com.example.hangat.course.model.GenerationReason;
+import com.example.hangat.course.model.Place;
 import com.example.hangat.course.model.TourPlaceDto;
+import com.example.hangat.course.model.Transport;
 import com.example.hangat.course.travel.CourseTravelService;
 import com.example.hangat.course.travel.StraightLineDistanceCalculator;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -21,6 +29,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.mockito.ArgumentMatchers.any;
 
 class CourseServiceAiGenerationFlowTest {
@@ -46,6 +55,37 @@ class CourseServiceAiGenerationFlowTest {
                 },
                 new CourseAiResultValidator());
         CoursePersistenceService persistenceService = mock(CoursePersistenceService.class);
+        Course course = mock(Course.class);
+        when(course.getId()).thenReturn(101L);
+        when(course.getCourseType()).thenReturn(CourseType.USER);
+        when(course.getGenerationReason()).thenReturn(GenerationReason.INITIAL);
+        when(course.getStatus()).thenReturn(CourseStatus.READY);
+        when(course.getStartDate()).thenReturn(LocalDate.of(2026, 8, 27));
+        when(course.getEndDate()).thenReturn(LocalDate.of(2026, 8, 29));
+        when(course.getPeople()).thenReturn(2);
+        when(course.getBudgetTotal()).thenReturn(500000);
+        when(course.getTransport()).thenReturn(Transport.RENTAL_CAR);
+        Place place = mock(Place.class);
+        when(place.getId()).thenReturn(301L);
+        CourseItem persistedItem = mock(CourseItem.class);
+        when(persistedItem.getId()).thenReturn(201L);
+        when(persistedItem.getCourse()).thenReturn(course);
+        when(persistedItem.getPlace()).thenReturn(place);
+        when(persistedItem.getDayNo()).thenReturn(1);
+        when(persistedItem.getPosition()).thenReturn(1);
+        when(persistedItem.getVisitDate()).thenReturn(LocalDate.of(2026, 8, 27));
+        when(persistedItem.getStartTime()).thenReturn(LocalTime.of(9, 0));
+        when(persistedItem.getItemSource()).thenReturn(CourseItemSource.AI_RECOMMENDED);
+        when(persistedItem.getRecommendationReason()).thenReturn("한글 추천 이유");
+        when(persistenceService.persist(
+                any(CourseRequestDto.class),
+                any(com.example.hangat.course.facts.CourseGenerationFacts.class),
+                any(CourseAiResultDto.class),
+                any(CourseGenerationMetadata.class)))
+                .thenReturn(new CoursePersistenceResult(
+                        course,
+                        java.util.Map.of("candidate-1", persistedItem),
+                        java.util.Map.of("candidate-1", "관광지")));
         CourseService service = new CourseService(
                 new StubTourApiService(),
                 new StubCongestionApiService(),

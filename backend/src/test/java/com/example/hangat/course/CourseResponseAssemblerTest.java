@@ -1,28 +1,41 @@
 package com.example.hangat.course;
 
-import com.example.hangat.course.ai.CourseAiInputDto;
 import com.example.hangat.course.ai.CourseAiResultDto;
+import com.example.hangat.course.facts.CandidateIdentity;
+import com.example.hangat.course.facts.CongestionFact;
+import com.example.hangat.course.facts.CourseCandidate;
+import com.example.hangat.course.facts.CourseGenerationFacts;
+import com.example.hangat.course.facts.ExternalClassificationFact;
+import com.example.hangat.course.facts.InternalPlaceCategory;
+import com.example.hangat.course.facts.PlaceFact;
+import com.example.hangat.course.facts.StyleHint;
+import com.example.hangat.course.facts.TravelFact;
+import com.example.hangat.course.facts.UserConstraint;
+import com.example.hangat.course.facts.WeatherFact;
+import com.example.hangat.course.facts.WeatherFactSet;
+import com.example.hangat.course.model.AccommodationDto;
 import com.example.hangat.course.model.CongestionLevel;
 import com.example.hangat.course.model.Course;
-import com.example.hangat.course.model.CourseCandidateDto;
 import com.example.hangat.course.model.CourseItem;
 import com.example.hangat.course.model.CourseItemSource;
+import com.example.hangat.course.model.CourseResponseDto;
 import com.example.hangat.course.model.CourseStatus;
 import com.example.hangat.course.model.CourseType;
 import com.example.hangat.course.model.GenerationReason;
 import com.example.hangat.course.model.Place;
-import com.example.hangat.course.model.CourseResponseDto;
 import com.example.hangat.course.model.PreferenceType;
-import com.example.hangat.course.model.TourPlaceDto;
 import com.example.hangat.course.model.Transport;
-import com.example.hangat.course.weather.CourseWeatherDto;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -31,174 +44,352 @@ import static org.mockito.Mockito.when;
 
 class CourseResponseAssemblerTest {
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper = new ObjectMapper()
+            .registerModule(new JavaTimeModule());
     private final CourseResponseAssembler assembler = new CourseResponseAssembler();
 
     @Test
-    void restoresBackendFactsAndPreservesAiDayAndItemOrder() throws Exception {
-        CourseAiInputDto input = input(List.of(
-                fact("first", "첫 장소", PreferenceType.WANT, List.of(
-                        new CourseAiInputDto.CongestionFactDto(
-                                LocalDate.of(2026, 8, 28),
-                                new BigDecimal("72.50"),
-                                CongestionLevel.CROWDED)),
-                        List.of(new CourseWeatherDto(
-                                LocalDate.of(2026, 8, 28), LocalTime.of(9, 0),
-                                new BigDecimal("27.5"), 20, "0", "1",
-                                new BigDecimal("2.1"), 65))),
-                fact("second", "둘째 장소", null, List.of(), null)));
-        CourseAiResultDto result = new CourseAiResultDto("1.0", List.of(
-                day("2026-08-29", item("second", "11:00", "두 번째 날을 먼저 반환")),
-                day("2026-08-28", item("second", "10:30", "일반 추천"),
-                        item("first", "09:00", "한글 고정 일정 추천"))));
+    void assemblesProviderNeutralFactsWithPersistedIdsAndOrdering() throws Exception {
+        LocalDate visitDate = LocalDate.of(2026, 9, 10);
+        CourseCandidate kto = candidate(
+                "kto-1", "KTO", "125266", "비자림", "제주 구좌읍",
+                "제주특별자치도 제주시 구좌읍 비자숲길 55", "forest.jpg",
+                null, "TOURIST", "관광지", List.of("NATURE"),
+                List.of(
+                        congestion(visitDate, "42.50", CongestionLevel.NORMAL),
+                        congestion(visitDate.plusDays(1), "70.00", CongestionLevel.CROWDED)),
+                "weather-east");
+        CourseCandidate kakao = candidate(
+                "kakao-1", "KAKAO_LOCAL", "987654", "사용자 카페", "제주 주소",
+                null, null, PreferenceType.WANT, "CAFE", "카페", List.of("CAFE"),
+                List.of(), "weather-east");
+        CourseGenerationFacts facts = new CourseGenerationFacts(
+                List.of(kto, kakao),
+                List.of(weatherSet("weather-east", visitDate)),
+                List.of(new TravelFact(
+                        "kto-1", "kakao-1", new BigDecimal("8200"), "HAVERSINE",
+                        null, null, Transport.RENTAL_CAR, null, null)));
+        CourseAiResultDto result = new CourseAiResultDto("2.0", List.of(
+                day(visitDate,
+                        item("kto-1", "09:00", "숲길 추천"),
+                        item("kakao-1", "11:00", "사용자 선택 유지"))));
+        CoursePersistenceResult persistence = persistence(
+                List.of("kto-1", "kakao-1"),
+                Map.of("kto-1", CourseItemSource.AI_RECOMMENDED,
+                        "kakao-1", CourseItemSource.USER_FIXED),
+                Map.of("kto-1", "관광지", "kakao-1", "카페"),
+                visitDate);
 
         CourseResponseDto response = assembler.assemble(
-                input,
-                result,
-                List.of(original("first", "첫 장소", "first.jpg"),
-                        original("second", "둘째 장소", "second.jpg")));
+                facts, result, persistence, accommodation());
 
-        assertThat(response.days()).extracting(CourseResponseDto.DayDto::visitDate)
-                .containsExactly(LocalDate.of(2026, 8, 29), LocalDate.of(2026, 8, 28));
-        assertThat(response.days().get(1).items())
-                .extracting(CourseResponseDto.ItemDto::candidateId)
-                .containsExactly("second", "first");
-
-        CourseResponseDto.ItemDto fixed = response.days().get(1).items().get(1);
-        assertThat(fixed.placeName()).isEqualTo("첫 장소");
-        assertThat(fixed.imageUrl()).isEqualTo("first.jpg");
-        assertThat(fixed.recommendationReason()).isEqualTo("한글 고정 일정 추천");
-        assertThat(fixed.itemSource()).isEqualTo(CourseResponseDto.ItemSource.USER_FIXED);
-        assertThat(fixed.congestion()).singleElement().satisfies(congestion -> {
-            assertThat(congestion.rate()).isEqualByComparingTo("72.50");
-            assertThat(congestion.level()).isEqualTo(CongestionLevel.CROWDED);
+        assertThat(response.id()).isEqualTo(101L);
+        assertThat(response.contractVersion()).isEqualTo("2.0");
+        assertThat(response.days()).singleElement().satisfies(day -> {
+            assertThat(day.dayNo()).isEqualTo(1);
+            assertThat(day.visitDate()).isEqualTo(visitDate);
+            assertThat(day.items()).extracting(CourseResponseDto.ItemDto::candidateId)
+                    .containsExactly("kto-1", "kakao-1");
         });
-        assertThat(fixed.weather()).singleElement().satisfies(weather ->
-                assertThat(weather.temperature()).isEqualByComparingTo("27.5"));
 
-        CourseResponseDto.ItemDto missingFacts = response.days().get(0).items().get(0);
-        assertThat(missingFacts.congestion()).isEmpty();
-        assertThat(missingFacts.weather()).isNull();
+        CourseResponseDto.ItemDto ktoItem = response.days().get(0).items().get(0);
+        assertThat(ktoItem.id()).isEqualTo(201L);
+        assertThat(ktoItem.placeId()).isEqualTo(301L);
+        assertThat(ktoItem.sourceCode()).isEqualTo("KTO");
+        assertThat(ktoItem.sourcePlaceId()).isEqualTo("125266");
+        assertThat(ktoItem.placeName()).isEqualTo("비자림");
+        assertThat(ktoItem.address()).isEqualTo("제주 구좌읍");
+        assertThat(ktoItem.roadAddress())
+                .isEqualTo("제주특별자치도 제주시 구좌읍 비자숲길 55");
+        assertThat(ktoItem.imageUrl()).isEqualTo("forest.jpg");
+        assertThat(ktoItem.categoryName()).isEqualTo("관광지");
+        assertThat(ktoItem.confirmedStyleHints()).containsExactly("NATURE");
+        assertThat(ktoItem.itemSource())
+                .isEqualTo(CourseResponseDto.ItemSource.AI_RECOMMENDED);
+        assertThat(ktoItem.congestion()).hasSize(2);
+        assertThat(ktoItem.congestionRate()).isEqualByComparingTo("42.50");
+        assertThat(ktoItem.congestionLevel()).isEqualTo(CongestionLevel.NORMAL);
+        assertThat(ktoItem.weather()).hasSize(2);
+        assertThat(ktoItem.inboundDistanceM()).isNull();
+        assertThat(ktoItem.inboundTravelMinutes()).isNull();
+
+        CourseResponseDto.ItemDto kakaoItem = response.days().get(0).items().get(1);
+        assertThat(kakaoItem.id()).isEqualTo(202L);
+        assertThat(kakaoItem.placeId()).isEqualTo(302L);
+        assertThat(kakaoItem.sourceCode()).isEqualTo("KAKAO_LOCAL");
+        assertThat(kakaoItem.sourcePlaceId()).isEqualTo("987654");
+        assertThat(kakaoItem.imageUrl()).isNull();
+        assertThat(kakaoItem.itemSource())
+                .isEqualTo(CourseResponseDto.ItemSource.USER_FIXED);
+        assertThat(kakaoItem.congestion()).isEmpty();
+        assertThat(kakaoItem.congestionRate()).isNull();
+        assertThat(kakaoItem.congestionLevel()).isNull();
+        assertThat(kakaoItem.inboundDistanceM()).isNull();
+        assertThat(kakaoItem.inboundTravelMinutes()).isNull();
+        assertThat(kakaoItem.costs()).isEmpty();
+        assertThat(kakaoItem.weather()).hasSize(2);
+        assertThat(response.accommodation()).isNotNull();
     }
 
     @Test
-    void rejectsCandidateIdMissingFromOriginalCandidateCollection() throws Exception {
-        CourseAiInputDto input = input(List.of(fact("known", "장소", null, List.of(), null)));
-        CourseAiResultDto result = new CourseAiResultDto(
-                "1.0", List.of(day("2026-08-28", item("unknown", "09:00", "추천"))));
+    void usesOnlyRealRouteFactsForInboundTravel() {
+        LocalDate visitDate = LocalDate.of(2026, 9, 10);
+        CourseCandidate first = candidate(
+                "first", "KTO", "1", "첫 장소", null, null, null,
+                null, "TOURIST", "관광지", List.of(), List.of(), null);
+        CourseCandidate second = withConstraint(candidate(
+                "second", "KTO", "2", "둘째 장소", null, null, null,
+                null, "TOURIST", "관광지", List.of(), List.of(), null),
+                UserConstraint.want(null, null));
+        CourseGenerationFacts facts = new CourseGenerationFacts(
+                List.of(first, second), List.of(), List.of(new TravelFact(
+                        "first", "second", new BigDecimal("1500"), "HAVERSINE",
+                        new BigDecimal("2100"), 8, Transport.RENTAL_CAR,
+                        "ROUTE_PROVIDER", Instant.parse("2026-09-01T00:00:00Z"))));
+        CoursePersistenceResult persistence = persistence(
+                List.of("first", "second"),
+                Map.of("first", CourseItemSource.AI_RECOMMENDED,
+                        "second", CourseItemSource.AI_RECOMMENDED),
+                Map.of("first", "관광지", "second", "관광지"),
+                visitDate);
+
+        CourseResponseDto response = assembler.assemble(
+                facts,
+                new CourseAiResultDto("2.0", List.of(day(
+                        visitDate, item("first", "09:00", "첫 추천"),
+                        item("second", "11:00", "둘째 추천")))),
+                persistence,
+                null);
+
+        assertThat(response.days().get(0).items().get(0).inboundDistanceM()).isNull();
+        assertThat(response.days().get(0).items().get(1).inboundDistanceM())
+                .isEqualByComparingTo("2100");
+        assertThat(response.days().get(0).items().get(1).inboundTravelMinutes())
+                .isEqualTo(8);
+        assertThat(response.days().get(0).items().get(1).preferenceType())
+                .isEqualTo(PreferenceType.WANT);
+        assertThat(response.days().get(0).items().get(1).itemSource())
+                .isEqualTo(CourseResponseDto.ItemSource.AI_RECOMMENDED);
+    }
+
+    @Test
+    void rejectsUnknownCandidateAndMissingPersistedItem() {
+        LocalDate visitDate = LocalDate.of(2026, 9, 10);
+        CourseCandidate known = candidate(
+                "known", "KTO", "1", "장소", null, null, null,
+                null, "TOURIST", "관광지", List.of(), List.of(), null);
+        CourseGenerationFacts facts = new CourseGenerationFacts(
+                List.of(known), List.of(), List.of());
+        CoursePersistenceResult persistence = persistence(
+                List.of("known"),
+                Map.of("known", CourseItemSource.AI_RECOMMENDED),
+                Map.of("known", "관광지"),
+                visitDate);
 
         assertThatThrownBy(() -> assembler.assemble(
-                input, result, List.of(original("known", "장소", null))))
+                facts,
+                new CourseAiResultDto("2.0", List.of(day(
+                        visitDate, item("unknown", "09:00", "추천")))),
+                persistence,
+                null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("unknown");
+
+        CoursePersistenceResult missingItem = new CoursePersistenceResult(
+                persistence.course(), Map.of(), Map.of());
+        assertThatThrownBy(() -> assembler.assemble(
+                facts,
+                new CourseAiResultDto("2.0", List.of(day(
+                        visitDate, item("known", "09:00", "추천")))),
+                missingItem,
+                null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("저장 항목");
     }
 
     @Test
-    void exposesOriginalFrontendInitialDisplayContractFromPersistedFacts() throws Exception {
-        CourseAiInputDto input = input(List.of(fact(
-                "first",
-                "첫 장소",
-                PreferenceType.WANT,
-                List.of(new CourseAiInputDto.CongestionFactDto(
-                        LocalDate.of(2026, 8, 28),
-                        new BigDecimal("72.50"),
-                        CongestionLevel.CROWDED)),
-                null)));
-        CourseAiResultDto result = new CourseAiResultDto(
-                "1.0",
-                List.of(day("2026-08-28", item("first", "09:00", "한글 추천 이유"))));
+    void serializesSnakeCaseProvenanceNullsAndEmptyCosts() throws Exception {
+        LocalDate visitDate = LocalDate.of(2026, 9, 10);
+        CourseCandidate candidate = candidate(
+                "kakao-1", "KAKAO_LOCAL", "987654", "사용자 카페",
+                "제주 주소", null, null, PreferenceType.WANT,
+                "CAFE", "카페", List.of("CAFE"), List.of(), null);
+        CoursePersistenceResult persistence = persistence(
+                List.of("kakao-1"),
+                Map.of("kakao-1", CourseItemSource.USER_FIXED),
+                Map.of("kakao-1", "카페"),
+                visitDate);
+        CourseResponseDto response = assembler.assemble(
+                new CourseGenerationFacts(List.of(candidate), List.of(), List.of()),
+                new CourseAiResultDto("2.0", List.of(day(
+                        visitDate, item("kakao-1", "11:00", "사용자 선택 유지")))),
+                persistence,
+                null);
 
+        String json = objectMapper.writeValueAsString(response);
+        assertThat(json).contains(
+                "\"source_code\":\"KAKAO_LOCAL\"",
+                "\"source_place_id\":\"987654\"",
+                "\"road_address\":null",
+                "\"inbound_distance_m\":null",
+                "\"inbound_travel_minutes\":null",
+                "\"weather\":null",
+                "\"costs\":[]");
+        assertThat(json).doesNotContain("tour_category", "compatibility");
+    }
+
+    @Test
+    void rejectsMissingSharedWeatherFactSet() {
+        LocalDate visitDate = LocalDate.of(2026, 9, 10);
+        CourseCandidate candidate = candidate(
+                "known", "KTO", "1", "장소", null, null, null,
+                null, "TOURIST", "관광지", List.of(), List.of(), "missing-weather");
+        CoursePersistenceResult persistence = persistence(
+                List.of("known"),
+                Map.of("known", CourseItemSource.AI_RECOMMENDED),
+                Map.of("known", "관광지"),
+                visitDate);
+
+        assertThatThrownBy(() -> assembler.assemble(
+                new CourseGenerationFacts(List.of(candidate), List.of(), List.of()),
+                new CourseAiResultDto("2.0", List.of(day(
+                        visitDate, item("known", "09:00", "추천")))),
+                persistence,
+                null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("missing-weather");
+    }
+
+    private CourseCandidate candidate(
+            String candidateId,
+            String sourceCode,
+            String sourcePlaceId,
+            String name,
+            String address,
+            String roadAddress,
+            String imageUrl,
+            PreferenceType preferenceType,
+            String categoryCode,
+            String categoryName,
+            List<String> styleCodes,
+            List<CongestionFact> congestionFacts,
+            String weatherFactSetId
+    ) {
+        return new CourseCandidate(
+                new CandidateIdentity(candidateId, null, sourceCode, sourcePlaceId),
+                new PlaceFact(name, address, roadAddress,
+                        new BigDecimal("33.4913"), new BigDecimal("126.8114"), imageUrl),
+                preferenceType == PreferenceType.WANT
+                        ? UserConstraint.want(LocalDate.of(2026, 9, 10), LocalTime.of(11, 0))
+                        : UserConstraint.none(),
+                "EAST",
+                List.of(new ExternalClassificationFact(
+                        sourceCode,
+                        "KTO".equals(sourceCode) ? "A01" : null,
+                        "KTO".equals(sourceCode) ? "A0101" : null,
+                        "KTO".equals(sourceCode) ? "A01010100" : null,
+                        "KAKAO_LOCAL".equals(sourceCode) ? "여행 > 카페" : null)),
+                new InternalPlaceCategory(null, categoryCode, categoryName),
+                styleCodes.stream()
+                        .map(code -> new StyleHint(code, "TEST", code))
+                        .toList(),
+                congestionFacts,
+                weatherFactSetId);
+    }
+
+    private CongestionFact congestion(
+            LocalDate date,
+            String rate,
+            CongestionLevel level
+    ) {
+        return new CongestionFact(null, date, new BigDecimal(rate), level, "DATA_GO_KR");
+    }
+
+    private CourseCandidate withConstraint(
+            CourseCandidate candidate,
+            UserConstraint constraint
+    ) {
+        return new CourseCandidate(
+                candidate.identity(),
+                candidate.place(),
+                constraint,
+                candidate.regionCode(),
+                candidate.externalClassifications(),
+                candidate.internalPlaceCategory(),
+                candidate.styleHints(),
+                candidate.congestionFacts(),
+                candidate.weatherFactSetId());
+    }
+
+    private WeatherFactSet weatherSet(String id, LocalDate date) {
+        return new WeatherFactSet(
+                id, "KMA", 52, 38, date.minusDays(1), LocalTime.of(23, 0),
+                List.of(
+                        new WeatherFact(null, date, LocalTime.of(9, 0),
+                                new BigDecimal("27.5"), 20, "0", "1",
+                                new BigDecimal("2.1"), 65),
+                        new WeatherFact(null, date, LocalTime.of(12, 0),
+                                new BigDecimal("29.0"), 30, "0", "3",
+                                new BigDecimal("2.5"), 60),
+                        new WeatherFact(null, date.plusDays(1), LocalTime.of(9, 0),
+                                new BigDecimal("26.0"), 60, "1", "4",
+                                new BigDecimal("3.0"), 70)));
+    }
+
+    private CoursePersistenceResult persistence(
+            List<String> candidateIds,
+            Map<String, CourseItemSource> sources,
+            Map<String, String> categories,
+            LocalDate visitDate
+    ) {
         Course course = mock(Course.class);
         when(course.getId()).thenReturn(101L);
         when(course.getCourseType()).thenReturn(CourseType.USER);
         when(course.getGenerationReason()).thenReturn(GenerationReason.INITIAL);
         when(course.getStatus()).thenReturn(CourseStatus.READY);
+        when(course.getStartDate()).thenReturn(visitDate);
+        when(course.getEndDate()).thenReturn(visitDate.plusDays(2));
         when(course.getPeople()).thenReturn(2);
-        when(course.getBudgetTotal()).thenReturn(500000);
+        when(course.getBudgetTotal()).thenReturn(400000);
         when(course.getTransport()).thenReturn(Transport.RENTAL_CAR);
 
-        Place place = mock(Place.class);
-        when(place.getId()).thenReturn(301L);
-        CourseItem persistedItem = mock(CourseItem.class);
-        when(persistedItem.getId()).thenReturn(201L);
-        when(persistedItem.getCourse()).thenReturn(course);
-        when(persistedItem.getPlace()).thenReturn(place);
-        when(persistedItem.getItemSource()).thenReturn(CourseItemSource.USER_FIXED);
+        Map<String, CourseItem> items = new LinkedHashMap<>();
+        for (int index = 0; index < candidateIds.size(); index++) {
+            String candidateId = candidateIds.get(index);
+            Place place = mock(Place.class);
+            when(place.getId()).thenReturn(301L + index);
+            CourseItem item = mock(CourseItem.class);
+            when(item.getId()).thenReturn(201L + index);
+            when(item.getCourse()).thenReturn(course);
+            when(item.getPlace()).thenReturn(place);
+            when(item.getDayNo()).thenReturn(1);
+            when(item.getPosition()).thenReturn(index + 1);
+            when(item.getVisitDate()).thenReturn(visitDate);
+            when(item.getStartTime()).thenReturn(LocalTime.of(9 + index * 2, 0));
+            when(item.getItemSource()).thenReturn(sources.get(candidateId));
+            when(item.getInboundDistanceMeters()).thenReturn(null);
+            when(item.getInboundTravelMinutes()).thenReturn(null);
+            when(item.getRecommendationReason()).thenReturn(
+                    CourseItemSource.USER_FIXED == sources.get(candidateId)
+                            ? "사용자 선택 유지" : index == 0 ? "숲길 추천" : "둘째 추천");
+            items.put(candidateId, item);
+        }
+        return new CoursePersistenceResult(course, items, categories);
+    }
 
-        var accommodation = objectMapper.readValue("""
+    private AccommodationDto accommodation() throws Exception {
+        return objectMapper.readValue("""
                 {"source_code":"KAKAO_LOCAL","source_place_id":"stay-1",
                  "place_name":"제주 숙소","address":"제주 주소",
                  "latitude":33.4,"longitude":126.8}
-                """, com.example.hangat.course.model.AccommodationDto.class);
-        CourseResponseDto response = assembler.assemble(
-                input,
-                result,
-                List.of(original("first", "첫 장소", "first.jpg")),
-                new CoursePersistenceResult(
-                        course,
-                        java.util.Map.of("first", persistedItem),
-                        java.util.Map.of("first", "관광지")),
-                accommodation);
-
-        assertThat(response.id()).isEqualTo(101L);
-        assertThat(response.accommodation()).isSameAs(accommodation);
-        CourseResponseDto.ItemDto responseItem = response.days().get(0).items().get(0);
-        assertThat(responseItem.id()).isEqualTo(201L);
-        assertThat(responseItem.courseId()).isEqualTo(101L);
-        assertThat(responseItem.placeId()).isEqualTo(301L);
-        assertThat(responseItem.dayNo()).isEqualTo(1);
-        assertThat(responseItem.visitDate()).isEqualTo(LocalDate.of(2026, 8, 28));
-        assertThat(responseItem.categoryName()).isEqualTo("관광지");
-        assertThat(responseItem.costs()).isEmpty();
-        assertThat(responseItem.congestionRate()).isEqualByComparingTo("72.50");
-        assertThat(responseItem.congestionLevel()).isEqualTo(CongestionLevel.CROWDED);
-        assertThat(responseItem.weather()).isNull();
+                """, AccommodationDto.class);
     }
 
-    private CourseAiInputDto input(List<CourseAiInputDto.CandidateFactDto> candidates) {
-        CourseAiInputDto.PlaceConstraintDto fixedWant = new CourseAiInputDto.PlaceConstraintDto(
-                new CourseAiInputDto.PlaceIdentityDto(null, null, null, null),
-                "첫 장소", "주소", null, null, null,
-                PreferenceType.WANT, LocalDate.of(2026, 8, 28), LocalTime.of(9, 0));
-        return new CourseAiInputDto(
-                "1.0",
-                new CourseAiInputDto.TripConditionDto(
-                        LocalDate.of(2026, 8, 27), LocalDate.of(2026, 8, 29),
-                        2, 500000, Transport.RENTAL_CAR),
-                new CourseAiInputDto.UserPreferencesDto(
-                        List.of(), List.of(), List.of(fixedWant), List.of(), null),
-                candidates, List.of(), null);
-    }
-
-    private CourseAiInputDto.CandidateFactDto fact(
-            String id,
-            String name,
-            PreferenceType preferenceType,
-            List<CourseAiInputDto.CongestionFactDto> congestion,
-            List<CourseWeatherDto> weather
+    private CourseAiResultDto.DayDto day(
+            LocalDate date,
+            CourseAiResultDto.ItemDto... items
     ) {
-        return new CourseAiInputDto.CandidateFactDto(
-                new CourseAiInputDto.PlaceIdentityDto(id, null, null, null),
-                name, "제주 주소", 33.4, 126.8,
-                new CourseAiInputDto.TourCategoryDto("A01", "A0101", "A01010100"),
-                "EAST", preferenceType, List.of("NATURE"), congestion, weather);
-    }
-
-    private CourseCandidateDto original(
-            String id,
-            String name,
-            String imageUrl
-    ) throws Exception {
-        TourPlaceDto place = objectMapper.readValue("""
-                {"contentid":"%s","title":"%s","addr1":"제주 주소",
-                 "mapy":33.4,"mapx":126.8,"cat1":"A01","firstimage":%s}
-                """.formatted(id, name,
-                        imageUrl == null ? "null" : "\"" + imageUrl + "\""), TourPlaceDto.class);
-        return new CourseCandidateDto(place, List.of(), null, List.of("NATURE"));
-    }
-
-    private CourseAiResultDto.DayDto day(String date, CourseAiResultDto.ItemDto... items) {
-        return new CourseAiResultDto.DayDto(LocalDate.parse(date), List.of(items));
+        return new CourseAiResultDto.DayDto(date, List.of(items));
     }
 
     private CourseAiResultDto.ItemDto item(

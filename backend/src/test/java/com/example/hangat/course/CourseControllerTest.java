@@ -69,6 +69,8 @@ class CourseControllerTest {
                 .andExpect(jsonPath("$.days[0].items[0].id").value(201))
                 .andExpect(jsonPath("$.days[0].items[0].course_id").value(101))
                 .andExpect(jsonPath("$.days[0].items[0].place_id").value(301))
+                .andExpect(jsonPath("$.days[0].items[0].source_code").value("KTO"))
+                .andExpect(jsonPath("$.days[0].items[0].source_place_id").value("125266"))
                 .andExpect(jsonPath("$.days[0].items[0].place_name").value("성산일출봉"))
                 .andExpect(jsonPath("$.days[0].items[0].day_no").value(1))
                 .andExpect(jsonPath("$.days[0].items[0].visit_date").value("2026-08-28"))
@@ -103,15 +105,17 @@ class CourseControllerTest {
         }
         CourseResponseDto.ItemDto item = new CourseResponseDto.ItemDto(
                 201L, 101L, 301L,
-                "candidate-1", "성산일출봉", "제주특별자치도 서귀포시 성산읍",
+                "candidate-1", "KTO", "125266",
+                "성산일출봉", "제주특별자치도 서귀포시 성산읍", null,
                 33.458, 126.942, null,
                 "관광지",
-                new CourseResponseDto.TourCategoryDto("A01", null, null),
                 "EAST", null, List.of("NATURE"), 1, 1,
                 LocalDate.of(2026, 8, 28),
                 LocalTime.of(9, 0), CourseResponseDto.ItemSource.AI_RECOMMENDED,
                 "혼잡도가 낮고 동선이 좋아요.",
                 List.of(),
+                null,
+                null,
                 new BigDecimal("22.5"),
                 com.example.hangat.course.model.CongestionLevel.QUIET,
                 List.of(new CourseResponseDto.CongestionFactDto(

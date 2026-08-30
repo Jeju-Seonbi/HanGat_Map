@@ -1,9 +1,13 @@
 package com.example.hangat.course;
 
-import com.example.hangat.course.ai.CourseAiInputDto;
 import com.example.hangat.course.ai.CourseAiResultDto;
+import com.example.hangat.course.facts.CongestionFact;
+import com.example.hangat.course.facts.CourseCandidate;
+import com.example.hangat.course.facts.CourseGenerationFacts;
+import com.example.hangat.course.facts.StyleHint;
+import com.example.hangat.course.facts.TravelFact;
+import com.example.hangat.course.facts.WeatherFactSet;
 import com.example.hangat.course.model.AccommodationDto;
-import com.example.hangat.course.model.CourseCandidateDto;
 import com.example.hangat.course.model.Course;
 import com.example.hangat.course.model.CourseItem;
 import com.example.hangat.course.model.CourseResponseDto;
@@ -11,10 +15,10 @@ import com.example.hangat.course.model.CourseResponseDto.CongestionFactDto;
 import com.example.hangat.course.model.CourseResponseDto.DayDto;
 import com.example.hangat.course.model.CourseResponseDto.ItemDto;
 import com.example.hangat.course.model.CourseResponseDto.ItemSource;
-import com.example.hangat.course.model.CourseResponseDto.TourCategoryDto;
 import com.example.hangat.course.model.CourseResponseDto.WeatherFactDto;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,198 +29,226 @@ import java.util.stream.Collectors;
 public class CourseResponseAssembler {
 
     public CourseResponseDto assemble(
-            CourseAiInputDto input,
+            CourseGenerationFacts facts,
             CourseAiResultDto result,
-            List<CourseCandidateDto> originalCandidates
-    ) {
-        return assemble(input, result, originalCandidates, null);
-    }
-
-    public CourseResponseDto assemble(
-            CourseAiInputDto input,
-            CourseAiResultDto result,
-            List<CourseCandidateDto> originalCandidates,
-            CoursePersistenceResult persistence
-    ) {
-        return assemble(input, result, originalCandidates, persistence, null);
-    }
-
-    public CourseResponseDto assemble(
-            CourseAiInputDto input,
-            CourseAiResultDto result,
-            List<CourseCandidateDto> originalCandidates,
             CoursePersistenceResult persistence,
             AccommodationDto accommodation
     ) {
-        if (input == null || input.tripCondition() == null) {
-            throw new IllegalArgumentException("AI 코스 입력이 필요합니다.");
+        if (facts == null) {
+            throw new IllegalArgumentException("코스 생성 사실이 필요합니다.");
         }
-        if (result == null) {
+        if (result == null || result.days() == null) {
             throw new IllegalArgumentException("AI 코스 생성 결과가 필요합니다.");
         }
+        if (persistence == null || persistence.course() == null) {
+            throw new IllegalArgumentException("코스 저장 결과가 필요합니다.");
+        }
 
-        Map<String, CourseAiInputDto.CandidateFactDto> factsById = input.candidates().stream()
-                .collect(Collectors.toMap(
-                        candidate -> candidate.identity().candidateId(),
-                        Function.identity(),
-                        (first, second) -> first,
-                        LinkedHashMap::new));
-        Map<String, CourseCandidateDto> originalsById = originalCandidates == null
-                ? Map.of()
-                : originalCandidates.stream()
-                        .filter(candidate -> candidate != null && candidate.getPlace() != null)
-                        .collect(Collectors.toMap(
-                                candidate -> candidate.getPlace().getContentId(),
-                                Function.identity(),
-                                (first, second) -> first,
-                                LinkedHashMap::new));
+        Map<String, CourseCandidate> candidatesById = indexCandidates(facts.candidates());
+        Map<String, WeatherFactSet> weatherFactSetsById = indexWeatherFactSets(
+                facts.weatherFactSets());
+        Map<TravelPair, TravelFact> travelFactsByPair = indexTravelFacts(facts.travelFacts());
 
-        List<DayDto> days = java.util.stream.IntStream.range(0, result.days().size())
-                .mapToObj(dayIndex -> toDay(
-                        dayIndex + 1,
-                        result.days().get(dayIndex),
-                        factsById,
-                        originalsById,
-                        input,
+        List<DayDto> days = result.days().stream()
+                .map(day -> toDay(
+                        day,
+                        candidatesById,
+                        weatherFactSetsById,
+                        travelFactsByPair,
                         persistence))
                 .toList();
 
-        Course course = persistence == null ? null : persistence.course();
+        Course course = persistence.course();
         return new CourseResponseDto(
-                course == null ? null : course.getId(),
+                course.getId(),
                 result.contractVersion(),
-                course == null ? null : course.getCourseType(),
-                course == null ? null : course.getGenerationReason(),
-                course == null ? null : course.getStatus(),
-                input.tripCondition().startDate(),
-                input.tripCondition().endDate(),
-                course == null ? input.tripCondition().people() : course.getPeople(),
-                course == null ? input.tripCondition().budgetTotal() : course.getBudgetTotal(),
-                course == null ? input.tripCondition().transport() : course.getTransport(),
+                course.getCourseType(),
+                course.getGenerationReason(),
+                course.getStatus(),
+                course.getStartDate(),
+                course.getEndDate(),
+                course.getPeople(),
+                course.getBudgetTotal(),
+                course.getTransport(),
                 accommodation,
                 days);
     }
 
     private DayDto toDay(
-            int dayNo,
             CourseAiResultDto.DayDto day,
-            Map<String, CourseAiInputDto.CandidateFactDto> factsById,
-            Map<String, CourseCandidateDto> originalsById,
-            CourseAiInputDto input,
+            Map<String, CourseCandidate> candidatesById,
+            Map<String, WeatherFactSet> weatherFactSetsById,
+            Map<TravelPair, TravelFact> travelFactsByPair,
             CoursePersistenceResult persistence
     ) {
+        if (day == null || day.items() == null || day.items().isEmpty()) {
+            throw new IllegalArgumentException("응답으로 변환할 AI 일정이 유효하지 않습니다.");
+        }
+
         List<ItemDto> items = java.util.stream.IntStream.range(0, day.items().size())
                 .mapToObj(itemIndex -> toItem(
-                        dayNo,
-                        itemIndex + 1,
-                        day,
                         day.items().get(itemIndex),
-                        factsById,
-                        originalsById,
-                        input,
+                        itemIndex == 0 ? null : day.items().get(itemIndex - 1).candidateId(),
+                        candidatesById,
+                        weatherFactSetsById,
+                        travelFactsByPair,
                         persistence))
                 .toList();
-        return new DayDto(dayNo, day.date(), items);
+        return new DayDto(items.get(0).dayNo(), items.get(0).visitDate(), items);
     }
 
     private ItemDto toItem(
-            int dayNo,
-            int position,
-            CourseAiResultDto.DayDto day,
             CourseAiResultDto.ItemDto item,
-            Map<String, CourseAiInputDto.CandidateFactDto> factsById,
-            Map<String, CourseCandidateDto> originalsById,
-            CourseAiInputDto input,
+            String previousCandidateId,
+            Map<String, CourseCandidate> candidatesById,
+            Map<String, WeatherFactSet> weatherFactSetsById,
+            Map<TravelPair, TravelFact> travelFactsByPair,
             CoursePersistenceResult persistence
     ) {
-        CourseAiInputDto.CandidateFactDto fact = factsById.get(item.candidateId());
-        CourseCandidateDto original = originalsById.get(item.candidateId());
-        if (fact == null) {
+        CourseCandidate candidate = candidatesById.get(item.candidateId());
+        if (candidate == null) {
             throw new IllegalArgumentException(
                     "응답으로 변환할 수 없는 AI 후보 식별자입니다: " + item.candidateId());
         }
+        CourseItem persistedItem = persistence.itemsByCandidateId().get(item.candidateId());
+        if (persistedItem == null) {
+            throw new IllegalArgumentException(
+                    "응답으로 변환할 저장 항목이 없습니다: " + item.candidateId());
+        }
 
-        CourseAiInputDto.TourCategoryDto category = fact.tourCategory();
-        CourseItem persistedItem = persistence == null
-                ? null
-                : persistence.itemsByCandidateId().get(item.candidateId());
-        List<CongestionFactDto> congestion = fact.congestion().stream()
-                .filter(congestionFact -> day.date().equals(congestionFact.date()))
-                .map(congestionFact -> new CongestionFactDto(
-                        congestionFact.date(), congestionFact.rate(), congestionFact.level()))
+        List<CongestionFactDto> congestion = candidate.congestionFacts().stream()
+                .map(this::toCongestionFact)
                 .toList();
-        CongestionFactDto displayedCongestion = congestion.stream().findFirst().orElse(null);
+        CongestionFactDto displayedCongestion = congestion.stream()
+                .filter(fact -> persistedItem.getVisitDate().equals(fact.date()))
+                .findFirst()
+                .orElse(null);
+        List<WeatherFactDto> weather = resolveWeather(
+                candidate, persistedItem, weatherFactSetsById);
+        TravelFact inboundTravel = previousCandidateId == null
+                ? null
+                : travelFactsByPair.get(new TravelPair(
+                        previousCandidateId, item.candidateId()));
+
+        BigDecimal inboundDistance = null;
+        Integer inboundTravelMinutes = null;
+        if (previousCandidateId != null) {
+            inboundDistance = persistedItem.getInboundDistanceMeters() == null
+                    ? (inboundTravel == null ? null : inboundTravel.routeDistanceMeters())
+                    : BigDecimal.valueOf(persistedItem.getInboundDistanceMeters());
+            inboundTravelMinutes = persistedItem.getInboundTravelMinutes() == null
+                    ? (inboundTravel == null ? null : inboundTravel.travelMinutes())
+                    : persistedItem.getInboundTravelMinutes();
+        }
+
         return new ItemDto(
-                persistedItem == null ? null : persistedItem.getId(),
-                persistedItem == null ? null : persistedItem.getCourse().getId(),
-                persistedItem == null ? null : persistedItem.getPlace().getId(),
-                item.candidateId(),
-                fact.name(),
-                fact.address(),
-                fact.latitude(),
-                fact.longitude(),
-                original == null ? null : original.getPlace().getImageUrl(),
-                persistence == null
-                        ? sourceCategoryName(input, item.candidateId())
-                        : persistence.categoryNamesByCandidateId().get(item.candidateId()),
-                category == null ? null : new TourCategoryDto(
-                        category.category1(), category.category2(), category.category3()),
-                fact.regionCode(),
-                fact.preferenceType(),
-                fact.confirmedStyleHints(),
-                dayNo,
-                position,
-                day.date(),
-                item.startTime(),
-                persistedItem == null
-                        ? (isFixedSchedule(day, item, fact, input)
-                                ? ItemSource.USER_FIXED
-                                : ItemSource.AI_RECOMMENDED)
-                        : ItemSource.valueOf(persistedItem.getItemSource().name()),
-                item.recommendationReason(),
+                persistedItem.getId(),
+                persistedItem.getCourse().getId(),
+                persistedItem.getPlace().getId(),
+                candidate.identity().candidateId(),
+                candidate.identity().sourceCode(),
+                candidate.identity().sourcePlaceId(),
+                candidate.place().name(),
+                candidate.place().address(),
+                candidate.place().roadAddress(),
+                candidate.place().latitude() == null
+                        ? null : candidate.place().latitude().doubleValue(),
+                candidate.place().longitude() == null
+                        ? null : candidate.place().longitude().doubleValue(),
+                candidate.place().imageUrl(),
+                categoryName(candidate, persistence),
+                candidate.regionCode(),
+                candidate.userConstraint().preferenceType(),
+                candidate.styleHints().stream().map(StyleHint::styleCode).toList(),
+                persistedItem.getDayNo(),
+                persistedItem.getPosition(),
+                persistedItem.getVisitDate(),
+                persistedItem.getStartTime(),
+                ItemSource.valueOf(persistedItem.getItemSource().name()),
+                persistedItem.getRecommendationReason(),
                 List.of(),
+                inboundDistance,
+                inboundTravelMinutes,
                 displayedCongestion == null ? null : displayedCongestion.rate(),
                 displayedCongestion == null ? null : displayedCongestion.level(),
                 congestion,
-                fact.weather() == null ? null : fact.weather().stream()
-                        .filter(weather -> day.date().equals(weather.forecastDate()))
-                        .map(weather -> new WeatherFactDto(
-                                weather.forecastDate(), weather.forecastTime(),
-                                weather.temperature(), weather.precipitationProbability(),
-                                weather.precipitationTypeCode(), weather.skyConditionCode(),
-                                weather.windSpeed(), weather.humidity()))
-                        .toList());
+                weather);
     }
 
-    private String sourceCategoryName(CourseAiInputDto input, String candidateId) {
-        return input.userPreferences().requiredPlaces().stream()
-                .filter(required -> required.identity() != null
-                        && candidateId.equals(required.identity().candidateId()))
-                .map(CourseAiInputDto.PlaceConstraintDto::categoryName)
-                .filter(value -> value != null && !value.isBlank())
-                .findFirst()
-                .orElse(null);
-    }
-
-    private boolean isFixedSchedule(
-            CourseAiResultDto.DayDto day,
-            CourseAiResultDto.ItemDto item,
-            CourseAiInputDto.CandidateFactDto candidate,
-            CourseAiInputDto input
+    private String categoryName(
+            CourseCandidate candidate,
+            CoursePersistenceResult persistence
     ) {
-        return input.userPreferences().requiredPlaces().stream()
-                .anyMatch(required -> required.fixedDate() != null
-                        && required.fixedDate().equals(day.date())
-                        && (required.fixedTime() == null
-                                || required.fixedTime().equals(item.startTime()))
-                        && sameName(required.name(), candidate.name()));
+        String persistedName = persistence.categoryNamesByCandidateId()
+                .get(candidate.identity().candidateId());
+        return persistedName == null || persistedName.isBlank()
+                ? candidate.internalPlaceCategory().name()
+                : persistedName;
     }
 
-    private boolean sameName(String first, String second) {
-        return normalize(first).equals(normalize(second));
+    private CongestionFactDto toCongestionFact(CongestionFact fact) {
+        return new CongestionFactDto(fact.date(), fact.rate(), fact.level());
     }
 
-    private String normalize(String value) {
-        return value == null ? "" : value.replaceAll("\\s+", "").toLowerCase(java.util.Locale.ROOT);
+    private List<WeatherFactDto> resolveWeather(
+            CourseCandidate candidate,
+            CourseItem persistedItem,
+            Map<String, WeatherFactSet> weatherFactSetsById
+    ) {
+        if (candidate.weatherFactSetId() == null) {
+            return null;
+        }
+        WeatherFactSet factSet = weatherFactSetsById.get(candidate.weatherFactSetId());
+        if (factSet == null) {
+            throw new IllegalArgumentException(
+                    "응답 후보가 존재하지 않는 날씨 fact set을 참조합니다: "
+                            + candidate.weatherFactSetId());
+        }
+        return factSet.facts().stream()
+                .filter(fact -> persistedItem.getVisitDate().equals(fact.forecastDate()))
+                .map(fact -> new WeatherFactDto(
+                        fact.forecastDate(), fact.forecastTime(), fact.temperature(),
+                        fact.precipitationProbability(), fact.precipitationTypeCode(),
+                        fact.skyConditionCode(), fact.windSpeed(), fact.humidity()))
+                .toList();
+    }
+
+    private Map<String, CourseCandidate> indexCandidates(List<CourseCandidate> candidates) {
+        return candidates.stream().collect(Collectors.toMap(
+                candidate -> candidate.identity().candidateId(),
+                Function.identity(),
+                (first, second) -> {
+                    throw new IllegalArgumentException(
+                            "응답 후보에 중복 candidateId가 있습니다: "
+                                    + first.identity().candidateId());
+                },
+                LinkedHashMap::new));
+    }
+
+    private Map<String, WeatherFactSet> indexWeatherFactSets(List<WeatherFactSet> factSets) {
+        return factSets.stream().collect(Collectors.toMap(
+                WeatherFactSet::weatherFactSetId,
+                Function.identity(),
+                (first, second) -> {
+                    throw new IllegalArgumentException(
+                            "응답 날씨에 중복 weatherFactSetId가 있습니다: "
+                                    + first.weatherFactSetId());
+                },
+                LinkedHashMap::new));
+    }
+
+    private Map<TravelPair, TravelFact> indexTravelFacts(List<TravelFact> travelFacts) {
+        return travelFacts.stream().collect(Collectors.toMap(
+                fact -> new TravelPair(fact.fromCandidateId(), fact.toCandidateId()),
+                Function.identity(),
+                (first, second) -> {
+                    throw new IllegalArgumentException(
+                            "응답 이동정보에 중복 후보 pair가 있습니다: "
+                                    + first.fromCandidateId() + "->" + first.toCandidateId());
+                },
+                LinkedHashMap::new));
+    }
+
+    private record TravelPair(String fromCandidateId, String toCandidateId) {
     }
 }
