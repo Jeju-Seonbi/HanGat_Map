@@ -93,7 +93,7 @@ watch(() => state.course, () => { naming.value = false })
       <template v-for="(stops, d) in byDay" :key="d">
         <div class="dayh">
           {{ fmt(at(state.di + +d - 1)) }} · {{ d }}일차 <i></i>
-          <span style="color:var(--tx3);font-weight:500">
+          <span v-if="dayWeather(d)" style="color:var(--tx3);font-weight:500">
             <span v-html="wxIcon(dayWeather(d).k, 15)"></span> {{ dayWeather(d).k }}
           </span>
         </div>

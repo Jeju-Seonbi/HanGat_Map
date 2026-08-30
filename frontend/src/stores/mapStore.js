@@ -4,6 +4,7 @@ import { crowd, tier } from '@/utils/crowd'
 import { at, iso, ago, D0 } from '@/utils/date'
 import MapPlaceService, { PENDING_LAYERS } from '@/services/map/MapPlaceService'
 import CrowdService, { attachSeries } from '@/services/map/CrowdService'
+import WeatherService from '@/services/map/WeatherService'
 
 /* 지도 페이지 전역 상태.
    Pinia와 같은 모양(state + action)으로 두어 나중에 옮기기 쉽게 했다.
@@ -100,7 +101,7 @@ export async function loadPlaces () {
   state.live = live
   state.loading = false
 
-  const forecast = await CrowdService.getForecast()
+  const [forecast] = await Promise.all([CrowdService.getForecast(), WeatherService.load()])
   state.forecastDays = forecast.days
   attachSeries(state.layers.spot, forecast, iso(new Date()))
 }
