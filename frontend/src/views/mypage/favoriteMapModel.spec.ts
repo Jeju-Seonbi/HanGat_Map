@@ -35,7 +35,7 @@ describe('favoriteMapModel', () => {
         latitude: 33.356,
         longitude: 126.306,
         score: 28,
-        level: 'RELAXED',
+        level: 'QUIET',
         cost: '무료',
       },
       {
