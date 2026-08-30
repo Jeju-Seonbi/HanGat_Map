@@ -8,14 +8,14 @@ import com.example.hangat.course.facts.StyleHint;
 import com.example.hangat.course.facts.TravelFact;
 import com.example.hangat.course.facts.WeatherFactSet;
 import com.example.hangat.course.model.AccommodationDto;
-import com.example.hangat.course.model.Course;
-import com.example.hangat.course.model.CourseItem;
 import com.example.hangat.course.model.CourseResponseDto;
 import com.example.hangat.course.model.CourseResponseDto.CongestionFactDto;
 import com.example.hangat.course.model.CourseResponseDto.DayDto;
 import com.example.hangat.course.model.CourseResponseDto.ItemDto;
 import com.example.hangat.course.model.CourseResponseDto.ItemSource;
 import com.example.hangat.course.model.CourseResponseDto.WeatherFactDto;
+import com.example.hangat.course.model.entity.Course;
+import com.example.hangat.course.model.entity.CourseItem;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -133,12 +133,13 @@ public class CourseResponseAssembler {
         BigDecimal inboundDistance = null;
         Integer inboundTravelMinutes = null;
         if (previousCandidateId != null) {
-            inboundDistance = persistedItem.getInboundDistanceMeters() == null
+            inboundDistance = persistedItem.getInboundDistanceM() == null
                     ? (inboundTravel == null ? null : inboundTravel.routeDistanceMeters())
-                    : BigDecimal.valueOf(persistedItem.getInboundDistanceMeters());
-            inboundTravelMinutes = persistedItem.getInboundTravelMinutes() == null
+                    : BigDecimal.valueOf(persistedItem.getInboundDistanceM());
+            Short persistedTravelMinutes = persistedItem.getInboundTravelMinutes();
+            inboundTravelMinutes = persistedTravelMinutes == null
                     ? (inboundTravel == null ? null : inboundTravel.travelMinutes())
-                    : persistedItem.getInboundTravelMinutes();
+                    : Integer.valueOf(persistedTravelMinutes);
         }
 
         return new ItemDto(

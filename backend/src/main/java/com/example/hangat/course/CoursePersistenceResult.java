@@ -1,7 +1,7 @@
 package com.example.hangat.course;
 
-import com.example.hangat.course.model.Course;
-import com.example.hangat.course.model.CourseItem;
+import com.example.hangat.course.model.entity.Course;
+import com.example.hangat.course.model.entity.CourseItem;
 
 import java.util.Map;
 

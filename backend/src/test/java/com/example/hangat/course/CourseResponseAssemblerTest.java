@@ -15,16 +15,16 @@ import com.example.hangat.course.facts.WeatherFact;
 import com.example.hangat.course.facts.WeatherFactSet;
 import com.example.hangat.course.model.AccommodationDto;
 import com.example.hangat.course.model.CongestionLevel;
-import com.example.hangat.course.model.Course;
-import com.example.hangat.course.model.CourseItem;
-import com.example.hangat.course.model.CourseItemSource;
 import com.example.hangat.course.model.CourseResponseDto;
-import com.example.hangat.course.model.CourseStatus;
-import com.example.hangat.course.model.CourseType;
-import com.example.hangat.course.model.GenerationReason;
-import com.example.hangat.course.model.Place;
 import com.example.hangat.course.model.PreferenceType;
+import com.example.hangat.course.model.entity.Course;
+import com.example.hangat.course.model.entity.CourseItem;
+import com.example.hangat.course.model.enums.CourseItemSource;
+import com.example.hangat.course.model.enums.CourseStatus;
+import com.example.hangat.course.model.enums.CourseType;
+import com.example.hangat.course.model.enums.GenerationReason;
 import com.example.hangat.course.model.Transport;
+import com.example.hangat.map.model.entity.Place;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.Test;
@@ -349,9 +349,10 @@ class CourseResponseAssemblerTest {
         when(course.getStatus()).thenReturn(CourseStatus.READY);
         when(course.getStartDate()).thenReturn(visitDate);
         when(course.getEndDate()).thenReturn(visitDate.plusDays(2));
-        when(course.getPeople()).thenReturn(2);
+        when(course.getPeople()).thenReturn((short) 2);
         when(course.getBudgetTotal()).thenReturn(400000);
-        when(course.getTransport()).thenReturn(Transport.RENTAL_CAR);
+        when(course.getTransport()).thenReturn(
+                com.example.hangat.course.model.enums.Transport.RENTAL_CAR);
 
         Map<String, CourseItem> items = new LinkedHashMap<>();
         for (int index = 0; index < candidateIds.size(); index++) {
@@ -362,12 +363,12 @@ class CourseResponseAssemblerTest {
             when(item.getId()).thenReturn(201L + index);
             when(item.getCourse()).thenReturn(course);
             when(item.getPlace()).thenReturn(place);
-            when(item.getDayNo()).thenReturn(1);
-            when(item.getPosition()).thenReturn(index + 1);
+            when(item.getDayNo()).thenReturn((short) 1);
+            when(item.getPosition()).thenReturn((short) (index + 1));
             when(item.getVisitDate()).thenReturn(visitDate);
             when(item.getStartTime()).thenReturn(LocalTime.of(9 + index * 2, 0));
             when(item.getItemSource()).thenReturn(sources.get(candidateId));
-            when(item.getInboundDistanceMeters()).thenReturn(null);
+            when(item.getInboundDistanceM()).thenReturn(null);
             when(item.getInboundTravelMinutes()).thenReturn(null);
             when(item.getRecommendationReason()).thenReturn(
                     CourseItemSource.USER_FIXED == sources.get(candidateId)

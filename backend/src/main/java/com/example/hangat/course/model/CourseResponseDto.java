@@ -3,6 +3,10 @@ package com.example.hangat.course.model;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
+import com.example.hangat.course.model.enums.CourseStatus;
+import com.example.hangat.course.model.enums.CourseType;
+import com.example.hangat.course.model.enums.GenerationReason;
+import com.example.hangat.course.model.enums.Transport;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -19,7 +23,7 @@ public record CourseResponseDto(
         CourseStatus status,
         LocalDate startDate,
         LocalDate endDate,
-        Integer people,
+        Short people,
         Integer budgetTotal,
         Transport transport,
         AccommodationDto accommodation,

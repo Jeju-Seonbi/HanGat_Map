@@ -8,17 +8,23 @@ import com.example.hangat.course.facts.ExternalClassificationFact;
 import com.example.hangat.course.facts.InternalPlaceCategory;
 import com.example.hangat.course.facts.PlaceFact;
 import com.example.hangat.course.facts.UserConstraint;
-import com.example.hangat.course.model.Course;
-import com.example.hangat.course.model.CourseItem;
-import com.example.hangat.course.model.CourseItemSource;
 import com.example.hangat.course.model.CourseRequestDto;
-import com.example.hangat.course.model.CourseStatus;
 import com.example.hangat.course.model.GenerationReason;
-import com.example.hangat.course.model.Place;
-import com.example.hangat.course.model.PlaceCategory;
-import com.example.hangat.course.model.PlaceSourceMapping;
-import com.example.hangat.course.model.Region;
-import com.example.hangat.course.model.Transport;
+import com.example.hangat.course.model.entity.CourseItem;
+import com.example.hangat.course.model.enums.CourseItemSource;
+import com.example.hangat.course.model.enums.CourseStatus;
+import com.example.hangat.course.repository.CourseItemRepository;
+import com.example.hangat.course.repository.CourseRepository;
+import com.example.hangat.map.model.entity.DataSource;
+import com.example.hangat.map.model.entity.Place;
+import com.example.hangat.map.model.entity.PlaceCategory;
+import com.example.hangat.map.model.entity.PlaceSourceMapping;
+import com.example.hangat.map.model.entity.Region;
+import com.example.hangat.map.repository.DataSourceRepository;
+import com.example.hangat.map.repository.PlaceCategoryRepository;
+import com.example.hangat.map.repository.PlaceRepository;
+import com.example.hangat.map.repository.PlaceSourceMappingRepository;
+import com.example.hangat.map.repository.RegionRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.BeforeEach;
@@ -61,6 +67,8 @@ class CoursePersistenceServiceTest {
     private RegionRepository regionRepository;
     @Autowired
     private PlaceCategoryRepository categoryRepository;
+    @Autowired
+    private DataSourceRepository dataSourceRepository;
 
     @BeforeEach
     void setUpReferences() {
@@ -70,10 +78,16 @@ class CoursePersistenceServiceTest {
         placeRepository.deleteAll();
         categoryRepository.deleteAll();
         regionRepository.deleteAll();
+        dataSourceRepository.deleteAll();
 
-        regionRepository.save(Region.reference("EAST", "동부", 1));
-        categoryRepository.save(PlaceCategory.reference("TOURIST", "관광지", 1));
-        categoryRepository.save(PlaceCategory.reference("CAFE", "카페", 2));
+        regionRepository.save(Region.builder()
+                .code("EAST").name("동부").displayOrder((byte) 1).build());
+        categoryRepository.save(PlaceCategory.builder()
+                .code("TOURIST").name("관광지").displayOrder((short) 1).build());
+        categoryRepository.save(PlaceCategory.builder()
+                .code("CAFE").name("카페").displayOrder((short) 2).build());
+        dataSourceRepository.save(dataSource("KTO", (short) 1));
+        dataSourceRepository.save(dataSource("KAKAO_LOCAL", (short) 2));
     }
 
     @Test
@@ -93,9 +107,9 @@ class CoursePersistenceServiceTest {
 
         assertThat(persisted.course().getId()).isNotNull();
         assertThat(persisted.course().getStatus()).isEqualTo(CourseStatus.READY);
-        assertThat(persisted.course().getGenerationReason()).isEqualTo(GenerationReason.INITIAL);
+        assertThat(persisted.course().getGenerationReason())
+                .isEqualTo(com.example.hangat.course.model.enums.GenerationReason.INITIAL);
         assertThat(persisted.course().getAlgorithmVersion()).isEqualTo("course-ai-2");
-        assertThat(persisted.course().getParentCourse()).isNull();
 
         CourseItem item = persisted.itemsByCandidateId().get("candidate-kto-1001");
         assertThat(item.getId()).isNotNull();
@@ -104,15 +118,15 @@ class CoursePersistenceServiceTest {
                 .isEqualTo("제주특별자치도 서귀포시 성산읍 일출로 284-12");
         assertThat(item.getPlace().getLotAddress())
                 .isEqualTo("제주특별자치도 서귀포시 성산읍 성산리 1");
-        assertThat(item.getDayNo()).isEqualTo(1);
-        assertThat(item.getPosition()).isEqualTo(1);
+        assertThat(item.getDayNo()).isEqualTo((short) 1);
+        assertThat(item.getPosition()).isEqualTo((short) 1);
         assertThat(item.getVisitDate()).isEqualTo(LocalDate.of(2026, 8, 27));
         assertThat(item.getStartTime()).isEqualTo(LocalTime.of(9, 0));
         assertThat(item.getItemSource()).isEqualTo(CourseItemSource.USER_FIXED);
         assertThat(item.getRecommendationReason()).isEqualTo("사실 데이터에 근거한 추천 이유");
-        assertThat(item.getInboundDistanceMeters()).isNull();
+        assertThat(item.getInboundDistanceM()).isNull();
         assertThat(item.getInboundTravelMinutes()).isNull();
-        assertThat(item.getPlannedCongestionForecastId()).isNull();
+        assertThat(item.getPlannedCongestionForecast()).isNull();
         assertThat(item.getPlannedWeatherForecastId()).isNull();
         assertThat(item.getRecommendationScore()).isNull();
         assertThat(item.getRecommendationReasonCode()).isNull();
@@ -143,7 +157,7 @@ class CoursePersistenceServiceTest {
         assertThat(first.itemsByCandidateId().get("candidate-2001").getPlace().getId())
                 .isEqualTo(second.itemsByCandidateId().get("candidate-2001").getPlace().getId());
         assertThat(second.course().getGenerationReason())
-                .isEqualTo(GenerationReason.USER_REGENERATE);
+                .isEqualTo(com.example.hangat.course.model.enums.GenerationReason.USER_REGENERATE);
     }
 
     @Test
@@ -199,7 +213,7 @@ class CoursePersistenceServiceTest {
     void rejectsConflictingInternalAndExternalIdentityAtomically() throws Exception {
         Place mappedPlace = savePlace("매핑 장소", null, "EAST", "TOURIST");
         Place requestedPlace = savePlace("내부 장소", null, "EAST", "TOURIST");
-        mappingRepository.save(PlaceSourceMapping.active(mappedPlace, "KTO", "conflict-1"));
+        mappingRepository.save(sourceMapping(mappedPlace, "KTO", "conflict-1"));
         CourseCandidate candidate = candidate(
                 "candidate-conflict", requestedPlace.getId(), "KTO", "conflict-1",
                 "내부 장소", null, null, "EAST", "TOURIST",
@@ -296,11 +310,13 @@ class CoursePersistenceServiceTest {
         CoursePersistenceResult persisted = persistenceService.persist(
                 request(), facts(fixedWant, flexibleWant, general), result,
                 metadata(GenerationReason.INITIAL, null));
-        List<CourseItem> items = courseItemRepository.findAllByCourseIdOrderByDayNoAscPositionAsc(
+        List<CourseItem> items = courseItemRepository.findItemsWithPlace(
                 persisted.course().getId());
 
-        assertThat(items).extracting(CourseItem::getDayNo).containsExactly(1, 2, 2);
-        assertThat(items).extracting(CourseItem::getPosition).containsExactly(1, 1, 2);
+        assertThat(items).extracting(CourseItem::getDayNo)
+                .containsExactly((short) 1, (short) 2, (short) 2);
+        assertThat(items).extracting(CourseItem::getPosition)
+                .containsExactly((short) 1, (short) 1, (short) 2);
         assertThat(items).extracting(CourseItem::getVisitDate)
                 .containsExactly(
                         LocalDate.of(2026, 8, 27),
@@ -391,35 +407,48 @@ class CoursePersistenceServiceTest {
         assertThat(courseItemRepository.count()).isZero();
     }
 
-    @Test
-    void persistsNullableParentReferenceForRegeneratedCourse() {
-        Course parent = courseRepository.save(Course.ready(
-                LocalDate.of(2026, 8, 27), LocalDate.of(2026, 8, 29), 2, 500000,
-                Transport.RENTAL_CAR, GenerationReason.INITIAL, "course-ai-1"));
-        Course child = courseRepository.save(Course.ready(
-                LocalDate.of(2026, 8, 27), LocalDate.of(2026, 8, 29), 2, 500000,
-                Transport.RENTAL_CAR, GenerationReason.USER_REGENERATE,
-                "course-ai-1", parent));
-
-        courseRepository.flush();
-
-        assertThat(child.getParentCourse()).isSameAs(parent);
-        assertThat(child.getParentCourse().getId()).isEqualTo(parent.getId());
-    }
-
     private Place savePlace(
             String name,
             String roadAddress,
             String regionCode,
             String categoryCode
     ) {
-        Region region = regionRepository.findByCodeIgnoreCaseAndActiveTrue(regionCode)
+        Region region = regionRepository.findByCode(regionCode)
                 .orElseThrow();
         PlaceCategory category = categoryRepository
-                .findByCodeIgnoreCaseAndActiveTrue(categoryCode).orElseThrow();
-        return placeRepository.save(Place.fromExternalCandidate(
-                region, category, name, normalizeName(name), roadAddress, null,
-                new BigDecimal("33.4580000"), new BigDecimal("126.9420000")));
+                .findByCode(categoryCode).orElseThrow();
+        return placeRepository.save(Place.builder()
+                .region(region)
+                .primaryCategory(category)
+                .name(name)
+                .normalizedName(normalizeName(name))
+                .roadAddress(roadAddress)
+                .latitude(new BigDecimal("33.4580000"))
+                .longitude(new BigDecimal("126.9420000"))
+                .build());
+    }
+
+    private PlaceSourceMapping sourceMapping(
+            Place place,
+            String sourceCode,
+            String sourcePlaceId
+    ) {
+        return PlaceSourceMapping.builder()
+                .place(place)
+                .source(dataSourceRepository.findById(sourceCode).orElseThrow())
+                .sourcePlaceId(sourcePlaceId)
+                .isActive(true)
+                .build();
+    }
+
+    private DataSource dataSource(String code, short order) {
+        return DataSource.builder()
+                .code(code)
+                .displayName(code)
+                .providerName("테스트 제공자")
+                .attributionText("테스트 출처")
+                .displayOrder(order)
+                .build();
     }
 
     private CourseGenerationFacts facts(CourseCandidate... candidates) {

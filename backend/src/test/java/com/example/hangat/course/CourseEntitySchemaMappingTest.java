@@ -46,7 +46,6 @@ class CourseEntitySchemaMappingTest {
                     null,
                     null);
             assertColumn(connection, "courses", "people", Types.SMALLINT, false, null, null);
-            assertColumn(connection, "courses", "parent_course_id", Types.BIGINT, true, null, null);
             assertColumn(connection, "course_items", "day_no", Types.SMALLINT, false, null, null);
             assertColumn(connection, "course_items", "position", Types.SMALLINT, false, null, null);
             assertColumn(
@@ -65,8 +64,6 @@ class CourseEntitySchemaMappingTest {
                     true,
                     8,
                     4);
-
-            assertSelfReference(connection);
         }
     }
 
@@ -108,19 +105,4 @@ class CourseEntitySchemaMappingTest {
         }
     }
 
-    private void assertSelfReference(Connection connection) throws Exception {
-        DatabaseMetaData metadata = connection.getMetaData();
-        try (ResultSet keys = metadata.getImportedKeys(
-                connection.getCatalog(), null, "COURSES")) {
-            boolean found = false;
-            while (keys.next()) {
-                if ("parent_course_id".equalsIgnoreCase(keys.getString("FKCOLUMN_NAME"))
-                        && "courses".equalsIgnoreCase(keys.getString("PKTABLE_NAME"))) {
-                    found = true;
-                    break;
-                }
-            }
-            assertThat(found).as("courses.parent_course_id self FK").isTrue();
-        }
-    }
 }

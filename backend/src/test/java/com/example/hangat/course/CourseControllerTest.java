@@ -1,10 +1,10 @@
 package com.example.hangat.course;
 
 import com.example.hangat.course.model.CourseResponseDto;
-import com.example.hangat.course.model.CourseStatus;
-import com.example.hangat.course.model.CourseType;
-import com.example.hangat.course.model.GenerationReason;
-import com.example.hangat.course.model.Transport;
+import com.example.hangat.course.model.enums.CourseStatus;
+import com.example.hangat.course.model.enums.CourseType;
+import com.example.hangat.course.model.enums.GenerationReason;
+import com.example.hangat.course.model.enums.Transport;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -128,7 +128,7 @@ class CourseControllerTest {
         return new CourseResponseDto(
                 101L, "1.0", CourseType.USER, GenerationReason.INITIAL, CourseStatus.READY,
                 LocalDate.of(2026, 8, 27), LocalDate.of(2026, 8, 29),
-                2, 500000, Transport.RENTAL_CAR, accommodation,
+                (short) 2, 500000, Transport.RENTAL_CAR, accommodation,
                 List.of(new CourseResponseDto.DayDto(
                         1, LocalDate.of(2026, 8, 28), List.of(item))));
     }

@@ -6,15 +6,25 @@ import com.example.hangat.course.facts.CourseCandidate;
 import com.example.hangat.course.facts.CourseGenerationFacts;
 import com.example.hangat.course.facts.InternalPlaceCategory;
 import com.example.hangat.course.facts.PlaceFact;
-import com.example.hangat.course.model.Course;
-import com.example.hangat.course.model.CourseItem;
-import com.example.hangat.course.model.CourseItemSource;
 import com.example.hangat.course.model.CourseRequestDto;
-import com.example.hangat.course.model.Place;
-import com.example.hangat.course.model.PlaceCategory;
-import com.example.hangat.course.model.PlaceSourceMapping;
 import com.example.hangat.course.model.PreferenceType;
-import com.example.hangat.course.model.Region;
+import com.example.hangat.course.model.entity.Course;
+import com.example.hangat.course.model.entity.CourseItem;
+import com.example.hangat.course.model.enums.CourseItemSource;
+import com.example.hangat.course.model.enums.CourseStatus;
+import com.example.hangat.course.model.enums.CourseType;
+import com.example.hangat.course.repository.CourseItemRepository;
+import com.example.hangat.course.repository.CourseRepository;
+import com.example.hangat.map.model.entity.DataSource;
+import com.example.hangat.map.model.entity.Place;
+import com.example.hangat.map.model.entity.PlaceCategory;
+import com.example.hangat.map.model.entity.PlaceSourceMapping;
+import com.example.hangat.map.model.entity.Region;
+import com.example.hangat.map.repository.DataSourceRepository;
+import com.example.hangat.map.repository.PlaceCategoryRepository;
+import com.example.hangat.map.repository.PlaceRepository;
+import com.example.hangat.map.repository.PlaceSourceMappingRepository;
+import com.example.hangat.map.repository.RegionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +43,7 @@ public class CoursePersistenceService {
     private final CourseItemRepository courseItemRepository;
     private final PlaceRepository placeRepository;
     private final PlaceSourceMappingRepository mappingRepository;
+    private final DataSourceRepository dataSourceRepository;
     private final RegionRepository regionRepository;
     private final PlaceCategoryRepository placeCategoryRepository;
 
@@ -41,6 +52,7 @@ public class CoursePersistenceService {
             CourseItemRepository courseItemRepository,
             PlaceRepository placeRepository,
             PlaceSourceMappingRepository mappingRepository,
+            DataSourceRepository dataSourceRepository,
             RegionRepository regionRepository,
             PlaceCategoryRepository placeCategoryRepository
     ) {
@@ -48,6 +60,7 @@ public class CoursePersistenceService {
         this.courseItemRepository = courseItemRepository;
         this.placeRepository = placeRepository;
         this.mappingRepository = mappingRepository;
+        this.dataSourceRepository = dataSourceRepository;
         this.regionRepository = regionRepository;
         this.placeCategoryRepository = placeCategoryRepository;
     }
@@ -71,14 +84,19 @@ public class CoursePersistenceService {
         Map<String, CourseCandidate> candidatesById = indexCandidates(facts);
         validateSelectedCandidates(result, candidatesById);
 
-        Course course = courseRepository.save(Course.ready(
-                request.getStartDate(),
-                request.getEndDate(),
-                request.getPeople(),
-                request.getBudgetTotal(),
-                request.getTransport(),
-                metadata.generationReason(),
-                metadata.algorithmVersion()));
+        Course course = courseRepository.save(Course.builder()
+                .courseType(CourseType.USER)
+                .generationReason(com.example.hangat.course.model.enums.GenerationReason.valueOf(
+                        metadata.generationReason().name()))
+                .status(CourseStatus.GENERATING)
+                .startDate(request.getStartDate())
+                .endDate(request.getEndDate())
+                .people(toPeople(request.getPeople()))
+                .budgetTotal(request.getBudgetTotal())
+                .transport(com.example.hangat.course.model.enums.Transport.valueOf(
+                        request.getTransport().name()))
+                .algorithmVersion(metadata.algorithmVersion())
+                .build());
 
         Map<String, CourseItem> itemsByCandidateId = new LinkedHashMap<>();
         Map<String, String> categoryNamesByCandidateId = new LinkedHashMap<>();
@@ -90,20 +108,24 @@ public class CoursePersistenceService {
                 CourseAiResultDto.ItemDto resultItem = day.items().get(itemIndex);
                 CourseCandidate candidate = candidatesById.get(resultItem.candidateId());
                 Place place = resolvePlace(candidate);
-                CourseItem item = courseItemRepository.save(CourseItem.generated(
-                        course,
-                        place,
-                        dayNo,
-                        itemIndex + 1,
-                        day.date(),
-                        resultItem.startTime(),
-                        resolveItemSource(candidate),
-                        resultItem.recommendationReason()));
+                CourseItem item = courseItemRepository.save(CourseItem.builder()
+                        .course(course)
+                        .place(place)
+                        .dayNo(toShort(dayNo, "dayNo"))
+                        .position(toShort(itemIndex + 1, "position"))
+                        .visitDate(day.date())
+                        .startTime(resultItem.startTime())
+                        .itemSource(resolveItemSource(candidate))
+                        .recommendationReason(resultItem.recommendationReason())
+                        .build());
                 itemsByCandidateId.put(resultItem.candidateId(), item);
                 categoryNamesByCandidateId.put(
                         resultItem.candidateId(), place.getPrimaryCategory().getName());
             }
         }
+
+        course.markReady();
+        courseRepository.save(course);
 
         return new CoursePersistenceResult(
                 course, itemsByCandidateId, categoryNamesByCandidateId);
@@ -173,14 +195,9 @@ public class CoursePersistenceService {
                     "내부 또는 외부 장소 식별자가 없는 후보는 저장할 수 없습니다.");
         }
         if (identity.placeId() == null) {
-            regionRepository.findByCodeIgnoreCaseAndActiveTrue(candidate.regionCode())
-                    .orElseThrow(() -> new IllegalStateException(
-                            "등록된 권역 코드를 찾을 수 없습니다: "
-                                    + candidate.regionCode()));
-            placeCategoryRepository.findByCodeIgnoreCaseAndActiveTrue(category.code())
-                    .orElseThrow(() -> new IllegalStateException(
-                            "등록된 장소 카테고리를 찾을 수 없습니다: "
-                                    + category.code()));
+            resolveRegion(candidate.regionCode());
+            resolveCategory(category.code());
+            resolveDataSource(normalizedSourceCode(identity));
         }
     }
 
@@ -224,8 +241,8 @@ public class CoursePersistenceService {
                                 "내부 장소와 외부 장소 매핑이 서로 충돌합니다: "
                                         + sourceCode + "/" + sourcePlaceId);
                     }
-                }, () -> mappingRepository.save(PlaceSourceMapping.active(
-                        place, sourceCode, sourcePlaceId)));
+                }, () -> mappingRepository.save(newSourceMapping(
+                        place, resolveDataSource(sourceCode), sourcePlaceId)));
     }
 
     private Place createMappedPlace(
@@ -233,29 +250,69 @@ public class CoursePersistenceService {
             String sourceCode,
             String sourcePlaceId
     ) {
-        Region region = regionRepository
-                .findByCodeIgnoreCaseAndActiveTrue(candidate.regionCode())
-                .orElseThrow(() -> new IllegalStateException(
-                        "등록된 권역 코드를 찾을 수 없습니다: "
-                                + candidate.regionCode()));
+        Region region = resolveRegion(candidate.regionCode());
         String categoryCode = candidate.internalPlaceCategory().code();
-        PlaceCategory category = placeCategoryRepository
-                .findByCodeIgnoreCaseAndActiveTrue(categoryCode)
-                .orElseThrow(() -> new IllegalStateException(
-                        "등록된 장소 카테고리를 찾을 수 없습니다: " + categoryCode));
+        PlaceCategory category = resolveCategory(categoryCode);
         PlaceFact fact = candidate.place();
-        Place place = placeRepository.save(Place.fromExternalCandidate(
-                region,
-                category,
-                fact.name(),
-                normalizeName(fact.name()),
-                fact.roadAddress(),
-                fact.address(),
-                fact.latitude(),
-                fact.longitude()));
-        mappingRepository.save(PlaceSourceMapping.active(
-                place, sourceCode, sourcePlaceId));
+        Place place = placeRepository.save(Place.builder()
+                .region(region)
+                .primaryCategory(category)
+                .name(fact.name())
+                .normalizedName(normalizeName(fact.name()))
+                .roadAddress(fact.roadAddress())
+                .lotAddress(fact.address())
+                .latitude(fact.latitude())
+                .longitude(fact.longitude())
+                .imageUrl(fact.imageUrl())
+                .build());
+        mappingRepository.save(newSourceMapping(
+                place, resolveDataSource(sourceCode), sourcePlaceId));
         return place;
+    }
+
+    private PlaceSourceMapping newSourceMapping(
+            Place place,
+            DataSource source,
+            String sourcePlaceId
+    ) {
+        return PlaceSourceMapping.builder()
+                .place(place)
+                .source(source)
+                .sourcePlaceId(sourcePlaceId)
+                .isActive(true)
+                .build();
+    }
+
+    private Region resolveRegion(String code) {
+        return regionRepository.findByCode(code)
+                .filter(Region::isActive)
+                .orElseThrow(() -> new IllegalStateException(
+                        "등록된 권역 코드를 찾을 수 없습니다: " + code));
+    }
+
+    private PlaceCategory resolveCategory(String code) {
+        return placeCategoryRepository.findByCode(code)
+                .filter(PlaceCategory::isActive)
+                .orElseThrow(() -> new IllegalStateException(
+                        "등록된 장소 카테고리를 찾을 수 없습니다: " + code));
+    }
+
+    private DataSource resolveDataSource(String sourceCode) {
+        return dataSourceRepository.findById(sourceCode)
+                .filter(DataSource::isActive)
+                .orElseThrow(() -> new IllegalStateException(
+                        "등록된 데이터 출처를 찾을 수 없습니다: " + sourceCode));
+    }
+
+    private short toPeople(Integer people) {
+        return toShort(people, "people");
+    }
+
+    private short toShort(Integer value, String field) {
+        if (value == null || value < 0 || value > Short.MAX_VALUE) {
+            throw new IllegalArgumentException(field + " 값이 SMALLINT 범위를 벗어났습니다.");
+        }
+        return value.shortValue();
     }
 
     private CourseItemSource resolveItemSource(CourseCandidate candidate) {
