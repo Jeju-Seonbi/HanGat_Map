@@ -33,6 +33,12 @@ public enum BaseResponseStatus {
     PASSWORD_TOO_LONG(false, 3110, "비밀번호가 너무 깁니다. 한글은 24자까지 가능합니다."),
     PASSWORD_CONFIRM_MISMATCH(false, 3111, "비밀번호가 일치하지 않습니다."),
 
+    // 3150번대 OAuth·인증 보안
+    OAUTH_LOGIN_FAILED(false, 3150, "소셜 로그인에 실패했습니다."),
+    OAUTH_FLOW_INVALID(false, 3151, "소셜 로그인 요청이 만료됐습니다. 다시 로그인해주세요."),
+    OAUTH_CODE_INVALID(false, 3152, "인증 코드를 확인해주세요."),
+    SOCIAL_PROVIDER_ALREADY_LINKED(false, 3153, "해당 소셜 로그인 제공자가 이미 연결되어 있습니다."),
+
     // 3200번대 장소
     PLACE_NOT_FOUND(false, 3201, "존재하지 않는 장소입니다."),
 

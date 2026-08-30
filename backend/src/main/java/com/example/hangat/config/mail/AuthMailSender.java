@@ -47,6 +47,14 @@ public class AuthMailSender {
                         + "본인이 요청하지 않았다면 이 메일을 무시하세요.");
     }
 
+    /** 소셜 가입 또는 기존 계정 연결에 사용할 이메일 인증 코드 */
+    @Async
+    public void sendOAuthCode(String to, String code) {
+        send(to, "[한갓지도] 소셜 로그인 인증 코드",
+                "인증 코드: " + code + "\n\n10분 안에 입력해주세요. 5회 틀리면 코드가 폐기됩니다.\n"
+                        + "본인이 요청하지 않았다면 이 메일을 무시하세요.");
+    }
+
     private void send(String to, String subject, String text) {
         try {
             SimpleMailMessage message = new SimpleMailMessage();
@@ -57,7 +65,7 @@ public class AuthMailSender {
             mailSender.send(message);
         } catch (Exception e) {
             // 던지면 @Async 스레드에서 죽어서 호출자가 못 받음. 로그만 남기고 재발송으로 구제
-            log.error("메일 발송 실패 to={}, subject={}", to, subject, e);
+            log.error("인증 메일 발송 실패 subject={}", subject, e);
         }
     }
 }
