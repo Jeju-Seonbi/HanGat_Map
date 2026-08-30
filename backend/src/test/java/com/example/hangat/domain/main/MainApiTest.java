@@ -108,7 +108,7 @@ class MainApiTest {
                 .andExpect(jsonPath("$.code").value(2000))
                 .andExpect(jsonPath("$.result.length()").value(2))       // 혼잡 컷 + 카페 제외
                 .andExpect(jsonPath("$.result[0].name").value("혼인지"))
-                .andExpect(jsonPath("$.result[0].level").value("RELAXED"))
+                .andExpect(jsonPath("$.result[0].level").value("QUIET"))
                 .andExpect(jsonPath("$.result[0].imageUrl").value("http://img.example/혼인지.jpg"))
                 .andExpect(jsonPath("$.result[1].name").value("새별오름"))
                 .andExpect(jsonPath("$.result[1].levelLabel").value("보통"));

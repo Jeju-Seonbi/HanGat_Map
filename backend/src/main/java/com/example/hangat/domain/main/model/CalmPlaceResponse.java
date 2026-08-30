@@ -1,6 +1,6 @@
 package com.example.hangat.domain.main.model;
 
-import com.example.hangat.domain.congestion.model.CongestionLevel;
+import com.example.hangat.map.model.enums.CongestionLevel;
 import com.example.hangat.map.model.entity.Place;
 
 /** 메인 "오늘 한적한 곳" 카드 한 장 (MAIN_001) */
@@ -30,7 +30,7 @@ public record CalmPlaceResponse(
                 place.getImageUrl(),
                 rate,
                 level,
-                level.getLabel(),
+                level.label(),
                 reason
         );
     }
