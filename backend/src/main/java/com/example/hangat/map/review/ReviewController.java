@@ -23,9 +23,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class ReviewController {
 
     private final ReviewService reviewService;
+    private final ReviewPhotoService photoService;
 
-    public ReviewController(ReviewService reviewService) {
+    public ReviewController(ReviewService reviewService, ReviewPhotoService photoService) {
         this.reviewService = reviewService;
+        this.photoService = photoService;
     }
 
     @Operation(summary = "장소별 후기 목록", description = "삭제된 후기는 빠지고 최신순. 없는 장소면 PLACE_NOT_FOUND(3201).")
@@ -51,6 +53,15 @@ public class ReviewController {
                                      Authentication authentication) {
         reviewService.delete(reviewId, currentUserId(authentication));
         return BaseResponse.success(null);
+    }
+
+    @Operation(summary = "후기 사진 업로드", description = "회원 전용. jpg/png/webp 최대 5장 - 돌려준 URL 을 작성 요청에 첨부한다.")
+    @PostMapping("/reviews/photos")
+    public BaseResponse<java.util.List<String>> uploadPhotos(
+            @RequestParam("files") java.util.List<org.springframework.web.multipart.MultipartFile> files,
+            Authentication authentication) {
+        currentUserId(authentication);
+        return BaseResponse.success(photoService.upload(files));
     }
 
     /** JWT 필터(auth 브랜치)가 principal 에 Long userId 를 넣는다 - 그 계약에 맞춘다 */
