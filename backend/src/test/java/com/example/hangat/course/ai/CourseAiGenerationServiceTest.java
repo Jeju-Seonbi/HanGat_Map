@@ -56,11 +56,16 @@ class CourseAiGenerationServiceTest {
             @Override
             public CourseAiResultDto generateCorrection(
                     CourseAiInputDto actualInput,
-                    String validationFailureReason
+                    CourseAiResultDto previousResult,
+                    CourseAiValidationCode validationCode,
+                    String validationMessage
             ) {
                 calls.incrementAndGet();
                 assertThat(actualInput).isSameAs(input);
-                assertThat(validationFailureReason).contains("중복 배치");
+                assertThat(previousResult).isSameAs(duplicate);
+                assertThat(validationCode)
+                        .isEqualTo(CourseAiValidationCode.AI_RESULT_DUPLICATE_CANDIDATE);
+                assertThat(validationMessage).contains("중복 배치");
                 return corrected;
             }
         };
@@ -85,7 +90,9 @@ class CourseAiGenerationServiceTest {
             @Override
             public CourseAiResultDto generateCorrection(
                     CourseAiInputDto actualInput,
-                    String validationFailureReason
+                    CourseAiResultDto previousResult,
+                    CourseAiValidationCode validationCode,
+                    String validationMessage
             ) {
                 calls.incrementAndGet();
                 return duplicateResult();
@@ -95,9 +102,12 @@ class CourseAiGenerationServiceTest {
                 provider, new CourseAiResultValidator());
 
         assertThatThrownBy(() -> service.generate(input))
-                .isInstanceOfSatisfying(CourseAiException.class, exception ->
-                        assertThat(exception.getFailureType())
-                                .isEqualTo(CourseAiFailureType.VALIDATION_ERROR));
+                .isInstanceOfSatisfying(CourseAiValidationException.class, exception -> {
+                    assertThat(exception.getFailureType())
+                            .isEqualTo(CourseAiFailureType.VALIDATION_ERROR);
+                    assertThat(exception.getCode())
+                            .isEqualTo(CourseAiValidationCode.AI_RESULT_DUPLICATE_CANDIDATE);
+                });
         assertThat(calls).hasValue(2);
     }
 

@@ -78,28 +78,33 @@ public class GeminiCourseAiProvider implements CourseAiProvider {
 
     @Override
     public CourseAiResultDto generate(CourseAiInputDto input) {
-        return generate(input, null);
+        return generate(input, null, null, null);
     }
 
     @Override
     public CourseAiResultDto generateCorrection(
             CourseAiInputDto input,
-            String validationFailureReason
+            CourseAiResultDto previousResult,
+            CourseAiValidationCode validationCode,
+            String validationMessage
     ) {
-        return generate(input, validationFailureReason);
+        return generate(input, previousResult, validationCode, validationMessage);
     }
 
     private CourseAiResultDto generate(
             CourseAiInputDto input,
-            String validationFailureReason
+            CourseAiResultDto previousResult,
+            CourseAiValidationCode validationCode,
+            String validationMessage
     ) {
         validateConfiguration();
         GeminiCallPhase phase = GeminiCallPhase.BUILD_REQUEST;
 
         try {
-            GeminiGenerateRequest request = validationFailureReason == null
+            GeminiGenerateRequest request = validationCode == null
                     ? buildRequest(input)
-                    : buildCorrectionRequest(input, validationFailureReason);
+                    : buildCorrectionRequest(
+                            input, previousResult, validationCode, validationMessage);
             phase = GeminiCallPhase.HTTP_EXCHANGE;
             ResponseEntity<String> httpResponse = restClient.post()
                     .uri("/models/{model}:generateContent", properties.model())
@@ -164,12 +169,15 @@ public class GeminiCourseAiProvider implements CourseAiProvider {
 
     GeminiGenerateRequest buildCorrectionRequest(
             CourseAiInputDto input,
-            String validationFailureReason
+            CourseAiResultDto previousResult,
+            CourseAiValidationCode validationCode,
+            String validationMessage
     ) {
         return new GeminiGenerateRequest(
                 new GeminiContent(null, List.of(new GeminiPart(prompt.systemInstruction()))),
                 List.of(new GeminiContent("user", List.of(new GeminiPart(
-                        prompt.correctionUserPrompt(input, validationFailureReason))))),
+                        prompt.correctionUserPrompt(
+                                input, previousResult, validationCode, validationMessage))))),
                 new GeminiGenerationConfig(
                         JSON_MIME_TYPE,
                         responseJsonSchema(input),
@@ -489,33 +497,41 @@ public class GeminiCourseAiProvider implements CourseAiProvider {
                 : Map.of(
                         "type", "string",
                         "enum", candidateIds,
-                        "description", "candidates[].identity.candidateId 중 하나를 그대로 사용");
+                        "description", "candidates[].candidateId 중 하나를 그대로 사용");
         Map<String, Object> item = Map.of(
                 "type", "object",
                 "properties", Map.of(
                         "candidateId", candidateId,
                         "startTime", Map.of(
                                 "type", "string",
-                                "description", "24시간제 HH:mm 형식의 방문 시작 시각"),
-                        "recommendationReason", Map.of("type", "string")
+                                "format", "time",
+                                "description", "24시간제 HH:mm:ss 방문 시작 시각"),
+                        "recommendationReason", Map.of(
+                                "type", "string",
+                                "description", "입력 사실에 근거한 300자 이하의 한 줄 추천 이유")
                 ),
-                "required", List.of("candidateId", "startTime", "recommendationReason")
+                "required", List.of("candidateId", "startTime", "recommendationReason"),
+                "additionalProperties", false
         );
         Map<String, Object> day = Map.of(
                 "type", "object",
                 "properties", Map.of(
                         "date", Map.of("type", "string", "format", "date"),
-                        "items", Map.of("type", "array", "items", item)
+                        "items", Map.of("type", "array", "items", item, "minItems", 1)
                 ),
-                "required", List.of("date", "items")
+                "required", List.of("date", "items"),
+                "additionalProperties", false
         );
         return Map.of(
                 "type", "object",
                 "properties", Map.of(
-                        "contractVersion", Map.of("type", "string"),
-                        "days", Map.of("type", "array", "items", day)
+                        "contractVersion", Map.of(
+                                "type", "string", "enum", List.of(input.contractVersion())),
+                        "days", Map.of(
+                                "type", "array", "items", day, "minItems", 1)
                 ),
-                "required", List.of("contractVersion", "days")
+                "required", List.of("contractVersion", "days"),
+                "additionalProperties", false
         );
     }
 

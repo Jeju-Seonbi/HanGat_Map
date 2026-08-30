@@ -121,6 +121,24 @@ class GeminiCourseAiProviderTest {
                 .path("enum"))
                 .extracting(JsonNode::asText)
                 .containsExactly("want-1", "normal-1", "normal-2");
+        JsonNode schema = request.path("generationConfig").path("responseJsonSchema");
+        assertThat(schema.path("additionalProperties").asBoolean()).isFalse();
+        assertThat(schema.path("properties").path("contractVersion")
+                .path("enum").path(0).asText()).isEqualTo("1.0");
+        assertThat(schema.path("properties").path("days").path("minItems").asInt())
+                .isEqualTo(1);
+        JsonNode daySchema = schema.path("properties").path("days").path("items");
+        assertThat(daySchema.path("additionalProperties").asBoolean()).isFalse();
+        assertThat(daySchema.path("properties").path("items").path("minItems").asInt())
+                .isEqualTo(1);
+        JsonNode itemSchema = daySchema.path("properties").path("items").path("items");
+        assertThat(itemSchema.path("additionalProperties").asBoolean()).isFalse();
+        assertThat(itemSchema.path("properties").path("startTime").path("format").asText())
+                .isEqualTo("time");
+        assertThat(itemSchema.path("properties").path("recommendationReason")
+                .path("description").asText()).contains("300자 이하");
+        assertThat(itemSchema.path("properties").path("recommendationReason")
+                .has("maxLength")).isFalse();
         assertThat(request.path("generationConfig").path("thinkingConfig")
                 .path("thinkingLevel").asText()).isEqualTo("low");
         assertThat(input.path("trip").path("startDate").asText())
@@ -144,13 +162,18 @@ class GeminiCourseAiProviderTest {
 
         String requestJson = objectMapper.writeValueAsString(provider.buildCorrectionRequest(
                 smokeInput(),
+                new CourseAiResultDto("1.0", List.of()),
+                CourseAiValidationCode.AI_RESULT_DUPLICATE_CANDIDATE,
                 "AI 코스 결과에 같은 candidateId가 중복 배치되었습니다."));
         JsonNode request = objectMapper.readTree(requestJson);
         String correctionPrompt = request.path("contents").path(0)
                 .path("parts").path(0).path("text").asText();
 
         assertThat(correctionPrompt)
-                .contains("실패 사유: AI 코스 결과에 같은 candidateId가 중복 배치되었습니다.")
+                .contains("Validation code: AI_RESULT_DUPLICATE_CANDIDATE")
+                .contains("Validation message: AI 코스 결과에 같은 candidateId가 중복 배치되었습니다.")
+                .contains("이전 전체 결과 JSON:")
+                .contains("\"contractVersion\":\"1.0\"")
                 .contains("동일 candidateId를 재사용하지 않는다")
                 .contains("후보가 부족하면 중복해서 채우지 말고")
                 .contains("\"candidateId\":\"want-1\"")

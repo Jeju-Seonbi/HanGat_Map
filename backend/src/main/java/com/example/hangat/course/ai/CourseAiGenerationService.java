@@ -18,19 +18,18 @@ public class CourseAiGenerationService {
 
     public CourseAiResultDto generate(CourseAiInputDto input) {
         CourseAiResultDto result = provider.generate(input);
-        CourseAiException validationFailure;
+        CourseAiValidationException validationFailure;
         try {
             validator.validate(input, result);
             return result;
-        } catch (CourseAiException exception) {
-            if (exception.getFailureType() != CourseAiFailureType.VALIDATION_ERROR) {
-                throw exception;
-            }
+        } catch (CourseAiValidationException exception) {
             validationFailure = exception;
         }
 
         CourseAiResultDto corrected = provider.generateCorrection(
                 input,
+                result,
+                validationFailure.getCode(),
                 validationFailure.getMessage()
         );
         validator.validate(input, corrected);

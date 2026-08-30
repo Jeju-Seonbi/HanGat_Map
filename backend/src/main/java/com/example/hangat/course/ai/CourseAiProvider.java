@@ -6,7 +6,9 @@ public interface CourseAiProvider {
 
     default CourseAiResultDto generateCorrection(
             CourseAiInputDto input,
-            String validationFailureReason
+            CourseAiResultDto previousResult,
+            CourseAiValidationCode validationCode,
+            String validationMessage
     ) {
         return generate(input);
     }
