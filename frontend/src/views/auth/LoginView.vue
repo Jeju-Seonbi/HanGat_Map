@@ -17,33 +17,19 @@ import FieldPassword from '../../components/auth/FieldPassword.vue'
 import BrandMark from '../../components/auth/BrandMark.vue'
 import { useAuthStore } from '../../stores/auth.js'
 import { useUiStore } from '../../stores/ui.js'
-import { readRecentLogins } from '../../api/auth.js'
+import {
+  pushRecentLogin, readRecentLogins, writeLastProvider
+} from '../../api/auth.js'
+import { oauthAuthorizationUrl } from '../../api/userAuth.js'
 import { isValidEmail, checkEmail, EMAIL_INPUT_FILTER, EMAIL_INPUT_MESSAGE } from '../../utils/validators.js'
-import { TEST_ACCOUNT, resetDb } from '../../api/db.js'
+import { putHandoff } from '../../utils/handoff.js'
 import { ApiError } from '../../api/errors.js'
 import { AUTH_HERO_IMAGES } from '../../data/authHeroImages.js'
 
-// 데모 계정 안내를 띄울지 — 정의와 이유는 src/config.js 참고
-import { SHOW_DEMO } from '../../config.js'
-
-/**
- * 소셜 로그인은 **아직 없다.**
- * OAuth 는 서버(리다이렉트 URI 등록·시크릿 보관·토큰 교환)가 있어야 성립하고,
- * 이 저장소에는 서버가 없다. 요구사항 정의서에도 소셜 로그인 항목은 없다.
- * 버튼을 시안대로 두되, 눌리면 상태를 밝힌다.
- *
- * Apple 로그인은 요청에 따라 **아예 제거**했다.
- * (Apple 은 다른 소셜 로그인을 제공하는 iOS 앱에 Sign in with Apple 을 요구하지만,
- *  웹 전용 서비스에는 해당하지 않는다 — App Store Review Guideline 4.8)
- */
 const SOCIALS = [
   { key: 'kakao', label: '카카오로 시작하기' },
   { key: 'google', label: '구글로 시작하기' }
 ]
-
-function notReady (label) {
-  ui.toast(`${label} 로그인은 아직 연결되지 않았어요`)
-}
 
 const auth = useAuthStore()
 const ui = useUiStore()
@@ -76,7 +62,12 @@ const canSubmit = computed(() =>
   isValidEmail(email.value) && !!password.value && !auth.loading
 )
 
-const redirectTo = computed(() => route.query.redirect || auth.returnTo || '/mypage/reviews')
+const redirectTo = computed(() => {
+  const candidate = route.query.redirect || auth.returnTo
+  return typeof candidate === 'string' && candidate.startsWith('/') && !candidate.startsWith('//')
+    ? candidate
+    : '/mypage/reviews'
+})
 
 async function submit () {
   touched.value.email = true
@@ -86,9 +77,10 @@ async function submit () {
   try {
     await auth.login({
       email: email.value.trim(),
-      password: password.value,
-      rememberEmail: rememberEmail.value
+      password: password.value
     })
+    pushRecentLogin(auth.user, { rememberEmail: rememberEmail.value })
+    writeLastProvider('email')
     ui.toast(`${auth.displayName}님, 반가워요`)
     const to = redirectTo.value
     auth.returnTo = null
@@ -104,28 +96,9 @@ async function submit () {
   }
 }
 
-async function loginDemo () {
-  email.value = TEST_ACCOUNT.email
-  password.value = TEST_ACCOUNT.password
-  rememberEmail.value = false
-  touched.value.email = false
-  serverError.value = ''
-  await submit()
-}
-
-/**
- * 데모 전용: 목 데이터를 처음 상태로 되돌린다.
- *
- * 브라우저에 남은 옛 시드 때문에 로그인이 안 되는 상황을 손으로 풀 수 있는 탈출구다.
- * (db.js 의 SEED_STAMP 가 이제 자동으로 잡지만, 시도 잠금·수정한 데이터까지
- *  한 번에 치우고 싶을 때가 있다.)
- */
-function demoReset () {
-  resetDb()
-  serverError.value = ''
-  locked.value = false
-  password.value = ''
-  ui.toast('데모 데이터를 처음 상태로 되돌렸어요')
+function startSocialLogin (provider) {
+  putHandoff('oauth-login', { provider, returnTo: redirectTo.value })
+  window.location.assign(oauthAuthorizationUrl(provider))
 }
 </script>
 
@@ -181,13 +154,6 @@ function demoReset () {
       </button>
     </form>
 
-    <!--
-      시안에는 카카오·네이버·Apple 이 있었으나 요청에 따라 **카카오·구글 두 개만** 둔다.
-      ⚠️ 둘 다 **연동 구현이 없다.** OAuth 는 서버(리다이렉트 URI·클라이언트 시크릿 검증)가
-         있어야 성립하는데 이 저장소에는 서버가 없다.
-         버튼만 두고 눌리면 "준비 중" 을 띄운다. 눌러도 아무 일이 없는 것보다는
-         상태를 밝히는 편이 낫다고 봤다. 요구사항 정의서에도 소셜 로그인 항목은 없다.
-    -->
     <div class="divider"><span>또는 소셜 로그인</span></div>
     <div class="socials">
       <div v-for="s in SOCIALS" :key="s.key" class="slot">
@@ -195,7 +161,7 @@ function demoReset () {
           class="social"
           :class="s.key"
           type="button"
-          @click="notReady(s.label.replace('로 시작하기', ''))"
+          @click="startSocialLogin(s.key)"
         >
           <BrandMark :name="s.key" />{{ s.label }}
         </button>
@@ -207,24 +173,6 @@ function demoReset () {
         아직 계정이 없으신가요? <RouterLink to="/signup">회원가입</RouterLink>
       </p>
 
-      <div class="demo-entry">
-        <p>가입하기 전에 저장 코스와 마이페이지를 먼저 둘러보세요.</p>
-        <button class="demo-login" type="button" :disabled="auth.loading" @click="loginDemo">
-          <span>{{ auth.loading ? '데모 계정 여는 중…' : '데모 계정으로 둘러보기' }}</span>
-          <span aria-hidden="true">→</span>
-        </button>
-      </div>
-
-      <div v-if="SHOW_DEMO" class="demo">
-        <div class="lbl">데모 빌드 · 화면 확인 도구</div>
-        <p class="muted">
-          로그인 차단 확인용: <code>suspended@</code>(이용 제한) · <code>withdrawn@</code>(탈퇴)
-        </p>
-        <p class="muted">
-          로그인이 안 되면
-          <button class="sw" type="button" @click="demoReset">데모 데이터 초기화</button>
-        </p>
-      </div>
     </template>
   </AuthLayout>
 </template>

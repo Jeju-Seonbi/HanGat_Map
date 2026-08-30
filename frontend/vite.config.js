@@ -76,7 +76,7 @@ export default defineConfig(() => ({
     }
   },
   server: {
-    port: 4173,
+    port: 5173,
     // 포트를 못 잡으면 조용히 다른 번호로 옮기지 말고 실패시킨다
     strictPort: true,
     headers: {
@@ -89,7 +89,7 @@ export default defineConfig(() => ({
     }
   },
   preview: {
-    port: 4173,
+    port: 5173,
     strictPort: true
   },
   test: {
