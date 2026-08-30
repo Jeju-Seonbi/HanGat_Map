@@ -50,7 +50,7 @@ public class PlaceImageIngestWriter {
             int order = 0;
             Set<String> seen = new HashSet<>();
             for (PlaceImageItem it : row.items()) {
-                String url = nz(it.originimgurl());
+                String url = toHttps(nz(it.originimgurl()));
                 // 같은 URL이 두 번 오는 응답 방어 - UK 로 죽는 대신 첫 장만 남긴다
                 if (url == null || !seen.add(url)) {
                     continue;
@@ -58,7 +58,7 @@ public class PlaceImageIngestWriter {
                 imageRepository.save(PlaceImage.builder()
                         .place(place)
                         .imageUrl(url)
-                        .thumbnailUrl(nz(it.smallimageurl()))
+                        .thumbnailUrl(toHttps(nz(it.smallimageurl())))
                         .urlHash(sha256(url))
                         .caption(nz(it.imgname()))
                         .licenseCode(nz(it.cpyrhtDivCd()))
@@ -74,6 +74,11 @@ public class PlaceImageIngestWriter {
             }
         }
         return new ChunkResult(updated, saved);
+    }
+
+    /** KTO가 http/https를 섞어 준다(실측 48/57이 http). https 페이지에서 http 사진은 차단되므로 통일한다 */
+    static String toHttps(String url) {
+        return (url != null && url.startsWith("http://")) ? "https://" + url.substring(7) : url;
     }
 
     static String sha256(String s) {

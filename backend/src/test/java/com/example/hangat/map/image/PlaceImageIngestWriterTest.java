@@ -83,6 +83,18 @@ class PlaceImageIngestWriterTest {
     }
 
     @Test
+    void http_주소는_https로_바뀌어_저장된다() {
+        // 실측: 같은 배치 안에서도 장소마다 http/https가 섞여 온다. https 배포에서 http 사진은 차단된다
+        writer.saveChunk(List.of(new PlaceImageIngestWriter.Row(감귤박물관.getId(), List.of(
+                item("http://tong.visitkorea.or.kr/cms/resource/86/3026686_image2_1.jpg", "a", "Type3")
+        ))), "출처");
+
+        List<PlaceImage> saved = imageRepository.findByPlaceIdOrderBySortOrder(감귤박물관.getId());
+        assertThat(saved.get(0).getImageUrl()).startsWith("https://");
+        assertThat(saved.get(0).getThumbnailUrl()).startsWith("https://");
+    }
+
+    @Test
     void 재적재하면_이전_사진이_교체된다() {
         writer.saveChunk(List.of(new PlaceImageIngestWriter.Row(감귤박물관.getId(), List.of(
                 item("https://tong.visitkorea.or.kr/old.jpg", "구버전", "Type3")
