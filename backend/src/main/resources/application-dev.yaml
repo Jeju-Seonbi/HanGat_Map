@@ -4,14 +4,15 @@ spring:
 
   # 기본값은 backend/docker-compose.yml 의 MariaDB와 일치 - .env 없이도 부팅된다
   datasource:
-    url: ${DB_URL:jdbc:mariadb://localhost:3306/hangatmap}
-    username: ${DB_USER:root}
-    password: ${DB_PASS:qwer1234}
+    url: ${DB_URL:jdbc:mariadb://localhost:3306/hangat}
+    username: ${DB_USER:hangat}
+    password: ${DB_PASS:hangat}
     driver-class-name: org.mariadb.jdbc.Driver
     hikari:
       maximum-pool-size: 10
       minimum-idle: 2
       connection-timeout: 30000
+
 
   jpa:
     hibernate:
@@ -98,3 +99,8 @@ app:
     from: ${MAIL_FROM}
   auth:
     code-hmac-secret: ${APP_AUTH_CODE_HMAC_SECRET}
+# 공공데이터포털 - 한국관광공사 계열 (KorService2 / 집중률 / 방문자수)
+# ★ service-key 는 Decoding 키. 계정당 인증키 1개가 활용신청한 모든 API에 통하므로 weather와 같은 값을 쓴다
+public-api:
+  service-key: ${SERVICE_KEY}
+  tour-base-url: https://apis.data.go.kr/B551011

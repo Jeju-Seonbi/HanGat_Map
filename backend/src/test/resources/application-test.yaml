@@ -6,6 +6,7 @@ spring:
     password:
     driver-class-name: org.h2.Driver
 
+
   jpa:
     hibernate:
       ddl-auto: create-drop
@@ -40,3 +41,7 @@ management:
   health:
     mail:
       enabled: false
+# 테스트용 더미 - 실호출은 PublicApiClientManualTest(@Disabled)에서만 한다
+public-api:
+  service-key: test-key
+  tour-base-url: http://localhost

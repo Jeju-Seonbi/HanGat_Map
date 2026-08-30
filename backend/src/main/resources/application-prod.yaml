@@ -97,3 +97,7 @@ app:
     from: ${MAIL_FROM}
   auth:
     code-hmac-secret: ${APP_AUTH_CODE_HMAC_SECRET}
+# 관광정보·집중률 조회용 API
+public-api:
+  service-key: ${SERVICE_KEY}
+  tour-base-url: https://apis.data.go.kr/B551011
