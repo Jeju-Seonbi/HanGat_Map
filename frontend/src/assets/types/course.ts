@@ -10,6 +10,7 @@ export type AccuracyType = 'VERIFIED' | 'ESTIMATED' | 'UNKNOWN'
 export type RecommendationReasonCode = 'CONGESTION' | 'STYLE' | 'GOOD_PRICE' | 'HIDDEN_GEM' | 'ROUTE'
 export type WeatherCondition = 'SUNNY' | 'CLOUDY' | 'RAIN' | 'SNOW' | 'STRONG_WIND'
 export type IndoorOutdoor = 'INDOOR' | 'OUTDOOR' | 'MIXED'
+export type PlaceSourceCode = 'KTO' | 'KAKAO_LOCAL'
 
 export interface RegionRef { region_id: number; code: 'EAST'|'WEST'|'SOUTH'|'NORTH'; name: string }
 export interface CourseStyle { tag_id: number; code: string; name: string; weight: number }
@@ -51,7 +52,8 @@ export interface CourseCostSummary {
 }
 export interface CourseItem {
   id: number; course_id: number; place_id: number; place_name: string; category_name: string; image_url?: string
-  source_code?: 'KAKAO_LOCAL'; source_place_id?: string; latitude?: number; longitude?: number
+  candidate_id?: string; source_code?: PlaceSourceCode; source_place_id?: string
+  address?: string; road_address?: string; latitude?: number; longitude?: number
   day_no: number; position: number; visit_date: string; start_time?: string; end_time?: string
   item_source: ItemSource; inbound_distance_m?: number; inbound_travel_minutes?: number
   congestion_rate?: number; congestion_level?: CongestionLevel; recommendation_reason_code?: RecommendationReasonCode

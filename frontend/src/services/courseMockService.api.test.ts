@@ -38,7 +38,12 @@ const response: CourseResult = {
       id: 201,
       course_id: 101,
       place_id: 301,
+      candidate_id: 'candidate-kto-1',
+      source_code: 'KTO',
+      source_place_id: '125266',
       place_name: '비자림',
+      address: '제주특별자치도 제주시 구좌읍 비자숲길 55',
+      road_address: '제주특별자치도 제주시 구좌읍 비자숲길 55',
       category_name: '관광지',
       day_no: 1,
       position: 1,
@@ -74,7 +79,16 @@ describe('courseMockService Backend generation', () => {
     })
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual(condition)
     expect(result).toBe(response)
-    expect(result.days[0].items[0]).toMatchObject({ id: 201, course_id: 101, place_id: 301, costs: [] })
+    expect(result.days[0].items[0]).toMatchObject({
+      id: 201,
+      course_id: 101,
+      place_id: 301,
+      candidate_id: 'candidate-kto-1',
+      source_code: 'KTO',
+      source_place_id: '125266',
+      road_address: '제주특별자치도 제주시 구좌읍 비자숲길 55',
+      costs: [],
+    })
     expect(result.days[0].items[0].end_time).toBeUndefined()
     expect(result.estimated_cost_min).toBeUndefined()
   })
