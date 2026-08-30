@@ -1,5 +1,6 @@
 package com.example.hangat.course;
 
+import com.example.hangat.common.model.BaseResponse;
 import com.example.hangat.course.model.CourseRequestDto;
 import com.example.hangat.course.model.CourseResponseDto;
 import lombok.RequiredArgsConstructor;
@@ -14,7 +15,7 @@ public class CourseController {
     private final CourseService courseService;
 
     @PostMapping("/courses")
-    public CourseResponseDto createCourse(@RequestBody CourseRequestDto request) {
-        return courseService.createCourse(request);
+    public BaseResponse<CourseResponseDto> createCourse(@RequestBody CourseRequestDto request) {
+        return BaseResponse.success(courseService.createCourse(request));
     }
 }
