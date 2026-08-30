@@ -30,7 +30,7 @@
       <div>
         <div class="day-head">
           <div><span class="eyebrow">DAY {{ day }}</span><h2>{{ ['숲에서 오름까지, 초록의 하루','바다 곁 마을을 천천히','남쪽의 고요한 풍경'][day-1] }}</h2></div><CongestionBadge
-            level="RELAXED"
+            level="QUIET"
             :score="27"
           />
         </div><div class="timeline">

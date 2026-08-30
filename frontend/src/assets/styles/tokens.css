@@ -54,12 +54,11 @@
   --course-busy:#e82a3f;
   --course-busy-bg:#ffdfe3;
 
-  /* 혼잡 4단계 — utils/congestion.ts 의 등급과 짝
-     RELAXED <40 / MODERATE <70 / CROWDED <80 / VERY_CROWDED ≥80 */
-  --relaxed:#2e9e6f;
-  --moderate:#e3b341;
+  /* 혼잡 3단계(팀 통일 2026-08-31) - utils/congestion.ts, 백엔드 map CongestionLevel 과 짝
+     QUIET <40 / NORMAL <70 / CROWDED >=70 */
+  --quiet:#2e9e6f;
+  --normal:#e3b341;
   --crowded:#e77c32;
-  --very:#d94a4a;
 
   --shadow:0 18px 50px rgba(22,60,69,.10);
 
@@ -87,15 +86,13 @@
   --ai-tx:#1c5fb0;
   --ai-bg:#d4e3ff;
 
-  /* 혼잡 — A 는 3단계, B·C 는 4단계.
-     A 이름 3개를 원천에 연결하고 4단계째(--crowd)를 새로 만든다.
-     ⚠️ 앰버는 글자색과 표시색을 분리한다. --moderate(#e3b341) 는 흰 배경 대비 약 1.9:1 로
+  /* 혼잡 - 전 화면 3단계 통일(2026-08-31).
+     ⚠️ 앰버는 글자색과 표시색을 분리한다. --normal(#e3b341) 는 흰 배경 대비 약 1.9:1 로
         글자에 쓰면 못 읽는다. 면(--mid-st)에만 원값을 쓰고 글자(--mid)는
         정동현님이 이미 쓰던 #8a6b08 을 쓴다. */
-  --calm:var(--relaxed);  --calm-bg:#e9f7f0;  --calm-st:var(--relaxed);
-  --mid:#8a6b08;          --mid-bg:#fbf3dd;   --mid-st:var(--moderate);
-  --busy:var(--very);     --busy-bg:#fdeaea;  --busy-st:var(--very);
-  --crowd:var(--crowded); --crowd-bg:#fdefe3;              /* [신규] 4단계째 */
+  --calm:var(--quiet);  --calm-bg:#e9f7f0;  --calm-st:var(--quiet);
+  --mid:#8a6b08;          --mid-bg:#fbf3dd;   --mid-st:var(--normal);
+  --busy:var(--crowded);     --busy-bg:#fdeaea;  --busy-st:var(--crowded);
   --none:#8b95a1;         --none-bg:#f0f2f5;               /* 예보 미제공 */
 
   --pink:#c2185b;  --pink-bg:#ffdfeb;
@@ -180,10 +177,9 @@ html.skin-toss{
     --course-mid-bg:#53431f;
     --course-busy:#ff9299;
     --course-busy-bg:#552d32;
-    --relaxed:#4fc48f;
-    --moderate:#ffc861;
+    --quiet:#4fc48f;
+    --normal:#ffc861;
     --crowded:#ff9d5c;
-    --very:#ff7b7b;
     --shadow:0 1px 3px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.5);
 
     /* 별칭 중 원천으로 못 만드는 파생값만 여기서 덮는다 */
@@ -197,7 +193,7 @@ html.skin-toss{
     --ai:#a4c9ff; --ai-tx:#a4c9ff; --ai-bg:#0a4478;
     --calm-bg:#123c2c;
     --mid:#ffc861; --mid-bg:#3c2f10;
-    --busy-bg:#3d1d1d; --crowd-bg:#3d2712;
+    --busy-bg:#3d1d1d;
     --none:#7f8b93; --none-bg:#242d33;
     --pink:#ff9ec0; --pink-bg:#3d1a28;
     --sky:#16242f; --mint:#123c36;
@@ -242,10 +238,9 @@ html.skin-toss{
   --course-mid-bg:#53431f;
   --course-busy:#ff9299;
   --course-busy-bg:#552d32;
-  --relaxed:#4fc48f;
-  --moderate:#ffc861;
+  --quiet:#4fc48f;
+  --normal:#ffc861;
   --crowded:#ff9d5c;
-  --very:#ff7b7b;
   --shadow:0 1px 3px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.5);
 
   --bg:#202a30;
@@ -258,7 +253,7 @@ html.skin-toss{
   --ai:#a4c9ff; --ai-tx:#a4c9ff; --ai-bg:#0a4478;
   --calm-bg:#123c2c;
   --mid:#ffc861; --mid-bg:#3c2f10;
-  --busy-bg:#3d1d1d; --crowd-bg:#3d2712;
+  --busy-bg:#3d1d1d;
   --none:#7f8b93; --none-bg:#242d33;
   --pink:#ff9ec0; --pink-bg:#3d1a28;
   --sky:#16242f; --mint:#123c36;
@@ -282,7 +277,7 @@ html.skin-toss{
   이 파일의 값과는 맞지 않는다. 새 팔레트 실측은 후속 과제다.
 
   통합 시점에 확인한 두 가지:
-    · --moderate #e3b341 은 흰 배경 대비 약 1.9:1 → 글자에 쓰지 않는다 (--mid 로 분리)
+    · --normal #e3b341 은 흰 배경 대비 약 1.9:1 → 글자에 쓰지 않는다 (--mid 로 분리)
     · --on-ac 는 --ac 로 칠한 면 위 글자 전용. 다크에서 --ac 가 밝게 뒤집히므로
       #fff 하드코딩을 쓰면 대비가 무너진다.
 */

@@ -3,7 +3,7 @@ package com.example.hangat.domain.main;
 import com.example.hangat.common.exception.BaseException;
 import com.example.hangat.common.model.BaseResponseStatus;
 import com.example.hangat.domain.congestion.CongestionService;
-import com.example.hangat.domain.congestion.model.CongestionLevel;
+import com.example.hangat.map.model.enums.CongestionLevel;
 import com.example.hangat.domain.main.model.CalmPlaceResponse;
 import com.example.hangat.map.model.entity.Place;
 import com.example.hangat.map.repository.PlaceRepository;
@@ -52,8 +52,8 @@ public class MainService {
         return placeRepository.findAllById(rates.keySet()).stream()
                 .filter(place -> TOURIST_CODE.equals(place.getPrimaryCategory().getCode()))
                 .map(place -> toResponse(place, rates.get(place.getId())))
-                .filter(response -> response.level() == CongestionLevel.RELAXED
-                        || response.level() == CongestionLevel.MODERATE)
+                .filter(response -> response.level() == CongestionLevel.QUIET
+                        || response.level() == CongestionLevel.NORMAL)
                 .sorted(Comparator.comparingDouble(CalmPlaceResponse::rate))
                 .limit(limit)
                 .toList();
@@ -68,7 +68,7 @@ public class MainService {
     private String reasonFor(Place place, CongestionLevel level) {
         if (place.isGoodPrice()) return "착한가격업소 검증가";
         if (place.isHiddenGem()) return "덜 알려진 숨은 명소";
-        if (level == CongestionLevel.RELAXED) return "이 날짜 혼잡 예보가 여유예요";
+        if (level == CongestionLevel.QUIET) return "이 날짜 혼잡 예보가 여유예요";
         return "인기 명소보다 한산한 편이에요";
     }
 }

@@ -1,11 +1,12 @@
 package com.example.hangat.domain.congestion;
 
-import com.example.hangat.domain.congestion.model.CongestionLevel;
+import com.example.hangat.map.model.enums.CongestionLevel;
 import com.example.hangat.map.repository.CongestionForecastRepository;
 import com.example.hangat.map.service.PlaceNameNormalizer;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -25,22 +26,20 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class CongestionService {
 
-    /** 등급 임계값 - 프론트 utils/congestion.ts와 동일해야 한다 (여유 <40 / 보통 <70 / 혼잡 <80 / 매우혼잡 >=80) */
-    private static final double MODERATE_FROM = 40.0;
-    private static final double CROWDED_FROM = 70.0;
-    private static final double VERY_CROWDED_FROM = 80.0;
-
     private final CongestionForecastRepository repository;
 
     public CongestionService(CongestionForecastRepository repository) {
         this.repository = repository;
     }
 
+    /**
+     * 등급 변환 - 팀 표준 3단계(여유 <40 / 보통 <70 / 혼잡 >=70)로 통일(2026-08-31).
+     * 임계값의 단일 출처는 map의 {@link CongestionLevel#from} 하나다 - DB에 영속되는 값과
+     * 화면 등급이 같은 함수에서 나와야 저장 스냅숏과 실시간 표시가 어긋나지 않는다.
+     * 프론트 utils/congestion.ts도 같은 3단계를 유지해야 한다.
+     */
     public CongestionLevel levelOf(double rate) {
-        if (rate < MODERATE_FROM) return CongestionLevel.RELAXED;
-        if (rate < CROWDED_FROM) return CongestionLevel.MODERATE;
-        if (rate < VERY_CROWDED_FROM) return CongestionLevel.CROWDED;
-        return CongestionLevel.VERY_CROWDED;
+        return CongestionLevel.from(BigDecimal.valueOf(rate));
     }
 
     /**
