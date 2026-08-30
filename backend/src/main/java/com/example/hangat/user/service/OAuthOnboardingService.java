@@ -257,7 +257,7 @@ public class OAuthOnboardingService {
                     .loginCompleted(loginResult);
         }
 
-        /*
+        /**
          * Kakao는 이 시점에서 처음으로 기존 계정을 조회한다.
          *
          * Google 신규 가입을 진행하는 사이
