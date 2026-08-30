@@ -1,6 +1,7 @@
-package com.example.hangat.user.model;
+package com.example.hangat.user.model.auth;
 
 import com.example.hangat.common.util.DateTimes;
+import com.example.hangat.user.model.User;
 import jakarta.persistence.*;
 import lombok.*;
 

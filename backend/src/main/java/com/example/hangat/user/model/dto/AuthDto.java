@@ -11,7 +11,6 @@ import java.time.LocalDate;
 
 /**
  * 인증 관련 Dto 모음 - 가입 / 로그인 / 비밀번호 찾기
- *
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class AuthDto {

@@ -100,8 +100,8 @@ public class User {
 
     /**
      * 소셜 가입.
-     * 제공자가 이메일을 이미 확인해줘서 PENDING 건너뛰고 바로 ACTIVE로 만듬.
-     * 카카오는 미인증 이메일을 줄 수 있으니 그때는 이거 쓰면 안 됨.
+     * 공급자가 이메일을 검증했거나 한갓 인증 코드를 통과한 뒤에만 호출한다.
+     * 이메일 소유권이 확인됐으므로 PENDING을 건너뛰고 바로 ACTIVE로 만든다.
      */
     public static User signUpWithSocial(String email, String nickname, LocalDate birthDate) {
         return User.builder()
