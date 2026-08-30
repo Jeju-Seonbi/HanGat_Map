@@ -122,6 +122,14 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
             """)
     List<Place> findWithoutDetail(Pageable pageable);
 
+    /** 사진이 아직 없는 장소부터. KTO에 사진이 0장인 곳도 다시 잡힌다 - 상세 적재의 empty 와 같은 트레이드오프 */
+    @Query("""
+            select p from Place p
+            where not exists (select 1 from PlaceImage i where i.place = p)
+            order by p.id
+            """)
+    List<Place> findWithoutImage(Pageable pageable);
+
     /**
      * 이름 매칭용 (id, normalized_name) 목록.
      *

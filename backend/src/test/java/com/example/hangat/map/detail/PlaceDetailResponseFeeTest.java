@@ -30,7 +30,7 @@ class PlaceDetailResponseFeeTest {
     void 입장료_원문이_그대로_나간다() {
         String 실측 = "[개인]- 일반 1,500원- 청소년 1,000원-어린이 800원";
 
-        PlaceDetailResponse res = PlaceDetailResponse.from(place(실측), null);
+        PlaceDetailResponse res = PlaceDetailResponse.from(place(실측), null, null);
 
         assertThat(res.getUseFeeText()).isEqualTo(실측);
         assertThat(res.isFree()).isFalse();
@@ -38,7 +38,7 @@ class PlaceDetailResponseFeeTest {
 
     @Test
     void 무료면_배지가_켜진다() {
-        PlaceDetailResponse res = PlaceDetailResponse.from(place("무료"), null);
+        PlaceDetailResponse res = PlaceDetailResponse.from(place("무료"), null, null);
 
         assertThat(res.isFree()).isTrue();
     }
@@ -46,7 +46,7 @@ class PlaceDetailResponseFeeTest {
     @Test
     void 조건부_무료는_배지를_켜지_않는다() {
         // 실측: 국립제주박물관 - "무료※ 단, 유료 특별전시 제외"
-        PlaceDetailResponse res = PlaceDetailResponse.from(place("무료※ 단, 유료 특별전시 제외"), null);
+        PlaceDetailResponse res = PlaceDetailResponse.from(place("무료※ 단, 유료 특별전시 제외"), null, null);
 
         assertThat(res.isFree()).isFalse();
         // 원문은 그대로 내려 화면이 조건을 보여줄 수 있게 한다
@@ -56,7 +56,7 @@ class PlaceDetailResponseFeeTest {
     @Test
     void 입장료가_없으면_null이고_무료도_아니다() {
         // 관광지 563곳에는 usefee 필드 자체가 없다 - '무료'가 아니라 '모름'이다
-        PlaceDetailResponse res = PlaceDetailResponse.from(place(null), null);
+        PlaceDetailResponse res = PlaceDetailResponse.from(place(null), null, null);
 
         assertThat(res.getUseFeeText()).isNull();
         assertThat(res.isFree()).isFalse();
