@@ -59,6 +59,8 @@ const feeBadge = computed(() => {
 const hasAmen = computed(() =>
   feeBadge.value || s.value.park != null || s.value.wc != null || s.value.in)
 
+/** KTO 실사진. 있으면 데모 업로드 대신 이걸 쓴다 */
+const ktoImages = computed(() => detail.value?.images ?? [])
 const photos = computed(() => state.placeImgs[s.value.n] || [])
 const reviews = computed(() => reviewsOf(s.value.n))
 const rated = computed(() => reviews.value.filter(r => r.r > 0))
@@ -152,8 +154,16 @@ function delImg(i) {
         <span class="ar">›</span>
       </button>
 
-      <!-- 장소 사진: 실서비스=KTO firstimage, 프로토타입=데모 업로드 -->
-      <div class="pimg">
+      <!-- 장소 사진(MAP-08): KTO 실사진이 있으면 그것만, 없으면 데모 업로드 -->
+      <div v-if="ktoImages.length" class="pimg">
+        <img v-for="(p, i) in ktoImages" :key="p.url" :src="p.thumb" :alt="p.caption || `${s.n} 사진`"
+          title="클릭하면 크게 보기" style="cursor:zoom-in"
+          @click="emit('open-photo', { photos: ktoImages.map(x => x.url), index: i })">
+      </div>
+      <div v-if="ktoImages.length && detail?.imageAttribution" class="pimg-src">
+        {{ detail.imageAttribution }}
+      </div>
+      <div v-if="!ktoImages.length" class="pimg">
         <img v-for="(p, i) in photos" :key="i" :src="p" :alt="`${s.n} 사진`"
           title="더블클릭하면 삭제 (데모)" @dblclick="delImg(i)">
         <button v-if="photos.length < 5" class="add" @click="imgInput.click()">

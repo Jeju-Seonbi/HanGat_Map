@@ -76,6 +76,16 @@ export interface PlaceDetail {
   feeText: string | null
   /** '무료'만 뜻할 때 true. 조건부 무료("무료※ 단, 특별전시 제외")는 false다 */
   free: boolean
+  /** 장소 사진(순서대로). 스트립은 thumb, 확대는 url 을 쓴다 */
+  images: PlaceImage[]
+  /** 사진 출처 표기 문구 - 사진이 있으면 화면에 반드시 보여준다(공공누리) */
+  imageAttribution: string | null
+}
+
+export interface PlaceImage {
+  url: string
+  thumb: string
+  caption: string | null
 }
 
 /** 백엔드 PlaceDetailResponse 중 이 화면이 쓰는 부분 */
@@ -83,6 +93,14 @@ interface BackendPlaceDetail {
   restDayText: string | null
   useFeeText: string | null
   free: boolean
+  images: BackendPlaceImage[]
+}
+
+interface BackendPlaceImage {
+  url: string
+  thumbnailUrl: string | null
+  caption: string | null
+  attribution: string | null
 }
 
 /** 화면 레이어 키 → 백엔드 type 파라미터 */
@@ -131,7 +149,18 @@ export const MapPlaceService = {
   async getDetail (id: number): Promise<PlaceDetail | null> {
     try {
       const row = await apiGet<BackendPlaceDetail>(`/places/${id}`)
-      return { rest: row.restDayText, feeText: row.useFeeText, free: row.free }
+      const images = (row.images ?? []).map(i => ({
+        url: i.url,
+        thumb: i.thumbnailUrl ?? i.url,
+        caption: i.caption
+      }))
+      return {
+        rest: row.restDayText,
+        feeText: row.useFeeText,
+        free: row.free,
+        images,
+        imageAttribution: row.images?.[0]?.attribution ?? null
+      }
     } catch {
       return null
     }
