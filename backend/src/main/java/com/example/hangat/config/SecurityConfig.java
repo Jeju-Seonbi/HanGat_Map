@@ -133,6 +133,12 @@ public class SecurityConfig {
                 .requestMatchers("/auth/**").permitAll()
                 .requestMatchers(
                         HttpMethod.GET,
+                        "/places",
+                        "/places/**",
+                        "/crowd/**"
+                ).permitAll()
+                .requestMatchers(
+                        HttpMethod.GET,
                         "/users/check-nickname"
                 ).permitAll()
 
