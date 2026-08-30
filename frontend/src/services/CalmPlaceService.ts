@@ -10,7 +10,7 @@
 import { apiGet } from './apiClient'
 import { levelLabel, places } from '../data/data'
 
-export type CongestionLevelName = 'RELAXED' | 'MODERATE' | 'CROWDED' | 'VERY_CROWDED'
+export type CongestionLevelName = 'QUIET' | 'NORMAL' | 'CROWDED'
 
 export interface CalmPlaceCard {
   key: string
@@ -69,7 +69,7 @@ export const CalmPlaceService = {
 /** 목업 폴백 - 기존 캐러셀과 동일 규칙 (관광지만, 혼잡 제외, 집중률 오름차순) */
 function sampleCards (limit: number): CalmPlaceCard[] {
   return [...places]
-    .filter(p => p.categoryCode !== 'RESTAURANT' && (p.level === 'RELAXED' || p.level === 'MODERATE'))
+    .filter(p => p.categoryCode !== 'RESTAURANT' && (p.level === 'QUIET' || p.level === 'NORMAL'))
     .sort((a, b) => a.score - b.score)
     .slice(0, limit)
     .map(p => ({
@@ -80,7 +80,7 @@ function sampleCards (limit: number): CalmPlaceCard[] {
       level: p.level as CongestionLevelName,
       levelLabel: levelLabel[p.level],
       imageUrl: p.imageUrl ?? p.image ?? null,
-      reason: p.level === 'RELAXED' ? '이 날짜 혼잡 예보가 여유예요' : '인기 명소보다 한산한 편이에요'
+      reason: p.level === 'QUIET' ? '이 날짜 혼잡 예보가 여유예요' : '인기 명소보다 한산한 편이에요'
     }))
 }
 

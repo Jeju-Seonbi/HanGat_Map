@@ -554,17 +554,17 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateArrows))
 .poster-stats .lv {
   font-weight: 700;
 }
-.poster-stats .lv.relaxed {
-  color: var(--relaxed);
+.poster-stats .lv.quiet {
+  color: var(--quiet);
 }
-.poster-stats .lv.moderate {
+.poster-stats .lv.normal {
   color: #b8860b;
 }
 .poster-stats .lv.crowded {
   color: var(--crowded);
 }
-.poster-stats .lv.very_crowded {
-  color: var(--very);
+.poster-stats .lv.crowded {
+  color: var(--crowded);
 }
 .poster-cta {
   display: inline-flex;

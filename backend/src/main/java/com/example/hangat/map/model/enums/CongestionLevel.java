@@ -18,12 +18,26 @@ import java.math.BigDecimal;
 public enum CongestionLevel {
 
     /** 이 곳 최성수기의 40% 미만. */
-    QUIET,
+    QUIET("여유"),
 
-    NORMAL,
+    NORMAL("보통"),
 
     /** 이 곳 최성수기의 70% 이상. */
-    CROWDED;
+    CROWDED("혼잡");
+
+    private final String label;
+
+    CongestionLevel(String label) {
+        this.label = label;
+    }
+
+    /**
+     * 화면 배지 문구. 팀 합의(2026-08-31)로 혼잡 등급은 이 3단계가 유일한 표준이다 -
+     * 백엔드 응답의 levelLabel과 프론트 라벨이 전부 여기서 나온다. 별도 4단계를 만들지 말 것.
+     */
+    public String label() {
+        return label;
+    }
 
     /** 경계값은 실측 분위수(25%=37.6 / 75%=71.1)에 맞춘 초안이다 - 화면 확인 후 조정 가능. */
     private static final BigDecimal QUIET_MAX = new BigDecimal("40");
