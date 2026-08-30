@@ -73,7 +73,6 @@ describe('courseMockService Backend generation', () => {
     expect(requestMock).toHaveBeenCalledWith('/courses', {
       method: 'POST',
       body: condition,
-      auth: true,
     })
     expect(result).toBe(response)
     expect(result.days[0].items[0]).toMatchObject({

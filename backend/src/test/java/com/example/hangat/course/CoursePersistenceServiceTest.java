@@ -107,6 +107,7 @@ class CoursePersistenceServiceTest {
 
         assertThat(persisted.course().getId()).isNotNull();
         assertThat(persisted.course().getStatus()).isEqualTo(CourseStatus.READY);
+        assertThat(persisted.course().getUser()).isNull();
         assertThat(persisted.course().getGenerationReason())
                 .isEqualTo(com.example.hangat.course.model.enums.GenerationReason.INITIAL);
         assertThat(persisted.course().getAlgorithmVersion()).isEqualTo("course-ai-2");

@@ -141,6 +141,10 @@ public class SecurityConfig {
                         HttpMethod.GET,
                         "/users/check-nickname"
                 ).permitAll()
+                .requestMatchers(
+                        HttpMethod.POST,
+                        "/courses"
+                ).permitAll()
 
                 // 그 외 API는 인증 필요
                 .anyRequest().authenticated()

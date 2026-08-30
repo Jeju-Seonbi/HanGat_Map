@@ -625,7 +625,6 @@ async function generate(condition: CourseCondition): Promise<CourseResult> {
   return await apiRequest('/courses', {
     method: 'POST',
     body: condition,
-    auth: true,
   }) as CourseResult
 }
 
