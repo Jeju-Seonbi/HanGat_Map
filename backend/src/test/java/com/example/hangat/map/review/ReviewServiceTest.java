@@ -8,6 +8,7 @@ import com.example.hangat.map.model.entity.Region;
 import com.example.hangat.map.model.entity.Review;
 import com.example.hangat.map.model.entity.ReviewImage;
 import com.example.hangat.map.model.enums.ReviewStatus;
+import com.example.hangat.map.review.model.ReviewCreateRequest;
 import com.example.hangat.map.review.model.ReviewResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -89,5 +90,67 @@ class ReviewServiceTest {
     void 없는_장소면_PLACE_NOT_FOUND다() {
         assertThatThrownBy(() -> service.getReviews(999_999L, 0, 6))
                 .isInstanceOf(BaseException.class);
+    }
+
+    private ReviewCreateRequest request(Byte rating, String report, String... urls) {
+        ReviewCreateRequest req = new ReviewCreateRequest();
+        set(req, "rating", rating);
+        set(req, "congestionReport", report);
+        set(req, "content", "한 줄 후기");
+        set(req, "imageUrls", urls.length == 0 ? null : java.util.List.of(urls));
+        return req;
+    }
+
+    private static void set(Object target, String field, Object value) {
+        try {
+            var f = target.getClass().getDeclaredField(field);
+            f.setAccessible(true);
+            f.set(target, value);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Test
+    void 작성하면_장소_평점_요약이_갱신된다() {
+        service.create(감귤박물관.getId(), 7L, request((byte) 4, null));
+        service.create(감귤박물관.getId(), 8L, request((byte) 5, null));
+
+        assertThat(감귤박물관.getReviewCount()).isEqualTo(2);
+        assertThat(감귤박물관.getRatingAvg()).isEqualByComparingTo("4.50");
+    }
+
+    @Test
+    void 제보만_한_후기는_건수에는_들지만_평균은_안_바꾼다() {
+        service.create(감귤박물관.getId(), 7L, request((byte) 4, null));
+        service.create(감귤박물관.getId(), 8L, request(null, "QUIET"));
+
+        assertThat(감귤박물관.getReviewCount()).isEqualTo(2);
+        assertThat(감귤박물관.getRatingAvg()).isEqualByComparingTo("4.00");
+    }
+
+    @Test
+    void 별점도_제보도_없으면_거부된다() {
+        assertThatThrownBy(() -> service.create(감귤박물관.getId(), 7L, request(null, null)))
+                .isInstanceOf(BaseException.class);
+    }
+
+    @Test
+    void 사진_6장은_거부된다() {
+        assertThatThrownBy(() -> service.create(감귤박물관.getId(), 7L,
+                request((byte) 4, null, "u1", "u2", "u3", "u4", "u5", "u6")))
+                .isInstanceOf(BaseException.class);
+    }
+
+    @Test
+    void 남의_후기는_지울_수_없다() {
+        ReviewResponse mine = service.create(감귤박물관.getId(), 7L, request((byte) 4, null));
+
+        assertThatThrownBy(() -> service.delete(mine.getId(), 999L))
+                .isInstanceOf(BaseException.class);
+
+        // 본인이면 지워지고 요약이 되돌아간다
+        service.delete(mine.getId(), 7L);
+        assertThat(감귤박물관.getReviewCount()).isZero();
     }
 }

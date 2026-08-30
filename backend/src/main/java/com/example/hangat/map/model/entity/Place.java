@@ -203,6 +203,12 @@ public class Place {
      * 상세 배치(detailIntro2)가 채우는 값들 - 목록 적재와 출처가 달라 따로 둔다.
      * 목록 배치가 이 값들을 null로 덮어쓰면 안 되므로 updateFromSource 와 섞지 않는다.
      */
+    /** 후기 작성·삭제 때 호출. avg 는 별점 있는 후기만의 평균, count 는 전체 후기 수 */
+    public void updateReviewSummary(java.math.BigDecimal ratingAvg, int reviewCount) {
+        this.ratingAvg = ratingAvg == null ? DEFAULT_RATING_AVG : ratingAvg;
+        this.reviewCount = reviewCount;
+    }
+
     public void updateDetail(String operatingHoursText, String restDayText,
                              Boolean parkingAvailable, Boolean toiletAvailable, String useFeeText) {
         this.operatingHoursText = operatingHoursText;
