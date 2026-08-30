@@ -389,8 +389,7 @@ public class OAuthOnboardingService {
 
         User user = User.signUpWithSocial(
                 flow.getTargetEmail(),
-                flow.getNickname(),
-                null
+                flow.getNickname()
         );
 
         userRepository.saveAndFlush(user);

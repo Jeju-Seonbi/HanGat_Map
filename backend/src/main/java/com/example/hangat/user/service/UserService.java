@@ -39,7 +39,7 @@ public class UserService {
                 request.password(), request.passwordConfirm());
 
         User user = userRepository.save(
-                User.signUpWithEmail(email, encoded, nickname, request.birthDate())
+                User.signUpWithEmail(email, encoded, nickname)
         );
 
         emailVerificationService.issue(user);
@@ -63,6 +63,14 @@ public class UserService {
             throw new BaseException(BaseResponseStatus.DUPLICATE_NICKNAME);
         }
         user.setNickname(nickname);
+        return UserDto.UserResponse.form(user);
+    }
+
+    // 선택 생년월일 변경 또는 삭제
+    @Transactional
+    public UserDto.UserResponse updateBirthDate(Long userId, java.time.LocalDate birthDate) {
+        User user = getUserOrThrow(userId);
+        user.updateBirthDate(birthDate);
         return UserDto.UserResponse.form(user);
     }
 

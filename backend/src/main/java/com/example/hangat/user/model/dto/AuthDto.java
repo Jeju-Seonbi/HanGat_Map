@@ -2,12 +2,9 @@ package com.example.hangat.user.model.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Past;
 import jakarta.validation.constraints.Size;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
-
-import java.time.LocalDate;
 
 /**
  * 인증 관련 Dto 모음 - 가입 / 로그인 / 비밀번호 찾기
@@ -46,10 +43,7 @@ public final class AuthDto {
 
                 @NotBlank(message = "닉네임을 입력해주세요.")
                 @Size(min = 2, max = 50, message = "닉네임은 2~50자여야 합니다.")
-                String nickname,
-
-                @Past(message = "생년월일을 확인해주세요.")
-                LocalDate birthDate
+                String nickname
         ) {
         }
 

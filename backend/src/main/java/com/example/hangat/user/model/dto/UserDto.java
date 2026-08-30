@@ -3,6 +3,7 @@ package com.example.hangat.user.model.dto;
 import com.example.hangat.user.model.User;
 import com.example.hangat.user.model.UserStatus;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Past;
 import jakarta.validation.constraints.Size;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -24,6 +25,13 @@ public final class UserDto {
     ){
     }
     public record NicknameAvailableResponse(boolean available) {
+    }
+
+    /** 선택 생년월일 변경. null이면 기존 값을 삭제한다. */
+    public record BirthDateRequest(
+            @Past(message = "생년월일을 확인해주세요.")
+            LocalDate birthDate
+    ) {
     }
 
     /**
