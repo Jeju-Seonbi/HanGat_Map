@@ -128,7 +128,7 @@ public class Course {
 
     /**
      * course_item_costs 합산 캐시. 원본은 항상 비용 테이블이다 - 스왑 등으로 일정이 바뀌면
-     * {@link #updateCostSummary}로 같은 트랜잭션에서 다시 채워야 한다.
+     * {@link #updateAggregates}로 같은 트랜잭션에서 다시 채워야 한다.
      */
     @Column(name = "estimated_cost_min")
     private Integer estimatedCostMin;

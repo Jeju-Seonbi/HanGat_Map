@@ -29,7 +29,8 @@ public class WeatherService {
     }
 
     public List<DailyWeather> getWeeklyForecast() {
-        LocalDate today = LocalDate.now();
+        // KST 고정 - 서버 시계가 UTC(OCI 기본)면 KST 새벽에 now()가 어제 날짜라 발표분·주간 창이 하루 밀린다
+        LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
 
         // 오늘 발표분 실패 시 어제 발표분으로 1회 출력
         List<ShortTermItem> shortTerm;

@@ -119,3 +119,7 @@ app:
 public-api:
   service-key: ${SERVICE_KEY}
   tour-base-url: https://apis.data.go.kr/B551011
+
+# 샘플 코스 기동 생성 - dev 편의용. 내일 출발 READY가 이미 있으면 스킵 (운영은 새벽 4시 스케줄만)
+sample-courses:
+  generate-on-startup: true
