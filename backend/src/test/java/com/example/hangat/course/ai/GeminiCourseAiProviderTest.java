@@ -106,6 +106,10 @@ class GeminiCourseAiProviderTest {
 
         assertThat(request.path("systemInstruction").path("parts").path(0).path("text").asText())
                 .contains("candidateId는 반드시 candidates[].candidateId 중 하나를")
+                .contains("각 DAY에 기본적으로 3개 장소")
+                .contains("3개 배치가 불가능하면 중복 없이 2개")
+                .contains("10:00:00, 14:00:00, 18:00:00")
+                .contains("fixedDate와 fixedTime을 절대 덮어쓰지 않는다")
                 .contains("straightDistanceMeters")
                 .contains("weather")
                 .doesNotContain("straightDistanceKm", "routeDistanceKm", "durationMinutes")
@@ -131,6 +135,10 @@ class GeminiCourseAiProviderTest {
         assertThat(daySchema.path("additionalProperties").asBoolean()).isFalse();
         assertThat(daySchema.path("properties").path("items").path("minItems").asInt())
                 .isEqualTo(1);
+        assertThat(daySchema.path("properties").path("items").path("maxItems").asInt())
+                .isEqualTo(3);
+        assertThat(daySchema.path("properties").path("items").path("description").asText())
+                .contains("기본 3개", "중복 없이 2개", "1개");
         JsonNode itemSchema = daySchema.path("properties").path("items").path("items");
         assertThat(itemSchema.path("additionalProperties").asBoolean()).isFalse();
         JsonNode startTimeSchema = itemSchema.path("properties").path("startTime");
@@ -179,6 +187,10 @@ class GeminiCourseAiProviderTest {
                 .contains("\"contractVersion\":\"1.0\"")
                 .contains("동일 candidateId를 재사용하지 않는다")
                 .contains("후보가 부족하면 중복해서 채우지 말고")
+                .contains("각 DAY에 기본적으로 3개 장소")
+                .contains("3개가 불가능하면 중복 없이 2개")
+                .contains("10:00:00, 14:00:00, 18:00:00")
+                .contains("fixedDate와 fixedTime을 덮어쓰지 않는다")
                 .contains("제주 현지 시각의 HH:mm:ss")
                 .contains("timezone, UTC offset, Z, fractional seconds")
                 .contains("\"candidateId\":\"want-1\"")

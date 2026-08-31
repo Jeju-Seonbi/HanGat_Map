@@ -159,6 +159,47 @@ class CourseAiResultValidatorContractTest {
     }
 
     @Test
+    void acceptsThreePlacesPerDayAcrossThreeDaysWithRequiredFixedSchedule() {
+        CourseAiInputDto base = input();
+        List<CandidateFactDto> candidates = List.of(
+                candidate("want-1", "성산일출봉"),
+                candidate("normal-1", "후보 1"),
+                candidate("normal-2", "후보 2"),
+                candidate("normal-3", "후보 3"),
+                candidate("normal-4", "후보 4"),
+                candidate("normal-5", "후보 5"),
+                candidate("normal-6", "후보 6"),
+                candidate("normal-7", "후보 7"),
+                candidate("normal-8", "후보 8"));
+        CourseAiInputDto sufficientInput = copyInput(base, candidates, base.hardConstraints());
+        CourseAiResultDto threePerDayResult = result(List.of(
+                day("2026-08-27",
+                        item("normal-1", "10:00"),
+                        item("normal-2", "14:00"),
+                        item("normal-3", "18:00")),
+                day("2026-08-28",
+                        item("want-1", "09:00"),
+                        item("normal-4", "14:00"),
+                        item("normal-5", "18:00")),
+                day("2026-08-29",
+                        item("normal-6", "10:00"),
+                        item("normal-7", "14:00"),
+                        item("normal-8", "18:00"))));
+
+        assertThatCode(() -> validator.validate(sufficientInput, threePerDayResult))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void acceptsTwoPlacesWithoutDuplicatingCandidatesWhenCandidatesAreLimited() {
+        CourseAiResultDto twoPlaceResult = result(List.of(
+                day("2026-08-28", item("want-1", "09:00"), item("normal-1", "14:00"))));
+
+        assertThatCode(() -> validator.validate(input(), twoPlaceResult))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
     void serializesOnlyTheFinalDecisionContract() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper()
                 .registerModule(new JavaTimeModule())

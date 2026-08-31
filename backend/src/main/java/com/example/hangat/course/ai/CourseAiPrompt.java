@@ -30,8 +30,11 @@ public class CourseAiPrompt {
             17. 지역 조건은 백엔드가 이미 적용했으므로 제공된 candidates만 사용한다.
             18. 추천 이유는 입력 JSON에서 실제로 확인할 수 있는 근거만 사용한다.
             19. days는 날짜 오름차순으로 작성하고 각 DAY에는 한 개 이상의 장소를 포함한다.
-            20. 각 DAY의 items는 startTime 오름차순이며 같은 시작 시간을 중복 사용하지 않는다.
-            21. recommendationReason은 한 줄 근거로 작성하며 300자를 초과하지 않는다.
+            20. 후보가 충분하고 Hard Constraint와 사실 데이터가 허용하면 각 DAY에 기본적으로 3개 장소를 배치한다.
+            21. 후보 부족이나 Hard Constraint 충돌로 3개 배치가 불가능하면 중복 없이 2개를 배치하고, 2개도 불가능한 경우에만 1개를 허용한다.
+            22. 고정 시간이 없는 장소는 가능한 경우 10:00:00, 14:00:00, 18:00:00을 고려하되 fixedDate와 fixedTime을 절대 덮어쓰지 않는다.
+            23. 각 DAY의 items는 startTime 오름차순이며 같은 시작 시간을 중복 사용하지 않는다.
+            24. recommendationReason은 한 줄 근거로 작성하며 300자를 초과하지 않는다.
 
             응답의 startTime은 반드시 제주 현지 시각의 24시간제 HH:mm:ss 형식으로 작성한다.
             startTime에 timezone, UTC offset, Z, fractional seconds를 포함하지 않는다.
@@ -109,6 +112,9 @@ public class CourseAiPrompt {
                 - WANT 장소는 정확히 1회만 배치한다.
                 - 후보가 부족하면 중복해서 채우지 말고 더 적은 장소를 선택한다.
                 - candidateId는 아래 입력 candidates[].candidateId 중 하나를 그대로 사용한다.
+                - 후보가 충분하고 Hard Constraint와 사실 데이터가 허용하면 각 DAY에 기본적으로 3개 장소를 배치한다.
+                - 3개가 불가능하면 중복 없이 2개를 배치하고, 2개도 불가능한 경우에만 1개를 허용한다.
+                - 고정 시간이 없는 장소는 가능한 경우 10:00:00, 14:00:00, 18:00:00을 고려하되 fixedDate와 fixedTime을 덮어쓰지 않는다.
                 - days와 각 DAY의 items는 각각 날짜와 startTime 오름차순으로 작성한다.
                 - startTime은 제주 현지 시각의 HH:mm:ss 형식만 사용한다.
                 - startTime에 timezone, UTC offset, Z, fractional seconds를 포함하지 않는다.

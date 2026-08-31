@@ -576,7 +576,12 @@ public class GeminiCourseAiProvider implements CourseAiProvider {
                 "type", "object",
                 "properties", Map.of(
                         "date", Map.of("type", "string", "format", "date"),
-                        "items", Map.of("type", "array", "items", item, "minItems", 1)
+                        "items", Map.of(
+                                "type", "array",
+                                "items", item,
+                                "minItems", 1,
+                                "maxItems", 3,
+                                "description", "기본 3개; 불가능한 경우 중복 없이 2개, 2개도 불가능한 경우 1개")
                 ),
                 "required", List.of("date", "items"),
                 "additionalProperties", false
