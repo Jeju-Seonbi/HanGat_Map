@@ -66,6 +66,7 @@ class CourseAiPreparationServiceTest {
                         input -> { throw new AssertionError("provider must not run in preparation test"); },
                         new CourseAiResultValidator()),
                 org.mockito.Mockito.mock(CoursePersistenceService.class),
+                org.mockito.Mockito.mock(CourseBudgetService.class),
                 new CourseResponseAssembler());
 
         CourseAiInputDto result = courseService.prepareAiInput(request());

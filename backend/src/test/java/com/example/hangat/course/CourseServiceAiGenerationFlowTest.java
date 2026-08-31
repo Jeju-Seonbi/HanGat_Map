@@ -86,6 +86,9 @@ class CourseServiceAiGenerationFlowTest {
                         course,
                         java.util.Map.of("candidate-1", persistedItem),
                         java.util.Map.of("candidate-1", "관광지")));
+        CourseBudgetService budgetService = mock(CourseBudgetService.class);
+        when(budgetService.calculateAndCache(101L))
+                .thenReturn(CourseBudgetCalculation.noData(500000));
         CourseService service = new CourseService(
                 new StubTourApiService(),
                 new StubCongestionApiService(),
@@ -96,6 +99,7 @@ class CourseServiceAiGenerationFlowTest {
                         Optional.empty()),
                 generationService,
                 persistenceService,
+                budgetService,
                 new CourseResponseAssembler());
 
         var response = service.createCourse(request());
@@ -112,6 +116,8 @@ class CourseServiceAiGenerationFlowTest {
                         metadata.generationReason()
                                 == com.example.hangat.course.model.GenerationReason.INITIAL));
         assertThat(response.days()).hasSize(1);
+        assertThat(response.budgetSummary().hasCostData()).isFalse();
+        assertThat(response.budgetSummary().budgetTotal()).isEqualTo(500000);
         assertThat(response.days().get(0).items().get(0).placeName()).isEqualTo("만장굴");
         assertThat(response.days().get(0).items().get(0).recommendationReason())
                 .isEqualTo("한글 추천 이유");

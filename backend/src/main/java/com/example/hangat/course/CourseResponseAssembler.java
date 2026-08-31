@@ -9,6 +9,8 @@ import com.example.hangat.course.facts.TravelFact;
 import com.example.hangat.course.facts.WeatherFactSet;
 import com.example.hangat.course.model.AccommodationDto;
 import com.example.hangat.course.model.CourseResponseDto;
+import com.example.hangat.course.model.CourseResponseDto.BudgetSummaryDto;
+import com.example.hangat.course.model.CourseResponseDto.CourseItemCostDto;
 import com.example.hangat.course.model.CourseResponseDto.CongestionFactDto;
 import com.example.hangat.course.model.CourseResponseDto.DayDto;
 import com.example.hangat.course.model.CourseResponseDto.ItemDto;
@@ -34,6 +36,19 @@ public class CourseResponseAssembler {
             CoursePersistenceResult persistence,
             AccommodationDto accommodation
     ) {
+        Integer budgetTotal = persistence == null || persistence.course() == null
+                ? null : persistence.course().getBudgetTotal();
+        return assemble(facts, result, persistence, accommodation,
+                CourseBudgetCalculation.noData(budgetTotal));
+    }
+
+    public CourseResponseDto assemble(
+            CourseGenerationFacts facts,
+            CourseAiResultDto result,
+            CoursePersistenceResult persistence,
+            AccommodationDto accommodation,
+            CourseBudgetCalculation budget
+    ) {
         if (facts == null) {
             throw new IllegalArgumentException("코스 생성 사실이 필요합니다.");
         }
@@ -42,6 +57,9 @@ public class CourseResponseAssembler {
         }
         if (persistence == null || persistence.course() == null) {
             throw new IllegalArgumentException("코스 저장 결과가 필요합니다.");
+        }
+        if (budget == null || budget.summary() == null) {
+            throw new IllegalArgumentException("코스 예산 계산 결과가 필요합니다.");
         }
 
         Map<String, CourseCandidate> candidatesById = indexCandidates(facts.candidates());
@@ -55,10 +73,12 @@ public class CourseResponseAssembler {
                         candidatesById,
                         weatherFactSetsById,
                         travelFactsByPair,
-                        persistence))
+                        persistence,
+                        budget))
                 .toList();
 
         Course course = persistence.course();
+        BudgetSummaryDto budgetSummary = toBudgetSummary(budget);
         return new CourseResponseDto(
                 course.getId(),
                 result.contractVersion(),
@@ -71,6 +91,9 @@ public class CourseResponseAssembler {
                 course.getBudgetTotal(),
                 course.getTransport(),
                 accommodation,
+                budget.totalExpectedMin(),
+                budget.totalExpectedMax(),
+                budgetSummary,
                 days);
     }
 
@@ -79,7 +102,8 @@ public class CourseResponseAssembler {
             Map<String, CourseCandidate> candidatesById,
             Map<String, WeatherFactSet> weatherFactSetsById,
             Map<TravelPair, TravelFact> travelFactsByPair,
-            CoursePersistenceResult persistence
+            CoursePersistenceResult persistence,
+            CourseBudgetCalculation budget
     ) {
         if (day == null || day.items() == null || day.items().isEmpty()) {
             throw new IllegalArgumentException("응답으로 변환할 AI 일정이 유효하지 않습니다.");
@@ -92,7 +116,8 @@ public class CourseResponseAssembler {
                         candidatesById,
                         weatherFactSetsById,
                         travelFactsByPair,
-                        persistence))
+                        persistence,
+                        budget))
                 .toList();
         return new DayDto(items.get(0).dayNo(), items.get(0).visitDate(), items);
     }
@@ -103,7 +128,8 @@ public class CourseResponseAssembler {
             Map<String, CourseCandidate> candidatesById,
             Map<String, WeatherFactSet> weatherFactSetsById,
             Map<TravelPair, TravelFact> travelFactsByPair,
-            CoursePersistenceResult persistence
+            CoursePersistenceResult persistence,
+            CourseBudgetCalculation budget
     ) {
         CourseCandidate candidate = candidatesById.get(item.candidateId());
         if (candidate == null) {
@@ -167,13 +193,47 @@ public class CourseResponseAssembler {
                 persistedItem.getStartTime(),
                 ItemSource.valueOf(persistedItem.getItemSource().name()),
                 persistedItem.getRecommendationReason(),
-                List.of(),
+                budget.itemCostsByItemId()
+                        .getOrDefault(persistedItem.getId(), List.of()).stream()
+                        .map(this::toCostDto)
+                        .toList(),
                 inboundDistance,
                 inboundTravelMinutes,
                 displayedCongestion == null ? null : displayedCongestion.rate(),
                 displayedCongestion == null ? null : displayedCongestion.level(),
                 congestion,
                 weather);
+    }
+
+    private BudgetSummaryDto toBudgetSummary(CourseBudgetCalculation budget) {
+        CourseBudgetCalculation.BudgetSummary summary = budget.summary();
+        return new BudgetSummaryDto(
+                summary.hasCostData(),
+                summary.budgetTotal(),
+                summary.verifiedTotal(),
+                summary.estimatedTotal(),
+                summary.estimatedMin(),
+                summary.estimatedMax(),
+                summary.totalExpected(),
+                budget.totalExpectedMin(),
+                budget.totalExpectedMax(),
+                summary.remainingBudget(),
+                summary.usageRate(),
+                summary.overBudget(),
+                summary.unknownCount());
+    }
+
+    private CourseItemCostDto toCostDto(CourseBudgetCalculation.CostLine cost) {
+        return new CourseItemCostDto(
+                cost.id(),
+                cost.courseId(),
+                cost.courseItemId(),
+                cost.category(),
+                cost.accuracyType(),
+                cost.amountMin() == null ? null : BigDecimal.valueOf(cost.amountMin()),
+                cost.amountMax() == null ? null : BigDecimal.valueOf(cost.amountMax()),
+                cost.currency(),
+                cost.basisText());
     }
 
     private String categoryName(

@@ -28,6 +28,9 @@ public record CourseResponseDto(
         Integer budgetTotal,
         Transport transport,
         AccommodationDto accommodation,
+        Integer estimatedCostMin,
+        Integer estimatedCostMax,
+        BudgetSummaryDto budgetSummary,
         List<DayDto> days,
         @JsonInclude(JsonInclude.Include.NON_NULL) String claimToken,
         @JsonInclude(JsonInclude.Include.NON_NULL) Instant claimExpiresAt
@@ -54,6 +57,9 @@ public record CourseResponseDto(
                 null,
                 null,
                 null,
+                null,
+                null,
+                null,
                 days,
                 null,
                 null);
@@ -74,13 +80,36 @@ public record CourseResponseDto(
             List<DayDto> days
     ) {
         this(id, contractVersion, courseType, generationReason, status, startDate, endDate,
-                people, budgetTotal, transport, accommodation, days, null, null);
+                people, budgetTotal, transport, accommodation, null, null, null,
+                days, null, null);
+    }
+
+    public CourseResponseDto(
+            Long id,
+            String contractVersion,
+            CourseType courseType,
+            GenerationReason generationReason,
+            CourseStatus status,
+            LocalDate startDate,
+            LocalDate endDate,
+            Short people,
+            Integer budgetTotal,
+            Transport transport,
+            AccommodationDto accommodation,
+            Integer estimatedCostMin,
+            Integer estimatedCostMax,
+            BudgetSummaryDto budgetSummary,
+            List<DayDto> days
+    ) {
+        this(id, contractVersion, courseType, generationReason, status, startDate, endDate,
+                people, budgetTotal, transport, accommodation, estimatedCostMin,
+                estimatedCostMax, budgetSummary, days, null, null);
     }
 
     public CourseResponseDto withClaimProof(String token, Instant expiresAt) {
         return new CourseResponseDto(id, contractVersion, courseType, generationReason, status,
-                startDate, endDate, people, budgetTotal, transport, accommodation, days,
-                token, expiresAt);
+                startDate, endDate, people, budgetTotal, transport, accommodation,
+                estimatedCostMin, estimatedCostMax, budgetSummary, days, token, expiresAt);
     }
 
     private static <T> List<T> immutableList(List<T> values) {
@@ -153,6 +182,25 @@ public record CourseResponseDto(
             BigDecimal amountMax,
             String currency,
             String basisText
+    ) {
+    }
+
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record BudgetSummaryDto(
+            boolean hasCostData,
+            Integer budgetTotal,
+            int verifiedTotal,
+            Integer estimatedTotal,
+            Integer estimatedMin,
+            Integer estimatedMax,
+            Integer totalExpected,
+            Integer totalExpectedMin,
+            Integer totalExpectedMax,
+            Integer remainingBudget,
+            BigDecimal usageRate,
+            Boolean overBudget,
+            int unknownCount
     ) {
     }
 

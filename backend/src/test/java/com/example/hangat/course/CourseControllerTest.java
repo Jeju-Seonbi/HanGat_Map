@@ -85,6 +85,10 @@ class CourseControllerTest {
                 .andExpect(jsonPath("$.result.days[0].items[0].category_name").value("관광지"))
                 .andExpect(jsonPath("$.result.days[0].items[0].costs").isArray())
                 .andExpect(jsonPath("$.result.days[0].items[0].costs").isEmpty())
+                .andExpect(jsonPath("$.result.budget_summary.has_cost_data").value(false))
+                .andExpect(jsonPath("$.result.budget_summary.budget_total").value(500000))
+                .andExpect(jsonPath("$.result.budget_summary.total_expected").isEmpty())
+                .andExpect(jsonPath("$.result.budget_summary.over_budget").isEmpty())
                 .andExpect(jsonPath("$.result.days[0].items[0].congestion_rate").value(22.5))
                 .andExpect(jsonPath("$.result.days[0].items[0].congestion_level").value("QUIET"))
                 .andExpect(jsonPath("$.result.accommodation.place_name").value("제주 숙소"))
@@ -155,6 +159,10 @@ class CourseControllerTest {
                 101L, "1.0", CourseType.USER, GenerationReason.INITIAL, CourseStatus.READY,
                 LocalDate.of(2026, 8, 27), LocalDate.of(2026, 8, 29),
                 (short) 2, 500000, Transport.RENTAL_CAR, accommodation,
+                null, null,
+                new CourseResponseDto.BudgetSummaryDto(
+                        false, 500000, 0, null, null, null,
+                        null, null, null, null, null, null, 0),
                 List.of(new CourseResponseDto.DayDto(
                         1, LocalDate.of(2026, 8, 28), List.of(item))));
     }

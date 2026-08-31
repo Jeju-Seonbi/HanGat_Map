@@ -35,6 +35,7 @@ public class CourseService {
     private final CourseAiPreparationService courseAiPreparationService;
     private final CourseAiGenerationService courseAiGenerationService;
     private final CoursePersistenceService coursePersistenceService;
+    private final CourseBudgetService courseBudgetService;
     private final CourseResponseAssembler courseResponseAssembler;
 
     public CourseResponseDto createCourse(CourseRequestDto request) {
@@ -45,9 +46,11 @@ public class CourseService {
                 prepared.facts(),
                 result,
                 prepared.metadata());
+        CourseBudgetCalculation budget = courseBudgetService.calculateAndCache(
+                persistence.course().getId());
         return courseResponseAssembler.assemble(
                 prepared.facts(), result, persistence,
-                request.getAccommodation());
+                request.getAccommodation(), budget);
     }
 
     CourseAiInputDto prepareAiInput(CourseRequestDto request) {

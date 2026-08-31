@@ -32,6 +32,12 @@ const response: CourseResult = {
   end_date: condition.end_date,
   people: condition.people,
   budget_total: condition.budget_total,
+  budget_summary: {
+    has_cost_data: false,
+    budget_total: condition.budget_total,
+    verified_total: 0,
+    unknown_count: 0,
+  },
   transport: condition.transport,
   accommodation: condition.accommodation,
   days: [{
@@ -87,6 +93,12 @@ describe('courseMockService Backend generation', () => {
     })
     expect(result.days[0].items[0].end_time).toBeUndefined()
     expect(result.estimated_cost_min).toBeUndefined()
+    expect(result.budget_summary).toEqual({
+      has_cost_data: false,
+      budget_total: 400000,
+      verified_total: 0,
+      unknown_count: 0,
+    })
   })
 
   it('propagates common client failures without falling back to mock generation', async () => {
@@ -126,6 +138,7 @@ describe('courseMockService Backend generation', () => {
       body: { claim_token: 'opaque-proof', title: '제주 여행' },
     })
     expect(result).toMatchObject({ id: 101, status: 'SAVED', title: '제주 여행' })
+    expect(result.budget_summary).toEqual(guestCourse.budget_summary)
     expect(result.claim_token).toBeUndefined()
     expect(result.claim_expires_at).toBeUndefined()
   })

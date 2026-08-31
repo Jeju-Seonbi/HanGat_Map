@@ -62,8 +62,12 @@ const visitCount = computed(() => result.value?.days.reduce((count, day) => coun
 const regionSummary = computed(() => condition.course_regions.map(region => region.name).join(' · ') || '전체')
 const styleSummary = computed(() => condition.course_styles.map(style => style.name).join(' · '))
 const estimatedCost = computed(() => {
-  if (result.value?.estimated_cost_min == null || result.value.estimated_cost_max == null) return '정보 없음'
-  return `${result.value.estimated_cost_min.toLocaleString()} ~ ${result.value.estimated_cost_max.toLocaleString()}원`
+  const summary = result.value?.budget_summary
+  if (!summary?.has_cost_data) return '정보 없음'
+  if (summary.total_expected_min == null || summary.total_expected_max == null) return '정보 없음'
+  return summary.total_expected_min === summary.total_expected_max
+    ? `${summary.total_expected_max.toLocaleString()}원`
+    : `${summary.total_expected_min.toLocaleString()} ~ ${summary.total_expected_max.toLocaleString()}원`
 })
 const congestionLabel = (rate?: number) => rate == null ? '-' : rate < 35 ? '한산' : rate < 65 ? '보통' : '혼잡'
 
@@ -268,7 +272,7 @@ const formatDistance = (metres?: number) => metres == null ? '' : `${(metres / 1
         </main>
 
         <aside class="course-side">
-          <BudgetGauge :budget="result.budget_total" :min="result.estimated_cost_min" :max="result.estimated_cost_max" :summary="result.cost_summary" />
+          <BudgetGauge :summary="result.budget_summary" />
           <section class="course-summary-card">
             <span class="summary-kicker">TRIP SUMMARY</span>
             <h3>코스 요약</h3>

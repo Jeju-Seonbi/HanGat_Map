@@ -33,6 +33,7 @@ class CourseServiceValidationTest {
                     input -> { throw new AssertionError("provider must not run in validation test"); },
                     new CourseAiResultValidator()),
             mock(CoursePersistenceService.class),
+            mock(CourseBudgetService.class),
             new CourseResponseAssembler());
 
     @Test

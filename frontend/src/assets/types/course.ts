@@ -50,6 +50,21 @@ export interface CourseCostSummary {
   estimated_max: number
   unknown_count: number
 }
+export interface CourseBudgetSummary {
+  has_cost_data: boolean
+  budget_total?: number
+  verified_total: number
+  estimated_total?: number
+  estimated_min?: number
+  estimated_max?: number
+  total_expected?: number
+  total_expected_min?: number
+  total_expected_max?: number
+  remaining_budget?: number
+  usage_rate?: number
+  over_budget?: boolean
+  unknown_count: number
+}
 export interface CourseItem {
   id: number; course_id: number; place_id: number; place_name: string; category_name: string; image_url?: string
   candidate_id?: string; source_code?: PlaceSourceCode; source_place_id?: string
@@ -72,7 +87,8 @@ export interface CourseResult {
   claim_token?: string; claim_expires_at?: string
   start_date: string; end_date: string; people: number; budget_total?: number; transport: Transport
   estimated_cost_min?: number; estimated_cost_max?: number; average_congestion_rate?: number
-  cost_summary?: CourseCostSummary; generation_error_code?: string; accommodation?: AccommodationInput; days: CourseDay[]
+  cost_summary?: CourseCostSummary; budget_summary?: CourseBudgetSummary
+  generation_error_code?: string; accommodation?: AccommodationInput; days: CourseDay[]
 }
 export interface AlternativePlace {
   place_id: number; place_name: string; category_name: string; subcategory_name?: string; image_url?: string

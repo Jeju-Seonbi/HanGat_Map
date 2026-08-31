@@ -234,8 +234,54 @@ class CourseResponseAssemblerTest {
                 "\"inbound_distance_m\":null",
                 "\"inbound_travel_minutes\":null",
                 "\"weather\":null",
-                "\"costs\":[]");
+                "\"costs\":[]",
+                "\"has_cost_data\":false",
+                "\"total_expected\":null",
+                "\"over_budget\":null");
         assertThat(json).doesNotContain("tour_category", "compatibility");
+    }
+
+    @Test
+    void projectsBudgetSummaryAndOnlyRealItemCostFacts() {
+        LocalDate visitDate = LocalDate.of(2026, 9, 10);
+        CourseCandidate candidate = candidate(
+                "known", "KTO", "1", "장소", null, null, null,
+                null, "TOURIST", "관광지", List.of(), List.of(), null);
+        CoursePersistenceResult persistence = persistence(
+                List.of("known"),
+                Map.of("known", CourseItemSource.AI_RECOMMENDED),
+                Map.of("known", "관광지"),
+                visitDate);
+        CourseBudgetCalculation budget = new CourseBudgetCalculation(
+                new CourseBudgetCalculation.BudgetSummary(
+                        true, 400000, 16000, 120000, 80000, 120000,
+                        136000, 264000, new BigDecimal("34.00"), false, 0),
+                96000,
+                136000,
+                Map.of(201L, List.of(new CourseBudgetCalculation.CostLine(
+                        501L, 101L, 201L, "FOOD", "VERIFIED",
+                        16000, 16000, "KRW", "8,000원 × 2명"))));
+
+        CourseResponseDto response = assembler.assemble(
+                new CourseGenerationFacts(List.of(candidate), List.of(), List.of()),
+                new CourseAiResultDto("2.0", List.of(day(
+                        visitDate, item("known", "09:00", "추천")))),
+                persistence,
+                null,
+                budget);
+
+        assertThat(response.estimatedCostMin()).isEqualTo(96000);
+        assertThat(response.estimatedCostMax()).isEqualTo(136000);
+        assertThat(response.budgetSummary().totalExpected()).isEqualTo(136000);
+        assertThat(response.budgetSummary().remainingBudget()).isEqualTo(264000);
+        assertThat(response.budgetSummary().usageRate()).isEqualByComparingTo("34.00");
+        assertThat(response.budgetSummary().overBudget()).isFalse();
+        assertThat(response.days().get(0).items().get(0).costs()).singleElement()
+                .satisfies(cost -> {
+                    assertThat(cost.id()).isEqualTo(501L);
+                    assertThat(cost.accuracyType()).isEqualTo("VERIFIED");
+                    assertThat(cost.amountMin()).isEqualByComparingTo("16000");
+                });
     }
 
     @Test
