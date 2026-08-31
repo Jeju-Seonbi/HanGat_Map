@@ -78,7 +78,6 @@ onMounted(async () => {
   const forecast = await WeatherService.getWeeklyForecast()
   weeklyWeather.value = forecast.days
   weatherLive.value = forecast.live
-
   const calm = await CalmPlaceService.getCalmPlaces()
   calmPlaces.value = calm.cards
   calmLive.value = calm.live

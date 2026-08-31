@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { CourseCondition, CourseItem, CourseResult } from '../assets/types/course'
-import { calculateCourseCostSummary, courseMockService } from './courseMockService'
+import { calculateCourseCostSummary, courseMockService, generateMockCourseForTest } from './courseMockService'
 import { savedCourseMockService } from './savedCourseMockService'
 import { getMockWeather, weatherRecommendationAdjustment } from './weatherMockService'
 import { calculateBudgetOverrun } from './budgetUtils'
@@ -26,7 +26,7 @@ describe('COURSE_004 weather', () => {
   })
 
   it('keeps a rainy USER_FIXED schedule and adds a warning', async () => {
-    const course = await courseMockService.generateCourse(condition(true))
+    const course = await generateMockCourseForTest(condition(true), 'INITIAL')
     const fixed = course.days.flatMap(day => day.items).find(item => item.place_name === '성산일출봉')!
     expect(fixed).toMatchObject({ visit_date: '2026-08-15', start_time: '15:00', item_source: 'USER_FIXED', weather_condition: 'RAIN' })
     expect(fixed.weather_warning).toContain('사용자 지정대로 유지')
@@ -35,7 +35,7 @@ describe('COURSE_004 weather', () => {
 
 describe('COURSE_005 same-place rescheduling', () => {
   it('changes only date/time for the same place to a lower-congestion conflict-free slot', async () => {
-    const course = await courseMockService.generateCourse(condition(true))
+    const course = await generateMockCourseForTest(condition(true), 'INITIAL')
     const original = course.days.flatMap(day => day.items).find(item => item.place_name === '성산일출봉')!
     const options = await courseMockService.getQuieterTimeOptions(course, original.id)
     expect(options.length).toBeGreaterThan(0)
@@ -70,7 +70,7 @@ describe('COURSE_008 mock saving', () => {
   beforeEach(() => savedCourseMockService.clear())
 
   it('saves once, returns a summary, preserves coordinates, and blocks duplicate course IDs', async () => {
-    const generated = await courseMockService.generateCourse(condition())
+    const generated = await generateMockCourseForTest(condition(), 'INITIAL')
     const record = await savedCourseMockService.save(generated, '동부 자연 여행')
     expect(record.course.status).toBe('SAVED')
     expect(record.summary).toMatchObject({ course_id: generated.id, title: '동부 자연 여행', start_date: generated.start_date, end_date: generated.end_date })

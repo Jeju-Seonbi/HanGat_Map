@@ -111,10 +111,7 @@ public class MapMasterDataInitializer implements ApplicationRunner {
      * 그 사실을 숨기면 데이터 정직성 원칙(§1.2)에 어긋난다.
      */
     private void initDataSources() {
-        if (dataSourceRepository.count() > 0) {
-            return;
-        }
-        dataSourceRepository.saveAll(List.of(
+        List<DataSource> requiredSources = List.of(
                 DataSource.builder()
                         .code("KTO")
                         .displayName("한국관광공사 국문 관광정보")
@@ -162,9 +159,24 @@ public class MapMasterDataInitializer implements ApplicationRunner {
                         .attributionText("출처: 제주시 착한가격업소 정보")
                         .disclaimerText("착한가격업소 지정 현황은 기준일자 기준이며 이후 변경될 수 있습니다.")
                         .displayOrder((short) 4)
+                        .build(),
+                DataSource.builder()
+                        .code("KAKAO_LOCAL")
+                        .displayName("카카오 로컬 장소 검색")
+                        .providerName("카카오")
+                        .homepageUrl("https://www.kakaocorp.com")
+                        .apiUrl("https://developers.kakao.com/docs/latest/ko/local/dev-guide")
+                        .attributionText("출처: 카카오 로컬")
+                        .displayOrder((short) 5)
                         .build()
-        ));
-        log.info("데이터 출처 마스터 4행 적재");
+        );
+        long inserted = requiredSources.stream()
+                .filter(source -> !dataSourceRepository.existsById(source.getCode()))
+                .peek(dataSourceRepository::save)
+                .count();
+        if (inserted > 0) {
+            log.info("누락 데이터 출처 마스터 {}행 적재", inserted);
+        }
     }
 
     private Region region(String code, String name, String lat, String lng, byte order) {

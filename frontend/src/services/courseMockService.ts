@@ -16,6 +16,7 @@ import type {
 } from '../assets/types/course'
 import { getMockWeather, weatherRecommendationAdjustment, weatherWarning } from './weatherMockService'
 import { savedCourseMockService } from './savedCourseMockService'
+import { apiRequest } from '../api/backendClient.js'
 
 const pause = (ms = 650) => new Promise(resolve => setTimeout(resolve, ms))
 const RECOMMENDED_ITEMS_PER_DAY = 3
@@ -534,7 +535,7 @@ function placeFlexibleWants(days: CourseDay[], dayRegions: RegionCode[], prefere
   })
 }
 
-async function generate(condition: CourseCondition, generationReason: CourseResult['generation_reason']): Promise<CourseResult> {
+async function generateMockCourse(condition: CourseCondition, generationReason: CourseResult['generation_reason']): Promise<CourseResult> {
   await pause()
   const courseId = ++sequence
   const dayCount = Math.max(1, Math.round((new Date(condition.end_date).getTime() - new Date(condition.start_date).getTime()) / 86400000) + 1)
@@ -620,10 +621,46 @@ async function generate(condition: CourseCondition, generationReason: CourseResu
   })
 }
 
+export function toCourseRequestPayload(condition: CourseCondition): CourseCondition {
+  return {
+    start_date: condition.start_date,
+    end_date: condition.end_date,
+    people: condition.people,
+    budget_total: condition.budget_total,
+    transport: condition.transport,
+    course_regions: condition.course_regions,
+    course_styles: condition.course_styles,
+    course_place_preferences: condition.course_place_preferences,
+    ...(condition.accommodation
+      ? { accommodation: { ...condition.accommodation } }
+      : {}),
+  }
+}
+
+export function applyAccommodationSelection(
+  course: CourseResult,
+  accommodation: AccommodationInput,
+): CourseResult {
+  return {
+    ...course,
+    accommodation: { ...accommodation },
+  }
+}
+
+async function generate(condition: CourseCondition): Promise<CourseResult> {
+  return await apiRequest('/courses', {
+    method: 'POST',
+    body: toCourseRequestPayload(condition),
+  }) as CourseResult
+}
+
+export const generateMockCourseForTest = generateMockCourse
+
 export const courseMockService = {
-  generateCourse: (condition: CourseCondition) => generate(condition, 'INITIAL'),
-  regenerateCourse: (condition: CourseCondition) => generate(condition, 'USER_REGENERATE'),
-  recalculateRouteWithAccommodation: (condition: CourseCondition, accommodation: AccommodationInput) => generate({
+  generateCourse: (condition: CourseCondition) => generate(condition),
+  regenerateCourse: (_condition: CourseCondition): Promise<CourseResult> => Promise.reject(new Error('코스 재생성은 아직 지원되지 않습니다.')),
+  applyAccommodationSelection,
+  recalculateRouteWithAccommodation: (condition: CourseCondition, accommodation: AccommodationInput) => generateMockCourse({
     ...JSON.parse(JSON.stringify(condition)) as CourseCondition,
     accommodation: { ...accommodation },
   }, 'USER_REGENERATE'),
@@ -785,6 +822,15 @@ export const courseMockService = {
     return recalc(copy)
   },
   async saveCourse(course: CourseResult, title: string) {
+    if (course.claim_token) {
+      const saved = await apiRequest(`/courses/${course.id}/claim`, {
+        method: 'POST',
+        auth: true,
+        body: { claim_token: course.claim_token, title },
+      }) as { id: number; status: 'SAVED'; title: string; saved_at: string }
+      const { claim_token: _claimToken, claim_expires_at: _claimExpiresAt, ...safeCourse } = course
+      return { ...safeCourse, id: saved.id, status: saved.status, title: saved.title }
+    }
     const saved = await savedCourseMockService.save(course, title)
     return saved.course
   },

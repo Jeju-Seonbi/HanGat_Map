@@ -32,12 +32,16 @@ public class WeatherClient {
 
     /* 단기 예보 - 시간별 TMP/TMN/TMX/SKY/PTY 행 목록 */
     public List<ShortTermItem> fetchShortTerm(String baseDate, String baseTime) {
+        return fetchShortTerm(baseDate, baseTime, JEJU_NX, JEJU_NY);
+    }
+
+    public List<ShortTermItem> fetchShortTerm(String baseDate, String baseTime, int nx, int ny) {
         KmaResponse<ShortTermItem> response = call(
                 uri -> uri.path("/VilageFcstInfoService_2.0/getVilageFcst")
                         .queryParam("base_date", baseDate)
                         .queryParam("base_time", baseTime)
-                        .queryParam("nx", JEJU_NX)
-                        .queryParam("ny", JEJU_NY)
+                        .queryParam("nx", nx)
+                        .queryParam("ny", ny)
                         .queryParam("numOfRows", 1000),
                 new ParameterizedTypeReference<>() {
                 });

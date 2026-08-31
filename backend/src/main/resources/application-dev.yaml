@@ -16,7 +16,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     show-sql: false
     properties:
       hibernate:
@@ -89,10 +89,25 @@ weather:
   base-url: https://apis.data.go.kr/1360000
   service-key: ${SERVICE_KEY}
 
+tour-api:
+  base-url: ${TOUR_API_BASE_URL}
+  service-key: ${TOUR_API_SERVICE_KEY}
+
+congestion-api:
+  base-url: ${CONGESTION_API_BASE_URL}
+  service-key: ${TOUR_API_SERVICE_KEY}
+
+gemini:
+  base-url: https://generativelanguage.googleapis.com/v1beta
+  api-key: ${GEMINI_API_KEY:}
+  model: gemini-3.6-flash
+  connect-timeout: 3s
+  read-timeout: 120s
+
 app:
-  frontend-url: ${FRONTEND_URL:http://localhost:5173}
+  frontend-url: ${FRONTEND_URL:http://localhost:4173}
   cors:
-    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4173,http://localhost:5173}
   cookie:
     secure: false
   mail:

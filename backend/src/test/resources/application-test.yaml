@@ -23,6 +23,21 @@ weather:
   base-url: http://localhost
   service-key: test-key
 
+tour-api:
+  base-url: http://localhost
+  service-key: test-key
+
+congestion-api:
+  base-url: http://localhost
+  service-key: test-key
+
+gemini:
+  base-url: http://localhost
+  api-key: test-gemini-key
+  model: gemini-3.6-flash
+  connect-timeout: 1s
+  read-timeout: 1s
+
 # HS256이라 32바이트 이상이어야 함. 테스트 전용 값
 jwt:
   secret: hangat-test-only-secret-key-not-for-production-0123456789

@@ -49,7 +49,7 @@ function htmlCspPlugin () {
           "img-src 'self' data: blob: http://*.daumcdn.net https://*.daumcdn.net http://*.kakaocdn.net https://*.kakaocdn.net http://tong.visitkorea.or.kr https://tong.visitkorea.or.kr",
           /* 개발 모드는 백엔드(hangat-api)를 직접 호출한다.
              운영 빌드는 같은 도메인 /api 프록시 경유라 'self' 로 충분하다. */
-          `connect-src 'self' https://api.pwnedpasswords.com https://dapi.kakao.com${dev ? ' http://localhost:8080 ws: wss:' : ''}`,
+          `connect-src 'self' https://api.pwnedpasswords.com https://dapi.kakao.com http://dapi.kakao.com${dev ? ' http://localhost:8080 ws: wss:' : ''}`,
           "font-src 'self' https://fonts.gstatic.com",
           "form-action 'self'",
           "base-uri 'none'",
@@ -78,7 +78,7 @@ export default defineConfig(() => ({
     }
   },
   server: {
-    port: 5173,
+    port: 4173,
     // 포트를 못 잡으면 조용히 다른 번호로 옮기지 말고 실패시킨다
     strictPort: true,
     headers: {

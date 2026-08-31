@@ -10,6 +10,7 @@ export type AccuracyType = 'VERIFIED' | 'ESTIMATED' | 'UNKNOWN'
 export type RecommendationReasonCode = 'CONGESTION' | 'STYLE' | 'GOOD_PRICE' | 'HIDDEN_GEM' | 'ROUTE'
 export type WeatherCondition = 'SUNNY' | 'CLOUDY' | 'RAIN' | 'SNOW' | 'STRONG_WIND'
 export type IndoorOutdoor = 'INDOOR' | 'OUTDOOR' | 'MIXED'
+export type PlaceSourceCode = 'KTO' | 'KAKAO_LOCAL'
 
 export interface RegionRef { region_id: number; code: 'EAST'|'WEST'|'SOUTH'|'NORTH'; name: string }
 export interface CourseStyle { tag_id: number; code: string; name: string; weight: number }
@@ -49,9 +50,25 @@ export interface CourseCostSummary {
   estimated_max: number
   unknown_count: number
 }
+export interface CourseBudgetSummary {
+  has_cost_data: boolean
+  budget_total?: number
+  verified_total: number
+  estimated_total?: number
+  estimated_min?: number
+  estimated_max?: number
+  total_expected?: number
+  total_expected_min?: number
+  total_expected_max?: number
+  remaining_budget?: number
+  usage_rate?: number
+  over_budget?: boolean
+  unknown_count: number
+}
 export interface CourseItem {
   id: number; course_id: number; place_id: number; place_name: string; category_name: string; image_url?: string
-  source_code?: 'KAKAO_LOCAL'; source_place_id?: string; latitude?: number; longitude?: number
+  candidate_id?: string; source_code?: PlaceSourceCode; source_place_id?: string
+  address?: string; road_address?: string; latitude?: number; longitude?: number
   day_no: number; position: number; visit_date: string; start_time?: string; end_time?: string
   item_source: ItemSource; inbound_distance_m?: number; inbound_travel_minutes?: number
   congestion_rate?: number; congestion_level?: CongestionLevel; recommendation_reason_code?: RecommendationReasonCode
@@ -67,9 +84,11 @@ export interface CourseDay {
 }
 export interface CourseResult {
   id: number; course_type: CourseType; generation_reason: GenerationReason; status: CourseStatus; title?: string
+  claim_token?: string; claim_expires_at?: string
   start_date: string; end_date: string; people: number; budget_total?: number; transport: Transport
   estimated_cost_min?: number; estimated_cost_max?: number; average_congestion_rate?: number
-  cost_summary?: CourseCostSummary; generation_error_code?: string; accommodation?: AccommodationInput; days: CourseDay[]
+  cost_summary?: CourseCostSummary; budget_summary?: CourseBudgetSummary
+  generation_error_code?: string; accommodation?: AccommodationInput; days: CourseDay[]
 }
 export interface AlternativePlace {
   place_id: number; place_name: string; category_name: string; subcategory_name?: string; image_url?: string

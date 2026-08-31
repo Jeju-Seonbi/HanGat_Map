@@ -40,7 +40,7 @@ public class SecurityConfig {
     private final List<String> allowedOrigins;
 
     public SecurityConfig(
-            @Value("${app.cors.allowed-origins:http://localhost:5173}")
+            @Value("${app.cors.allowed-origins:http://localhost:4173,http://localhost:5173}")
             String allowedOrigins) {
 
         this.allowedOrigins = Arrays.stream(allowedOrigins.split(","))
@@ -140,6 +140,10 @@ public class SecurityConfig {
                 .requestMatchers(
                         HttpMethod.GET,
                         "/users/check-nickname"
+                ).permitAll()
+                .requestMatchers(
+                        HttpMethod.POST,
+                        "/courses"
                 ).permitAll()
 
                 // 그 외 API는 인증 필요

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../app/stores/auth'
 import CourseConditionForm from '../../components/course/CourseConditionForm.vue'
@@ -10,6 +10,7 @@ import CongestionRescheduleModal from '../../components/course/CongestionResched
 import AccommodationRecommendations from '../../components/course/AccommodationRecommendations.vue'
 import { courseMockService } from '../../services/courseMockService'
 import { accommodationMockService } from '../../services/accommodationMockService'
+import { storePendingCourseClaim, takePendingCourseClaim } from '../../services/pendingCourseClaim'
 import type { AccommodationInput, AccommodationRecommendation, AlternativePlace, CongestionRescheduleOption, CourseCondition, CourseItem, CourseResult } from '../../assets/types/course'
 
 const now = new Date()
@@ -61,8 +62,12 @@ const visitCount = computed(() => result.value?.days.reduce((count, day) => coun
 const regionSummary = computed(() => condition.course_regions.map(region => region.name).join(' · ') || '전체')
 const styleSummary = computed(() => condition.course_styles.map(style => style.name).join(' · '))
 const estimatedCost = computed(() => {
-  if (result.value?.estimated_cost_min == null || result.value.estimated_cost_max == null) return '정보 없음'
-  return `${result.value.estimated_cost_min.toLocaleString()} ~ ${result.value.estimated_cost_max.toLocaleString()}원`
+  const summary = result.value?.budget_summary
+  if (!summary?.has_cost_data) return '정보 없음'
+  if (summary.total_expected_min == null || summary.total_expected_max == null) return '정보 없음'
+  return summary.total_expected_min === summary.total_expected_max
+    ? `${summary.total_expected_max.toLocaleString()}원`
+    : `${summary.total_expected_min.toLocaleString()} ~ ${summary.total_expected_max.toLocaleString()}원`
 })
 const congestionLabel = (rate?: number) => rate == null ? '-' : rate < 35 ? '한산' : rate < 65 ? '보통' : '혼잡'
 
@@ -93,11 +98,12 @@ async function generate(next: CourseCondition, regenerate = false) {
 }
 
 async function selectRecommendedAccommodation(accommodation: AccommodationInput) {
+  if (!result.value) return
   loading.value = true
   error.value = ''
   try {
     Object.assign(condition, accommodationMockService.selectAccommodation(condition, accommodation))
-    result.value = await courseMockService.recalculateRouteWithAccommodation(condition, accommodation)
+    result.value = courseMockService.applyAccommodationSelection(result.value, accommodation)
     recommendedAccommodations.value = []
   } catch {
     delete condition.accommodation
@@ -153,11 +159,6 @@ async function reschedule(option: CongestionRescheduleOption) {
 }
 
 function openSave() {
-  if (!auth.isAuthenticated) {
-    alert('코스를 저장하려면 로그인이 필요해요.')
-    router.push({ path: '/login', query: { redirect: '/ai-course' } })
-    return
-  }
   title.value = result.value?.title || ''
   saveError.value = ''
   saveOpen.value = true
@@ -169,6 +170,12 @@ async function save() {
   saveLoading.value = true
   saveError.value = ''
   try {
+    if (!auth.isAuthenticated) {
+      storePendingCourseClaim(result.value, condition, clean)
+      saveOpen.value = false
+      await router.push({ path: '/login', query: { redirect: '/ai-course' } })
+      return
+    }
     result.value = await courseMockService.saveCourse(result.value, clean)
     saveOpen.value = false
     toast.value = '코스를 저장했어요.'
@@ -178,6 +185,24 @@ async function save() {
     saveLoading.value = false
   }
 }
+
+onMounted(async () => {
+  if (!auth.isAuthenticated) return
+  const pending = takePendingCourseClaim()
+  if (!pending) return
+
+  saveLoading.value = true
+  try {
+    result.value = await courseMockService.saveCourse(pending.course, pending.title)
+    Object.assign(condition, pending.condition)
+    editing.value = false
+    toast.value = '코스를 저장했어요.'
+  } catch {
+    error.value = '로그인 전 생성한 코스를 저장하지 못했어요. 다시 생성해 주세요.'
+  } finally {
+    saveLoading.value = false
+  }
+})
 
 const formatDate = (value: string) => new Intl.DateTimeFormat('ko-KR', {
   month: 'long',
@@ -248,7 +273,7 @@ const formatDistance = (metres?: number) => metres == null ? '' : `${(metres / 1
         </main>
 
         <aside class="course-side">
-          <BudgetGauge :budget="result.budget_total" :min="result.estimated_cost_min" :max="result.estimated_cost_max" :summary="result.cost_summary" />
+          <BudgetGauge :summary="result.budget_summary" />
           <section class="course-summary-card">
             <span class="summary-kicker">TRIP SUMMARY</span>
             <h3>코스 요약</h3>
