@@ -14,6 +14,6 @@ public record GeminiProperties(
 ) {
     public GeminiProperties {
         connectTimeout = connectTimeout == null ? Duration.ofSeconds(3) : connectTimeout;
-        readTimeout = readTimeout == null ? Duration.ofSeconds(60) : readTimeout;
+        readTimeout = readTimeout == null ? Duration.ofSeconds(120) : readTimeout;
     }
 }
