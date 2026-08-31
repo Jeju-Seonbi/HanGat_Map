@@ -44,6 +44,15 @@ export interface ReviewCreateInput {
   imageUrls?: string[]
 }
 
+/** 서버 레벨 → 화면 키(calm/mid/busy). 배지 색·라벨이 이 키를 쓴다 */
+export const LEVEL_TO_KEY: Record<string, 'calm' | 'mid' | 'busy'> = {
+  QUIET: 'calm', NORMAL: 'mid', CROWDED: 'busy'
+}
+
+/** 로컬 저장 사진은 상대경로로 온다 - 백엔드 주소를 붙여야 그림이 뜬다 */
+export const absUrl = (u: string): string =>
+  u && u.startsWith('/') ? BACKEND_BASE_URL + u : u
+
 export const ReviewApiService = {
   /** 장소별 후기 목록 - 비로그인 허용, 6개씩 */
   getReviews (placeId: number, page = 0): Promise<ReviewPage> {

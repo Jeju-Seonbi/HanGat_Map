@@ -3,13 +3,14 @@
 import { ref, computed, watch } from 'vue'
 import StarIcon from './StarIcon.vue'
 import ReviewSection from './ReviewSection.vue'
-import { state, reviewsOf, toggleFav, isFav, toast, savePlaceImgs } from '@/stores/mapStore'
+import { state, toggleFav, isFav, toast, savePlaceImgs } from '@/stores/mapStore'
 
 import { crowd, tier, tierKo, rank30, bestDay, CROWD_KO } from '@/utils/crowd'
 import { at, fmtK } from '@/utils/date'
 import { wxOf, wxIcon } from '@/utils/weather'
 import { dist, won, shrink } from '@/utils/geo'
 import MapPlaceService from '@/services/map/MapPlaceService'
+import ReviewApiService, { LEVEL_TO_KEY, absUrl } from '@/services/map/ReviewApiService'
 
 const props = defineProps({ place: { type: Object, required: true } })
 const emit = defineEmits(['close', 'open-place', 'open-photo'])
@@ -62,10 +63,12 @@ const hasAmen = computed(() =>
 /** KTO 실사진. 있으면 데모 업로드 대신 이걸 쓴다 */
 const ktoImages = computed(() => detail.value?.images ?? [])
 const photos = computed(() => state.placeImgs[s.value.n] || [])
-const reviews = computed(() => reviewsOf(s.value.n))
-const rated = computed(() => reviews.value.filter(r => r.r > 0))
-const avg = computed(() => rated.value.length
-  ? rated.value.reduce((a, b) => a + b.r, 0) / rated.value.length : 0)
+/* 후기 요약은 상세 API(places.rating_avg 비정규화)가 준다 - localStorage 데모 아님 */
+const reviewCount = computed(() => detail.value?.reviewCount ?? 0)
+const ratingAvg = computed(() => detail.value?.ratingAvg ?? null)
+/** 하단 미리보기용 최근 3건 */
+const previewReviews = ref([])
+const rvDate = iso => { const d = new Date(iso); return `${d.getMonth() + 1}/${d.getDate()}` }
 
 watch(() => props.place.n, loadDetail, { immediate: true })
 
@@ -76,9 +79,15 @@ async function loadDetail() {
   // 목업 모드는 id 가 없다
   if (s.value.id == null) return
   const id = s.value.id
-  const d = await MapPlaceService.getDetail(id)
+  const [d, rv] = await Promise.all([
+    MapPlaceService.getDetail(id),
+    ReviewApiService.getReviews(id, 0).catch(() => null)
+  ])
   // 응답이 늦게 와도 그새 다른 장소를 열었으면 버린다
-  if (s.value.id === id) detail.value = d
+  if (s.value.id === id) {
+    detail.value = d
+    previewReviews.value = rv?.content.slice(0, 3) ?? []
+  }
 }
 
 function jumpToBest() {
@@ -141,11 +150,11 @@ function delImg(i) {
       </div>
 
       <button class="rvchip" @click="view = 'rv'">
-        <template v-if="reviews.length">
-          <template v-if="rated.length">
-            <StarIcon filled :size="15" /><span class="sc">{{ avg.toFixed(1) }}</span>
+        <template v-if="reviewCount">
+          <template v-if="ratingAvg != null">
+            <StarIcon filled :size="15" /><span class="sc">{{ ratingAvg.toFixed(1) }}</span>
           </template>
-          <span class="ct">후기 {{ reviews.length }}</span>
+          <span class="ct">후기 {{ reviewCount }}</span>
         </template>
         <template v-else>
           <StarIcon :size="15" />
@@ -257,36 +266,36 @@ function delImg(i) {
         </template>
       </div>
 
-      <!-- 상세 하단 후기 미리보기 (최근 3개) -->
+      <!-- 상세 하단 후기 미리보기 (최근 3개, 실 API) -->
       <div class="rvprev">
         <div class="rvp-h"><i></i>방문 후기
-          <span v-if="reviews.length" class="rvp-avg">
-            <template v-if="rated.length"><StarIcon filled :size="13" /> {{ avg.toFixed(1) }} · </template>
-            {{ reviews.length }}개
+          <span v-if="reviewCount" class="rvp-avg">
+            <template v-if="ratingAvg != null"><StarIcon filled :size="13" /> {{ ratingAvg.toFixed(1) }} · </template>
+            {{ reviewCount }}개
           </span>
         </div>
-        <template v-if="reviews.length">
-          <div v-for="(r, ri) in reviews.slice(0, 3)" :key="ri" class="rv-i">
+        <template v-if="previewReviews.length">
+          <div v-for="r in previewReviews" :key="r.id" class="rv-i">
             <div class="rv-h">
-              <span class="rv-av">{{ r.u.slice(0, 1) }}</span>
-              <span class="rv-nm">{{ r.u }}</span>
-              <span class="rv-dt">{{ r.d }} 방문</span>
+              <span class="rv-av">여</span>
+              <span class="rv-nm">여행자{{ r.userId }}</span>
+              <span class="rv-dt">{{ rvDate(r.createdAt) }} 작성</span>
             </div>
             <div class="rv-mt">
-              <template v-if="r.r"><StarIcon v-for="n in 5" :key="n" :filled="n <= r.r" :size="12" /></template>
-              <span v-if="r.c" class="bdg"
-                :style="{ background: `var(--${r.c}-bg)`, color: `var(--${r.c})`, fontSize: '10px', padding: '2px 8px' }">
-                {{ CROWD_KO[r.c] }}
+              <template v-if="r.rating"><StarIcon v-for="n in 5" :key="n" :filled="n <= r.rating" :size="12" /></template>
+              <span v-if="LEVEL_TO_KEY[r.congestionReport]" class="bdg"
+                :style="{ background: `var(--${LEVEL_TO_KEY[r.congestionReport]}-bg)`, color: `var(--${LEVEL_TO_KEY[r.congestionReport]})`, fontSize: '10px', padding: '2px 8px' }">
+                {{ CROWD_KO[LEVEL_TO_KEY[r.congestionReport]] }}
               </span>
             </div>
-            <div v-if="r.t" class="rv-tx">{{ r.t }}</div>
-            <div v-if="r.ph && r.ph.length" class="rv-imgs">
-              <img v-for="(p, pi) in r.ph" :key="pi" :src="p" :alt="`후기 사진 ${pi + 1}`"
-                title="클릭하면 크게 보기" @click="emit('open-photo', { photos: r.ph, index: pi })">
+            <div v-if="r.content" class="rv-tx">{{ r.content }}</div>
+            <div v-if="r.imageUrls && r.imageUrls.length" class="rv-imgs">
+              <img v-for="(p, pi) in r.imageUrls" :key="pi" :src="absUrl(p)" :alt="`후기 사진 ${pi + 1}`"
+                title="클릭하면 크게 보기" @click="emit('open-photo', { photos: r.imageUrls.map(absUrl), index: pi })">
             </div>
           </div>
           <button class="rvp-more" @click="view = 'rv'">
-            {{ reviews.length > 3 ? `후기 ${reviews.length}개 모두 보기 ›` : '후기 남기기 ›' }}
+            {{ reviewCount > 3 ? `후기 ${reviewCount}개 모두 보기 ›` : '후기 남기기 ›' }}
           </button>
         </template>
         <template v-else>
@@ -302,7 +311,8 @@ function delImg(i) {
         <div style="flex:1"><h4>{{ s.n }}</h4><div class="sub">방문 후기</div></div>
         <button class="pox" @click="emit('close')">×</button>
       </div>
-      <ReviewSection :place="s" @open-photo="p => emit('open-photo', p)" />
+      <ReviewSection :place="s" :rating-avg="ratingAvg"
+        @open-photo="p => emit('open-photo', p)" @changed="loadDetail" />
     </div>
   </div>
 </template>
