@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CourseCondition, CourseResult } from '../assets/types/course'
 import { apiRequest } from '../api/backendClient.js'
-import { courseMockService } from './courseMockService'
+import { courseMockService, toCourseRequestPayload } from './courseMockService'
 
 vi.mock('../api/backendClient.js', () => ({ apiRequest: vi.fn() }))
 
@@ -18,8 +18,11 @@ const condition: CourseCondition = {
     source_code: 'KAKAO_LOCAL',
     source_place_id: 'accommodation-1',
     place_name: '제주 숙소',
+    address: '제주특별자치도 제주시 연동 1',
+    road_address: '제주특별자치도 제주시 숙소로 1',
     latitude: 33.45,
     longitude: 126.55,
+    category_name: '여행 > 숙박 > 호텔',
   },
 }
 
@@ -78,7 +81,19 @@ describe('courseMockService Backend generation', () => {
     expect(requestMock).toHaveBeenCalledOnce()
     expect(requestMock).toHaveBeenCalledWith('/courses', {
       method: 'POST',
-      body: condition,
+      body: toCourseRequestPayload(condition),
+    })
+    expect(requestMock.mock.calls[0]?.[1]?.body).toMatchObject({
+      accommodation: {
+        source_code: 'KAKAO_LOCAL',
+        source_place_id: 'accommodation-1',
+        place_name: '제주 숙소',
+        address: '제주특별자치도 제주시 연동 1',
+        road_address: '제주특별자치도 제주시 숙소로 1',
+        latitude: 33.45,
+        longitude: 126.55,
+        category_name: '여행 > 숙박 > 호텔',
+      },
     })
     expect(result).toBe(response)
     expect(result.days[0].items[0]).toMatchObject({
@@ -99,6 +114,20 @@ describe('courseMockService Backend generation', () => {
       verified_total: 0,
       unknown_count: 0,
     })
+  })
+
+  it('omits accommodation from the request payload when none is selected', async () => {
+    const conditionWithoutAccommodation = { ...condition }
+    delete conditionWithoutAccommodation.accommodation
+    const requestMock = vi.mocked(apiRequest).mockResolvedValue({
+      ...response,
+      accommodation: undefined,
+    })
+
+    await courseMockService.generateCourse(conditionWithoutAccommodation)
+
+    expect(requestMock).toHaveBeenCalledOnce()
+    expect(requestMock.mock.calls[0]?.[1]?.body).not.toHaveProperty('accommodation')
   })
 
   it('propagates common client failures without falling back to mock generation', async () => {

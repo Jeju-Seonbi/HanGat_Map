@@ -621,10 +621,26 @@ async function generateMockCourse(condition: CourseCondition, generationReason: 
   })
 }
 
+export function toCourseRequestPayload(condition: CourseCondition): CourseCondition {
+  return {
+    start_date: condition.start_date,
+    end_date: condition.end_date,
+    people: condition.people,
+    budget_total: condition.budget_total,
+    transport: condition.transport,
+    course_regions: condition.course_regions,
+    course_styles: condition.course_styles,
+    course_place_preferences: condition.course_place_preferences,
+    ...(condition.accommodation
+      ? { accommodation: { ...condition.accommodation } }
+      : {}),
+  }
+}
+
 async function generate(condition: CourseCondition): Promise<CourseResult> {
   return await apiRequest('/courses', {
     method: 'POST',
-    body: condition,
+    body: toCourseRequestPayload(condition),
   }) as CourseResult
 }
 
