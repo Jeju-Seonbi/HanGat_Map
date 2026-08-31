@@ -65,4 +65,24 @@ public class CongestionService {
                         forecast -> forecast.getRate().doubleValue(),
                         (a, b) -> a));
     }
+
+    /**
+     * {@link #ratesFor}의 엔티티 버전 - placeId → 예보 행.
+     *
+     * <p>숫자만으로 충분한 화면 조회와 달리, 코스 스냅숏(course_items의
+     * planned_congestion_forecast_id)은 <b>어느 발표 버전을 보고 골랐는지</b>를 행으로
+     * 고정해야 해서 엔티티가 필요하다. 샘플 코스 배치가 쓰고, 스왑 API도 이걸 쓸 예정이다.
+     */
+    public Map<Long, com.example.hangat.map.model.entity.CongestionForecast> forecastsFor(LocalDate date) {
+        Optional<LocalDateTime> latestBase = repository.findLatestBaseAt();
+        if (latestBase.isEmpty()) {
+            return Map.of();
+        }
+        return repository.findByBaseAtAndForecastAt(latestBase.get(), PlaceNameNormalizer.jejuDayToUtc(date))
+                .stream()
+                .collect(Collectors.toMap(
+                        forecast -> forecast.getPlace().getId(),
+                        forecast -> forecast,
+                        (a, b) -> a));
+    }
 }

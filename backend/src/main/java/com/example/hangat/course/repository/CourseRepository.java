@@ -7,6 +7,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.time.LocalDate;
 import java.util.Optional;
 
 /**
@@ -29,4 +30,11 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
      */
     Optional<Course> findFirstByPresetIdAndCourseTypeAndStatusOrderByIdDesc(
             Long presetId, CourseType courseType, CourseStatus status);
+
+    /**
+     * 프리셋 단위 멱등 장치 - 같은 출발일 READY가 있으면 그 프리셋은 재생성하지 않는다.
+     * 배치 부분 실패 후 재실행하면 실패분만 다시 만든다(전체 스킵이 아니라).
+     */
+    boolean existsByPresetIdAndCourseTypeAndStatusAndStartDate(
+            Long presetId, CourseType courseType, CourseStatus status, LocalDate startDate);
 }

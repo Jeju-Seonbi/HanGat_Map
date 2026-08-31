@@ -2,6 +2,7 @@ package com.example.hangat.course.repository;
 
 import com.example.hangat.course.model.entity.CourseItem;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -25,4 +26,12 @@ public interface CourseItemRepository extends JpaRepository<CourseItem, Long> {
             order by i.dayNo, i.position
             """)
     List<CourseItem> findItemsWithPlace(@Param("courseId") Long courseId);
+
+    /**
+     * 생성 실패한 코스의 일정 정리 - FAILED 코스에 앞 일차 아이템이 고아로 남지 않게.
+     * 벌크 DELETE 사유는 {@code CongestionForecastRepository#deleteVersion} 참고.
+     */
+    @Modifying
+    @Query("delete from CourseItem i where i.course.id = :courseId")
+    int deleteByCourse(@Param("courseId") Long courseId);
 }
