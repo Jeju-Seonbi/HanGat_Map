@@ -17,19 +17,6 @@ const writeLS = (k, v) => {
   try { localStorage.setItem(k, JSON.stringify(v)); return true } catch { return false }
 }
 
-const SAMPLE_REVIEWS = {
-  /* 방문일은 오늘 기준 상대값 — 날짜가 흘러도 '며칠 전 방문'으로 자연스럽게 유지된다 */
-  '협재해수욕장': [
-    { u: '지민', r: 5, c: 'busy', d: ago(1), t: '물빛은 최고인데 오후엔 자리가 없어요. 아침 일찍 가세요.' },
-    { u: '상현', r: 4, c: 'busy', d: ago(7), t: '주차장이 금방 차요' },
-    { u: '해나', r: 5, c: 'mid', d: ago(22), t: '평일에 가니 한산하고 좋았어요' }],
-  '금오름': [
-    { u: '예린', r: 5, c: 'calm', d: ago(3), t: '분화구까지 20분이면 올라가요. 노을 시간 추천!' },
-    { u: '도윤', r: 4, c: 'calm', d: ago(11), t: '사람 거의 없어서 좋았습니다' }],
-  '성산일출봉': [{ u: '민서', r: 4, c: 'busy', d: ago(4), t: '경치는 좋은데 계단에서 계속 멈춰서요' }],
-  '저지오름': [{ u: '현우', r: 5, c: 'calm', d: ago(9), t: '조용히 걷기 좋아요. 그늘도 많습니다' }],
-}
-
 export const REGIONS = ['전체', '동부', '서부', '남부', '북부']
 
 /** 업종 필터 (MAP_001) — 한 번에 4개씩 보이고 좌우로 넘긴다 */
@@ -59,7 +46,6 @@ export const state = reactive({
   F: { reg: '서부', bud: 150000, cat: '' },   // cat='' = 모든 종류
   L: { crowd: 1, spot: 1, food: 1, dine: 0, cafe: 0, cvs: 0, stay: 0, mart: 0, rain: 1 },
   favs: readLS('hangat_favs', []),
-  reviews: readLS('hangat_reviews', null) || SAMPLE_REVIEWS,
   placeImgs: readLS('hangat_place_imgs', {}),
   courses: readLS('hangat_courses', []),
   toast: '',
@@ -140,22 +126,6 @@ export function toggleFav(name) {
   return true
 }
 export const isFav = name => state.favs.includes(name)
-
-/** MAP_008 후기 등록 — 별점 또는 혼잡 제보 중 하나는 있어야 한다 */
-export function addReview(placeName, { star, crowdVote, text, photos }) {
-  if (!star && !crowdVote) return false
-  const user = currentUser()
-  if (!user) { toast('후기 작성은 로그인이 필요해요'); return false }
-  const d = at(state.di)
-  const list = state.reviews[placeName] || (state.reviews[placeName] = [])
-  list.unshift({
-    u: currentUserName(user), r: star || 0, c: crowdVote || '',
-    d: `${d.getMonth() + 1}/${d.getDate()}`, t: text, ph: [...photos],
-  })
-  if (!writeLS('hangat_reviews', state.reviews)) toast('저장 공간이 가득 찼어요 (데모 한계)')
-  return true
-}
-export const reviewsOf = name => state.reviews[name] || []
 
 export function savePlaceImgs() {
   if (!writeLS('hangat_place_imgs', state.placeImgs)) toast('저장 공간이 가득 찼어요 (데모 한계)')
