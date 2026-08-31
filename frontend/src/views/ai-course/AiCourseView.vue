@@ -98,11 +98,12 @@ async function generate(next: CourseCondition, regenerate = false) {
 }
 
 async function selectRecommendedAccommodation(accommodation: AccommodationInput) {
+  if (!result.value) return
   loading.value = true
   error.value = ''
   try {
     Object.assign(condition, accommodationMockService.selectAccommodation(condition, accommodation))
-    result.value = await courseMockService.recalculateRouteWithAccommodation(condition, accommodation)
+    result.value = courseMockService.applyAccommodationSelection(result.value, accommodation)
     recommendedAccommodations.value = []
   } catch {
     delete condition.accommodation

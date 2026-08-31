@@ -54,6 +54,7 @@ const response: CourseResult = {
       source_code: 'KTO',
       source_place_id: '125266',
       place_name: '비자림',
+      image_url: '/images/bijarim.jpg',
       address: '제주특별자치도 제주시 구좌읍 비자숲길 55',
       road_address: '제주특별자치도 제주시 구좌읍 비자숲길 55',
       category_name: '관광지',
@@ -69,6 +70,21 @@ const response: CourseResult = {
     }],
   }],
 }
+
+const itineraryContract = (course: CourseResult) => course.days.flatMap(day =>
+  day.items.map(item => ({
+    candidateId: item.candidate_id,
+    placeId: item.place_id,
+    sourceCode: item.source_code,
+    sourcePlaceId: item.source_place_id,
+    placeName: item.place_name,
+    imageUrl: item.image_url,
+    recommendationReason: item.recommendation_reason,
+    congestionRate: item.congestion_rate,
+    congestionLevel: item.congestion_level,
+    visitDate: item.visit_date,
+    startTime: item.start_time,
+  })))
 
 afterEach(() => vi.clearAllMocks())
 
@@ -128,6 +144,68 @@ describe('courseMockService Backend generation', () => {
 
     expect(requestMock).toHaveBeenCalledOnce()
     expect(requestMock.mock.calls[0]?.[1]?.body).not.toHaveProperty('accommodation')
+  })
+
+  it('keeps the Backend itinerary unchanged when a recommended accommodation is selected', () => {
+    const backendCourse: CourseResult = {
+      ...response,
+      accommodation: undefined,
+      days: [{
+        day_no: 1,
+        visit_date: condition.start_date,
+        items: [
+          response.days[0].items[0],
+          {
+            ...response.days[0].items[0],
+            id: 202,
+            place_id: 302,
+            candidate_id: 'candidate-kto-2',
+            source_place_id: '125267',
+            place_name: '종달리해변',
+            image_url: '/images/jongdal.jpg',
+            position: 2,
+            start_time: '13:00',
+            congestion_rate: undefined,
+            congestion_level: undefined,
+            recommendation_reason: '바다 풍경을 볼 수 있어요.',
+          },
+          {
+            ...response.days[0].items[0],
+            id: 203,
+            place_id: 303,
+            candidate_id: 'candidate-kto-3',
+            source_place_id: '125268',
+            place_name: '비밀의 숲',
+            image_url: '/images/forest.jpg',
+            position: 3,
+            start_time: '17:00',
+            congestion_rate: undefined,
+            congestion_level: undefined,
+            recommendation_reason: '조용한 숲길을 걸을 수 있어요.',
+          },
+        ],
+      }],
+    }
+    const before = structuredClone(backendCourse)
+
+    const selected = courseMockService.applyAccommodationSelection(
+      backendCourse,
+      condition.accommodation!,
+    )
+
+    expect(selected.id).toBe(backendCourse.id)
+    expect(selected.days).toBe(backendCourse.days)
+    expect(selected.days).toEqual(before.days)
+    expect(itineraryContract(selected)).toEqual(itineraryContract(before))
+    expect(selected.accommodation).toEqual(condition.accommodation)
+    expect(selected.days.flatMap(day => day.items).every(item =>
+      item.weather_condition == null
+      && item.temperature == null
+      && item.inbound_distance_m == null
+      && item.inbound_travel_minutes == null
+      && item.costs.length === 0)).toBe(true)
+    expect(selected.estimated_cost_min).toBeUndefined()
+    expect(selected.estimated_cost_max).toBeUndefined()
   })
 
   it('propagates common client failures without falling back to mock generation', async () => {

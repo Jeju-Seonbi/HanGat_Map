@@ -637,6 +637,16 @@ export function toCourseRequestPayload(condition: CourseCondition): CourseCondit
   }
 }
 
+export function applyAccommodationSelection(
+  course: CourseResult,
+  accommodation: AccommodationInput,
+): CourseResult {
+  return {
+    ...course,
+    accommodation: { ...accommodation },
+  }
+}
+
 async function generate(condition: CourseCondition): Promise<CourseResult> {
   return await apiRequest('/courses', {
     method: 'POST',
@@ -649,6 +659,7 @@ export const generateMockCourseForTest = generateMockCourse
 export const courseMockService = {
   generateCourse: (condition: CourseCondition) => generate(condition),
   regenerateCourse: (_condition: CourseCondition): Promise<CourseResult> => Promise.reject(new Error('코스 재생성은 아직 지원되지 않습니다.')),
+  applyAccommodationSelection,
   recalculateRouteWithAccommodation: (condition: CourseCondition, accommodation: AccommodationInput) => generateMockCourse({
     ...JSON.parse(JSON.stringify(condition)) as CourseCondition,
     accommodation: { ...accommodation },
