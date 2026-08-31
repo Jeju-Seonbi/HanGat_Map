@@ -16,8 +16,9 @@ import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
+import org.hibernate.annotations.Check;
+import org.hibernate.annotations.DialectOverride;
+import org.hibernate.dialect.MariaDBDialect;
 
 import java.time.LocalDateTime;
 
@@ -82,8 +83,18 @@ public class CoursePreset {
      * 권역·스타일 등 프리셋 설정(JSON). 명세서 상세설명대로 <b>검색 조건에는 쓰지 않는다</b> -
      * 배치가 생성 요청을 만들 때만 읽으므로 스키마를 굳히지 않고 JSON으로 둔다.
      */
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "filter_json")
+    @Check(
+            name = "ck_course_presets_filter_json",
+            constraints = "filter_json IS NULL OR filter_json IS JSON"
+    )
+    @DialectOverride.Check(
+            dialect = MariaDBDialect.class,
+            override = @Check(
+                    name = "ck_course_presets_filter_json",
+                    constraints = "filter_json IS NULL OR JSON_VALID(filter_json)"
+            )
+    )
+    @Column(name = "filter_json", columnDefinition = "LONGTEXT")
     private String filterJson;
 
     /** 배치 대상 여부. 내리고 싶은 프리셋은 행 삭제가 아니라 비활성화한다. */
