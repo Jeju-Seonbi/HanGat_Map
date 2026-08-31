@@ -76,6 +76,9 @@ export interface PlaceDetail {
   feeText: string | null
   /** '무료'만 뜻할 때 true. 조건부 무료("무료※ 단, 특별전시 제외")는 false다 */
   free: boolean
+  /** 별점 평균. 별점 후기가 없으면 null - 0.0 으로 그리지 않는다 */
+  ratingAvg: number | null
+  reviewCount: number
   /** 장소 사진(순서대로). 스트립은 thumb, 확대는 url 을 쓴다 */
   images: PlaceImage[]
   /** 사진 출처 표기 문구 - 사진이 있으면 화면에 반드시 보여준다(공공누리) */
@@ -93,6 +96,8 @@ interface BackendPlaceDetail {
   restDayText: string | null
   useFeeText: string | null
   free: boolean
+  ratingAvg: number | null
+  reviewCount: number
   images: BackendPlaceImage[]
 }
 
@@ -158,6 +163,8 @@ export const MapPlaceService = {
         rest: row.restDayText,
         feeText: row.useFeeText,
         free: row.free,
+        ratingAvg: row.ratingAvg,
+        reviewCount: row.reviewCount ?? 0,
         images,
         imageAttribution: row.images?.[0]?.attribution ?? null
       }

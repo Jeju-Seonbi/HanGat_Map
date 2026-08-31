@@ -1,47 +1,126 @@
 <script setup>
-/* MAP_008 후기 — 별점 + 혼잡 제보 + 한 줄 + 사진(최대 6장). 열람은 누구나, 작성은 회원만 */
-import { ref, computed, watch } from 'vue'
+/* MAP-09 후기 — 실 API. 열람은 누구나, 작성·삭제는 회원만 (JWT) */
+import { ref, computed, watch, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import StarIcon from './StarIcon.vue'
-import { state, reviewsOf, addReview, toast } from '@/stores/mapStore'
+import { toast } from '@/stores/mapStore'
+import { useAuthStore } from '@/stores/auth.js'
+import ReviewApiService, { LEVEL_TO_KEY, absUrl } from '@/services/map/ReviewApiService'
 import { CROWD_KO } from '@/utils/crowd'
-import { shrink } from '@/utils/geo'
 
-const props = defineProps({ place: { type: Object, required: true } })
-const emit = defineEmits(['open-photo'])
+const props = defineProps({
+  place: { type: Object, required: true },
+  /** 부모(상세 API)가 주는 별점 평균 - 목록 첫 페이지만으로는 못 구한다 */
+  ratingAvg: { type: Number, default: null }
+})
+const emit = defineEmits(['open-photo', 'changed'])
 
-const star = ref(0)
-const crowdVote = ref('')
-const text = ref('')
-const photos = ref([])
-const shown = ref(6)
-const fileInput = ref(null)
+const router = useRouter()
+const auth = useAuthStore()
 
-const list = computed(() => reviewsOf(props.place.n))
-const rated = computed(() => list.value.filter(r => r.r > 0))
-const avg = computed(() => rated.value.length
-  ? rated.value.reduce((a, b) => a + b.r, 0) / rated.value.length : 0)
+/* 화면 키(calm/mid/busy) → 서버 레벨 */
+const TO_LEVEL = { calm: 'QUIET', mid: 'NORMAL', busy: 'CROWDED' }
+const FROM_LEVEL = LEVEL_TO_KEY
+
+const MAX_PHOTOS = 5
+
+/* ── 목록 ── */
+const items = ref([])
+const pageNo = ref(0)
+const totalPages = ref(0)
+const totalElements = ref(0)
+const loading = ref(false)
+
+async function load (reset = true) {
+  if (props.place.id == null) return    // 목업 장소는 후기 미지원
+  loading.value = true
+  try {
+    const page = await ReviewApiService.getReviews(props.place.id, reset ? 0 : pageNo.value + 1)
+    items.value = reset ? page.content : [...items.value, ...page.content]
+    pageNo.value = page.number
+    totalPages.value = page.totalPages
+    totalElements.value = page.totalElements
+  } catch {
+    // 목록만 실패 - 작성 폼은 살려 둔다
+  } finally {
+    loading.value = false
+  }
+}
+onMounted(load)
+watch(() => props.place.id, () => { resetForm(); load() })
+
 const counts = computed(() => {
   const c = { calm: 0, mid: 0, busy: 0 }
-  list.value.forEach(r => { if (r.c) c[r.c]++ })
+  items.value.forEach(r => { const k = FROM_LEVEL[r.congestionReport]; if (k) c[k]++ })
   return c
 })
 const total = computed(() => (counts.value.calm + counts.value.mid + counts.value.busy) || 1)
-const canSubmit = computed(() => !!star.value || !!crowdVote.value)
+const myId = computed(() => ReviewApiService.myUserId())
 
-function reset() { star.value = 0; crowdVote.value = ''; text.value = ''; photos.value = []; shown.value = 6 }
-watch(() => props.place.n, reset)
+const dateOf = iso => { const d = new Date(iso); return `${d.getMonth() + 1}/${d.getDate()}` }
 
-function submit() {
-  if (!canSubmit.value) return
-  if (addReview(props.place.n, { star: star.value, crowdVote: crowdVote.value, text: text.value.trim(), photos: photos.value })) reset()
+/* ── 작성 ── */
+const star = ref(0)
+const crowdVote = ref('')
+const text = ref('')
+const photos = ref([])          // { file, preview }
+const submitting = ref(false)
+const fileInput = ref(null)
+
+const canSubmit = computed(() => (!!star.value || !!crowdVote.value) && !submitting.value)
+
+function resetForm () {
+  star.value = 0; crowdVote.value = ''; text.value = ''; photos.value = []
 }
 
-async function onFiles(e) {
-  const remain = 6 - photos.value.length
-  if (remain <= 0) { toast('사진은 최대 6장까지예요'); e.target.value = ''; return }
-  for (const f of [...e.target.files].slice(0, remain)) photos.value.push(await shrink(f, 640))
-  if (e.target.files.length > remain) toast('사진은 최대 6장까지예요')
+function onFiles (e) {
+  const remain = MAX_PHOTOS - photos.value.length
+  if (remain <= 0) { toast(`사진은 최대 ${MAX_PHOTOS}장까지예요`); e.target.value = ''; return }
+  for (const f of [...e.target.files].slice(0, remain)) {
+    photos.value.push({ file: f, preview: URL.createObjectURL(f) })
+  }
+  if (e.target.files.length > remain) toast(`사진은 최대 ${MAX_PHOTOS}장까지예요`)
   e.target.value = ''
+}
+
+async function submit () {
+  if (!canSubmit.value) return
+  if (!auth.isLoggedIn) {
+    toast('로그인하면 후기를 남길 수 있어요')
+    router.push({ name: 'login', query: { redirect: '/map' } })
+    return
+  }
+  submitting.value = true
+  try {
+    const imageUrls = photos.value.length
+      ? await ReviewApiService.uploadPhotos(photos.value.map(p => p.file))
+      : []
+    await ReviewApiService.create(props.place.id, {
+      rating: star.value || null,
+      congestionReport: TO_LEVEL[crowdVote.value] ?? null,
+      content: text.value.trim() || null,
+      imageUrls
+    })
+    resetForm()
+    await load()
+    emit('changed')             // 부모가 상세를 다시 읽어 별점 요약을 갱신한다
+    toast('후기가 등록됐어요')
+  } catch (err) {
+    toast(err?.message ?? '후기 등록에 실패했어요')
+  } finally {
+    submitting.value = false
+  }
+}
+
+async function removeReview (r) {
+  try {
+    await ReviewApiService.remove(r.id)
+    await load()
+    emit('changed')
+    toast('후기를 삭제했어요')
+  } catch (err) {
+    toast(err?.message ?? '삭제에 실패했어요')
+  }
 }
 </script>
 
@@ -61,26 +140,26 @@ async function onFiles(e) {
 
     <div class="rv-phrow">
       <span v-for="(p, i) in photos" :key="i" class="rv-pht">
-        <img :src="p" alt="첨부한 사진">
+        <img :src="p.preview" alt="첨부한 사진">
         <button class="del" aria-label="사진 삭제" @click="photos.splice(i, 1)">×</button>
       </span>
-      <button v-if="photos.length < 6" class="rv-phadd" @click="fileInput.click()">
-        사진<br>{{ photos.length }}/6
+      <button v-if="photos.length < MAX_PHOTOS" class="rv-phadd" @click="fileInput.click()">
+        사진<br>{{ photos.length }}/{{ MAX_PHOTOS }}
       </button>
       <input ref="fileInput" type="file" accept="image/*" multiple style="display:none" @change="onFiles">
     </div>
 
     <div class="rv-in">
       <input v-model="text" placeholder="한 줄 남기기 (선택)" maxlength="60" @keydown.enter="submit">
-      <button :disabled="!canSubmit" @click="submit">등록</button>
+      <button :disabled="!canSubmit" @click="submit">{{ submitting ? '등록 중…' : '등록' }}</button>
     </div>
 
-    <template v-if="list.length">
+    <template v-if="items.length">
       <div class="rv-sum">
         <StarIcon filled :size="15" />
-        <!-- 별점 없이 혼잡 제보만 있으면 평균을 '-'로 띄우지 않는다 -->
-        <span class="avg">{{ avg ? avg.toFixed(1) : '-' }}</span>
-        <span class="cnt">후기 {{ list.length }}</span>
+        <!-- 별점 후기가 없으면 평균을 만들어내지 않는다 -->
+        <span class="avg">{{ ratingAvg != null ? ratingAvg.toFixed(1) : '-' }}</span>
+        <span class="cnt">후기 {{ totalElements }}</span>
       </div>
       <div class="rv-bar">
         <div v-for="c in ['calm', 'mid', 'busy']" :key="c" class="rv-b">
@@ -92,33 +171,40 @@ async function onFiles(e) {
         </div>
       </div>
 
-      <div v-for="(r, ri) in list.slice(0, shown)" :key="ri" class="rv-i">
+      <div v-for="r in items" :key="r.id" class="rv-i">
         <div class="rv-h">
-          <span class="rv-av">{{ r.u.slice(0, 1) }}</span>
-          <span class="rv-nm">{{ r.u }}</span>
-          <span class="rv-dt">{{ r.d }} 방문</span>
+          <span class="rv-av">여</span>
+          <!-- 닉네임은 백엔드 users join 후 - 지금은 익명 표기 -->
+          <span class="rv-nm">여행자{{ r.userId }}</span>
+          <span class="rv-dt">{{ dateOf(r.createdAt) }} 작성</span>
+          <button v-if="myId === r.userId" class="rv-del" aria-label="내 후기 삭제"
+            @click="removeReview(r)">삭제</button>
         </div>
         <div class="rv-mt">
-          <template v-if="r.r"><StarIcon v-for="n in 5" :key="n" :filled="n <= r.r" :size="12" /></template>
-          <span v-if="r.c" class="bdg"
-            :style="{ background: `var(--${r.c}-bg)`, color: `var(--${r.c})`, fontSize: '10px', padding: '2px 8px' }">
-            {{ CROWD_KO[r.c] }}
+          <template v-if="r.rating"><StarIcon v-for="n in 5" :key="n" :filled="n <= r.rating" :size="12" /></template>
+          <span v-if="FROM_LEVEL[r.congestionReport]" class="bdg"
+            :style="{ background: `var(--${FROM_LEVEL[r.congestionReport]}-bg)`, color: `var(--${FROM_LEVEL[r.congestionReport]})`, fontSize: '10px', padding: '2px 8px' }">
+            {{ CROWD_KO[FROM_LEVEL[r.congestionReport]] }}
           </span>
         </div>
-        <div v-if="r.t" class="rv-tx">{{ r.t }}</div>
-        <div v-if="r.ph && r.ph.length" class="rv-imgs">
-          <img v-for="(p, pi) in r.ph" :key="pi" :src="p" :alt="`후기 사진 ${pi + 1}`"
-            title="클릭하면 크게 보기" @click="emit('open-photo', { photos: r.ph, index: pi })">
+        <div v-if="r.content" class="rv-tx">{{ r.content }}</div>
+        <div v-if="r.imageUrls && r.imageUrls.length" class="rv-imgs">
+          <img v-for="(p, pi) in r.imageUrls" :key="pi" :src="absUrl(p)" :alt="`후기 사진 ${pi + 1}`"
+            title="클릭하면 크게 보기" @click="emit('open-photo', { photos: r.imageUrls.map(absUrl), index: pi })">
         </div>
       </div>
 
-      <!-- MAP_008: 6건씩 노출 + 더보기 -->
-      <button v-if="list.length > shown" class="rvchip"
-        style="justify-content:center;margin-top:8px" @click="shown += 6">
-        <span class="ct">후기 {{ list.length - shown }}개 더보기</span>
+      <button v-if="pageNo + 1 < totalPages" class="rvchip"
+        style="justify-content:center;margin-top:8px" :disabled="loading" @click="load(false)">
+        <span class="ct">후기 {{ totalElements - items.length }}개 더보기</span>
       </button>
     </template>
 
     <div v-else class="rv-none">아직 후기가 없어요.<br>첫 방문 후기를 남겨보세요.</div>
   </div>
 </template>
+
+<style scoped>
+.rv-del{margin-left:auto;background:none;border:0;color:var(--tx3);font-size:11px}
+.rv-del:hover{color:#b02c2c}
+</style>
