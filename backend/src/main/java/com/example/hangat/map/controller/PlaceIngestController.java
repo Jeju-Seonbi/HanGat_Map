@@ -34,15 +34,25 @@ public class PlaceIngestController {
     private final CongestionIngestService congestionIngestService;
     private final PlaceDetailIngestService placeDetailIngestService;
     private final PlaceImageIngestService placeImageIngestService;
+    private final com.example.hangat.map.goodprice.GoodPriceIngestService goodPriceIngestService;
 
     public PlaceIngestController(PlaceIngestService placeIngestService,
                                  CongestionIngestService congestionIngestService,
                                  PlaceDetailIngestService placeDetailIngestService,
-                                 PlaceImageIngestService placeImageIngestService) {
+                                 PlaceImageIngestService placeImageIngestService,
+                                 com.example.hangat.map.goodprice.GoodPriceIngestService goodPriceIngestService) {
         this.placeIngestService = placeIngestService;
         this.congestionIngestService = congestionIngestService;
         this.placeDetailIngestService = placeDetailIngestService;
         this.placeImageIngestService = placeImageIngestService;
+        this.goodPriceIngestService = goodPriceIngestService;
+    }
+
+    @Operation(summary = "착한가격업소 적재 (MAP-04)",
+            description = "행안부 CSV(리소스 포함)의 외식업을 적재한다. 좌표는 카카오 로컬로 지오코딩 - 재실행 멱등.")
+    @PostMapping("/goodprice")
+    public BaseResponse<com.example.hangat.map.goodprice.GoodPriceIngestService.GoodPriceResult> ingestGoodPrice() {
+        return BaseResponse.success(goodPriceIngestService.ingest());
     }
 
     @Operation(summary = "장소 상세 정보 적재 (MAP-07)",
