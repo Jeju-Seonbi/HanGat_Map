@@ -116,3 +116,6 @@ app:
 public-api:
   service-key: ${SERVICE_KEY}
   tour-base-url: https://apis.data.go.kr/B551011
+
+kakao-local:
+  rest-key: ${KAKAO_LOCAL_REST_KEY:}
