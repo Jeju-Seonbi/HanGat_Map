@@ -2,7 +2,7 @@ import { reactive, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { crowd, tier } from '@/utils/crowd'
 import { at, iso, ago, D0 } from '@/utils/date'
-import MapPlaceService, { PENDING_LAYERS } from '@/services/map/MapPlaceService'
+import MapPlaceService, { LAZY_LAYERS } from '@/services/map/MapPlaceService'
 import CrowdService, { attachSeries } from '@/services/map/CrowdService'
 import WeatherService from '@/services/map/WeatherService'
 
@@ -73,8 +73,21 @@ export const CATEGORIES = computed(() => {
     .map(([name, n]) => ({ name, n }))
 })
 
-/** 아직 적재 전인 레이어 - 화면이 '빈 지도'와 '준비 중'을 구분해 표시한다 */
-export const isPendingLayer = key => state.live && PENDING_LAYERS.includes(key)
+/**
+ * 업종 칩 토글. 대용량 레이어(카페·편의점·마트 5,419곳)는 첫 진입에 싣지 않고
+ * 처음 켜는 순간 받아온다 - 한 번 받으면 메모리에 남아 재요청이 없다.
+ */
+const layerLoading = new Set()
+export async function toggleLayer (key) {
+  state.L[key] ^= 1
+  if (!state.L[key] || !state.live || !LAZY_LAYERS.includes(key)) return
+  if (state.layers[key].length || layerLoading.has(key)) return
+  layerLoading.add(key)
+  const rows = await MapPlaceService.getLayer(key)
+  layerLoading.delete(key)
+  if (rows) state.layers[key] = rows
+  else toast('데이터를 불러오지 못했어요 — 칩을 껐다 다시 켜 주세요')
+}
 
 /**
  * 장소·예보를 받아 state에 채운다. 지도 화면 진입 시 한 번 호출한다.

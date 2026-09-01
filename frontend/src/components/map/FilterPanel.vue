@@ -3,7 +3,7 @@
 import { computed, ref, watch } from 'vue'
 import SearchBox from './SearchBox.vue'
 import LayerIcon from './LayerIcon.vue'
-import { state, rankedRows, CATEGORIES, REGIONS, LAYERS, FILTER_VISIBLE, isPendingLayer } from '@/stores/mapStore'
+import { state, rankedRows, CATEGORIES, REGIONS, LAYERS, FILTER_VISIBLE, toggleLayer } from '@/stores/mapStore'
 import { at, fmtK } from '@/utils/date'
 import { mapBridge } from '@/composables/mapBridge'
 
@@ -86,11 +86,9 @@ function toggleCourse() {
           @click="moveFilter(-1)">‹</button>
         <div class="ftr-vp">
           <div class="ftr" :style="{ transform: shift }">
-            <button v-for="l in LAYERS" :key="l.k" :class="[l.k, { on: state.L[l.k], soon: isPendingLayer(l.k) }]"
-              @click="state.L[l.k] ^= 1">
+            <button v-for="l in LAYERS" :key="l.k" :class="[l.k, { on: state.L[l.k] }]"
+              @click="toggleLayer(l.k)">
               <span class="ico"><LayerIcon :name="l.k" /></span>{{ l.t }}
-              <!-- 적재 전 레이어 - 켜도 빈 지도라 '고장'으로 보이지 않게 표시한다 -->
-              <em v-if="isPendingLayer(l.k)" class="soon-tag">준비중</em>
             </button>
           </div>
         </div>
