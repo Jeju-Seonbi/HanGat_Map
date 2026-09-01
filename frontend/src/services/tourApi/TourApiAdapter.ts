@@ -1,6 +1,0 @@
-import type{Place}from'../../assets/types';import type{TourApiBundle,TourApiItem}from'./tourApi.types'
-const text=(value?:string)=>value?.replace(/<[^>]*>/g,' ').replace(/&nbsp;|&#160;/gi,' ').replace(/&amp;/gi,'&').replace(/\s+/g,' ').trim()||''
-const coordinate=(value?:string)=>{const parsed=Number(value);return Number.isFinite(parsed)&&parsed!==0?parsed:undefined}
-const first=(...values:(string|undefined)[])=>values.find(Boolean)
-export function adaptTourPlace(mock:Place,bundle:TourApiBundle):Place{const merged:TourApiItem={...bundle.list,...bundle.detail};const extra=bundle.images.map(i=>i.originimgurl||i.smallimageurl).filter((url):url is string=>Boolean(url));const image=first(merged.firstimage,extra[0],merged.firstimage2,mock.image,'/images/placeholder.svg')!;return{...mock,contentId:merged.contentid||mock.contentId,name:text(merged.title)||mock.name,address:text(`${merged.addr1??''} ${merged.addr2??''}`)||mock.address,longitude:coordinate(merged.mapx)??mock.longitude,latitude:coordinate(merged.mapy)??mock.latitude,description:text(merged.overview)||mock.description,image,images:[...new Set([image,...extra])],imageSource:image===mock.image?'MOCK':'TOUR_API'}}
-export{coordinate,text as stripHtml}
