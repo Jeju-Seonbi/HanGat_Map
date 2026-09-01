@@ -1,13 +1,14 @@
 /**
- * AI 코스(POST /courses 응답) → 지도 코스(state.course) 변환 (MAP-06).
+ * AI 코스(POST /courses 응답)·저장 코스(GET /courses/{id}) → 지도 코스(state.course) 변환 (MAP-06).
  *
  * 지도의 코스 표시 엔진(CoursePanel·경로선·일차 전환)은 샘플 코스 형식을 먹는다.
- * AI 응답을 그 형식으로 번역만 하면 화면 코드는 그대로 돈다.
+ * 두 응답을 그 형식으로 번역만 하면 화면 코드는 그대로 돈다.
  *
- * 전달은 sessionStorage 를 쓴다 - 백엔드에 코스 조회(GET)가 없어서
- * AI코스 페이지가 저장하고 지도 페이지가 꺼내 읽는다. 탭을 닫으면 사라진다.
+ * 전달 방식이 다르다 - AI 코스는 저장 전이라 id가 없어 sessionStorage로 넘기고(?course=ai),
+ * 저장 코스는 id가 있어 URL로 넘긴다(?course=123). URL 쪽은 새로고침·공유가 된다.
  */
 import type { MapPlace } from './MapPlaceService'
+import type { CourseDetail } from '../CourseService'
 
 /** AI 응답에서 지도가 쓰는 부분 (JSON 은 snake_case) */
 export interface AiCourseResult {
@@ -40,8 +41,8 @@ interface AiCourseItem {
 
 /** 지도 코스 형식 - utils/course.js 샘플 생성기의 출력과 같은 모양 */
 export interface MapCourse {
-  /** 'ai' = 여행일 고정 코스. 날짜 슬라이더가 혼잡을 재계산하지 않는다 */
-  source: 'ai'
+  /** 'ai'·'saved' = 여행일 고정 코스. 날짜 슬라이더가 혼잡을 재계산하지 않는다 */
+  source: 'ai' | 'saved'
   startDate: string
   days: number
   stops: MapCourseStop[]
@@ -111,6 +112,46 @@ export function toMapCourse (
     stops,
     bud: result.budget_total ?? 0,
     spent: stops.reduce((a, b) => a + b.cost, 0),
+    avg: rated.length ? Math.round(rated.reduce((a, b) => a + (b.c ?? 0), 0) / rated.length) : null,
+    pav: null,
+    move: stops.reduce((a, b) => a + b.mv, 0)
+  }
+}
+
+/** 저장 코스 상세(CourseService 변환본) → 지도 코스. 코스 상세 페이지의 '지도에서 보기'가 쓴다 */
+export function toMapCourseFromDetail (
+  detail: CourseDetail,
+  findPlace?: (placeId: number | null, name: string) => MapPlace | null
+): MapCourse {
+  const stops: MapCourseStop[] = []
+
+  for (const day of [...detail.days].sort((a, b) => a.dayNo - b.dayNo)) {
+    for (const it of [...day.items].sort((a, b) => a.position - b.position)) {
+      if (it.latitude == null || it.longitude == null) continue
+
+      const matched = findPlace?.(it.placeId, it.placeName) ?? null
+      stops.push({
+        d: day.dayNo,
+        t: (it.startTime ?? '').slice(0, 5) || '--:--',
+        k: MEAL_CATEGORIES.some(m => (it.categoryName ?? '').includes(m)) ? 'm' : 's',
+        o: matched ?? { id: it.placeId, n: it.placeName, x: it.longitude, y: it.latitude },
+        c: it.congestionRate == null ? null : Math.round(it.congestionRate),
+        why: it.reason ?? '저장한 코스예요',
+        cost: 0,   // 상세 응답엔 일정별 비용이 없다 - 지어내지 않고 0 (경비 footer는 bud=0이면 숨는다)
+        mv: it.inboundTravelMinutes ?? 0,
+        alt: []
+      })
+    }
+  }
+
+  const rated = stops.filter(s => s.c != null)
+  return {
+    source: 'saved',
+    startDate: detail.startDate,
+    days: detail.days.length,
+    stops,
+    bud: 0,
+    spent: 0,
     avg: rated.length ? Math.round(rated.reduce((a, b) => a + (b.c ?? 0), 0) / rated.length) : null,
     pav: null,
     move: stops.reduce((a, b) => a + b.mv, 0)
