@@ -27,6 +27,7 @@ const openCount = computed(() => (state.sel ? 1 : 0) + (state.course ? 1 : 0))
 function openPlace(nameOrSpot) {
   const s = typeof nameOrSpot === 'string' ? state.layers.spot.find(x => x.n === nameOrSpot) : nameOrSpot
   if (!s) return
+  if (!s) return
   mapBridge.panTo(s.y, s.x)
   state.sel = s
 }

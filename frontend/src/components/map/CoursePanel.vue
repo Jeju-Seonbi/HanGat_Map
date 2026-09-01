@@ -107,7 +107,7 @@ watch(() => state.course, () => { naming.value = false })
         </div>
         <template v-for="(s, i) in stops" :key="s.t + s.d">
           <div v-if="i > 0 && s.mv" class="mv">↓ 차로 {{ s.mv }}분</div>
-          <div class="stop" @click="emit('open-place', s.o ? s.o.n : s.f.n)">
+          <div class="stop" @click="emit('open-place', s.o ?? s.f.n)">
             <div class="tm">{{ s.t }}</div>
             <div>
               <!-- 혼잡·업종은 목록과 같은 핀 색으로 표시 (뱃지와 의미 중복 제거) -->
