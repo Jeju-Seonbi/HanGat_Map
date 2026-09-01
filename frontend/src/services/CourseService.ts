@@ -82,6 +82,8 @@ export interface CourseDetailItem {
   categoryName: string
   regionName: string | null
   imageUrl: string | null
+  latitude: number | null
+  longitude: number | null
   position: number
   startTime: string | null
   /** 지금 예보. null이면 '혼잡 정보 없음' */
@@ -148,6 +150,8 @@ interface BackendCourseDetail {
       category_name: string
       region_name: string | null
       image_url: string | null
+      latitude: number | null
+      longitude: number | null
       position: number
       start_time: string | null
       congestion_rate: number | null
@@ -284,6 +288,8 @@ export const CourseService = {
             categoryName: item.category_name,
             regionName: item.region_name,
             imageUrl: item.image_url,
+            latitude: item.latitude,
+            longitude: item.longitude,
             position: item.position,
             startTime: item.start_time,
             congestionRate: item.congestion_rate,
