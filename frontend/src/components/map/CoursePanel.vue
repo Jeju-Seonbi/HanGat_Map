@@ -25,7 +25,9 @@ const byDay = computed(() => {
 const gap = computed(() => (course.value.pav == null ? null : course.value.pav - course.value.avg))
 const lead = computed(() => {
   const g = gap.value
-  if (g == null) return 'AI가 혼잡·날씨를 보고 짠 코스예요'
+  if (g == null) {
+    return course.value.source === 'saved' ? '저장한 코스예요' : 'AI가 혼잡·날씨를 보고 짠 코스예요'
+  }
   return g >= 30 ? '훨씬 한산한 코스예요' : g >= 15 ? '꽤 한산한 코스예요'
     : g >= 5 ? '조금 더 한산해요' : '인기 코스와 비슷해요'
 })
@@ -125,24 +127,27 @@ watch(() => state.course, () => { naming.value = false })
     </div>
 
     <div class="pf">
-      <div class="bh">
-        <span style="color:var(--tx2)">예상 경비</span>
-        <b class="tnum">{{ won(course.spent) }} / {{ won(course.bud) }}</b>
-      </div>
-      <div class="bar">
-        <i :style="{ width: spentPct + '%', background: rest < 0 ? 'var(--busy)' : 'var(--ac)' }"></i>
-      </div>
-      <div class="bn">
-        <template v-if="rest >= 0">
-          {{ won(rest) }}원 남아요 · 식비 ● 입장료 ● 실측 / 숙박·이동비 ○ 미포함
-        </template>
-        <template v-else>
-          <span style="color:var(--busy)">{{ won(-rest) }}원 넘었어요</span> · 식사를 더 저렴한 곳으로 바꿔보세요
-        </template>
-      </div>
+      <!-- 저장 코스 상세엔 비용 데이터가 없다 - bud=0이면 0원/0원 거짓 표시 대신 숨긴다 -->
+      <template v-if="course.bud">
+        <div class="bh">
+          <span style="color:var(--tx2)">예상 경비</span>
+          <b class="tnum">{{ won(course.spent) }} / {{ won(course.bud) }}</b>
+        </div>
+        <div class="bar">
+          <i :style="{ width: spentPct + '%', background: rest < 0 ? 'var(--busy)' : 'var(--ac)' }"></i>
+        </div>
+        <div class="bn">
+          <template v-if="rest >= 0">
+            {{ won(rest) }}원 남아요 · 식비 ● 입장료 ● 실측 / 숙박·이동비 ○ 미포함
+          </template>
+          <template v-else>
+            <span style="color:var(--busy)">{{ won(-rest) }}원 넘었어요</span> · 식사를 더 저렴한 곳으로 바꿔보세요
+          </template>
+        </div>
+      </template>
 
-      <!-- MY_001: 코스 저장 (회원 전용) -->
-      <div>
+      <!-- MY_001: 코스 저장 (회원 전용). 이미 저장된 코스(saved)에는 저장 버튼이 무의미하다 -->
+      <div v-if="course.source !== 'saved'">
         <div v-if="naming" class="savebox">
           <input ref="nameInput" v-model="draftTitle" maxlength="60" placeholder="코스 이름"
             @keydown.enter="confirmSave" @keydown.esc="naming = false">

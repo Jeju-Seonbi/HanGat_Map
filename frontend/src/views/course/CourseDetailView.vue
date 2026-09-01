@@ -3,7 +3,7 @@
 // 숫자 id는 백엔드 GET /courses/{id} 실데이터, 문자열 id('sample-aewol')는 기존 목업 -
 // 목업 코스 링크가 아직 살아 있어 전환기 동안 두 경로가 공존한다.
 import { computed, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import CongestionBadge from '../../components/common/CongestionBadge.vue'
 import MapRenderer from '../../components/map/MapRenderer.vue'
 import { sampleCourses } from '../../data/courses'
@@ -14,6 +14,7 @@ import CourseService, { type CourseDetail } from '../../services/CourseService'
 import type { CongestionLevel, Place } from '../../assets/types'
 
 const route = useRoute()
+const router = useRouter()
 const courseId = String(route.params.courseId ?? '')
 const editing = ref(false)
 const shared = ref(false)
@@ -201,6 +202,14 @@ const view = computed<CourseView | null>(() => {
         </p>
       </div>
       <div class="actions">
+        <!-- 실데이터 코스만 - 목업 코스는 지도에 이어줄 id·좌표가 없다 -->
+        <button
+          v-if="live"
+          class="btn ghost"
+          @click="router.push(`/map?course=${courseId}`)"
+        >
+          지도에서 보기
+        </button>
         <button
           class="btn ghost"
           @click="shared = true"

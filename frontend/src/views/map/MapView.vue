@@ -12,7 +12,8 @@ import { state, toast, loadPlaces } from '@/stores/mapStore'
 import { refreshCourse, courseFromNames } from '@/utils/course'
 import { at, iso, D0, FORECAST_DAYS } from '@/utils/date'
 import { useRouter, useRoute } from 'vue-router'
-import { popAiCourse, toMapCourse } from '@/services/map/CourseBridge'
+import { popAiCourse, toMapCourse, toMapCourseFromDetail } from '@/services/map/CourseBridge'
+import CourseService from '@/services/CourseService'
 
 const router = useRouter()
 const route = useRoute()
@@ -44,19 +45,35 @@ function toggleCourse() {
   router.push('/ai-course')
 }
 
+/** placeId → 적재 장소. 매칭되면 코스 핀 클릭 시 상세도 열린다 */
+function placeFinder() {
+  const byId = new Map(state.layers.spot.filter(p => p.id != null).map(p => [p.id, p]))
+  return id => (id != null && byId.get(id)) || null
+}
+
+/** 변환된 코스를 화면에 올린다 - 슬라이더를 여행 시작일로(예보 밖이면 오늘 유지), 경로가 다 보이게 줌 */
+function applyCourse(course) {
+  state.course = course
+  state.courseDay = 'all'
+  const k = Math.round((new Date(course.startDate + 'T00:00:00') - D0) / 864e5)
+  if (k >= 0 && k < FORECAST_DAYS) state.di = k
+  const pts = course.stops.map(s => [s.o.y, s.o.x])
+  if (pts.length > 1) mapBridge.fitPoints(pts, 12)
+}
+
 /** AI코스 페이지가 담아 둔 코스를 꺼내 그린다 (?course=ai) */
 function loadAiCourse() {
   const raw = popAiCourse()
   if (!raw) return false
-  // placeId 로 적재 장소와 이어 붙인다 - 매칭되면 핀 클릭 시 상세도 열린다
-  const byId = new Map(state.layers.spot.filter(p => p.id != null).map(p => [p.id, p]))
-  state.course = toMapCourse(raw, id => (id != null && byId.get(id)) || null)
-  state.courseDay = 'all'
-  // 날짜 슬라이더를 여행 시작일로 - 예보 범위 밖이면 오늘 유지
-  const k = Math.round((new Date(raw.start_date + 'T00:00:00') - D0) / 864e5)
-  if (k >= 0 && k < FORECAST_DAYS) state.di = k
-  const pts = state.course.stops.map(s => [s.o.y, s.o.x])
-  if (pts.length > 1) mapBridge.fitPoints(pts, 12)
+  applyCourse(toMapCourse(raw, placeFinder()))
+  return true
+}
+
+/** 저장 코스를 URL의 id로 불러와 그린다 (?course=123) - 새로고침·링크 공유가 된다 */
+async function loadSavedCourse(id) {
+  const detail = await CourseService.getCourseDetail(id)
+  if (!detail) { toast('코스를 불러오지 못했어요'); return false }
+  applyCourse(toMapCourseFromDetail(detail, placeFinder()))
   return true
 }
 
@@ -89,8 +106,8 @@ function loadFromURL() {
 
 /* 날짜가 바뀌면 코스의 혼잡도도 다시 계산한다 */
 watch(() => state.di, () => {
-  // AI 코스의 혼잡은 여행일 기준 값이다 - 슬라이더로 재계산하면 거짓이 된다
-  if (state.course?.source === 'ai') return
+  // AI·저장 코스의 혼잡은 여행일 기준 값이다 - 슬라이더로 재계산하면 거짓이 된다
+  if (state.course?.source) return
   if (state.course) {
     refreshCourse(state.course, { region: state.F.reg, dayIndex: state.di })
     state.course = { ...state.course }
@@ -101,6 +118,7 @@ onMounted(async () => {
   // 장소·예보를 먼저 받아야 URL의 ?place= 로 들어온 장소를 찾을 수 있다
   await loadPlaces()
   if (route.query.course === 'ai' && loadAiCourse()) return
+  if (/^\d+$/.test(route.query.course ?? '') && await loadSavedCourse(route.query.course)) return
   loadFromURL()
 })
 </script>
