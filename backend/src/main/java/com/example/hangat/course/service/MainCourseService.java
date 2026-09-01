@@ -1,6 +1,6 @@
 package com.example.hangat.course.service;
 
-import com.example.hangat.course.model.MainCourseResponse;
+import com.example.hangat.course.model.CourseSummaryResponse;
 import com.example.hangat.course.model.entity.Course;
 import com.example.hangat.course.model.entity.CoursePreset;
 import com.example.hangat.course.model.enums.CourseStatus;
@@ -46,9 +46,9 @@ public class MainCourseService {
         this.itemRepository = itemRepository;
     }
 
-    public List<MainCourseResponse> mainCourses() {
+    public List<CourseSummaryResponse> mainCourses() {
         LocalDate today = LocalDate.now(KST);
-        List<MainCourseResponse> cards = new ArrayList<>();
+        List<CourseSummaryResponse> cards = new ArrayList<>();
         for (CoursePreset preset : presetRepository.findActivePresets()) {
             courseRepository.findFirstByPresetIdAndCourseTypeAndStatusOrderByIdDesc(
                             preset.getId(), CourseType.SAMPLE, CourseStatus.READY)
@@ -57,13 +57,13 @@ public class MainCourseService {
                     .ifPresent(cards::add);
         }
         return cards.stream()
-                .sorted(Comparator.comparing(MainCourseResponse::averageCongestionRate,
+                .sorted(Comparator.comparing(CourseSummaryResponse::averageCongestionRate,
                         Comparator.nullsLast(BigDecimal::compareTo)))
                 .limit(CARD_COUNT)
                 .toList();
     }
 
-    private MainCourseResponse toCard(Course course) {
-        return MainCourseResponse.of(course, itemRepository.findItemsWithPlace(course.getId()));
+    private CourseSummaryResponse toCard(Course course) {
+        return CourseSummaryResponse.of(course, itemRepository.findItemsWithPlace(course.getId()));
     }
 }

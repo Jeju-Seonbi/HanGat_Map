@@ -340,7 +340,9 @@ public class SampleCourseGenerator {
                 .visitDate(date)
                 .plannedCongestionForecast(forecast)
                 .inboundDistanceM(travel.distanceM()).inboundTravelMinutes(travel.minutes())
-                .recommendationReasonCode(rainy && indoor ? "WEATHER" : "CONGESTION")
+                // 근거 코드는 명세서·프론트 union 목록(CONGESTION/STYLE/GOOD_PRICE/HIDDEN_GEM/ROUTE) 안에서만 쓴다
+                // - 날씨 사유는 코드가 아니라 아래 문구가 설명한다
+                .recommendationReasonCode("CONGESTION")
                 .recommendationReason(reasonFor(place, forecast, rainy, indoor))
                 .build();
     }

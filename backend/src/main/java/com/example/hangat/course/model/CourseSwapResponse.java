@@ -42,7 +42,8 @@ public record CourseSwapResponse(
             CongestionLevel congestionLevel,
             String congestionLabel,
             String recommendationReason,
-            /** 교체 전 장소명. 교체된 일정에만 값이 있다. */
+            /** 교체 전 장소. 교체된 일정에만 값이 있고, id를 함께 줘야 되돌리기가 가능하다. */
+            Long replacedFromPlaceId,
             String replacedFromPlaceName,
             Integer inboundDistanceM,
             Integer inboundTravelMinutes
@@ -64,6 +65,8 @@ public record CourseSwapResponse(
                     level,
                     level == null ? null : level.label(),
                     item.getRecommendationReason(),
+                    item.getReplacedFromPlace() == null
+                            ? null : item.getReplacedFromPlace().getId(),
                     item.getReplacedFromPlace() == null
                             ? null : item.getReplacedFromPlace().getName(),
                     item.getInboundDistanceM(),

@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 
 /** 코스 일정 조회 - 코스 상세·스왑 대상 찾기가 쓴다. 쓰기는 생성 엔진·스왑 서비스 몫. */
@@ -26,6 +27,19 @@ public interface CourseItemRepository extends JpaRepository<CourseItem, Long> {
             order by i.dayNo, i.position
             """)
     List<CourseItem> findItemsWithPlace(@Param("courseId") Long courseId);
+
+    /**
+     * 여러 코스의 일정을 한 번에 - 저장 코스 목록이 카드마다 대표 사진·장소 수를 채울 때 쓴다.
+     * 코스 수만큼 조회하면(N+1) 페이지 한 장에 열 번을 친다.
+     */
+    @Query("""
+            select i from CourseItem i
+            join fetch i.place p
+            join fetch p.region
+            where i.course.id in :courseIds
+            order by i.course.id, i.dayNo, i.position
+            """)
+    List<CourseItem> findItemsOfCourses(@Param("courseIds") Collection<Long> courseIds);
 
     /**
      * 생성 실패한 코스의 일정 정리 - FAILED 코스에 앞 일차 아이템이 고아로 남지 않게.

@@ -287,6 +287,39 @@ class CourseSwapTest {
                 .andExpect(jsonPath("$.code").value(3306));
     }
 
+    /**
+     * 샘플 코스는 소유자가 없지만 "임자 없는 코스"가 아니라 모두의 것이다.
+     * 소유자 검사만 있으면 통과해 버려, 메인 추천 카드를 누구나 영구히 바꿀 수 있게 된다.
+     */
+    @Test
+    void 메인_샘플_코스는_아무도_스왑할_수_없다() {
+        Course 샘플 = courseRepository.save(Course.builder()
+                .courseType(com.example.hangat.course.model.enums.CourseType.SAMPLE)
+                .title("동부 샘플")
+                .startDate(출발일).endDate(출발일.plusDays(1))
+                .transport(Transport.RENTAL_CAR)
+                .build());
+        CourseItem 샘플일정 = itemRepository.save(CourseItem.builder()
+                .course(샘플).place(성산일출봉)
+                .dayNo((short) 1).position((short) 1)
+                .visitDate(출발일)
+                .build());
+        샘플.markReady();
+        em.flush();
+
+        assertThatThrownBy(() -> swapService.swap(
+                샘플.getId(), 샘플일정.getId(), 혼인지.getId(), null))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("본인의 코스만");
+        // 로그인 사용자도 마찬가지 - 공유 자산이라 주인이 없다
+        assertThatThrownBy(() -> swapService.swap(
+                샘플.getId(), 샘플일정.getId(), 혼인지.getId(), 회원가입("any@hangat.local").getId()))
+                .isInstanceOf(BaseException.class);
+        em.clear();
+        assertThat(itemRepository.findById(샘플일정.getId()).orElseThrow().getPlace().getName())
+                .isEqualTo("성산일출봉");   // 그대로여야 한다
+    }
+
     @Test
     void 삭제된_코스는_스왑되지_않는다() {
         course.softDelete();
