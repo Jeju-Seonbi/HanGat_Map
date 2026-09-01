@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <!--
+    viewport-fit=cover — iOS 노치·홈 인디케이터 영역까지 그린다.
+    이게 없으면 하단 탭바에서 쓰는 env(safe-area-inset-bottom) 이 항상 0 이라
+    홈 인디케이터가 탭 위에 겹친다.
+    ⚠️ maximum-scale / user-scalable 은 넣지 않는다 — 확대를 막으면
+       저시력 사용자가 못 읽는다(WCAG 1.4.4).
+  -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <!--
+    Referrer 차단.
+    이메일 인증 링크(/verify?token=…)처럼 URL에 일회용 토큰이 실릴 수 있다.
+    Referer 헤더로 토큰이 외부(지도 타일 CDN 등)로 새는 것을 막는다.
+  -->
+  <meta name="referrer" content="no-referrer">
+
+  <!--
+    CSP. 아래 content 값은 vite.config.js 의 htmlCspPlugin 이 빌드 모드에 맞춰 채운다.
+    ⚠️ meta 로 전달된 CSP 는 frame-ancestors / report-uri / sandbox 를 무시한다(스펙).
+       클릭재킹 차단은 서버 응답 헤더로 해야 한다 — README '배포 시 필요한 응답 헤더' 참고.
+  -->
+  <meta http-equiv="Content-Security-Policy" content="%CSP%">
+
+  <title>한갓지도</title>
+  <meta name="description" content="한적한 제주를 찾아주는 여행 코스 서비스">
+
+  <!--
+    메인·AI코스·관광지 화면이 쓰는 Noto Sans KR · Gowun Dodum.
+    통합 전에는 assets/styles.css 안의 @import 였는데, CSP 의 style-src 가 'self' 뿐이라
+    조용히 차단됐다. <link> 로 옮기고 vite.config.js 의 CSP 에 출처를 추가했다.
+    (회원·마이페이지가 쓰는 Be Vietnam Pro · Figtree 는 @fontsource 로 번들된다)
+  -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Noto+Sans+KR:wght@400;500;600;700&display=swap">
+
+  <script>
+    /*
+      첫 페인트 전에 테마를 확정한다.
+      이 스크립트가 없으면 다크 사용자에게 흰 화면이 한 프레임 번쩍인다.
+      번들보다 먼저 동기 실행돼야 하므로 인라인으로 둔다.
+      (CSP 의 script-src 에 이 블록의 해시가 들어간다 — vite.config.js 참고)
+    */
+    (function () {
+      try {
+        var v = localStorage.getItem('hangat_theme')
+        if (v === 'light' || v === 'dark') document.documentElement.setAttribute('data-theme', v)
+      } catch (e) { /* 저장소 접근 불가 → 시스템 설정을 따른다 */ }
+    })()
+  </script>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
