@@ -23,7 +23,7 @@ public class CourseController {
 
     @PostMapping("/courses")
     public BaseResponse<CourseResponseDto> createCourse(
-            @RequestBody CourseRequestDto request,
+            @Valid @RequestBody CourseRequestDto request,
             Authentication authentication
     ) {
         CourseResponseDto response = courseService.createCourse(request);
