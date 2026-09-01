@@ -30,7 +30,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * 대안 장소 API(#과밀지역우회) 검증.
- * 기준: 성산일출봉(혼잡 83) - 실좌표를 써서 거리 컷까지 실세계 값으로 검증한다.
+ * 기준: 성산일출봉(집중률 83, 혼잡) - 실좌표를 써서 거리 컷까지 실세계 값으로 검증한다.
+ * 응답은 코스 도메인과 같은 snake_case 계약(프론트 AlternativePlace 타입).
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -107,13 +108,48 @@ class AlternativeApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(2000))
                 .andExpect(jsonPath("$.result.length()").value(2))   // 혼인지 + 광치기 (혼잡·원거리·카페 컷)
-                .andExpect(jsonPath("$.result[0].name").value("혼인지"))
-                .andExpect(jsonPath("$.result[0].levelLabel").value("여유"))
-                .andExpect(jsonPath("$.result[0].distanceKm").value(5.3))
-                .andExpect(jsonPath("$.result[1].name").value("광치기해변"))
-                .andExpect(jsonPath("$.result[?(@.name == '협재해수욕장')]").isEmpty())
-                .andExpect(jsonPath("$.result[?(@.name == '표선해수욕장')]").isEmpty())
-                .andExpect(jsonPath("$.result[?(@.name == '성산카페')]").isEmpty());
+                .andExpect(jsonPath("$.result[0].place_name").value("혼인지"))
+                .andExpect(jsonPath("$.result[0].congestion_level").value("QUIET"))
+                .andExpect(jsonPath("$.result[0].congestion_label").value("여유"))
+                .andExpect(jsonPath("$.result[0].distance_m").value(org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.greaterThan(5000),
+                        org.hamcrest.Matchers.lessThan(5700))))
+                .andExpect(jsonPath("$.result[0].radius_km").value(10))
+                .andExpect(jsonPath("$.result[0].category_name").value("관광지"))
+                // 교체 설득 문구는 기준 장소 대비 격차를 말한다 (83 - 23 = 60)
+                .andExpect(jsonPath("$.result[0].replacement_reason")
+                        .value(org.hamcrest.Matchers.containsString("60 낮")))
+                .andExpect(jsonPath("$.result[1].place_name").value("광치기해변"))
+                .andExpect(jsonPath("$.result[?(@.place_name == '협재해수욕장')]").isEmpty())
+                .andExpect(jsonPath("$.result[?(@.place_name == '표선해수욕장')]").isEmpty())
+                .andExpect(jsonPath("$.result[?(@.place_name == '성산카페')]").isEmpty());
+    }
+
+    @Test
+    void 가까운_후보가_충분하면_먼_후보는_섞이지_않는다() throws Exception {
+        // 15km 지점에 가장 한산한(1.00) 후보를 둬도, 10km 안이 정원을 채우면 밀린다
+        save("먼오름", tourist, 33.5900, 126.9800, "1.00");   // 성산에서 약 15km
+
+        mockMvc.perform(get("/places/{id}/alternatives", baseId)
+                        .param("date", DATE.toString())
+                        .param("limit", "2"))
+                .andExpect(jsonPath("$.result.length()").value(2))
+                .andExpect(jsonPath("$.result[*].radius_km",
+                        org.hamcrest.Matchers.everyItem(org.hamcrest.Matchers.is(10))))
+                .andExpect(jsonPath("$.result[?(@.place_name == '먼오름')]").isEmpty());
+    }
+
+    @Test
+    void 가까운_후보가_모자라면_먼_후보로_채운다() throws Exception {
+        save("먼오름", tourist, 33.5900, 126.9800, "1.00");   // 약 15km
+
+        mockMvc.perform(get("/places/{id}/alternatives", baseId)
+                        .param("date", DATE.toString())
+                        .param("limit", "5"))
+                .andExpect(jsonPath("$.result.length()").value(3))
+                // 집중률은 1.00으로 가장 낮지만 근거리를 먼저 채우므로 마지막에 온다
+                .andExpect(jsonPath("$.result[2].place_name").value("먼오름"))
+                .andExpect(jsonPath("$.result[2].radius_km").value(20));
     }
 
     @Test
@@ -121,8 +157,8 @@ class AlternativeApiTest {
         mockMvc.perform(get("/places/{id}/alternatives", baseId)
                         .param("date", DATE.toString())
                         .param("exclude", nearCalmId.toString()))
-                .andExpect(jsonPath("$.result[?(@.name == '혼인지')]").isEmpty())
-                .andExpect(jsonPath("$.result[0].name").value("광치기해변"));
+                .andExpect(jsonPath("$.result[?(@.place_name == '혼인지')]").isEmpty())
+                .andExpect(jsonPath("$.result[0].place_name").value("광치기해변"));
     }
 
     @Test
