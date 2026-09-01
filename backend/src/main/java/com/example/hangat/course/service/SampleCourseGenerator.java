@@ -61,8 +61,6 @@ public class SampleCourseGenerator {
     private static final int REGIONS_TO_PICK = 3;
     /** 이 이상이면 그날은 "비 예보"로 보고 실내 우선 배치. 기상청 강수확률(%) 기준. */
     private static final int RAINY_PROB_FROM = 60;
-    /** 이동시간 추정용 평균 속도(km/h) - 렌터카 기준 추정치임을 숨기지 않는다. */
-    private static final double AVG_SPEED_KMH = 40.0;
     /** 동선 묶기 전 저혼잡 후보 풀 크기 - 너무 크면 동선이 저혼잡을 이기고, 너무 작으면 다 몰린다. */
     private static final int ROUTE_POOL_SIZE = 10;
 
@@ -75,6 +73,7 @@ public class SampleCourseGenerator {
     private final CongestionService congestionService;
     private final WeatherService weatherService;
     private final GeoService geoService;
+    private final CourseTravelCalculator travelCalculator;
 
     public SampleCourseGenerator(CoursePresetRepository presetRepository,
                                  CourseRepository courseRepository,
@@ -82,7 +81,8 @@ public class SampleCourseGenerator {
                                  PlaceRepository placeRepository,
                                  CongestionService congestionService,
                                  WeatherService weatherService,
-                                 GeoService geoService) {
+                                 GeoService geoService,
+                                 CourseTravelCalculator travelCalculator) {
         this.presetRepository = presetRepository;
         this.courseRepository = courseRepository;
         this.itemRepository = itemRepository;
@@ -90,6 +90,7 @@ public class SampleCourseGenerator {
         this.congestionService = congestionService;
         this.weatherService = weatherService;
         this.geoService = geoService;
+        this.travelCalculator = travelCalculator;
     }
 
     /** 한 번의 배치 결과 - 로그·수동 실행 응답용. */
@@ -330,21 +331,15 @@ public class SampleCourseGenerator {
     private CourseItem courseItem(Course course, Place place, int dayNo, int position,
                                   LocalDate date, CongestionForecast forecast,
                                   Place previous, boolean rainy) {
-        Integer distanceM = null;
-        Short minutes = null;
-        if (previous != null) {
-            double km = geoService.distanceKm(previous.getLatitude(), previous.getLongitude(),
-                    place.getLatitude(), place.getLongitude());
-            distanceM = (int) Math.round(km * 1000);
-            minutes = (short) Math.max(1, Math.ceil(km / AVG_SPEED_KMH * 60));
-        }
+        // 스왑과 같은 계산기를 쓴다 - 배치와 스왑의 이동시간이 어긋나면 화면에서 티가 난다
+        CourseTravelCalculator.Travel travel = travelCalculator.between(previous, place);
         boolean indoor = IndoorClassifier.isIndoor(place);
         return CourseItem.builder()
                 .course(course).place(place)
                 .dayNo((short) dayNo).position((short) position)
                 .visitDate(date)
                 .plannedCongestionForecast(forecast)
-                .inboundDistanceM(distanceM).inboundTravelMinutes(minutes)
+                .inboundDistanceM(travel.distanceM()).inboundTravelMinutes(travel.minutes())
                 .recommendationReasonCode(rainy && indoor ? "WEATHER" : "CONGESTION")
                 .recommendationReason(reasonFor(place, forecast, rainy, indoor))
                 .build();

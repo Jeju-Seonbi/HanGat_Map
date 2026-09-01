@@ -39,6 +39,20 @@ public interface CongestionForecastRepository extends JpaRepository<CongestionFo
     List<CongestionForecast> findSeriesOf(@Param("placeId") Long placeId,
                                           @Param("baseAt") LocalDateTime baseAt);
 
+    /**
+     * 한 장소·한 날짜의 예보 한 건 - 스왑이 교체 장소의 스냅숏을 박을 때 쓴다.
+     *
+     * <p>하루 전체를 읽는 {@code findByBaseAtAndForecastAt}(수백 건)과 달리 한 건만 필요할 때
+     * 쓰라고 따로 둔다. baseAt까지 조건에 넣어야 발표 버전이 섞이지 않는다(클래스 주석 참고).
+     */
+    @Query("""
+            select f from CongestionForecast f
+            where f.place.id = :placeId and f.forecastAt = :forecastAt and f.baseAt = :baseAt
+            """)
+    Optional<CongestionForecast> findOne(@Param("placeId") Long placeId,
+                                         @Param("forecastAt") LocalDateTime forecastAt,
+                                         @Param("baseAt") LocalDateTime baseAt);
+
     /** 같은 버전을 다시 적재하려는지 판정한다 - 배치를 하루에 두 번 돌렸을 때. */
     boolean existsByBaseAt(LocalDateTime baseAt);
 

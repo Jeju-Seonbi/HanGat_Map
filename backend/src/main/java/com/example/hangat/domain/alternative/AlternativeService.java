@@ -5,14 +5,15 @@ import com.example.hangat.common.geo.GeoService;
 import com.example.hangat.common.model.BaseResponseStatus;
 import com.example.hangat.domain.alternative.model.AlternativePlaceResponse;
 import com.example.hangat.domain.congestion.CongestionService;
-import com.example.hangat.map.model.enums.CongestionLevel;
 import com.example.hangat.map.model.entity.Place;
+import com.example.hangat.map.model.enums.CongestionLevel;
 import com.example.hangat.map.repository.PlaceRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -20,15 +21,23 @@ import java.util.Set;
 
 /**
  * 과밀 스팟 대안 제시 (담당: 정동현) - #과밀지역우회
- * 규칙: 같은 카테고리 + 반경 내 + 그날 예보 존재 + 혼잡 미만, 집중률 낮은 순 상위 N.
+ *
+ * <p>규칙: 같은 카테고리 + 반경 내 + 그날 예보 존재 + 혼잡 미만, 집중률 낮은 순 상위 N.
  * [바운딩 박스 선필터(DB) → 하버사인 정밀 컷(자바)] 2단계 - GeoService 주석 참고.
+ *
+ * <p><b>반경은 10km 우선, 모자라면 20km까지 확장한다.</b> 화면이 "10km 후보를 먼저 표시하고,
+ * 부족한 경우 20km 안의 조금 더 먼 대안을 함께 보여드려요"라고 안내하므로 응답도 후보마다
+ * 어느 반경에서 나왔는지({@code radiusKm})를 알려준다. 가까운 대안이 있는데 먼 곳을 섞으면
+ * "우회 때문에 하루를 버렸다"가 되므로 근거리를 항상 먼저 채운다.
  */
 @Service
 @Transactional(readOnly = true)
 public class AlternativeService {
 
-    /** 대안 탐색 반경(km) - 데모 해보고 튜닝할 값이라 상수로 분리 */
-    private static final double RADIUS_KM = 15.0;
+    /** 1차 탐색 반경(km) - 이 안에서 먼저 채운다. */
+    private static final int NEAR_RADIUS_KM = 10;
+    /** 2차 확장 반경(km) - 1차가 모자랄 때만 여기까지 본다. */
+    private static final int FAR_RADIUS_KM = 20;
 
     private final PlaceRepository placeRepository;
     private final CongestionService congestionService;
@@ -52,10 +61,16 @@ public class AlternativeService {
             throw new BaseException(BaseResponseStatus.CONGESTION_NOT_FOUND, date.toString());
         }
 
-        GeoService.BoundingBox box = geoService.boxAround(
-                base.getLatitude().doubleValue(), base.getLongitude().doubleValue(), RADIUS_KM);
+        double baseRate = rates.getOrDefault(base.getId(), Double.NaN);
 
-        return placeRepository.findCandidatesInBox(
+        // 넓은 쪽(20km) 한 번만 조회하고 자바에서 가까운 순으로 나눈다 - 쿼리를 두 번 치지 않는다
+        GeoService.BoundingBox box = geoService.boxAround(
+                base.getLatitude().doubleValue(), base.getLongitude().doubleValue(), FAR_RADIUS_KM);
+
+        record Candidate(Place place, double rate, double distanceKm) {
+        }
+
+        List<Candidate> candidates = placeRepository.findCandidatesInBox(
                         base.getPrimaryCategory().getCode(),
                         BigDecimal.valueOf(box.minLat()), BigDecimal.valueOf(box.maxLat()),
                         BigDecimal.valueOf(box.minLng()), BigDecimal.valueOf(box.maxLng()))
@@ -63,28 +78,64 @@ public class AlternativeService {
                 .filter(place -> !place.getId().equals(base.getId()))
                 .filter(place -> !excludeIds.contains(place.getId()))
                 .filter(place -> rates.containsKey(place.getId()))
-                .map(place -> toResponse(base, place, rates.get(place.getId())))
-                .filter(response -> response.level() == CongestionLevel.QUIET
-                        || response.level() == CongestionLevel.NORMAL)
-                .filter(response -> response.distanceKm() <= RADIUS_KM)
-                .sorted(Comparator.comparingDouble(AlternativePlaceResponse::rate))
-                .limit(limit)
+                .filter(place -> CongestionLevel.from(BigDecimal.valueOf(rates.get(place.getId())))
+                        != CongestionLevel.CROWDED)
+                .map(place -> new Candidate(place, rates.get(place.getId()), geoService.distanceKm(
+                        base.getLatitude(), base.getLongitude(),
+                        place.getLatitude(), place.getLongitude())))
+                .filter(c -> c.distanceKm() <= FAR_RADIUS_KM)
+                .sorted(Comparator.comparingDouble(Candidate::rate))
                 .toList();
+
+        // 10km 안을 먼저 채우고, 모자란 자리만 20km에서 보충한다
+        List<AlternativePlaceResponse> results = new ArrayList<>();
+        for (int radius : new int[]{NEAR_RADIUS_KM, FAR_RADIUS_KM}) {
+            for (Candidate c : candidates) {
+                if (results.size() >= limit) {
+                    break;
+                }
+                boolean inThisRing = radius == NEAR_RADIUS_KM
+                        ? c.distanceKm() <= NEAR_RADIUS_KM
+                        : c.distanceKm() > NEAR_RADIUS_KM;
+                if (inThisRing) {
+                    results.add(toResponse(base, baseRate, c.place(), c.rate(), c.distanceKm(), radius));
+                }
+            }
+        }
+        return results;
     }
 
-    private AlternativePlaceResponse toResponse(Place base, Place candidate, double rate) {
-        CongestionLevel level = congestionService.levelOf(rate);
-        double distance = geoService.distanceKm(
-                base.getLatitude(), base.getLongitude(),
-                candidate.getLatitude(), candidate.getLongitude());
-        return AlternativePlaceResponse.of(candidate, rate, level, distance, reasonFor(candidate, level));
+    private AlternativePlaceResponse toResponse(Place base, double baseRate, Place candidate,
+                                                double rate, double distanceKm, int radiusKm) {
+        CongestionLevel level = CongestionLevel.from(BigDecimal.valueOf(rate));
+        return AlternativePlaceResponse.of(candidate, rate, level, distanceKm, radiusKm,
+                recommendationReason(candidate, level),
+                replacementReason(base, baseRate, rate, distanceKm));
     }
 
-    /** 추천 근거 - MainService와 같은 우선순위 (검증가 > 숨은 명소 > 예보 여유) */
-    private String reasonFor(Place place, CongestionLevel level) {
+    /** 이 장소가 어떤 곳인지 - MainService와 같은 우선순위 (검증가 > 숨은 명소 > 예보 여유) */
+    private String recommendationReason(Place place, CongestionLevel level) {
         if (place.isGoodPrice()) return "착한가격업소 검증가";
         if (place.isHiddenGem()) return "덜 알려진 숨은 명소";
         if (level == CongestionLevel.QUIET) return "이 날짜 혼잡 예보가 여유예요";
         return "인기 명소보다 한산한 편이에요";
+    }
+
+    /**
+     * 왜 바꾸면 나은지 - 교체 버튼 옆 한 줄.
+     * 기준 장소의 그날 예보가 없으면(커버 밖) 비교 문구를 만들지 않는다 - 없는 수치를 지어내지 않는다.
+     */
+    private String replacementReason(Place base, double baseRate, double rate, double distanceKm) {
+        String distanceText = distanceKm < 1
+                ? Math.round(distanceKm * 1000) + "m"
+                : String.format("%.1fkm", distanceKm);
+        if (Double.isNaN(baseRate)) {
+            return base.getName() + "에서 " + distanceText + " 거리예요";
+        }
+        int gap = (int) Math.round(baseRate - rate);
+        if (gap <= 0) {
+            return base.getName() + "에서 " + distanceText + ", 혼잡도는 비슷해요";
+        }
+        return base.getName() + "보다 집중률이 " + gap + " 낮고 " + distanceText + " 거리예요";
     }
 }

@@ -30,8 +30,10 @@ public class AlternativeController {
 
     @GetMapping("/{placeId}/alternatives")
     @Operation(summary = "과밀 스팟 대안 장소", description = """
-            같은 카테고리·반경 15km·해당 날짜(기본: 오늘) 예보가 혼잡 미만인 장소를
-            집중률 낮은 순으로 반환한다. exclude로 이미 코스에 포함된 장소를 제외할 수 있다.
+            같은 카테고리·해당 날짜(기본: 오늘) 예보가 혼잡 미만인 장소를 집중률 낮은 순으로 반환한다.
+            반경은 10km를 먼저 채우고 모자랄 때만 20km까지 넓히며, 후보마다 radius_km로 알려준다.
+            exclude로 이미 코스에 포함된 장소를 제외할 수 있다.
+            응답은 코스 도메인과 같은 snake_case 계약이다.
             혼잡 예보는 날짜 단위로만 제공된다 (시간대 예측 없음).""")
     public BaseResponse<List<AlternativePlaceResponse>> alternatives(
             @PathVariable Long placeId,

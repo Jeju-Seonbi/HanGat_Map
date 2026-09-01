@@ -73,6 +73,17 @@ public class CongestionService {
      * planned_congestion_forecast_id)은 <b>어느 발표 버전을 보고 골랐는지</b>를 행으로
      * 고정해야 해서 엔티티가 필요하다. 샘플 코스 배치가 쓰고, 스왑 API도 이걸 쓸 예정이다.
      */
+    /**
+     * 한 장소·한 날짜의 최신 발표 예보 - 스왑이 교체 장소 스냅숏을 박을 때 쓴다.
+     * 예보가 없는 장소·날짜면 빈 값이고, 그때 스냅숏은 NULL('혼잡 정보 없음')로 남는다.
+     */
+    public Optional<com.example.hangat.map.model.entity.CongestionForecast> forecastOf(
+            Long placeId, LocalDate date) {
+        return repository.findLatestBaseAt()
+                .flatMap(baseAt -> repository.findOne(
+                        placeId, PlaceNameNormalizer.jejuDayToUtc(date), baseAt));
+    }
+
     public Map<Long, com.example.hangat.map.model.entity.CongestionForecast> forecastsFor(LocalDate date) {
         Optional<LocalDateTime> latestBase = repository.findLatestBaseAt();
         if (latestBase.isEmpty()) {
