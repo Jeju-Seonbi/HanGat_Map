@@ -53,6 +53,9 @@ public enum BaseResponseStatus {
     COURSE_CLAIM_INVALID(false, 3303, "코스 저장 증명을 확인해주세요."),
     COURSE_CLAIM_EXPIRED(false, 3304, "코스 저장 가능 시간이 만료되었습니다."),
     COURSE_NOT_CLAIMABLE(false, 3305, "저장할 수 없는 코스입니다."),
+    COURSE_ITEM_NOT_FOUND(false, 3306, "존재하지 않는 코스 일정입니다."),
+    COURSE_FORBIDDEN(false, 3307, "본인의 코스만 변경할 수 있습니다."),
+    COURSE_PLACE_DUPLICATED(false, 3308, "이미 코스에 담긴 장소입니다."),
 
     // 3400번대 혼잡 예보
     CONGESTION_NOT_FOUND(false, 3401, "해당 날짜의 혼잡 예보가 없습니다."),

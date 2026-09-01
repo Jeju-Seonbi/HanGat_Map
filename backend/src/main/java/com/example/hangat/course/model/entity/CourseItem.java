@@ -183,6 +183,15 @@ public class CourseItem {
         this.recommendationReason = reason;
     }
 
+    /**
+     * 직전 일정에서의 이동 정보 갱신 - 스왑으로 앞뒤 장소가 바뀌면 다시 계산해 넣는다.
+     * 첫 슬롯은 null을 넣어 "이동 없음"을 유지한다(0km와 구분).
+     */
+    public void updateInbound(Integer distanceM, Short minutes) {
+        this.inboundDistanceM = distanceM;
+        this.inboundTravelMinutes = minutes;
+    }
+
     /** 마이페이지 메모. */
     public void updateMemo(String memo) {
         this.memo = memo;
