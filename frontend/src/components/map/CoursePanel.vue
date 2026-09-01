@@ -22,9 +22,10 @@ const byDay = computed(() => {
   course.value?.stops.forEach(s => (g[s.d] = g[s.d] || []).push(s))
   return g
 })
-const gap = computed(() => course.value.pav - course.value.avg)
+const gap = computed(() => (course.value.pav == null ? null : course.value.pav - course.value.avg))
 const lead = computed(() => {
   const g = gap.value
+  if (g == null) return 'AI가 혼잡·날씨를 보고 짠 코스예요'
   return g >= 30 ? '훨씬 한산한 코스예요' : g >= 15 ? '꽤 한산한 코스예요'
     : g >= 5 ? '조금 더 한산해요' : '인기 코스와 비슷해요'
 })
@@ -76,7 +77,8 @@ watch(() => state.course, () => { naming.value = false })
     <div class="pb">
       <div class="stat">
         <div class="n" style="font-size:19px">{{ lead }}</div>
-        <div class="cmp">
+        <!-- 비교값(pav)이 없는 AI 코스는 비교 막대를 그리지 않는다 - 없는 수치를 만들지 않는다 -->
+        <div v-if="course.pav != null" class="cmp">
           <div class="cmp-r"><span>이 코스</span>
             <div class="cbar"><i :style="{ width: course.avg + '%', background: 'var(--calm-st)' }"></i></div>
             <b>{{ course.avg }}</b>
@@ -86,7 +88,13 @@ watch(() => state.course, () => { naming.value = false })
             <b>{{ course.pav }}</b>
           </div>
         </div>
-        <p>혼잡 정도 · 같은 날 기준 · 낮을수록 한산해요</p>
+        <div v-else-if="course.avg != null" class="cmp">
+          <div class="cmp-r"><span>코스 평균 혼잡</span>
+            <div class="cbar"><i :style="{ width: course.avg + '%', background: 'var(--calm-st)' }"></i></div>
+            <b>{{ course.avg }}</b>
+          </div>
+        </div>
+        <p v-if="course.avg != null">혼잡 정도 · 여행일 기준 · 낮을수록 한산해요</p>
         <p>총 이동 {{ moveText }}</p>
       </div>
 

@@ -124,7 +124,7 @@ function toggleCourse() {
       </div>
 
       <button class="cta" @click="toggleCourse">
-        {{ state.course ? '코스 지우기' : '샘플 코스 지도에 표시' }}
+        {{ state.course ? '코스 지우기' : 'AI 코스 만들기' }}
       </button>
 
       <div class="cta-leg">

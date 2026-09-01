@@ -49,6 +49,14 @@ const toast = ref('')
 const auth = useAuthStore()
 const router = useRouter()
 
+/* MAP-06: 결과를 지도 코스로 전달한다 - 저장은 CourseBridge, 표시는 지도 페이지가 맡는다 */
+async function viewOnMap() {
+  if (!result.value) return
+  const { stashAiCourse } = await import('@/services/map/CourseBridge')
+  stashAiCourse(result.value as never)
+  await router.push({ path: '/map', query: { course: 'ai' } })
+}
+
 const transportLabel = {
   RENTAL_CAR: '렌터카',
   PUBLIC_TRANSIT: '대중교통',
@@ -257,7 +265,10 @@ const formatDistance = (metres?: number) => metres == null ? '' : `${(metres / 1
             <span>예상 비용 <b>{{ estimatedCost }}</b></span>
           </div>
         </div>
-        <button class="btn result-save" :disabled="result.status === 'SAVED'" @click="openSave">{{ result.status === 'SAVED' ? '저장 완료' : '코스 저장' }}</button>
+        <div class="result-actions-row">
+          <button class="btn" @click="viewOnMap">지도에서 보기</button>
+          <button class="btn result-save" :disabled="result.status === 'SAVED'" @click="openSave">{{ result.status === 'SAVED' ? '저장 완료' : '코스 저장' }}</button>
+        </div>
       </header>
 
       <div class="course-result-grid">

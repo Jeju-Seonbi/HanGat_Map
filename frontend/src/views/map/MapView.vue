@@ -9,8 +9,13 @@ import CoursePanel from '@/components/map/CoursePanel.vue'
 import PhotoLightbox from '@/components/map/PhotoLightbox.vue'
 import { state, toast, loadPlaces } from '@/stores/mapStore'
 
-import { buildCourse, refreshCourse, courseFromNames } from '@/utils/course'
+import { refreshCourse, courseFromNames } from '@/utils/course'
 import { at, iso, D0, FORECAST_DAYS } from '@/utils/date'
+import { useRouter, useRoute } from 'vue-router'
+import { popAiCourse, toMapCourse } from '@/services/map/CourseBridge'
+
+const router = useRouter()
+const route = useRoute()
 import { mapBridge } from '@/composables/mapBridge'
 import MapToast from '@/components/map/MapToast.vue'
 
@@ -34,15 +39,24 @@ function toggleCourse() {
     history.replaceState(null, '', location.pathname)
     return
   }
-  const c = buildCourse({
-    region: state.F.reg, budget: state.F.bud, dayIndex: state.di, useRain: !!state.L.rain,
-  })
-  if (!c) { toast('해당 권역 후보가 부족해요'); return }
-  state.course = c
+  // 샘플 생성기 대신 실 기능으로 안내한다 - 가짜 코스를 화면에 올리지 않는다
+  router.push('/ai-course')
+}
+
+/** AI코스 페이지가 담아 둔 코스를 꺼내 그린다 (?course=ai) */
+function loadAiCourse() {
+  const raw = popAiCourse()
+  if (!raw) return false
+  // placeId 로 적재 장소와 이어 붙인다 - 매칭되면 핀 클릭 시 상세도 열린다
+  const byId = new Map(state.layers.spot.filter(p => p.id != null).map(p => [p.id, p]))
+  state.course = toMapCourse(raw, id => (id != null && byId.get(id)) || null)
   state.courseDay = 'all'
-  syncURL()
-  const pts = c.stops.filter(s => s.o).map(s => [s.o.y, s.o.x])
+  // 날짜 슬라이더를 여행 시작일로 - 예보 범위 밖이면 오늘 유지
+  const k = Math.round((new Date(raw.start_date + 'T00:00:00') - D0) / 864e5)
+  if (k >= 0 && k < FORECAST_DAYS) state.di = k
+  const pts = state.course.stops.map(s => [s.o.y, s.o.x])
   if (pts.length > 1) mapBridge.fitPoints(pts, 12)
+  return true
 }
 
 /* COM_002: 날짜는 순번이 아니라 실제 날짜로 저장한다 —
@@ -74,6 +88,8 @@ function loadFromURL() {
 
 /* 날짜가 바뀌면 코스의 혼잡도도 다시 계산한다 */
 watch(() => state.di, () => {
+  // AI 코스의 혼잡은 여행일 기준 값이다 - 슬라이더로 재계산하면 거짓이 된다
+  if (state.course?.source === 'ai') return
   if (state.course) {
     refreshCourse(state.course, { region: state.F.reg, dayIndex: state.di })
     state.course = { ...state.course }
@@ -83,6 +99,7 @@ watch(() => state.di, () => {
 onMounted(async () => {
   // 장소·예보를 먼저 받아야 URL의 ?place= 로 들어온 장소를 찾을 수 있다
   await loadPlaces()
+  if (route.query.course === 'ai' && loadAiCourse()) return
   loadFromURL()
 })
 </script>
