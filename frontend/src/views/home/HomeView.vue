@@ -3,17 +3,14 @@
 // 구성: ① 서비스 소개 히어로(MAIN_003) ② 퀵스타트 ③ 코스 추천 3종 → 코스 상세(MAIN_002) ④ 장소 추천 캐러셀(MAIN_001)
 // 정직성 원칙: 혼잡은 '날짜 단위 예보'로만 표현한다 (시간대별 혼잡 표현 금지 - 데이터 없음)
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
-import { usePlaces } from '../../composables/usePlaces'
 import { useTravelStore } from '../../app/stores/travel'
-import { homeCourses } from '../../data/courses'
-import { levelOf } from '../../utils/congestion'
 import type { DailyWeather } from '../../services/WeatherService'
 import { WeatherService } from '../../services/WeatherService'
 import CalmPlaceService, { type CalmPlaceCard } from '../../services/CalmPlaceService'
+import CourseService, { type CourseCard } from '../../services/CourseService'
 import PlaceImage from '../../components/common/PlaceImage.vue'
 import CongestionBadge from '../../components/common/CongestionBadge.vue'
 
-const { places } = usePlaces()
 const store = useTravelStore()
 const weeklyWeather = ref<DailyWeather[]>([])
 // true = 기상청 실데이터, false = 백엔드 미가동 시 시연용 샘플 폴백
@@ -28,27 +25,9 @@ const fmtDate = (iso: string) => {
   return `${Number(m)}월 ${Number(d)}일`
 }
 
-// MAIN_002: 코스 추천 3종 - 평균 혼잡과 경유지는 장소 데이터에서 계산
-const courseCards = computed(() =>
-  homeCourses.map((course) => {
-    const resolved = course.days
-      .flatMap((d) => d.items)
-      .flatMap((item) => {
-        const place = places.value.find((p) => p.id === item.placeId)
-        if (!place) return []
-        return [{ name: place.name, score: item.scoreOverride ?? place.score }]
-      })
-    const avgScore = resolved.length
-      ? Math.round(resolved.reduce((sum, r) => sum + r.score, 0) / resolved.length)
-      : 0
-    return {
-      ...course,
-      stops: resolved.map((r) => r.name).join(' → '),
-      avgScore,
-      avgLevel: levelOf(avgScore),
-    }
-  }),
-)
+// MAIN_002: 코스 추천 3종 - 새벽 배치가 만든 실데이터(백엔드 미가동 시 목업 폴백)
+const courseCards = ref<CourseCard[]>([])
+const coursesLive = ref(false)
 
 // MAIN_001: 오늘 날짜 예보 기준 한적한 관광지 (백엔드 실데이터, 실패 시 목업 폴백)
 const calmPlaces = ref<CalmPlaceCard[]>([])
@@ -81,6 +60,9 @@ onMounted(async () => {
   const calm = await CalmPlaceService.getCalmPlaces()
   calmPlaces.value = calm.cards
   calmLive.value = calm.live
+  const courses = await CourseService.getMainCourses()
+  courseCards.value = courses.cards
+  coursesLive.value = courses.live
   await nextTick()
   updateArrows()
 })
@@ -172,7 +154,7 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateArrows))
           <span class="eyebrow">READY-MADE COURSE</span>
           <h2>한적한 곳으로 이어 만든 추천 코스</h2>
           <p class="muted">
-            대표 조건 3종으로 미리 만들어 둔 코스 · 카드를 누르면 코스 상세로 이동해요
+            {{ coursesLive ? '새벽 배치가 그날 여유로운 권역으로 미리 만든 코스' : '시연용 데이터 · 백엔드 연결 대기' }} · 카드를 누르면 코스 상세로 이동해요
           </p>
         </div>
       </div>
@@ -187,7 +169,10 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateArrows))
             {{ course.conditionLabel }}
           </div>
           <h3>{{ course.title }}</h3>
-          <p class="course-stops">
+          <p
+            v-if="course.stops"
+            class="course-stops"
+          >
             {{ course.stops }}
           </p>
           <p class="muted course-highlight">
@@ -198,8 +183,10 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateArrows))
           </p>
           <div class="course-foot">
             <CongestionBadge
-              :level="course.avgLevel"
+              v-if="course.level"
+              :level="course.level"
             />
+            <span v-else />
             <span class="text-link">코스 상세 →</span>
           </div>
         </RouterLink>
