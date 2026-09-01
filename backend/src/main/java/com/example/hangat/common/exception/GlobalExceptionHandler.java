@@ -7,6 +7,7 @@ import com.example.hangat.common.model.BaseResponseStatus;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -41,6 +42,14 @@ public class GlobalExceptionHandler {
         }
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(BaseResponse.fail(BaseResponseStatus.REQUEST_ERROR, errors));
+    }
+
+    /** JSON 문법 오류나 enum 변환 실패 등 요청 본문 역직렬화 실패 → 공통 400. */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<BaseResponse<Object>> handleUnreadableRequest(
+            HttpMessageNotReadableException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(BaseResponse.fail(BaseResponseStatus.REQUEST_ERROR));
     }
 
     @ExceptionHandler(BaseException.class)

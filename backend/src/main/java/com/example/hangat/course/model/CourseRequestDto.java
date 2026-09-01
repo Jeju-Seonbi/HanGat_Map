@@ -1,6 +1,9 @@
 package com.example.hangat.course.model;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -25,10 +28,14 @@ public class CourseRequestDto {
     @JsonProperty("course_regions")
     private List<CourseRegionDto> courseRegions;
 
+    @NotNull(message = "이동수단을 선택해주세요.")
     private Transport transport;
 
     @JsonProperty("course_styles")
-    private List<CourseStyleDto> courseStyles;
+    @NotEmpty(message = "여행 스타일을 하나 이상 선택해주세요.")
+    @Valid
+    private List<@NotNull(message = "여행 스타일 정보는 null일 수 없습니다.") CourseStyleDto>
+            courseStyles;
 
     @JsonProperty("course_place_preferences")
     private List<PlacePreferenceDto> coursePlacePreferences;

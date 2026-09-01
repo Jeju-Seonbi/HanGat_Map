@@ -54,7 +54,13 @@ class SecuritySmokeTests {
     void 코스_생성은_인증_없이_접근된다() throws Exception {
         mockMvc.perform(post("/courses")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{}"))
+                        .content("""
+                                {"start_date":"2026-09-10","end_date":"2026-09-12",
+                                 "people":2,"budget_total":500000,"transport":"RENTAL_CAR",
+                                 "course_regions":[],
+                                 "course_styles":[{"code":"NATURE","weight":1}],
+                                 "course_place_preferences":[]}
+                                """))
                 .andExpect(status().isOk());
     }
 
