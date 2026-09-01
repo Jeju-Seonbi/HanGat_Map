@@ -35,17 +35,27 @@ public class PlaceIngestController {
     private final PlaceDetailIngestService placeDetailIngestService;
     private final PlaceImageIngestService placeImageIngestService;
     private final com.example.hangat.map.goodprice.GoodPriceIngestService goodPriceIngestService;
+    private final com.example.hangat.map.store.StoreIngestService storeIngestService;
 
     public PlaceIngestController(PlaceIngestService placeIngestService,
                                  CongestionIngestService congestionIngestService,
                                  PlaceDetailIngestService placeDetailIngestService,
                                  PlaceImageIngestService placeImageIngestService,
-                                 com.example.hangat.map.goodprice.GoodPriceIngestService goodPriceIngestService) {
+                                 com.example.hangat.map.goodprice.GoodPriceIngestService goodPriceIngestService,
+                                 com.example.hangat.map.store.StoreIngestService storeIngestService) {
         this.placeIngestService = placeIngestService;
         this.congestionIngestService = congestionIngestService;
         this.placeDetailIngestService = placeDetailIngestService;
         this.placeImageIngestService = placeImageIngestService;
         this.goodPriceIngestService = goodPriceIngestService;
+        this.storeIngestService = storeIngestService;
+    }
+
+    @Operation(summary = "카페·편의점·마트 적재 (MAP-04)",
+            description = "소상공인 상가정보를 업종 3종(카페·편의점·슈퍼마켓)으로 수집한다. 좌표 포함이라 지오코딩 불필요 - 재실행 멱등.")
+    @PostMapping("/stores")
+    public BaseResponse<com.example.hangat.map.store.StoreIngestService.StoreIngestResult> ingestStores() {
+        return BaseResponse.success(storeIngestService.ingest());
     }
 
     @Operation(summary = "착한가격업소 적재 (MAP-04)",
