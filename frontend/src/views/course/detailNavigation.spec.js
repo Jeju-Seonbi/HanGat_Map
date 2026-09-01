@@ -19,7 +19,12 @@ describe('course and place detail navigation', () => {
   })
 
   it('provides a place detail link for every saved-course stop', () => {
-    expect(courseDetailSource).toContain(':to="`/places/${place.id}`"')
+    // 실데이터 연동으로 링크 경로가 뷰모델(stop.detailPath)로 옮겨졌다.
+    // 목업 코스는 여전히 /places/:id 를 채우고, 실데이터 일정은 장소 상세가 목업 id
+    // 라우팅이라 null 을 넣어 링크를 걸지 않는다 - 두 규칙을 함께 못 박는다.
+    expect(courseDetailSource).toContain(':to="stop.detailPath"')
+    expect(courseDetailSource).toContain('v-if="stop.detailPath"')
+    expect(courseDetailSource).toContain('detailPath: `/places/${place.id}`')
     expect(courseDetailSource).toContain('class="place-detail-link"')
   })
 
