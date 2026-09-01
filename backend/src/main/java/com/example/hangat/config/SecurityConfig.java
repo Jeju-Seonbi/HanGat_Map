@@ -145,6 +145,12 @@ public class SecurityConfig {
                         HttpMethod.POST,
                         "/courses"
                 ).permitAll()
+                // 코스 상세는 비회원 임시 코스·메인 샘플을 열어야 해서 공개.
+                // 소유자가 있는 저장 코스는 서비스가 본인 여부를 검증한다(3307)
+                .requestMatchers(
+                        HttpMethod.GET,
+                        "/courses/*"
+                ).permitAll()
                 // 스왑(#과밀지역우회)은 비회원 코스에도 열려 있어야 한다 - 생성이 비로그인 허용이라
                 // 생성 직후 대안 교체까지가 한 흐름이다. 소유자 있는 저장 코스는 서비스가 본인 검증
                 .requestMatchers(

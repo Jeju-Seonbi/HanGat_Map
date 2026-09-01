@@ -6,6 +6,7 @@ import com.example.hangat.course.model.CourseSwapResponse;
 import com.example.hangat.course.model.entity.Course;
 import com.example.hangat.course.model.entity.CourseItem;
 import com.example.hangat.course.model.enums.CourseStatus;
+import com.example.hangat.course.model.enums.CourseType;
 import com.example.hangat.course.repository.CourseItemRepository;
 import com.example.hangat.course.repository.CourseRepository;
 import com.example.hangat.domain.congestion.CongestionService;
@@ -70,6 +71,12 @@ public class CourseSwapService {
         }
         if (course.getStatus() != CourseStatus.READY && course.getStatus() != CourseStatus.SAVED) {
             throw new BaseException(BaseResponseStatus.COURSE_NOT_CLAIMABLE, course.getStatus().name());
+        }
+        // ⚠️ 샘플 코스는 소유자가 없지만 "임자 없는 코스"가 아니라 <b>모두의 것</b>이다.
+        // 아래 소유자 검사만으로는 통과해 버려, 메인 추천 카드를 누구나 영구히 바꿀 수 있게 된다
+        // (배치가 같은 출발일을 재생성하지 않으므로 복구도 안 된다). 먼저 막는다.
+        if (course.getCourseType() == CourseType.SAMPLE) {
+            throw new BaseException(BaseResponseStatus.COURSE_FORBIDDEN, courseId);
         }
         // 소유자가 있는 코스는 본인만. 소유자 없는 임시 코스는 URL을 아는 사람이 바꿀 수 있다(생성 정책과 동일)
         if (course.getUser() != null
