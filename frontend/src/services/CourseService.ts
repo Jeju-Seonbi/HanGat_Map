@@ -9,7 +9,7 @@
  */
 import { apiGet } from './apiClient'
 import { apiRequest } from '../api/backendClient'
-import { homeCourses, sampleCourses } from '../data/courses'
+import { homeCourses } from '../data/courses'
 import type { CongestionLevel } from '../assets/types'
 
 /** 화면이 그리는 코스 카드 한 장 - 메인 추천과 저장 목록이 같은 모양을 쓴다(백엔드 계약도 동일). */
@@ -33,6 +33,14 @@ export interface CourseCard {
 export interface CourseCards {
   /** true = 백엔드 실데이터, false = 목업 폴백 */
   live: boolean
+  cards: CourseCard[]
+  totalPages: number
+  totalElements: number
+}
+
+/** 저장 코스 목록 - 개인 데이터라 목업으로 채우지 않고 실패를 실패로 알린다 */
+export interface SavedCourses {
+  ok: boolean
   cards: CourseCard[]
   totalPages: number
   totalElements: number
@@ -187,7 +195,7 @@ const toCard = (row: BackendCourseCard): CourseCard => ({
 })
 
 /** 목업 코스를 같은 카드 모양으로 - 백엔드가 죽어도 화면이 비지 않게 */
-const mockCards = (source: typeof sampleCourses): CourseCard[] =>
+const mockCards = (source: typeof homeCourses): CourseCard[] =>
   source.map(course => ({
     id: course.id,
     title: course.title,
@@ -221,21 +229,25 @@ export const CourseService = {
   },
 
   /**
-   * 내 저장 코스 목록. 로그인이 필요하며, 비로그인·통신 실패면 목업으로 화면을 유지한다.
+   * 내 저장 코스 목록(로그인 필수 - 라우터 가드가 앞에서 막는다).
+   *
+   * <b>여기만 목업 폴백을 두지 않는다.</b> 날씨·추천 코스는 공용 데이터라 시연용 샘플로
+   * 채워도 되지만, "내가 저장한 코스"를 가짜로 채우면 사용자에게 하지 않은 일을 했다고
+   * 말하는 셈이다. 실패는 실패로 알린다.
+   *
    * @param page 0부터
    */
-  async getSavedCourses (page = 0, size = 10): Promise<CourseCards> {
+  async getSavedCourses (page = 0, size = 10): Promise<SavedCourses> {
     try {
       const body = await apiRequest(`/courses?page=${page}&size=${size}`, { auth: true }) as BackendPage<BackendCourseCard>
       return {
-        live: true,
+        ok: true,
         cards: body.content.map(toCard),
         totalPages: Math.max(1, body.totalPages),
         totalElements: body.totalElements,
       }
     } catch {
-      const cards = mockCards(sampleCourses)
-      return { live: false, cards, totalPages: 1, totalElements: cards.length }
+      return { ok: false, cards: [], totalPages: 1, totalElements: 0 }
     }
   },
 
