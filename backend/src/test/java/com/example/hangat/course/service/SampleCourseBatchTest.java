@@ -1,6 +1,6 @@
 package com.example.hangat.course.service;
 
-import com.example.hangat.course.model.MainCourseResponse;
+import com.example.hangat.course.model.CourseSummaryResponse;
 import com.example.hangat.course.model.entity.Course;
 import com.example.hangat.course.model.entity.CourseItem;
 import com.example.hangat.course.model.entity.CoursePreset;
@@ -268,9 +268,9 @@ class SampleCourseBatchTest {
         SampleCourseGenerator.RunSummary 다음날 = generator.generate(출발일.plusDays(1));
 
         assertThat(다음날.failedRegions()).containsExactly("WEST");
-        List<MainCourseResponse> cards = mainCourseService.mainCourses();
+        List<CourseSummaryResponse> cards = mainCourseService.mainCourses();
         assertThat(cards).hasSize(3);   // 서부 자리는 어제 코스가 지킨다
-        MainCourseResponse 서부카드 = cards.stream()
+        CourseSummaryResponse 서부카드 = cards.stream()
                 .filter(c -> c.title().equals("서부 고요 1박 2일")).findFirst().orElseThrow();
         assertThat(서부카드.startDate()).isEqualTo(출발일);   // 직전 성공분
     }
@@ -296,15 +296,15 @@ class SampleCourseBatchTest {
                 .andExpect(jsonPath("$.code").value(2000))
                 .andExpect(jsonPath("$.result.length()").value(3))
                 .andExpect(jsonPath("$.result[0].title").value("남부 여유 2박 3일"))
-                .andExpect(jsonPath("$.result[0].durationText").value("2박 3일"))
-                .andExpect(jsonPath("$.result[0].level").value("QUIET"))
-                .andExpect(jsonPath("$.result[0].levelLabel").value("여유"))
+                .andExpect(jsonPath("$.result[0].duration_text").value("2박 3일"))
+                .andExpect(jsonPath("$.result[0].congestion_level").value("QUIET"))
+                .andExpect(jsonPath("$.result[0].congestion_label").value("여유"))
                 .andExpect(jsonPath("$.result[0].people").value(2))
-                .andExpect(jsonPath("$.result[0].placeCount").value(9))
-                .andExpect(jsonPath("$.result[0].estimatedCostMin").isEmpty())
+                .andExpect(jsonPath("$.result[0].place_count").value(9))
+                .andExpect(jsonPath("$.result[0].estimated_cost_min").isEmpty())
                 .andExpect(jsonPath("$.result[1].title").value("동부 한산 2박 3일"))
                 .andExpect(jsonPath("$.result[2].title").value("서부 고요 1박 2일"))
-                .andExpect(jsonPath("$.result[2].durationText").value("1박 2일"));
+                .andExpect(jsonPath("$.result[2].duration_text").value("1박 2일"));
     }
 
     @Test

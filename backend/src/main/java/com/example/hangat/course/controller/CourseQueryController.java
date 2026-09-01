@@ -1,10 +1,17 @@
 package com.example.hangat.course.controller;
 
+import com.example.hangat.common.exception.BaseException;
 import com.example.hangat.common.model.BaseResponse;
+import com.example.hangat.common.model.BaseResponseStatus;
+import com.example.hangat.common.model.PageResponse;
 import com.example.hangat.common.security.CurrentUser;
 import com.example.hangat.course.model.CourseDetailResponse;
+import com.example.hangat.course.model.CourseSummaryResponse;
 import com.example.hangat.course.service.CourseQueryService;
 import io.swagger.v3.oas.annotations.Operation;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
@@ -20,6 +27,21 @@ public class CourseQueryController {
 
     public CourseQueryController(CourseQueryService courseQueryService) {
         this.courseQueryService = courseQueryService;
+    }
+
+    @GetMapping("/courses")
+    @Operation(summary = "저장 코스 목록", description = """
+            내가 저장한 코스만 최근 저장 순으로 페이징해 반환한다(MY_001). 로그인 필수.
+            삭제한 코스는 목록에 나오지 않는다.
+            카드 모양은 메인 추천 코스(GET /main/courses)와 같은 계약이다.""")
+    public BaseResponse<PageResponse<CourseSummaryResponse>> savedCourses(
+            @PageableDefault(size = 10, sort = "savedAt", direction = Sort.Direction.DESC)
+            Pageable pageable) {
+        Long userId = CurrentUser.idOrNull();
+        if (userId == null) {
+            throw new BaseException(BaseResponseStatus.LOGIN_REQUIRED);
+        }
+        return BaseResponse.success(courseQueryService.savedCourses(userId, pageable));
     }
 
     @GetMapping("/courses/{courseId}")

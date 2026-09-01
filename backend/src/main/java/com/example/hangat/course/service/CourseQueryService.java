@@ -2,7 +2,9 @@ package com.example.hangat.course.service;
 
 import com.example.hangat.common.exception.BaseException;
 import com.example.hangat.common.model.BaseResponseStatus;
+import com.example.hangat.common.model.PageResponse;
 import com.example.hangat.course.model.CourseDetailResponse;
+import com.example.hangat.course.model.CourseSummaryResponse;
 import com.example.hangat.course.model.entity.Course;
 import com.example.hangat.course.model.entity.CourseItem;
 import com.example.hangat.course.model.enums.CourseStatus;
@@ -12,6 +14,8 @@ import com.example.hangat.domain.congestion.CongestionService;
 import com.example.hangat.map.model.entity.CongestionForecast;
 import com.example.hangat.map.model.entity.Place;
 import com.example.hangat.map.model.enums.CongestionLevel;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +26,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 코스 조회 (담당: 정동현) - 메인 추천 카드·저장 코스 목록의 진입점.
@@ -44,6 +49,28 @@ public class CourseQueryService {
         this.courseRepository = courseRepository;
         this.itemRepository = itemRepository;
         this.congestionService = congestionService;
+    }
+
+    /**
+     * 저장 코스 목록(MY_001) - 내가 저장한 코스만, 최근 저장 순.
+     * 논리 삭제라 상태를 항상 SAVED로 못 박는다 - 지운 코스가 목록에 새면 안 된다.
+     */
+    public PageResponse<CourseSummaryResponse> savedCourses(Long userId, Pageable pageable) {
+        Page<Course> page = courseRepository.findByUserIdAndStatus(
+                userId, CourseStatus.SAVED, pageable);
+        Map<Long, List<CourseItem>> itemsByCourse = itemsOf(page.getContent());
+        return PageResponse.from(page.map(course -> CourseSummaryResponse.of(
+                course, itemsByCourse.getOrDefault(course.getId(), List.of()))));
+    }
+
+    /** 카드마다 조회하면 페이지 한 장에 N번을 친다 - 한 번에 읽어 코스별로 나눈다. */
+    private Map<Long, List<CourseItem>> itemsOf(List<Course> courses) {
+        if (courses.isEmpty()) {
+            return Map.of();
+        }
+        List<Long> ids = courses.stream().map(Course::getId).toList();
+        return itemRepository.findItemsOfCourses(ids).stream()
+                .collect(Collectors.groupingBy(item -> item.getCourse().getId()));
     }
 
     /** @param authUserId 인증된 회원 id. 비로그인이면 null */
