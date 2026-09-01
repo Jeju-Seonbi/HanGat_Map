@@ -113,10 +113,9 @@ export type LayerKey = 'spot' | 'food' | 'dine' | 'cafe' | 'cvs' | 'stay' | 'mar
 
 /**
  * 아직 적재하지 않은 레이어. 화면이 '빈 지도'와 '준비 중'을 구분해 표시하기 위해 명시한다.
- * - food(착한가격): 행안부 착한가격업소 적재 예정
- * - cafe/cvs/mart: 소상공인 상가정보 적재 예정
+ * - cafe/cvs/mart: 소상공인 상가정보 적재 예정 (API 활용신청 승인 대기)
  */
-export const PENDING_LAYERS: LayerKey[] = ['food', 'cafe', 'cvs', 'mart']
+export const PENDING_LAYERS: LayerKey[] = ['cafe', 'cvs', 'mart']
 
 export interface MapPlaces {
   /** true = 백엔드 실데이터, false = 하드코딩 폴백 */
@@ -136,7 +135,7 @@ export const MapPlaceService = {
    * 하나가 실패해도 나머지가 살아 있도록 개별로 처리한다.
    */
   async getAll (): Promise<MapPlaces> {
-    const keys: LayerKey[] = ['spot', 'dine', 'stay']   // 적재된 레이어만 호출
+    const keys: LayerKey[] = ['spot', 'food', 'dine', 'stay']   // 적재된 레이어만 호출
     try {
       const results = await Promise.all(keys.map(k => apiGet<BackendPlace[]>(`/places?type=${k}`)))
       const layers = emptyLayers()
