@@ -31,40 +31,45 @@ public class CourseCommandService {
 
     public CourseSummaryResponse rename(Long courseId, String title, Long authUserId) {
         Course course = ownedByMe(courseId, authUserId);
+        // 삭제는 멱등이라 주인이 삭제된 코스에 접근할 수 있지만, 이름 변경은 되살리기가 아니다
+        if (course.getStatus() == CourseStatus.DELETED) {
+            throw new BaseException(BaseResponseStatus.COURSE_NOT_FOUND, courseId);
+        }
         course.rename(title.trim());
         return CourseSummaryResponse.of(course, itemRepository.findItemsWithPlace(courseId));
     }
 
-    /** 이미 지운 코스를 또 지워도 성공으로 답한다 - 화면이 두 번 눌러도 오류를 보지 않게. */
+    /**
+     * 이미 지운 코스를 또 지워도 성공으로 답한다 - 화면이 두 번 눌러도 오류를 보지 않게.
+     *
+     * <p><b>멱등 단축은 소유자 확인 뒤에 온다.</b> 앞에 두면 남의 삭제된 코스에 성공(2000)이 나가
+     * "이 id는 존재했고 지워졌다"가 새어 나간다(같은 id가 GET에서는 3301인데 DELETE만 2000).
+     */
     public void delete(Long courseId, Long authUserId) {
-        Course course = courseRepository.findById(courseId)
-                .orElseThrow(() -> new BaseException(BaseResponseStatus.COURSE_NOT_FOUND, courseId));
-        if (course.getStatus() == CourseStatus.DELETED) {
-            return;
-        }
-        requireOwner(course, authUserId);
+        Course course = ownedByMe(courseId, authUserId);
         course.softDelete();
     }
 
     /**
-     * 삭제된 코스는 "없는 코스"로 답한다 - 존재 여부까지 숨긴다.
+     * 삭제된 코스는 "없는 코스"로 답한다 - 존재 여부까지 숨긴다. 단 <b>주인에게는</b> 삭제된 코스도
+     * 돌려준다(삭제의 멱등 재호출 때문). 즉 남에게는 3301, 주인에게는 정상 진행이다.
      * 소유자 없는 임시 코스는 이름 변경·삭제 대상이 아니다(저장하지 않은 코스라 지울 것도 없다).
      */
     private Course ownedByMe(Long courseId, Long authUserId) {
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new BaseException(BaseResponseStatus.COURSE_NOT_FOUND, courseId));
-        if (course.getStatus() == CourseStatus.DELETED) {
-            throw new BaseException(BaseResponseStatus.COURSE_NOT_FOUND, courseId);
+        if (!isOwner(course, authUserId)) {
+            // 남의 눈에는 삭제된 코스와 없는 코스가 같아야 한다
+            throw course.getStatus() == CourseStatus.DELETED
+                    ? new BaseException(BaseResponseStatus.COURSE_NOT_FOUND, courseId)
+                    : new BaseException(BaseResponseStatus.COURSE_FORBIDDEN, courseId);
         }
-        requireOwner(course, authUserId);
         return course;
     }
 
-    private void requireOwner(Course course, Long authUserId) {
-        if (course.getUser() == null
-                || authUserId == null
-                || !course.getUser().getId().equals(authUserId)) {
-            throw new BaseException(BaseResponseStatus.COURSE_FORBIDDEN, course.getId());
-        }
+    private boolean isOwner(Course course, Long authUserId) {
+        return course.getUser() != null
+                && authUserId != null
+                && course.getUser().getId().equals(authUserId);
     }
 }

@@ -20,9 +20,10 @@ import java.util.List;
  * (후보 근거·프롬프트 팩트·예산 계산 내역)을 함께 나르는 무거운 계약이라 저장된 행만으로는
  * 채울 수 없다. 여기는 <b>화면이 그리는 데 필요한 것만</b> 담는다.
  *
- * <p><b>혼잡은 두 값을 함께 준다</b>(명세서 21.0/25.0): {@code congestionRate}는 지금 예보,
- * {@code plannedCongestionRate}는 저장 시점 스냅숏이다. 예보는 매일 갱신되므로 재열람 시
- * "그때는 이랬는데 지금은 이렇다"를 화면이 함께 보여줄 수 있어야 한다.
+ * <p><b>혼잡은 항상 두 값을 함께 준다</b>(명세서 21.0/25.0): {@code congestion*}은 지금 예보,
+ * {@code planned*}는 저장 시점 스냅숏이다. 예보는 매일 갱신되므로 재열람 시 "그때는 이랬는데
+ * 지금은 이렇다"를 화면이 함께 보여줄 수 있어야 한다. 코스 평균도 같은 규칙이라
+ * 헤더 배지(지금 기준)와 일정별 값이 어긋나지 않는다.
  */
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public record CourseDetailResponse(
@@ -39,11 +40,22 @@ public record CourseDetailResponse(
         Transport transport,
         Integer estimatedCostMin,
         Integer estimatedCostMax,
+        /** 지금 예보로 다시 계산한 평균 - 아래 일정들의 congestion_rate와 같은 기준이다. */
         BigDecimal averageCongestionRate,
         CongestionLevel congestionLevel,
         String congestionLabel,
-        /** 이 사용자가 스왑·이름수정·삭제를 할 수 있는지 - 화면이 버튼 노출을 결정한다. */
-        boolean editable,
+        /** 생성·마지막 변경 시점에 저장해 둔 평균. 지금 값과 다르면 예보가 그만큼 움직인 것이다. */
+        BigDecimal plannedAverageCongestionRate,
+        /**
+         * 일정을 대안으로 교체할 수 있는지 - 소유자 없는 임시 코스이거나 내 저장 코스일 때.
+         * 샘플 코스는 공유 자산이라 false다.
+         */
+        boolean swappable,
+        /**
+         * 이름 변경·삭제를 할 수 있는지 - <b>내 저장 코스일 때만</b> true.
+         * 저장하지 않은 임시 코스는 지울 것도 이름 붙일 것도 없어 swappable과 값이 다르다.
+         */
+        boolean manageable,
         List<DayDto> days
 ) {
 
@@ -77,11 +89,14 @@ public record CourseDetailResponse(
             Double congestionRate,
             CongestionLevel congestionLevel,
             String congestionLabel,
-            /** 저장(생성) 시점 스냅숏. 지금 예보와 다르면 화면이 변화를 알려줄 수 있다. */
+            /** 저장(생성) 시점 스냅숏. 등급까지 같이 줘서 화면이 임계값을 다시 구현하지 않게 한다. */
             Double plannedCongestionRate,
+            CongestionLevel plannedCongestionLevel,
+            String plannedCongestionLabel,
             String recommendationReasonCode,
             String recommendationReason,
-            /** 스왑으로 바뀐 일정에만 값이 있다. */
+            /** 스왑으로 바뀐 일정에만 값이 있다. id를 함께 줘야 교체 전 장소로 되짚을 수 있다. */
+            Long replacedFromPlaceId,
             String replacedFromPlaceName
     ) {
     }

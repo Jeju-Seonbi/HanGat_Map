@@ -10,7 +10,6 @@ import com.example.hangat.course.model.CourseSummaryResponse;
 import com.example.hangat.course.service.CourseQueryService;
 import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -35,7 +34,7 @@ public class CourseQueryController {
             삭제한 코스는 목록에 나오지 않는다.
             카드 모양은 메인 추천 코스(GET /main/courses)와 같은 계약이다.""")
     public BaseResponse<PageResponse<CourseSummaryResponse>> savedCourses(
-            @PageableDefault(size = 10, sort = "savedAt", direction = Sort.Direction.DESC)
+            @PageableDefault(size = 10)   // 정렬은 서비스가 최근 저장 순으로 고정한다
             Pageable pageable) {
         Long userId = CurrentUser.idOrNull();
         if (userId == null) {

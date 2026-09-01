@@ -11,7 +11,6 @@ import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Objects;
 
@@ -49,8 +48,7 @@ public record CourseSummaryResponse(
     private static final int HIGHLIGHT_COUNT = 3;
 
     public static CourseSummaryResponse of(Course course, List<CourseItem> items) {
-        // ChronoUnit인 이유: 연말 경계(12/31 → 1/1)에서 dayOfYear 뺄셈은 음수가 된다
-        int days = (int) ChronoUnit.DAYS.between(course.getStartDate(), course.getEndDate()) + 1;
+        CourseDuration duration = CourseDuration.between(course.getStartDate(), course.getEndDate());
         BigDecimal avg = course.getAverageCongestionRate();
         return new CourseSummaryResponse(
                 course.getId(),
@@ -59,8 +57,8 @@ public record CourseSummaryResponse(
                 items.isEmpty() ? null : items.get(0).getPlace().getRegion().getName(),
                 course.getStartDate(),
                 course.getEndDate(),
-                days,
-                (days - 1) + "박 " + days + "일",
+                duration.days(),
+                duration.text(),
                 course.getPeople(),
                 course.getTransport(),
                 avg,

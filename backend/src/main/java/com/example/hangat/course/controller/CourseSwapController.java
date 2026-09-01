@@ -1,13 +1,12 @@
 package com.example.hangat.course.controller;
 
 import com.example.hangat.common.model.BaseResponse;
+import com.example.hangat.common.security.CurrentUser;
 import com.example.hangat.course.model.CourseSwapRequest;
 import com.example.hangat.course.model.CourseSwapResponse;
 import com.example.hangat.course.service.CourseSwapService;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -40,15 +39,7 @@ public class CourseSwapController {
             @PathVariable Long itemId,
             @Valid @RequestBody CourseSwapRequest request) {
         return BaseResponse.success(
-                courseSwapService.swap(courseId, itemId, request.placeId(), currentUserId()));
+                courseSwapService.swap(courseId, itemId, request.placeId(), CurrentUser.idOrNull()));
     }
 
-    /** 비로그인이면 null - 익명 토큰(anonymousUser)은 principal이 Long이 아니다. */
-    private Long currentUserId() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
-            return null;
-        }
-        return authentication.getPrincipal() instanceof Long userId ? userId : null;
-    }
 }

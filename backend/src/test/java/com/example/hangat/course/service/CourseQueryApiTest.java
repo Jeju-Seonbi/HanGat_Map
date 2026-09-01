@@ -194,7 +194,7 @@ class CourseQueryApiTest {
                 .andExpect(jsonPath("$.result.days.length()").value(2))
                 .andExpect(jsonPath("$.result.days[0].items[0].place_name").value("성산일출봉"))
                 .andExpect(jsonPath("$.result.days[0].items[0].planned_congestion_rate").value(80.0))
-                .andExpect(jsonPath("$.result.editable").value(true))
+                .andExpect(jsonPath("$.result.swappable").value(true))
                 .andExpect(jsonPath("$.result.duration_text").value("1박 2일"));
     }
 
@@ -208,7 +208,7 @@ class CourseQueryApiTest {
 
         CourseDetailResponse mine = queryService.detail(저장코스.getId(), 주인.getId());
         assertThat(mine.title()).isEqualTo("동부 한산 코스");
-        assertThat(mine.editable()).isTrue();
+        assertThat(mine.manageable()).isTrue();
     }
 
     @Test
@@ -222,7 +222,8 @@ class CourseQueryApiTest {
         em.flush();
 
         CourseDetailResponse detail = queryService.detail(샘플.getId(), 주인.getId());
-        assertThat(detail.editable()).isFalse();   // 공유 자산이라 남이 못 바꾼다
+        assertThat(detail.swappable()).isFalse();   // 공유 자산이라 남이 못 바꾼다
+        assertThat(detail.manageable()).isFalse();
     }
 
     @Test
@@ -288,6 +289,70 @@ class CourseQueryApiTest {
      * 목록은 공개 목록에 없으므로 Security가 컨트롤러 앞에서 막는다(401 + 3002).
      * 컨트롤러의 LOGIN_REQUIRED 가드는 경로가 실수로 permitAll에 들어갔을 때를 위한 이중 방어다.
      */
+    @Test
+    void 남의_코스는_지울_수_없고_삭제된_코스는_남에게_없는_코스로_보인다() {
+        assertThatThrownBy(() -> commandService.delete(저장코스.getId(), 남.getId()))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("본인의 코스만");
+        assertThat(courseRepository.findById(저장코스.getId()).orElseThrow().getDeletedAt())
+                .isNull();   // 남이 눌러도 지워지지 않는다
+
+        commandService.delete(저장코스.getId(), 주인.getId());
+        em.flush();
+
+        // 삭제 뒤에는 남에게 "없는 코스"여야 한다 - 성공(2000)이 나가면 '존재했고 지워졌다'가 샌다
+        assertThatThrownBy(() -> commandService.delete(저장코스.getId(), 남.getId()))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("존재하지 않는 코스");
+        // 주인의 재삭제는 여전히 멱등
+        commandService.delete(저장코스.getId(), 주인.getId());
+    }
+
+    @Test
+    void 목록은_최근_저장순으로_페이징되고_카드마다_제_일정만_담는다() {
+        Place 협재 = place("협재해수욕장", 33.3940, 126.2400, "18.00");
+        Course 둘째 = course(null, null);
+        item(둘째, 협재, 1, 1, 출발일, null);
+        item(둘째, 협재, 1, 2, 출발일, null);   // 같은 장소 두 칸 - 개수 세기 확인용
+        둘째.markReady();
+        둘째.markSaved(주인, "서부 코스");
+        em.flush();
+        em.clear();
+
+        var page = queryService.savedCourses(주인.getId(), PageRequest.of(0, 10));
+        assertThat(page.getContent()).hasSize(2);
+        // 최근 저장이 먼저 - @PageableDefault가 아닌 서비스 계약으로도 정렬이 보장돼야 한다
+        assertThat(page.getContent().get(0).title()).isEqualTo("서부 코스");
+        assertThat(page.getContent().get(1).title()).isEqualTo("동부 한산 코스");
+        // 카드마다 자기 일정만 - findItemsOfCourses 그룹핑이 섞이면 여기서 깨진다
+        assertThat(page.getContent().get(0).placeCount()).isEqualTo(2);
+        assertThat(page.getContent().get(0).highlightNames()).containsExactly("협재해수욕장", "협재해수욕장");
+        assertThat(page.getContent().get(1).placeCount()).isEqualTo(1);
+        assertThat(page.getContent().get(1).highlightNames()).containsExactly("혼인지");
+
+        // 2페이지 - 페이징 자체도 확인
+        var second = queryService.savedCourses(주인.getId(), PageRequest.of(1, 1));
+        assertThat(second.getContent()).hasSize(1);
+        assertThat(second.getContent().get(0).title()).isEqualTo("동부 한산 코스");
+    }
+
+    @Test
+    void 상세_평균은_지금_예보_기준이고_저장_시점_값도_함께_준다() {
+        CourseDetailResponse detail = queryService.detail(임시코스.getId(), null);
+
+        // 지금 예보 (35 + 23 + 41) / 3 = 33.00, 저장된 캐시는 생성 당시 값 33.00
+        assertThat(detail.averageCongestionRate()).isEqualByComparingTo("33.00");
+        assertThat(detail.congestionLabel()).isEqualTo("여유");
+        assertThat(detail.plannedAverageCongestionRate()).isEqualByComparingTo("33.00");
+        // 임시 코스는 스왑은 되지만 이름변경·삭제 대상이 아니다
+        assertThat(detail.swappable()).isTrue();
+        assertThat(detail.manageable()).isFalse();
+
+        CourseDetailResponse saved = queryService.detail(저장코스.getId(), 주인.getId());
+        assertThat(saved.swappable()).isTrue();
+        assertThat(saved.manageable()).isTrue();
+    }
+
     @Test
     void 저장_목록은_로그인이_필요하다() throws Exception {
         mockMvc.perform(get("/courses"))
