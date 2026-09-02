@@ -199,6 +199,23 @@ public class Place {
         this.imageUrl = imageUrl;
     }
 
+    /** 검증된 Kakao 숙박 사실로만 기존 Place의 외부 표시 사실을 갱신한다. */
+    public void updateVerifiedAccommodation(
+            Region region, PlaceCategory primaryCategory,
+            String name, String normalizedName, String roadAddress, String lotAddress,
+            BigDecimal latitude, BigDecimal longitude, String phone
+    ) {
+        this.region = region;
+        this.primaryCategory = primaryCategory;
+        this.name = name;
+        this.normalizedName = normalizedName;
+        this.roadAddress = roadAddress;
+        this.lotAddress = lotAddress;
+        this.latitude = latitude;
+        this.longitude = longitude;
+        this.phone = phone;
+    }
+
     /**
      * 상세 배치(detailIntro2)가 채우는 값들 - 목록 적재와 출처가 달라 따로 둔다.
      * 목록 배치가 이 값들을 null로 덮어쓰면 안 되므로 updateFromSource 와 섞지 않는다.
