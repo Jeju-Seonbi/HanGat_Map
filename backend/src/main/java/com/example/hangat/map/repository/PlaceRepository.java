@@ -122,6 +122,15 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
             """)
     List<Place> findWithoutDetail(Pageable pageable);
 
+    /** 메뉴(overview)가 아직 없는 음식점부터. KTO가 메뉴를 안 주는 곳도 다시 잡힌다 - 상세 적재의 empty 와 같은 트레이드오프 */
+    @Query("""
+            select p from Place p
+            where p.primaryCategory.code = 'FOOD'
+              and p.overview is null
+            order by p.id
+            """)
+    List<Place> findFoodWithoutMenu(Pageable pageable);
+
     List<Place> findByNormalizedName(String normalizedName);
 
     /** 사진이 아직 없는 장소부터. KTO에 사진이 0장인 곳도 다시 잡힌다 - 상세 적재의 empty 와 같은 트레이드오프 */
