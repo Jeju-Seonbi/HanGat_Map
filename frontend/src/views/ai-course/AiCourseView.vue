@@ -8,7 +8,7 @@ import BudgetGauge from '../../components/course/BudgetGauge.vue'
 import AlternativePlaceModal from '../../components/course/AlternativePlaceModal.vue'
 import CongestionRescheduleModal from '../../components/course/CongestionRescheduleModal.vue'
 import AccommodationRecommendations from '../../components/course/AccommodationRecommendations.vue'
-import { courseMockService } from '../../services/courseMockService'
+import { courseGenerationErrorMessage, courseMockService } from '../../services/courseMockService'
 import { storePendingCourseClaim, takePendingCourseClaim } from '../../services/pendingCourseClaim'
 import type { AccommodationInput, AccommodationRecommendation, AlternativePlace, CongestionRescheduleOption, CourseCondition, CourseItem, CourseResult } from '../../assets/types/course'
 
@@ -102,8 +102,8 @@ async function generate(next: CourseCondition, regenerate = false) {
       })
     }
     requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'smooth' }))
-  } catch {
-    error.value = '코스를 생성하지 못했어요. 다시 시도해 주세요.'
+  } catch (generationFailure) {
+    error.value = courseGenerationErrorMessage(generationFailure)
   } finally {
     loading.value = false
   }

@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CourseCondition, CourseResult } from '../assets/types/course'
 import { apiRequest } from '../api/backendClient.js'
-import { courseMockService, toCourseRequestPayload } from './courseMockService'
+import { ApiError } from '../api/errors.js'
+import {
+  courseGenerationErrorMessage,
+  courseMockService,
+  toCourseRequestPayload,
+} from './courseMockService'
 
 vi.mock('../api/backendClient.js', () => ({ apiRequest: vi.fn() }))
 
@@ -294,6 +299,21 @@ describe('courseMockService Backend generation', () => {
     await expect(courseMockService.generateCourse(condition))
       .rejects.toThrow('코스 생성 API 요청에 실패했습니다.')
     expect(requestMock).toHaveBeenCalledOnce()
+  })
+
+  it('shows the stable server message for exhausted transient Gemini failures', () => {
+    const error = new ApiError(
+      503,
+      5003,
+      'AI 코스 생성 서버가 일시적으로 혼잡합니다. 잠시 후 다시 시도해 주세요.'
+    )
+
+    expect(courseGenerationErrorMessage(error)).toBe(
+      'AI 코스 생성 서버가 일시적으로 혼잡합니다. 잠시 후 다시 시도해 주세요.'
+    )
+    expect(courseGenerationErrorMessage(new Error('internal detail'))).toBe(
+      '코스를 생성하지 못했어요. 다시 시도해 주세요.'
+    )
   })
 
   it('keeps regeneration unavailable instead of sending an INITIAL request or returning mock data', async () => {
