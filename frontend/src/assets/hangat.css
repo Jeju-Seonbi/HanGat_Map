@@ -249,6 +249,8 @@
 .wxc.on .wd{color:var(--ac-dk)}
 .wxc .wi{height:30px;display:flex;align-items:center;justify-content:center;margin:3px 0 1px}
 .wxc .wt{font-size:14px;font-weight:800;letter-spacing:-.03em}
+.wxc .wt.pre{font-size:10px;font-weight:600;color:var(--tx3);line-height:17px}
+.wx-note{font-size:10.5px;color:var(--tx3);margin:-7px 2px 12px}
 .wxc .wc{height:3px;border-radius:2px;margin:8px 13px 0;opacity:.85}
 .wxi{display:inline-block;vertical-align:-4px;flex-shrink:0}
 /* ── 장소 사진 (실데이터=KTO firstimage, 프로토타입=데모 업로드) ── */
