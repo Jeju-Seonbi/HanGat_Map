@@ -38,7 +38,8 @@ const tipText = computed(() => {
   return g >= 25 ? '훨씬 한산한' : g >= 12 ? '꽤 한산한' : '조금 더 한산한'
 })
 
-/* 선택일을 가운데 두고 7일 — 범위를 넘지 않게 시작점을 당긴다 */
+/* 선택일을 가운데 두고 7일 — 범위를 넘지 않게 시작점을 당긴다.
+   날씨 없는 날도 카드는 유지한다(혼잡은 30일 커버) - 그 날은 기온 대신 '예보 전'으로 표시 (2026-09-02 C안) */
 const week = computed(() => {
   const st = Math.max(0, Math.min(state.di - 1, 23))
   return Array.from({ length: 7 }, (_, j) => {
@@ -46,6 +47,16 @@ const week = computed(() => {
     return { k, d, w, cc, t: tier(cc), ko: tierKo(cc), label: `${d.getMonth() + 1}/${d.getDate()} ${'일월화수목금토'[d.getDay()]}` }
   })
 })
+
+/** 날씨가 제공되는 마지막 날짜 라벨. 창에 날씨 없는 카드가 있을 때 캡션으로 안내한다 */
+const wxUntil = computed(() => {
+  let last = -1
+  for (let i = 0; i < 30; i++) if (wxOf(i)) last = i
+  if (last < 0) return null
+  const d = at(last)
+  return `${d.getMonth() + 1}/${d.getDate()}`
+})
+const weatherGap = computed(() => week.value.some(w => !w.w))
 
 /**
  * 입장료 배지. 모르면 배지를 안 그린다 -
@@ -216,10 +227,19 @@ function delImg(i) {
           @click="state.di = w.k">
           <div class="wd">{{ w.label }}</div>
           <div class="wi" v-html="w.w ? wxIcon(w.w.k, 27) : ''"></div>
-          <div class="wt">{{ w.w ? w.w.t + '°' : '–' }}</div>
+          <!-- 날씨 없는 날은 고장이 아니라 원래 없는 것 - '-' 대신 명시적으로 말한다 -->
+          <div v-if="w.w" class="wt">{{ w.w.t }}°</div>
+          <div v-else class="wt pre">예보 전</div>
+          <!-- 강수확률 30% 이상만 표시. 빈 칸도 같은 높이로 두어 카드 줄이 맞는다 -->
+          <div class="wp">
+            <template v-if="w.w && w.w.rp >= 30">
+              <svg width="7" height="9" viewBox="0 0 8 10" aria-hidden="true"><path d="M4 .4C5.3 2.3 6.8 4 6.8 5.9a2.8 2.8 0 1 1-5.6 0C1.2 4 2.7 2.3 4 .4Z" fill="#2F93E0"/></svg>{{ w.w.rp }}%
+            </template>
+          </div>
           <div class="wc" :style="{ background: `var(--${w.t})` }" :title="w.ko"></div>
         </div>
       </div>
+      <div v-if="weatherGap && wxUntil" class="wx-note">날씨는 {{ wxUntil }}까지 제공돼요 · 혼잡은 30일 표시</div>
 
       <!-- 없는 정보(null)는 배지를 그리지 않는다 - '주차 없음'과 '주차 정보 없음'은 다르다 -->
       <div v-if="hasAmen" class="amen">
