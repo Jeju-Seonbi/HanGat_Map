@@ -37,7 +37,11 @@ async function showGoodPriceTip(f) {
   closeTip()
   const node = document.createElement('div')
   node.className = 'gp-tip'
-  node.innerHTML = `<b>${f.n}</b><span>메뉴 불러오는 중…</span>`
+  const render = body => {
+    node.innerHTML = `<b>${f.n}</b>${body}<button class="gp-more">상세 보기</button>`
+    node.querySelector('.gp-more').addEventListener('click', () => { closeTip(); emit('select', f) })
+  }
+  render('<span>메뉴 불러오는 중…</span>')
   node.addEventListener('click', e => e.stopPropagation())
   const my = new kakao.maps.CustomOverlay({
     position: LL(f.y, f.x), content: node, yAnchor: 1.3, zIndex: 500, clickable: true,
@@ -46,10 +50,9 @@ async function showGoodPriceTip(f) {
   tip = my
   const d = f.id != null ? await MapPlaceService.getDetail(f.id) : null
   if (tip !== my) return   // 기다리는 사이 닫혔거나 다른 핀으로 바뀜
-  const rows = d?.overview
+  render(d?.overview
     ? d.overview.replace(/^대표메뉴:\s*/, '').split(' · ').map(m => `<span>${m}</span>`).join('')
-    : '<span>메뉴 정보 없음</span>'
-  node.innerHTML = `<b>${f.n}</b>${rows}`
+    : '<span>메뉴 정보 없음</span>')
 }
 
 function syncLabelVisibility() {
@@ -93,9 +96,10 @@ function draw() {
 
   const poi = (g, list) => {
     if (!L[g]) return
+    // 착한가격은 정의서(MAP_001)대로 툴팁, 나머지 업종은 관광지처럼 상세 패널
     list.filter(f => inRegion(f) && hasCoords(f)).forEach(f => addPin(g, f.y, f.x,
       `<div class="lb-t poi-label">${f.n}</div><div class="poi-marker ${POI_MARKER_CLASS[g]}"></div>`,
-      g === 'food' ? () => showGoodPriceTip(f) : null, 60))
+      g === 'food' ? () => showGoodPriceTip(f) : () => emit('select', f), 60))
   }
   poi('food', state.layers.food)
   poi('dine', state.layers.dine)
