@@ -38,9 +38,12 @@ const tipText = computed(() => {
   return g >= 25 ? '훨씬 한산한' : g >= 12 ? '꽤 한산한' : '조금 더 한산한'
 })
 
-/* 선택일을 가운데 두고 7일 — 범위를 넘지 않게 시작점을 당긴다 */
+/* 선택일을 가운데 두되, 창은 날씨가 있는 날 안에서만 움직인다 —
+   범위 밖 '-' 카드를 만들지 않는다 (2026-09-02 결정). 날씨가 10일로 늘면 창도 따라 넓어진다 */
 const week = computed(() => {
-  const st = Math.max(0, Math.min(state.di - 1, 23))
+  let last = 0
+  for (let i = 0; i < 30; i++) if (wxOf(i)) last = i
+  const st = Math.max(0, Math.min(state.di - 1, last - 6, 23))
   return Array.from({ length: 7 }, (_, j) => {
     const k = st + j, d = at(k), w = wxOf(k), cc = crowd(s.value, k)
     return { k, d, w, cc, t: tier(cc), ko: tierKo(cc), label: `${d.getMonth() + 1}/${d.getDate()} ${'일월화수목금토'[d.getDay()]}` }
