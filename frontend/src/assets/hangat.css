@@ -52,7 +52,7 @@
 .lb-t{background:var(--surf);border-radius:var(--rp);padding:3px 10px;font-size:11.5px;
   font-weight:800;color:var(--tx);box-shadow:0 2px 7px rgba(30,50,80,.18);white-space:nowrap}
 .poi-marker{width:17px;height:17px;border-radius:50%;border:3px solid #fff;box-sizing:border-box;
-  box-shadow:0 2px 7px rgba(16,35,48,.35)}
+  box-shadow:0 2px 7px rgba(16,35,48,.35);cursor:pointer}
 /* 업종별 마커 — 혼잡 3색(민트·앰버·레드)과 겹치지 않는 색만 사용 */
 .mk-food{background:var(--pink)}
 .mk-dine{background:#7b6ef6}
@@ -60,6 +60,23 @@
 .mk-cvs{background:#2f7de1}
 .mk-stay{background:#5f7d95}
 .mk-mart{background:#c2571a}
+/* 착한가격 클릭 툴팁 (MAP_001: 상호·대표메뉴·가격) */
+.gp-tip{display:flex;flex-direction:column;gap:3px;background:var(--surf);border-radius:12px;
+  padding:9px 13px;box-shadow:0 3px 14px rgba(30,50,80,.26);white-space:nowrap}
+.gp-tip b{font-size:12.5px;color:var(--tx)}
+.gp-tip span{font-size:11.5px;font-weight:600;color:var(--tx2)}
+.gp-tip .gp-more{margin-top:5px;padding:5px 0 1px;border:0;border-top:1px solid rgba(0,0,0,.08);
+  background:none;color:var(--ac);font-size:11.5px;font-weight:800;cursor:pointer}
+
+/* 상세 패널 착한가격 대표 메뉴 (MAP_007) */
+.menu{margin:10px 0 4px;padding:10px 12px;background:var(--surf2);border-radius:12px}
+.mn-h{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;color:var(--tx2);margin-bottom:7px}
+.mn-h i{width:3px;height:11px;border-radius:2px;background:var(--pink)}
+.mn-b{margin-left:auto;font-size:10px;font-weight:800;color:var(--pink);background:var(--pink-bg);padding:2px 8px;border-radius:999px}
+.mn-r{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:3px 0}
+.mn-n{color:var(--tx)}
+.mn-p{font-weight:800;color:var(--tx);white-space:nowrap}
+
 .mk-num{background:var(--ac);color:var(--on-ac);border-radius:50%;width:20px;height:20px;font-size:11px;
   font-weight:800;display:flex;align-items:center;justify-content:center;
   border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.28)}

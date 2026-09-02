@@ -83,6 +83,8 @@ export interface PlaceDetail {
   images: PlaceImage[]
   /** 사진 출처 표기 문구 - 사진이 있으면 화면에 반드시 보여준다(공공누리) */
   imageAttribution: string | null
+  /** 소개 원문. 착한가격업소는 "대표메뉴: ○○ 9,000원 · …" 형태 - 핀 툴팁이 쓴다 */
+  overview: string | null
 }
 
 export interface PlaceImage {
@@ -99,6 +101,7 @@ interface BackendPlaceDetail {
   ratingAvg: number | null
   reviewCount: number
   images: BackendPlaceImage[]
+  overview: string | null
 }
 
 interface BackendPlaceImage {
@@ -175,7 +178,8 @@ export const MapPlaceService = {
         ratingAvg: row.ratingAvg,
         reviewCount: row.reviewCount ?? 0,
         images,
-        imageAttribution: row.images?.[0]?.attribution ?? null
+        imageAttribution: row.images?.[0]?.attribution ?? null,
+        overview: row.overview ?? null
       }
     } catch {
       return null
