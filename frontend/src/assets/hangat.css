@@ -60,6 +60,12 @@
 .mk-cvs{background:#2f7de1}
 .mk-stay{background:#5f7d95}
 .mk-mart{background:#c2571a}
+/* 착한가격 클릭 툴팁 (MAP_001: 상호·대표메뉴·가격) */
+.gp-tip{display:flex;flex-direction:column;gap:3px;background:var(--surf);border-radius:12px;
+  padding:9px 13px;box-shadow:0 3px 14px rgba(30,50,80,.26);white-space:nowrap}
+.gp-tip b{font-size:12.5px;color:var(--tx)}
+.gp-tip span{font-size:11.5px;font-weight:600;color:var(--tx2)}
+
 .mk-num{background:var(--ac);color:var(--on-ac);border-radius:50%;width:20px;height:20px;font-size:11px;
   font-weight:800;display:flex;align-items:center;justify-content:center;
   border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.28)}
