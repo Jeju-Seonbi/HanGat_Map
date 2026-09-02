@@ -34,9 +34,39 @@ spec:
 
       http:
         paths:
-          # Swagger UI의 Try it out이 같은 호스트에서 API를 호출할 수 있도록
-          # 백엔드 전체 경로를 연결한다.
+          # 대표 주소는 app-root를 통해 Swagger UI로 이동한다.
           - path: /
+            pathType: Exact
+
+            backend:
+              service:
+                name: {{ include "hangat.fullname" . }}-backend
+
+                port:
+                  number: {{ .Values.backend.service.port }}
+
+          # Swagger 정적 파일과 OpenAPI 명세 경로만 외부에 공개한다.
+          - path: /swagger-ui
+            pathType: Prefix
+
+            backend:
+              service:
+                name: {{ include "hangat.fullname" . }}-backend
+
+                port:
+                  number: {{ .Values.backend.service.port }}
+
+          - path: /swagger-ui.html
+            pathType: Exact
+
+            backend:
+              service:
+                name: {{ include "hangat.fullname" . }}-backend
+
+                port:
+                  number: {{ .Values.backend.service.port }}
+
+          - path: /v3/api-docs
             pathType: Prefix
 
             backend:
