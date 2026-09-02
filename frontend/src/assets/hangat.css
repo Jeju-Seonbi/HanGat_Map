@@ -77,6 +77,10 @@
 .mn-n{color:var(--tx)}
 .mn-p{font-weight:800;color:var(--tx);white-space:nowrap}
 
+/* 선택 장소 강조 핀 - 레이어가 꺼져 있어도 검색으로 연 곳은 보여준다 (MAP_002) */
+.pw .lb-t.sel-on{display:block}
+.poi-marker.sel-pick{width:24px;height:24px;border-width:4px}
+
 .mk-num{background:var(--ac);color:var(--on-ac);border-radius:50%;width:20px;height:20px;font-size:11px;
   font-weight:800;display:flex;align-items:center;justify-content:center;
   border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.28)}

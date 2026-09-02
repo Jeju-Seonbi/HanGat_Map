@@ -16,7 +16,10 @@ const failed = ref('')
 const origin = location.origin
 let map = null
 /* 오버레이는 반응형일 필요가 없어 ref 바깥에 둔다 */
-const OV = { spot: [], food: [], dine: [], cafe: [], cvs: [], stay: [], mart: [], route: [], num: [] }
+const OV = { spot: [], food: [], dine: [], cafe: [], cvs: [], stay: [], mart: [], route: [], num: [], sel: [] }
+
+/** 선택 핀의 업종색 - 지도 마커와 같은 팔레트 */
+const CAT_MARKER = { FOOD: 'mk-dine', CAFE: 'mk-cafe', CONVENIENCE: 'mk-cvs', LODGING: 'mk-stay', MART: 'mk-mart' }
 
 const LL = (lat, lng) => new kakao.maps.LatLng(lat, lng)
 
@@ -107,6 +110,15 @@ function draw() {
   poi('cvs', state.layers.cvs)
   poi('stay', state.layers.stay)
   poi('mart', state.layers.mart)
+
+  // 검색 등으로 연 장소는 레이어가 꺼져 있어도 선택 핀을 띄운다 (MAP_002) -
+  // 지도가 이동만 하고 아무것도 안 보이면 고장으로 느껴진다. 이름표는 줌 무관 항상 표시
+  if (sel && hasCoords(sel) && !(L.spot && state.layers.spot.includes(sel))) {
+    const pin = sel.cat === 'TOURIST'
+      ? `<div class="pn ${L.crowd ? tier(crowd(sel, di)) : 'calm'} pick" style="width:20px;height:20px"></div>`
+      : `<div class="poi-marker sel-pick ${sel.good ? 'mk-food' : (CAT_MARKER[sel.cat] ?? 'mk-dine')}"></div>`
+    addPin('sel', sel.y, sel.x, `<div class="lb-t sel-on">${sel.n}</div>` + pin, () => emit('select', sel), 500)
+  }
 
   if (course) {
     /* MAP_006: 일차 전환 시 해당 일차 경로만 강조 (번호는 일차 내 방문 순서) */
