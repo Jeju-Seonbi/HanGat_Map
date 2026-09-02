@@ -250,6 +250,8 @@
 .wxc .wi{height:30px;display:flex;align-items:center;justify-content:center;margin:3px 0 1px}
 .wxc .wt{font-size:14px;font-weight:800;letter-spacing:-.03em}
 .wxc .wt.pre{font-size:10px;font-weight:600;color:var(--tx3);line-height:17px}
+.wxc .wp{height:12px;display:flex;align-items:center;justify-content:center;gap:2px;
+  font-size:9.5px;font-weight:700;color:#2F93E0;letter-spacing:-.02em}
 .wx-note{font-size:10.5px;color:var(--tx3);margin:-7px 2px 12px}
 .wxc .wc{height:3px;border-radius:2px;margin:8px 13px 0;opacity:.85}
 .wxi{display:inline-block;vertical-align:-4px;flex-shrink:0}

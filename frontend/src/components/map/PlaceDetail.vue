@@ -230,6 +230,12 @@ function delImg(i) {
           <!-- 날씨 없는 날은 고장이 아니라 원래 없는 것 - '-' 대신 명시적으로 말한다 -->
           <div v-if="w.w" class="wt">{{ w.w.t }}°</div>
           <div v-else class="wt pre">예보 전</div>
+          <!-- 강수확률 30% 이상만 표시. 빈 칸도 같은 높이로 두어 카드 줄이 맞는다 -->
+          <div class="wp">
+            <template v-if="w.w && w.w.rp >= 30">
+              <svg width="7" height="9" viewBox="0 0 8 10" aria-hidden="true"><path d="M4 .4C5.3 2.3 6.8 4 6.8 5.9a2.8 2.8 0 1 1-5.6 0C1.2 4 2.7 2.3 4 .4Z" fill="#2F93E0"/></svg>{{ w.w.rp }}%
+            </template>
+          </div>
           <div class="wc" :style="{ background: `var(--${w.t})` }" :title="w.ko"></div>
         </div>
       </div>
