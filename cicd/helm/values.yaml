@@ -48,7 +48,8 @@ backend:
     MAIL_FROM: "no-reply@hangatjeju.com"
 
     FRONTEND_URL: "https://hangatjeju.com"
-    CORS_ALLOWED_ORIGINS: "https://hangatjeju.com"
+    BACKEND_URL: "https://api.hangatjeju.com"
+    CORS_ALLOWED_ORIGINS: "https://hangatjeju.com,https://swagger.hangatjeju.com"
 
     TOUR_API_BASE_URL: "https://apis.data.go.kr/B551011/KorService2/areaBasedList2"
     CONGESTION_API_BASE_URL: "https://apis.data.go.kr/B551011/TatsCnctrRateService/tatsCnctrRatedList"
