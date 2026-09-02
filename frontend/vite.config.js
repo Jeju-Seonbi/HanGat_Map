@@ -11,13 +11,30 @@ import vue from '@vitejs/plugin-vue'
  * - style-src: 'unsafe-inline' 이 필요하다. 개발 모드에서 Vue SFC 의 <style> 이
  *   런타임 JS 로 주입되고, 일부 데이터 시각화가 동적 style 속성을 사용한다.
  *   script-src 의 'unsafe-inline' 과 달리 style-src 쪽은 XSS 실행 경로가 아니라 위험이 훨씬 낮다.
- * - connect-src: HIBP Pwned Passwords(k-익명성 유출 조회) + 개발 모드 HMR 웹소켓.
+ * - connect-src: 설정된 백엔드 API + HIBP Pwned Passwords(k-익명성 유출 조회)
+ *   + 개발 모드 HMR 웹소켓.
  * - img-src: 지도 타일 CDN + data: (플레이스홀더).
  *
  * ⚠️ meta 태그로 전달한 CSP 는 frame-ancestors 를 무시한다(스펙상).
  *    클릭재킹 차단은 서버 헤더로 넣어야 한다. README 참고.
  */
+function apiOriginForCsp (apiBaseUrl) {
+  const value = apiBaseUrl?.trim()
+
+  // /api 같은 동일 출처 경로는 'self'가 이미 허용한다.
+  if (!value || value.startsWith('/')) return ''
+
+  const url = new URL(value)
+  if (!['http:', 'https:'].includes(url.protocol)) {
+    throw new Error('VITE_API_BASE_URL은 HTTP(S) URL 또는 상대 경로여야 합니다.')
+  }
+
+  return url.origin
+}
+
 function htmlCspPlugin () {
+  const apiOrigin = apiOriginForCsp(process.env.VITE_API_BASE_URL)
+
   return {
     name: 'html-csp',
     enforce: 'post',
@@ -47,9 +64,9 @@ function htmlCspPlugin () {
           /* tong.visitkorea.or.kr: TourAPI 장소 사진(한산 장소 캐러셀 등) - 공사 이미지는 http 원본이라
              http도 열되, 운영 빌드는 upgrade-insecure-requests 가 https 로 승격시킨다. */
           "img-src 'self' data: blob: http://*.daumcdn.net https://*.daumcdn.net http://*.kakaocdn.net https://*.kakaocdn.net http://tong.visitkorea.or.kr https://tong.visitkorea.or.kr",
-          /* 개발 모드는 백엔드(hangat-api)를 직접 호출한다.
-             운영 빌드는 같은 도메인 /api 프록시 경유라 'self' 로 충분하다. */
-          `connect-src 'self' https://api.pwnedpasswords.com https://dapi.kakao.com http://dapi.kakao.com${dev ? ' http://localhost:8080 ws: wss:' : ''}`,
+          /* 동일 출처 /api는 'self'로, 별도 API 서브도메인은 VITE_API_BASE_URL의
+             origin을 빌드 시점에 추가해 운영 요청이 CSP에 막히지 않게 한다. */
+          `connect-src 'self'${apiOrigin ? ` ${apiOrigin}` : ''} https://api.pwnedpasswords.com https://dapi.kakao.com http://dapi.kakao.com${dev ? ' http://localhost:8080 ws: wss:' : ''}`,
           "font-src 'self' https://fonts.gstatic.com",
           "form-action 'self'",
           "base-uri 'none'",
