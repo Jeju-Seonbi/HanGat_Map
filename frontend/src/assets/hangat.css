@@ -83,7 +83,8 @@
 
 .mk-num{background:var(--ac);color:var(--on-ac);border-radius:50%;width:20px;height:20px;font-size:11px;
   font-weight:800;display:flex;align-items:center;justify-content:center;
-  border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.28)}
+  border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.28);cursor:pointer}
+.mk-num.pick{width:26px;height:26px;font-size:13px;box-shadow:0 0 0 5px rgba(0,184,163,.34),0 2px 9px rgba(0,0,0,.3)}
 
 /* ── 플로팅 공통 ── */
 .fl{position:absolute;background:var(--surf);border-radius:var(--r);box-shadow:var(--sh2)}

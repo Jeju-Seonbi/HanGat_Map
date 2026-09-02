@@ -112,8 +112,10 @@ function draw() {
   poi('mart', state.layers.mart)
 
   // 검색 등으로 연 장소는 레이어가 꺼져 있어도 선택 핀을 띄운다 (MAP_002) -
-  // 지도가 이동만 하고 아무것도 안 보이면 고장으로 느껴진다. 이름표는 줌 무관 항상 표시
-  if (sel && hasCoords(sel) && !(L.spot && state.layers.spot.includes(sel))) {
+  // 지도가 이동만 하고 아무것도 안 보이면 고장으로 느껴진다. 이름표는 줌 무관 항상 표시.
+  // 코스 정류지는 제외 - 번호 핀이 이미 그 자리를 표시하고, 겹치면 이름표가 두 장 뜬다
+  if (sel && hasCoords(sel) && !(L.spot && state.layers.spot.includes(sel))
+      && !(course && course.stops.some(cs => cs.o === sel))) {
     const pin = sel.cat === 'TOURIST'
       ? `<div class="pn ${L.crowd ? tier(crowd(sel, di)) : 'calm'} pick" style="width:20px;height:20px"></div>`
       : `<div class="poi-marker sel-pick ${sel.good ? 'mk-food' : (CAT_MARKER[sel.cat] ?? 'mk-dine')}"></div>`
@@ -136,7 +138,10 @@ function draw() {
         line.setMap(map)
         OV.route.push(line)
       }
-      if (on) pts.forEach((p, i) => addPin('num', p[0], p[1], `<div class="mk-num">${i + 1}</div>`, null, 600))
+      // 코스 핀도 눌러서 이름·상세를 본다 - 코스가 화면의 주인공이라 이름표는 줌 무관 상시 표시
+      if (on) g[d].forEach((stop, i) => addPin('num', stop.o.y, stop.o.x,
+        `<div class="lb-t sel-on">${stop.o.n}</div><div class="mk-num${sel === stop.o ? ' pick' : ''}">${i + 1}</div>`,
+        () => emit('select', stop.o), 600))
     })
   }
 }
