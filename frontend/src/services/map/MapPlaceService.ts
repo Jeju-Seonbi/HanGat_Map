@@ -27,6 +27,8 @@ export interface MapPlace {
   addr: string | null
   tel: string | null
   hours: string | null
+  /** 착한가격 지정 여부 - 상세 메뉴 섹션의 '착한가격' 뱃지 조건 (일반 식당 메뉴엔 안 붙인다) */
+  good: boolean
   park: boolean | null
   wc: boolean | null
   /** 그 장소의 날짜별 집중률. CrowdService가 채운다. 예보 없으면 null */
@@ -165,7 +167,8 @@ export const MapPlaceService = {
    */
   async getDetail (id: number): Promise<PlaceDetail | null> {
     try {
-      const row = await apiGet<BackendPlaceDetail>(`/places/${id}`)
+      // 15초: 핀 전량 재생성이 메인 스레드를 5초 넘게 잠그면 5초 기본값으론 응답이 Abort로 죽는다
+      const row = await apiGet<BackendPlaceDetail>(`/places/${id}`, 15000)
       const images = (row.images ?? []).map(i => ({
         url: i.url,
         thumb: i.thumbnailUrl ?? i.url,
@@ -200,6 +203,7 @@ function toMapPlace (row: BackendPlace): MapPlace {
     addr: row.roadAddress ?? row.lotAddress,
     tel: row.phone,
     hours: row.operatingHoursText,
+    good: row.goodPrice,
     park: row.parkingAvailable,
     wc: row.toiletAvailable,
     series: null,
@@ -228,6 +232,7 @@ function mockLayers (): Record<LayerKey, MapPlace[]> {
       n: m.n, x: m.x, y: m.y, r: m.r,
       c: m.c ?? m.m ?? '정보 없음',
       addr: m.addr ?? null, tel: m.tel ?? null, hours: m.hours ?? null,
+      good: k === 'food',   // 목업 food 레이어 = 착한가격 샘플
       park: m.park ?? null, wc: m.wc ?? null,
       // b는 그대로 넘긴다 - 폴백의 목적이 '백엔드가 죽어도 화면이 살아 있는 것'인데,
       // 혼잡 값을 버리면 좌측 순위 목록까지 비어서 화면이 반쯤 죽는다.
