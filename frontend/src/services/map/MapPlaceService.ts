@@ -24,6 +24,8 @@ export interface MapPlace {
   r: string
   /** 세부분류 표시명 (오름/해수욕장/박물관…). 미분류면 '정보 없음' */
   c: string
+  /** 카테고리 코드 (TOURIST/FOOD/CAFE/…) - 검색 결과의 핀 색 구분용 */
+  cat: string
   addr: string | null
   tel: string | null
   hours: string | null
@@ -161,6 +163,19 @@ export const MapPlaceService = {
     }
   },
 
+  /** 통합 검색 (MAP_002) - 이름·메뉴 부분 일치 상위 20건. 화면 필터(권역·업종) 범위를 함께 보낸다. 실패하면 빈 배열. */
+  async search (q: string, opts?: { region?: string | null, categories?: string[] }): Promise<MapPlace[]> {
+    try {
+      const params = new URLSearchParams({ q })
+      if (opts?.region) params.set('region', opts.region)
+      if (opts?.categories?.length) params.set('categories', opts.categories.join(','))
+      const rows = await apiGet<BackendPlace[]>(`/places/search?${params}`)
+      return rows.map(toMapPlace)
+    } catch {
+      return []
+    }
+  },
+
   /**
    * 상세 패널을 열 때만 부른다. 실패하면 null - 패널은 목록 데이터로 계속 그려진다.
    * 목업 모드는 id 가 null 이라 호출부에서 걸러진다.
@@ -200,6 +215,7 @@ function toMapPlace (row: BackendPlace): MapPlace {
     r: row.regionName,
     // 세부분류가 없는 장소가 있다 - 빈 문자열로 두면 드롭다운에 빈 항목이 생긴다
     c: row.tagName ?? '정보 없음',
+    cat: row.categoryCode,
     addr: row.roadAddress ?? row.lotAddress,
     tel: row.phone,
     hours: row.operatingHoursText,
@@ -223,6 +239,12 @@ function emptyLayers (): Record<LayerKey, MapPlace[]> {
   return { spot: [], food: [], dine: [], cafe: [], cvs: [], stay: [], mart: [] }
 }
 
+/** 목업 레이어 → 카테고리 코드. 검색 결과 핀 색이 폴백에서도 같게 보이게 한다. */
+const MOCK_CAT: Record<LayerKey, string> = {
+  spot: 'TOURIST', food: 'FOOD', dine: 'FOOD',
+  cafe: 'CAFE', cvs: 'CONVENIENCE', stay: 'LODGING', mart: 'MART'
+}
+
 /** 백엔드가 없을 때 쓰는 하드코딩 폴백 - 기존 화면과 똑같이 보인다. */
 function mockLayers (): Record<LayerKey, MapPlace[]> {
   const layers = emptyLayers()
@@ -231,6 +253,7 @@ function mockLayers (): Record<LayerKey, MapPlace[]> {
       id: null,
       n: m.n, x: m.x, y: m.y, r: m.r,
       c: m.c ?? m.m ?? '정보 없음',
+      cat: MOCK_CAT[k],
       addr: m.addr ?? null, tel: m.tel ?? null, hours: m.hours ?? null,
       good: k === 'food',   // 목업 food 레이어 = 착한가격 샘플
       park: m.park ?? null, wc: m.wc ?? null,

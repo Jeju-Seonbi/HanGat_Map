@@ -111,12 +111,11 @@ export const inFilter = s =>
 
 export const inRegion = o => state.F.reg === '전체' || o.r === state.F.reg
 
-/** 좌측 목록 — 집중률 결측 장소는 순위에서 제외 (지도에는 회색 핀으로 남는다) */
+/** 좌측 목록 — 필터 안 관광지 전체를 정렬해 보여준다. 집중률 결측 장소는 순위에서 제외 (지도에는 회색 핀으로 남는다) */
 export const rankedRows = computed(() =>
   state.layers.spot.filter(s => inFilter(s) && crowd(s, state.di) != null)
     .map(s => ({ s, c: crowd(s, state.di), t: tier(crowd(s, state.di)) }))
-    .sort((a, b) => (state.sort === 'calm' ? a.c - b.c : b.c - a.c))
-    .slice(0, 8))
+    .sort((a, b) => (state.sort === 'calm' ? a.c - b.c : b.c - a.c)))
 
 /* ── 액션 ── */
 let toastTimer = null
