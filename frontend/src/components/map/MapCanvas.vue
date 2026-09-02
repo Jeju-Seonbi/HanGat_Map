@@ -98,7 +98,7 @@ function draw() {
     if (!L[g]) return
     // 착한가격은 정의서(MAP_001)대로 툴팁, 나머지 업종은 관광지처럼 상세 패널
     list.filter(f => inRegion(f) && hasCoords(f)).forEach(f => addPin(g, f.y, f.x,
-      `<div class="lb-t poi-label">${f.n}</div><div class="poi-marker ${POI_MARKER_CLASS[g]}"></div>`,
+      `<div class="lb-t">${f.n}</div><div class="poi-marker ${POI_MARKER_CLASS[g]}"></div>`,
       g === 'food' ? () => showGoodPriceTip(f) : () => emit('select', f), 60))
   }
   poi('food', state.layers.food)
