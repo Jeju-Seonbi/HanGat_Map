@@ -1,0 +1,34 @@
+/* ═══════════════════════════════════════════════════════════
+   서체 — Stitch DESIGN.md 의 지정을 그대로 따른다
+
+     Figtree        구조 요소(헤드라인·라벨·버튼). 800/900 의 기하학적 굵기와 음수 자간
+     Be Vietnam Pro 본문·데이터. 긴 글에서 가독성이 좋다
+
+   ⚠️ Google Fonts CDN 을 쓰지 않는다.
+      이 앱의 CSP 는 `font-src 'self'` 다(vite.config.js). 외부 폰트는 차단된다.
+      그래서 @fontsource 로 **로컬에 번들**한다. 오프라인에서도 뜨고,
+      외부 요청이 없어 렌더 차단·추적 문제도 없다.
+
+   ⚠️ 두 서체 모두 **한글 글리프가 없다.** 라틴 서브셋만 존재한다.
+      원본 Stitch 시안도 같은 조건이었다(한글은 브라우저 기본 폰트로 렌더됨).
+      그래서 아래 --font-* 스택에서 한글은 Pretendard → 시스템 한글 폰트로 넘긴다.
+      즉 **숫자·영문은 Figtree, 한글은 시스템 폰트**가 되는데,
+      이게 원본 시안이 실제로 보여주던 모습이다.
+   ═══════════════════════════════════════════════════════════ */
+
+/* Figtree — 헤드라인(800/900), 라벨·버튼(700), 보조(500/400) */
+@import '@fontsource/figtree/400.css';
+@import '@fontsource/figtree/500.css';
+@import '@fontsource/figtree/700.css';
+@import '@fontsource/figtree/800.css';
+@import '@fontsource/figtree/900.css';
+
+/* Be Vietnam Pro — 본문 */
+@import '@fontsource/be-vietnam-pro/400.css';
+@import '@fontsource/be-vietnam-pro/500.css';
+@import '@fontsource/be-vietnam-pro/700.css';
+
+:root {
+  --font-head: 'Figtree', 'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
+  --font-body: 'Be Vietnam Pro', 'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
+}

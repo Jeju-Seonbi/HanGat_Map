@@ -1,0 +1,12 @@
+export type KakaoLatLng=object
+export interface KakaoMapInstance{setCenter(position:KakaoLatLng):void;panTo(position:KakaoLatLng):void;setBounds(bounds:KakaoBounds):void;setLevel(level:number):void;relayout():void}
+export interface KakaoBounds{extend(position:KakaoLatLng):void}
+export interface KakaoOverlay{setMap(map:KakaoMapInstance|null):void}
+export type KakaoCustomOverlay=KakaoOverlay
+export type KakaoPolyline=KakaoOverlay
+export interface KakaoPagination{current:number;last:number;totalCount:number;hasNextPage:boolean;hasPrevPage:boolean;nextPage():void;prevPage():void;gotoPage(page:number):void}
+export interface KakaoPlacesOptions{rect?:string;size?:number;page?:number;sort?:string}
+export interface KakaoPlacesService{keywordSearch(keyword:string,callback:(results:import('./KakaoPlaceSearchMapper').KakaoPlaceSearchDocument[],status:string,pagination:KakaoPagination)=>void,options?:KakaoPlacesOptions):void}
+export interface KakaoMapsServices{Places:new()=>KakaoPlacesService;Status:{OK:string;ZERO_RESULT:string;ERROR:string};SortBy:{ACCURACY:string;DISTANCE:string}}
+export interface KakaoMaps{load(callback:()=>void):void;LatLng:new(lat:number,lng:number)=>KakaoLatLng;LatLngBounds:new()=>KakaoBounds;Map:new(container:HTMLElement,options:{center:KakaoLatLng;level:number})=>KakaoMapInstance;CustomOverlay:new(options:{map:KakaoMapInstance;position:KakaoLatLng;content:HTMLElement;yAnchor:number;zIndex?:number})=>KakaoCustomOverlay;Polyline:new(options:{path:KakaoLatLng[];strokeWeight:number;strokeColor:string;strokeOpacity:number;strokeStyle:string})=>KakaoPolyline;event:{addListener(target:KakaoCustomOverlay,event:string,callback:()=>void):void};services?:KakaoMapsServices}
+declare global{interface Window{kakao?:{maps:KakaoMaps}}}

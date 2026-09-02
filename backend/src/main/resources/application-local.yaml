@@ -1,0 +1,9 @@
+spring:
+  # Reuse the existing development environment contract without duplicating
+  # datasource, mail, security, or external API settings.
+  config:
+    import: classpath:application-dev.yaml
+
+# Normal local runs inherit ddl-auto=validate from application-dev.yaml.
+# For an explicitly approved one-time reset only, start the process with
+# SPRING_JPA_HIBERNATE_DDL_AUTO=create and remove it immediately afterward.

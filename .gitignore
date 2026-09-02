@@ -1,0 +1,26 @@
+# Local agent and analysis output
+.claude/
+.calude/
+docs/superpowers/
+.understand-anything/
+
+# Local environment values must not be committed.
+.env
+.env.*
+!.env.demo
+!.env.example
+!.env.sample
+!.env.template
+
+# Dependencies, build output, caches, and logs
+node_modules/
+dist/
+coverage/
+.vite/
+.cache/
+*.log
+
+# Operating-system metadata
+.DS_Store
+Thumbs.db
+Desktop.ini
