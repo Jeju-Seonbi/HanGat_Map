@@ -21,7 +21,8 @@ COPY frontend/tsconfig.node.json ./
 COPY frontend/public ./public
 COPY frontend/src ./src
 
-# 운영 환경에서는 같은 도메인의 /api를 통해 백엔드에 접근한다.
+# Jenkins가 운영 API 서브도메인을 전달한다.
+# 별도로 전달하지 않는 로컬 이미지 빌드는 /api를 기본값으로 사용한다.
 ARG VITE_API_BASE_URL=/api
 
 # 카카오 지도 키는 빌드할 때만 임시로 마운트한다.

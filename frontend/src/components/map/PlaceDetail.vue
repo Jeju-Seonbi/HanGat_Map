@@ -60,6 +60,16 @@ const feeBadge = computed(() => {
 const hasAmen = computed(() =>
   feeBadge.value || s.value.park != null || s.value.wc != null || s.value.in)
 
+/** 착한가격 대표 메뉴 - 상세 overview가 "대표메뉴: ..." 형태일 때만 (관광지 소개문과 구분) */
+const menuRows = computed(() => {
+  const o = detail.value?.overview
+  if (!o || !o.startsWith('대표메뉴:')) return []
+  return o.replace(/^대표메뉴:\s*/, '').split(' · ').map(item => {
+    const m = item.match(/^(.*?)\s*([\d,]+원)$/)
+    return m ? { n: m[1], p: m[2] } : { n: item, p: '' }
+  })
+})
+
 /** KTO 실사진. 있으면 데모 업로드 대신 이걸 쓴다 */
 const ktoImages = computed(() => detail.value?.images ?? [])
 const photos = computed(() => state.placeImgs[s.value.n] || [])
@@ -217,6 +227,14 @@ function delImg(i) {
         <span v-if="s.park != null" class="am" :class="{ no: !s.park }">주차</span>
         <span v-if="s.wc != null" class="am" :class="{ no: !s.wc }">화장실</span>
         <span v-if="s.in" class="am">실내</span>
+      </div>
+
+      <!-- 착한가격 대표 메뉴 (행안부 실데이터) - 메뉴 없는 업소는 섹션 자체를 숨긴다 -->
+      <div v-if="menuRows.length" class="menu">
+        <div class="mn-h"><i></i>대표 메뉴<span v-if="s.good" class="mn-b">착한가격</span></div>
+        <div v-for="m in menuRows" :key="m.n" class="mn-r">
+          <span class="mn-n">{{ m.n }}</span><span class="mn-p">{{ m.p }}</span>
+        </div>
       </div>
 
       <!-- 주소(복사) · 운영시간(있을 때만 — 상시 개방은 줄 자체를 표시하지 않음) · 전화 -->
