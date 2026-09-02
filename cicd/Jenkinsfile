@@ -50,11 +50,28 @@ pipeline {
         stage('Backend Test') {
             steps {
                 sh '''
-                    docker run --rm \
+                    set -eu
+
+                    TEST_CONTAINER="hangat-backend-test-${BUILD_NUMBER}"
+
+                    cleanup() {
+                        mkdir -p "$WORKSPACE/backend/build/test-results/test"
+                        docker cp \
+                          "$TEST_CONTAINER:/workspace/build/test-results/test/." \
+                          "$WORKSPACE/backend/build/test-results/test/" \
+                          >/dev/null 2>&1 || true
+                        docker rm -f "$TEST_CONTAINER" >/dev/null 2>&1 || true
+                    }
+
+                    trap cleanup EXIT
+
+                    docker rm -f "$TEST_CONTAINER" >/dev/null 2>&1 || true
+
+                    docker create \
+                      --name "$TEST_CONTAINER" \
                       --user "$(id -u):$(id -g)" \
                       --env HOME=/tmp \
                       --env GRADLE_USER_HOME=/tmp/gradle \
-                      --volume "$WORKSPACE/backend:/workspace" \
                       --workdir /workspace \
                       eclipse-temurin:17-jdk-jammy \
                       sh -c "
@@ -62,6 +79,12 @@ pipeline {
                         chmod +x gradlew &&
                         ./gradlew test --no-daemon
                       "
+
+                    docker cp \
+                      "$WORKSPACE/backend/." \
+                      "$TEST_CONTAINER:/workspace"
+
+                    docker start --attach "$TEST_CONTAINER"
                 '''
             }
         }
@@ -71,11 +94,23 @@ pipeline {
         stage('Frontend Test') {
             steps {
                 sh '''
-                    docker run --rm \
+                    set -eu
+
+                    TEST_CONTAINER="hangat-frontend-test-${BUILD_NUMBER}"
+
+                    cleanup() {
+                        docker rm -f "$TEST_CONTAINER" >/dev/null 2>&1 || true
+                    }
+
+                    trap cleanup EXIT
+
+                    docker rm -f "$TEST_CONTAINER" >/dev/null 2>&1 || true
+
+                    docker create \
+                      --name "$TEST_CONTAINER" \
                       --user "$(id -u):$(id -g)" \
                       --env HOME=/tmp \
                       --env npm_config_cache=/tmp/npm-cache \
-                      --volume "$WORKSPACE/frontend:/workspace" \
                       --workdir /workspace \
                       node:22-alpine \
                       sh -c "
@@ -83,6 +118,12 @@ pipeline {
                         npm run type-check &&
                         npm test
                       "
+
+                    docker cp \
+                      "$WORKSPACE/frontend/." \
+                      "$TEST_CONTAINER:/workspace"
+
+                    docker start --attach "$TEST_CONTAINER"
                 '''
             }
         }
