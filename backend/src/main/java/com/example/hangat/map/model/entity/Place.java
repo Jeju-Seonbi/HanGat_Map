@@ -211,6 +211,11 @@ public class Place {
         if (this.phone == null && phone != null) this.phone = phone;
     }
 
+    /** 음식점 메뉴 배치(detailIntro2)가 채운다 - 착한가격이 이미 넣은 overview는 지우지 않는다 */
+    public void updateMenuText(String menuText) {
+        if (this.overview == null && menuText != null) this.overview = menuText;
+    }
+
     /** 후기 작성·삭제 때 호출. avg 는 별점 있는 후기만의 평균, count 는 전체 후기 수 */
     public void updateReviewSummary(java.math.BigDecimal ratingAvg, int reviewCount) {
         this.ratingAvg = ratingAvg == null ? DEFAULT_RATING_AVG : ratingAvg;

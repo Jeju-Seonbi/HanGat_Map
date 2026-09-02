@@ -35,10 +35,10 @@
 
 /* 카카오 CustomOverlay 안에서 핀과 라벨을 겹쳐 배치 */
 .pw{position:relative;display:flex;align-items:center;justify-content:center}
+/* 핀 이름표는 상세 줌(level 7 이하)에서만 - 관광지·업종 공통. 축소 뷰의 라벨 밭 방지 */
 .pw .lb-t{position:absolute;bottom:calc(100% + 5px);left:50%;transform:translateX(-50%);
-  pointer-events:none}
-.pw .poi-label{display:none}
-#map.labels-visible .pw .poi-label{display:block}
+  pointer-events:none;display:none}
+#map.labels-visible .pw .lb-t{display:block}
 
 /* 글로우 핀 */
 .pn{border-radius:50%;border:2px solid #fff;box-sizing:border-box;

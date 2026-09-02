@@ -231,7 +231,7 @@ function delImg(i) {
 
       <!-- 착한가격 대표 메뉴 (행안부 실데이터) - 메뉴 없는 업소는 섹션 자체를 숨긴다 -->
       <div v-if="menuRows.length" class="menu">
-        <div class="mn-h"><i></i>대표 메뉴<span class="mn-b">착한가격</span></div>
+        <div class="mn-h"><i></i>대표 메뉴<span v-if="s.good" class="mn-b">착한가격</span></div>
         <div v-for="m in menuRows" :key="m.n" class="mn-r">
           <span class="mn-n">{{ m.n }}</span><span class="mn-p">{{ m.p }}</span>
         </div>
