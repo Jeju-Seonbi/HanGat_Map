@@ -18,6 +18,8 @@ pipeline {
         BACKEND_IMAGE = 'lumisia/hangat-backend'
         FRONTEND_IMAGE = 'lumisia/hangat-frontend'
 
+        FRONTEND_API_BASE_URL = 'https://api.hangatjeju.com'
+
         HELM_RELEASE = 'hangat'
         K8S_NAMESPACE = 'hangat'
     }
@@ -145,12 +147,14 @@ pipeline {
                         set +x
 
                         test -n "$KAKAO_MAP_KEY"
+                        test -n "$FRONTEND_API_BASE_URL"
 
                         docker build \
-                          --secret id=kakao_map_key,env=KAKAO_MAP_KEY \
-                          --file cicd/frontend.Dockerfile \
-                          --tag "$FRONTEND_IMAGE:$IMAGE_TAG" \
-                          .
+                        --build-arg VITE_API_BASE_URL="$FRONTEND_API_BASE_URL" \
+                        --secret id=kakao_map_key,env=KAKAO_MAP_KEY \
+                        --file cicd/frontend.Dockerfile \
+                        --tag "$FRONTEND_IMAGE:$IMAGE_TAG" \
+                        .
                     '''
                 }
             }
@@ -218,7 +222,6 @@ pipeline {
                           "$HELM_RELEASE" \
                           cicd/helm \
                           --namespace "$K8S_NAMESPACE" \
-                          --create-namespace \
                           --values cicd/helm/values.yaml \
                           --values cicd/helm/values-oci-k3s.yaml \
                           --values "$HELM_VALUES_PRIVATE" \

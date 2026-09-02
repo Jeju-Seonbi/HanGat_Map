@@ -1,0 +1,49 @@
+{{- if and .Values.ingress.enabled .Values.ingress.swagger.enabled }}
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+
+metadata:
+  name: {{ include "hangat.fullname" . }}-swagger
+  namespace: {{ .Release.Namespace }}
+
+  labels:
+    {{- include "hangat.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api-documentation
+
+  annotations:
+    # swagger.hangatjeju.com 루트 접속 시 Swagger UI로 이동한다.
+    nginx.ingress.kubernetes.io/app-root: /swagger-ui/index.html
+
+    nginx.ingress.kubernetes.io/ssl-redirect: {{ .Values.ingress.forceSslRedirect | quote }}
+    nginx.ingress.kubernetes.io/force-ssl-redirect: {{ .Values.ingress.forceSslRedirect | quote }}
+
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.swagger.host | quote }}
+
+      secretName: {{ .Values.ingress.tls.secretName }}
+  {{- end }}
+
+  rules:
+    - host: {{ .Values.ingress.swagger.host | quote }}
+
+      http:
+        paths:
+          # Swagger UI의 Try it out이 같은 호스트에서 API를 호출할 수 있도록
+          # 백엔드 전체 경로를 연결한다.
+          - path: /
+            pathType: Prefix
+
+            backend:
+              service:
+                name: {{ include "hangat.fullname" . }}-backend
+
+                port:
+                  number: {{ .Values.backend.service.port }}
+
+{{- end }}
