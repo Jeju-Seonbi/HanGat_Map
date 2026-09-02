@@ -88,7 +88,7 @@ export interface CourseResult {
   start_date: string; end_date: string; people: number; budget_total?: number; transport: Transport
   estimated_cost_min?: number; estimated_cost_max?: number; average_congestion_rate?: number
   cost_summary?: CourseCostSummary; budget_summary?: CourseBudgetSummary
-  generation_error_code?: string; accommodation?: AccommodationInput; days: CourseDay[]
+  generation_error_code?: string; accommodation?: AccommodationInput | null; days: CourseDay[]
 }
 export interface AlternativePlace {
   place_id: number; place_name: string; category_name: string; subcategory_name?: string; image_url?: string

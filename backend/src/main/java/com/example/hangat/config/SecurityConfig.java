@@ -145,6 +145,16 @@ public class SecurityConfig {
                         HttpMethod.POST,
                         "/courses"
                 ).permitAll()
+                .requestMatchers(
+                        HttpMethod.POST,
+                        "/courses/*/accommodations/search"
+                ).permitAll()
+                // READY 숙소 변경은 서비스가 course-scoped claim proof를 검증한다.
+                // SAVED 코스는 같은 공개 경로에서도 로그인 owner만 통과한다.
+                .requestMatchers(
+                        HttpMethod.PATCH,
+                        "/courses/*/accommodation"
+                ).permitAll()
                 // 코스 상세는 비회원 임시 코스·메인 샘플을 열어야 해서 공개.
                 // 소유자가 있는 저장 코스는 서비스가 본인 여부를 검증한다(3307)
                 .requestMatchers(

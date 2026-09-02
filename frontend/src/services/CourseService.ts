@@ -11,6 +11,7 @@ import { apiGet } from './apiClient'
 import { apiRequest } from '../api/backendClient'
 import { homeCourses } from '../data/courses'
 import type { CongestionLevel } from '../assets/types'
+import type { AccommodationInput } from '../assets/types/course'
 
 /** 화면이 그리는 코스 카드 한 장 - 메인 추천과 저장 목록이 같은 모양을 쓴다(백엔드 계약도 동일). */
 export interface CourseCard {
@@ -122,6 +123,7 @@ export interface CourseDetail {
   swappable: boolean
   /** 이름 변경·삭제를 할 수 있는지 */
   manageable: boolean
+  accommodation: AccommodationInput | null
   days: CourseDetailDay[]
 }
 
@@ -140,6 +142,7 @@ interface BackendCourseDetail {
   planned_average_congestion_rate: number | null
   swappable: boolean
   manageable: boolean
+  accommodation: AccommodationInput | null
   days: Array<{
     day_no: number
     visit_date: string
@@ -278,6 +281,7 @@ export const CourseService = {
         budgetLabel: budgetLabelOf(row.estimated_cost_min, row.estimated_cost_max),
         swappable: row.swappable,
         manageable: row.manageable,
+        accommodation: row.accommodation,
         days: row.days.map(day => ({
           dayNo: day.day_no,
           visitDate: day.visit_date,

@@ -335,12 +335,16 @@ function routeLeg(from: { lat: number; lng: number; island?: boolean }, to: { la
   }
 }
 
-function accommodationLocation(accommodation?: AccommodationInput) {
+function accommodationLocation(accommodation?: AccommodationInput | null) {
   if (!accommodation) return undefined
   return { lat: accommodation.latitude, lng: accommodation.longitude }
 }
 
-function recalculateDayTravel(day: CourseDay, transport: Transport, accommodation?: AccommodationInput) {
+function recalculateDayTravel(
+  day: CourseDay,
+  transport: Transport,
+  accommodation?: AccommodationInput | null,
+) {
   const fallbackRegion = findPlace(day.items[0]?.place_id ?? 0, day.items[0]?.place_name ?? '')?.region ?? accommodation?.region ?? 'EAST'
   day.items.forEach((item, index) => {
     item.position = index + 1
@@ -654,11 +658,41 @@ async function generate(condition: CourseCondition): Promise<CourseResult> {
   }) as CourseResult
 }
 
+async function updateAccommodation(
+  course: CourseResult,
+  accommodation: AccommodationInput,
+): Promise<AccommodationInput> {
+  return await apiRequest(`/courses/${course.id}/accommodation`, {
+    method: 'PATCH',
+    auth: !course.claim_token,
+    body: {
+      accommodation,
+      ...(course.claim_token ? { claim_token: course.claim_token } : {}),
+    },
+  }) as AccommodationInput
+}
+
+async function getRecommendedAccommodations(
+  course: CourseResult,
+): Promise<import('../assets/types/course').AccommodationRecommendation[]> {
+  const items = await apiRequest(`/courses/${course.id}/accommodations/search`, {
+    method: 'POST',
+    auth: !course.claim_token,
+    body: course.claim_token ? { claim_token: course.claim_token } : {},
+  }) as AccommodationInput[]
+  return items.map(item => ({
+    ...item,
+    recommendation_reason: '현재 코스의 저장된 장소 주변에서 확인한 Kakao 숙박 장소예요.',
+  }))
+}
+
 export const generateMockCourseForTest = generateMockCourse
 
 export const courseMockService = {
   generateCourse: (condition: CourseCondition) => generate(condition),
   regenerateCourse: (_condition: CourseCondition): Promise<CourseResult> => Promise.reject(new Error('코스 재생성은 아직 지원되지 않습니다.')),
+  updateAccommodation,
+  getRecommendedAccommodations,
   applyAccommodationSelection,
   recalculateRouteWithAccommodation: (condition: CourseCondition, accommodation: AccommodationInput) => generateMockCourse({
     ...JSON.parse(JSON.stringify(condition)) as CourseCondition,

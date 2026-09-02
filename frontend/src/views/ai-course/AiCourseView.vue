@@ -9,7 +9,6 @@ import AlternativePlaceModal from '../../components/course/AlternativePlaceModal
 import CongestionRescheduleModal from '../../components/course/CongestionRescheduleModal.vue'
 import AccommodationRecommendations from '../../components/course/AccommodationRecommendations.vue'
 import { courseMockService } from '../../services/courseMockService'
-import { accommodationMockService } from '../../services/accommodationMockService'
 import { storePendingCourseClaim, takePendingCourseClaim } from '../../services/pendingCourseClaim'
 import type { AccommodationInput, AccommodationRecommendation, AlternativePlace, CongestionRescheduleOption, CourseCondition, CourseItem, CourseResult } from '../../assets/types/course'
 
@@ -41,6 +40,7 @@ const rescheduleOptions = ref<CongestionRescheduleOption[]>([])
 const rescheduleLoading = ref(false)
 const recommendedAccommodations = ref<AccommodationRecommendation[]>([])
 const accommodationLoading = ref(false)
+const accommodationError = ref('')
 const saveOpen = ref(false)
 const title = ref('')
 const saveError = ref('')
@@ -91,8 +91,12 @@ async function generate(next: CourseCondition, regenerate = false) {
     editing.value = false
     if (!condition.accommodation) {
       accommodationLoading.value = true
-      void accommodationMockService.getRecommendedAccommodations(result.value).then((items) => {
+      accommodationError.value = ''
+      void courseMockService.getRecommendedAccommodations(result.value).then((items) => {
         recommendedAccommodations.value = items
+      }).catch(() => {
+        recommendedAccommodations.value = []
+        accommodationError.value = '주변 숙소를 불러오지 못했어요.'
       }).finally(() => {
         accommodationLoading.value = false
       })
@@ -110,12 +114,18 @@ async function selectRecommendedAccommodation(accommodation: AccommodationInput)
   loading.value = true
   error.value = ''
   try {
-    Object.assign(condition, accommodationMockService.selectAccommodation(condition, accommodation))
-    result.value = courseMockService.applyAccommodationSelection(result.value, accommodation)
+    const savedAccommodation = await courseMockService.updateAccommodation(
+      result.value,
+      accommodation,
+    )
+    condition.accommodation = { ...savedAccommodation }
+    result.value = courseMockService.applyAccommodationSelection(
+      result.value,
+      savedAccommodation,
+    )
     recommendedAccommodations.value = []
   } catch {
-    delete condition.accommodation
-    error.value = '숙소를 반영한 동선을 계산하지 못했어요. 다시 시도해 주세요.'
+    error.value = '숙소를 저장하지 못했어요. 기존 일정은 그대로 유지됩니다.'
   } finally {
     loading.value = false
   }
@@ -302,6 +312,7 @@ const formatDistance = (metres?: number) => metres == null ? '' : `${(metres / 1
             v-if="!result.accommodation"
             :items="recommendedAccommodations"
             :loading="accommodationLoading"
+            :error="accommodationError"
             @select="selectRecommendedAccommodation"
           />
         </aside>
