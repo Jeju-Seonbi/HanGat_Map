@@ -1,5 +1,5 @@
 <script setup>
-/* MAP_002 검색 — 관광지(이름·종류·권역)와 착한가격업소(상호·메뉴·권역)를 부분 일치로 찾는다 */
+/* MAP_002 검색 — 관광지(이름·종류·권역)와 착한가격업소(상호·업종·권역)를 부분 일치로 찾는다 */
 import { ref, computed } from 'vue'
 import { state } from '@/stores/mapStore'
 
@@ -12,7 +12,7 @@ const emit = defineEmits(['pick-spot'])
 const q = ref('')
 const open = ref(false)
 const input = ref(null)
-const EXAMPLES = ['오름', '해변', '전시', '국수']
+const EXAMPLES = ['오름', '해변', '전시', '식당']
 
 const hits = computed(() => {
   const k = q.value.trim()
@@ -68,9 +68,10 @@ defineExpose({ close })
         <span class="rpin" :class="h.type === 'spot' ? tier(h.c) : 'food'"></span>
         <span class="info">
           <span class="rn">{{ h.o.n }}</span>
-          <span class="rs">{{ h.type === 'spot' ? `${h.o.c} · ${h.o.r}` : `${h.o.m} · ${h.o.r}` }}</span>
+          <!-- 라이브 착한가격엔 메뉴·가격 필드가 없다 - 업종으로 통일, 가격은 있을 때만 -->
+          <span class="rs">{{ h.o.c }} · {{ h.o.r }}</span>
         </span>
-        <span v-if="h.type === 'food'" class="bdg"
+        <span v-if="h.type === 'food' && h.o.p != null" class="bdg"
           style="background:var(--pink-bg);color:var(--pink)">{{ won(h.o.p) }}원</span>
       </div>
     </template>
@@ -82,7 +83,7 @@ defineExpose({ close })
           <path d="M15.4 15.4L21 21" /></svg>
       </div>
       <b>'{{ q.trim() }}'에 맞는 곳이 없어요</b>
-      <p>장소 이름, 종류, 메뉴로 찾을 수 있어요</p>
+      <p>장소 이름, 종류, 권역으로 찾을 수 있어요</p>
       <div class="sb-eg">
         <button v-for="t in EXAMPLES" :key="t" @click="useExample(t)">{{ t }}</button>
       </div>
