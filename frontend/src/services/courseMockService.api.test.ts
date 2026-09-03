@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CourseCondition, CourseResult } from '../assets/types/course'
 import { apiRequest } from '../api/backendClient.js'
-import { courseMockService, toCourseRequestPayload } from './courseMockService'
+import { ApiError } from '../api/errors.js'
+import {
+  courseGenerationErrorMessage,
+  courseMockService,
+  toCourseRequestPayload,
+} from './courseMockService'
 
 vi.mock('../api/backendClient.js', () => ({ apiRequest: vi.fn() }))
 
@@ -146,10 +151,11 @@ describe('courseMockService Backend generation', () => {
     expect(requestMock.mock.calls[0]?.[1]?.body).not.toHaveProperty('accommodation')
   })
 
-  it('keeps the Backend itinerary unchanged when a recommended accommodation is selected', () => {
+  it('persists a recommended accommodation before changing local state and keeps the Backend itinerary unchanged', async () => {
     const backendCourse: CourseResult = {
       ...response,
       accommodation: undefined,
+      claim_token: 'opaque-proof',
       days: [{
         day_no: 1,
         visit_date: condition.start_date,
@@ -187,12 +193,25 @@ describe('courseMockService Backend generation', () => {
       }],
     }
     const before = structuredClone(backendCourse)
+    const requestMock = vi.mocked(apiRequest).mockResolvedValue(condition.accommodation!)
 
-    const selected = courseMockService.applyAccommodationSelection(
+    const savedAccommodation = await courseMockService.updateAccommodation(
       backendCourse,
       condition.accommodation!,
     )
+    const selected = courseMockService.applyAccommodationSelection(
+      backendCourse,
+      savedAccommodation,
+    )
 
+    expect(requestMock).toHaveBeenCalledWith('/courses/101/accommodation', {
+      method: 'PATCH',
+      auth: false,
+      body: {
+        accommodation: condition.accommodation,
+        claim_token: 'opaque-proof',
+      },
+    })
     expect(selected.id).toBe(backendCourse.id)
     expect(selected.days).toBe(backendCourse.days)
     expect(selected.days).toEqual(before.days)
@@ -208,6 +227,71 @@ describe('courseMockService Backend generation', () => {
     expect(selected.estimated_cost_max).toBeUndefined()
   })
 
+  it('does not mark an accommodation as selected when the Backend update fails', async () => {
+    const backendCourse: CourseResult = {
+      ...response,
+      accommodation: undefined,
+      claim_token: 'opaque-proof',
+    }
+    const before = structuredClone(backendCourse)
+    vi.mocked(apiRequest).mockRejectedValue(new Error('숙소 저장 실패'))
+
+    await expect(courseMockService.updateAccommodation(
+      backendCourse,
+      condition.accommodation!,
+    )).rejects.toThrow('숙소 저장 실패')
+
+    expect(backendCourse).toEqual(before)
+    expect(backendCourse.accommodation).toBeUndefined()
+  })
+
+  it('loads real accommodation recommendations from the Backend without a mock fallback', async () => {
+    const backendCourse: CourseResult = { ...response, claim_token: 'opaque-proof' }
+    const kakaoAccommodation = {
+      source_code: 'KAKAO_LOCAL' as const,
+      source_place_id: 'real-kakao-123',
+      place_name: 'Kakao 검증 호텔',
+      latitude: 33.45,
+      longitude: 126.55,
+      region: 'EAST' as const,
+    }
+    const requestMock = vi.mocked(apiRequest).mockResolvedValue([kakaoAccommodation])
+
+    const recommendations = await courseMockService.getRecommendedAccommodations(backendCourse)
+
+    expect(requestMock).toHaveBeenCalledWith('/courses/101/accommodations/search', {
+      method: 'POST',
+      auth: false,
+      body: { claim_token: 'opaque-proof' },
+    })
+    expect(recommendations).toEqual([expect.objectContaining({
+      source_place_id: 'real-kakao-123',
+      recommendation_reason: expect.any(String),
+    })])
+
+    requestMock.mockRejectedValueOnce(new Error('Kakao unavailable'))
+    await expect(courseMockService.getRecommendedAccommodations(backendCourse))
+      .rejects.toThrow('Kakao unavailable')
+    expect(recommendations.every(item => !item.source_place_id.startsWith('MOCK_KAKAO_'))).toBe(true)
+  })
+
+  it('uses the authenticated owner boundary for a SAVED course', async () => {
+    const savedCourse: CourseResult = {
+      ...response,
+      status: 'SAVED',
+      accommodation: undefined,
+    }
+    const requestMock = vi.mocked(apiRequest).mockResolvedValue(condition.accommodation!)
+
+    await courseMockService.updateAccommodation(savedCourse, condition.accommodation!)
+
+    expect(requestMock).toHaveBeenCalledWith('/courses/101/accommodation', {
+      method: 'PATCH',
+      auth: true,
+      body: { accommodation: condition.accommodation },
+    })
+  })
+
   it('propagates common client failures without falling back to mock generation', async () => {
     const requestMock = vi.mocked(apiRequest)
             .mockRejectedValue(new Error('코스 생성 API 요청에 실패했습니다.'))
@@ -215,6 +299,21 @@ describe('courseMockService Backend generation', () => {
     await expect(courseMockService.generateCourse(condition))
       .rejects.toThrow('코스 생성 API 요청에 실패했습니다.')
     expect(requestMock).toHaveBeenCalledOnce()
+  })
+
+  it('shows the stable server message for exhausted transient Gemini failures', () => {
+    const error = new ApiError(
+      503,
+      5003,
+      'AI 코스 생성 서버가 일시적으로 혼잡합니다. 잠시 후 다시 시도해 주세요.'
+    )
+
+    expect(courseGenerationErrorMessage(error)).toBe(
+      'AI 코스 생성 서버가 일시적으로 혼잡합니다. 잠시 후 다시 시도해 주세요.'
+    )
+    expect(courseGenerationErrorMessage(new Error('internal detail'))).toBe(
+      '코스를 생성하지 못했어요. 다시 시도해 주세요.'
+    )
   })
 
   it('keeps regeneration unavailable instead of sending an INITIAL request or returning mock data', async () => {
