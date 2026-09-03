@@ -236,7 +236,8 @@ function delImg(i) {
               <svg width="7" height="9" viewBox="0 0 8 10" aria-hidden="true"><path d="M4 .4C5.3 2.3 6.8 4 6.8 5.9a2.8 2.8 0 1 1-5.6 0C1.2 4 2.7 2.3 4 .4Z" fill="#2F93E0"/></svg>{{ w.w.rp }}%
             </template>
           </div>
-          <div class="wc" :style="{ background: `var(--${w.t})` }" :title="w.ko"></div>
+          <!-- 혼잡 바는 핀과 같은 면색(-st) - 글자용 진한 톤을 면에 쓰면 핀과 색이 어긋난다 -->
+          <div class="wc" :style="{ background: `var(--${w.t}-st, var(--${w.t}))` }" :title="w.ko"></div>
         </div>
       </div>
       <div v-if="weatherGap && wxUntil" class="wx-note">날씨는 {{ wxUntil }}까지 제공돼요 · 혼잡은 30일 표시</div>

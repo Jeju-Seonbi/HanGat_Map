@@ -38,7 +38,7 @@ export function crowdOn (place, date) {
 export const tier = c => (c == null ? 'none' : c < 40 ? 'calm' : c < 70 ? 'mid' : 'busy')
 
 /** 원본 :511 */
-export const tierKo = c => (c == null ? '정보 없음' : c < 40 ? '한산' : c < 70 ? '보통' : '붐빔')
+export const tierKo = c => (c == null ? '정보 없음' : c < 40 ? '한산' : c < 70 ? '보통' : '혼잡')
 
 /** 원본 :526~528 */
 export function weatherOn (date) {
@@ -119,7 +119,7 @@ export function crowd (s, i) {
 }
 
 /** 혼잡 단계의 한국어 라벨. 리뷰의 혼잡 제보 선택지에 쓰인다 (MAP_008) */
-export const CROWD_KO = { calm: '한산', mid: '보통', busy: '붐빔' }
+export const CROWD_KO = { calm: '한산', mid: '보통', busy: '혼잡' }
 
 /** 그 장소의 30일 예보 중 i일이 몇 번째로 한산한가 (1 = 가장 한산). 예보 없는 날은 순위에서 뺀다 */
 export function rank30 (s, i) {
