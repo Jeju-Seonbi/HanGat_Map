@@ -135,7 +135,7 @@ async function removeReview (r) {
 
     <div class="rv-c">
       <button v-for="c in ['calm', 'mid', 'busy']" :key="c" :class="[c, { on: crowdVote === c }]"
-        @click="crowdVote = crowdVote === c ? '' : c">{{ CROWD_KO[c] }}했어요</button>
+        @click="crowdVote = crowdVote === c ? '' : c">{{ CROWD_KO[c] }}</button>
     </div>
 
     <div class="rv-phrow">
