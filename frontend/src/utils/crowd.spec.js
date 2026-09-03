@@ -89,7 +89,7 @@ describe('tier / tierKo — 원본 경계값(40, 70) 유지', () => {
     expect(tierKo(null)).toBe('정보 없음')
     expect(tierKo(10)).toBe('한산')
     expect(tierKo(50)).toBe('보통')
-    expect(tierKo(90)).toBe('붐빔')
+    expect(tierKo(90)).toBe('혼잡')
   })
 })
 
