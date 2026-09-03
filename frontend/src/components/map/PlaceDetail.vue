@@ -91,7 +91,7 @@ const reviewCount = computed(() => detail.value?.reviewCount ?? 0)
 const ratingAvg = computed(() => detail.value?.ratingAvg ?? null)
 /** 하단 미리보기용 최근 3건 */
 const previewReviews = ref([])
-const rvDate = iso => { const d = new Date(iso); return `${d.getMonth() + 1}/${d.getDate()}` }
+const rvDate = iso => { const d = new Date(iso); return `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}` }
 
 watch(() => props.place.n, loadDetail, { immediate: true })
 
@@ -350,8 +350,8 @@ async function shareNative() {
         <template v-if="previewReviews.length">
           <div v-for="r in previewReviews" :key="r.id" class="rv-i">
             <div class="rv-h">
-              <span class="rv-av">여</span>
-              <span class="rv-nm">여행자{{ r.userId }}</span>
+              <span class="rv-av">{{ (r.nickname ?? '여')[0] }}</span>
+              <span class="rv-nm">{{ r.nickname ?? `여행자${r.userId}` }}</span>
               <span class="rv-dt">{{ rvDate(r.createdAt) }} 작성</span>
             </div>
             <div class="rv-mt">
