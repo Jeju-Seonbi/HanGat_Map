@@ -28,6 +28,11 @@
   <title>한갓지도</title>
   <meta name="description" content="한적한 제주를 찾아주는 여행 코스 서비스">
 
+  <!-- public 정적 자산은 Vite 빌드 결과의 루트로 복사되고 Nginx가 그대로 제공한다. -->
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="/favicon-32x32.png" sizes="32x32">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
   <!--
     메인·AI코스·관광지 화면이 쓰는 Noto Sans KR · Gowun Dodum.
     통합 전에는 assets/styles.css 안의 @import 였는데, CSP 의 style-src 가 'self' 뿐이라
