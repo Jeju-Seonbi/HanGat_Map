@@ -56,7 +56,8 @@ function htmlCspPlugin () {
           */
           /* dapi.kakao.com 의 sdk.js 는 로더일 뿐이고, 실제 지도 코드는
              t1.daumcdn.net/mapjsapi/... 에서 2차로 내려온다. 둘 다 열어야 한다. */
-          `script-src 'self' https://dapi.kakao.com http://t1.daumcdn.net https://t1.daumcdn.net ${hashes.join(' ')}`.trim(),
+          /* t1.kakaocdn.net: 카카오톡 공유 SDK(kakao.min.js) - useKakaoShare.js 가 내려받는다 */
+          `script-src 'self' https://dapi.kakao.com http://t1.daumcdn.net https://t1.daumcdn.net https://t1.kakaocdn.net ${hashes.join(' ')}`.trim(),
           "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
           /* 지도 타일은 mts.daumcdn.net, 마커·아이콘은 t1.daumcdn.net 에서 온다.
              카카오 SDK 가 http 로 요청하므로 http 와일드카드도 필요하다
@@ -68,7 +69,9 @@ function htmlCspPlugin () {
              origin을 빌드 시점에 추가해 운영 요청이 CSP에 막히지 않게 한다. */
           `connect-src 'self'${apiOrigin ? ` ${apiOrigin}` : ''} https://api.pwnedpasswords.com https://dapi.kakao.com http://dapi.kakao.com${dev ? ' http://localhost:8080 ws: wss:' : ''}`,
           "font-src 'self' https://fonts.gstatic.com",
-          "form-action 'self'",
+          /* sharer.kakao.com: 카카오톡 공유가 새 창으로 폼 전송하는 목적지 -
+             form-action 은 대상 창이 달라도 전송 자체를 막는다 */
+          "form-action 'self' https://sharer.kakao.com",
           "base-uri 'none'",
           "object-src 'none'",
           "frame-src 'none'",
