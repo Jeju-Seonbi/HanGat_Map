@@ -3,12 +3,14 @@
 import { ref, computed, watch } from 'vue'
 import StarIcon from './StarIcon.vue'
 import ReviewSection from './ReviewSection.vue'
-import { state, toggleFav, isFav, toast, savePlaceImgs } from '@/stores/mapStore'
+import { state, toggleFav, isFav, toast } from '@/stores/mapStore'
 
 import { crowd, tier, tierKo, rank30, bestDay, CROWD_KO } from '@/utils/crowd'
 import { at, fmtK } from '@/utils/date'
 import { wxOf, wxIcon } from '@/utils/weather'
-import { dist, won, shrink } from '@/utils/geo'
+import { dist, won } from '@/utils/geo'
+import { copyText } from '@/utils/clipboard'
+import { shareToKakao, preloadKakao } from '@/composables/useKakaoShare'
 import MapPlaceService from '@/services/map/MapPlaceService'
 import ReviewApiService, { LEVEL_TO_KEY, absUrl } from '@/services/map/ReviewApiService'
 
@@ -17,7 +19,8 @@ const emit = defineEmits(['close', 'open-place', 'open-photo'])
 
 const view = ref('info')
 const hint = ref('')
-const imgInput = ref(null)
+/* 공유 시트 열림 - loadDetail(즉시 watch)이 닫으므로 선언이 이 위에 있어야 한다 */
+const shareOpen = ref(false)
 /** 휴무일·입장료는 상세 API에만 있다. 못 받아오면 null - 해당 줄만 안 보인다 */
 const detail = ref(null)
 
@@ -81,9 +84,8 @@ const menuRows = computed(() => {
   })
 })
 
-/** KTO 실사진. 있으면 데모 업로드 대신 이걸 쓴다 */
+/** 관광공사(KTO) 공식 사진 - 상세에 싣는 사진은 이것뿐이다 */
 const ktoImages = computed(() => detail.value?.images ?? [])
-const photos = computed(() => state.placeImgs[s.value.n] || [])
 /* 후기 요약은 상세 API(places.rating_avg 비정규화)가 준다 - localStorage 데모 아님 */
 const reviewCount = computed(() => detail.value?.reviewCount ?? 0)
 const ratingAvg = computed(() => detail.value?.ratingAvg ?? null)
@@ -96,6 +98,7 @@ watch(() => props.place.n, loadDetail, { immediate: true })
 async function loadDetail() {
   view.value = 'info'
   hint.value = ''
+  shareOpen.value = false
   detail.value = null
   // 목업 모드는 id 가 없다
   if (s.value.id == null) return
@@ -138,22 +141,53 @@ function findNearby() {
   hint.value = nearby.value.length ? '' : '<span style="color:var(--tx3)">반경 12km 안에는 한산한 대안이 없어요.</span>'
 }
 
-function copyAddr() {
-  const done = () => toast('주소를 복사했어요')
-  if (navigator.clipboard?.writeText) navigator.clipboard.writeText(s.value.addr).then(done).catch(done)
-  else done()
+async function copyAddr() {
+  toast(await copyText(s.value.addr)
+    ? '주소를 복사했어요'
+    : '복사가 막혀 있어요 — 주소를 드래그해 직접 복사해 주세요')
 }
 
-async function onImgFiles(e) {
-  const list = state.placeImgs[s.value.n] || (state.placeImgs[s.value.n] = [])
-  for (const f of [...e.target.files].slice(0, 5 - list.length)) list.push(await shrink(f, 640))
-  savePlaceImgs()
-  e.target.value = ''
+/* ── 친구에게 공유 (MAP_007) ── */
+/** 시트를 열 때 카카오 SDK를 미리 받아둔다 - 클릭 시 팝업이 활성화 안에서 열리게 */
+function toggleShare() {
+  shareOpen.value = !shareOpen.value
+  if (shareOpen.value) preloadKakao()
 }
-function delImg(i) {
-  ;(state.placeImgs[s.value.n] || []).splice(i, 1)
-  savePlaceImgs()
+
+/** 공유용 딥링크(?place=id) - 목업 장소는 id가 없어 현재 화면 주소로 대신한다 */
+const shareUrl = computed(() =>
+  s.value.id != null ? `${location.origin}/map?place=${s.value.id}` : location.href)
+
+async function copyLink() {
+  shareOpen.value = false
+  toast(await copyText(shareUrl.value)
+    ? '링크를 복사했어요 — 붙여넣으면 이 장소가 바로 열려요'
+    : '복사가 막혀 있어요 — 주소창의 주소를 직접 복사해 주세요')
 }
+
+/* 팝업은 클릭 활성화 안에서 열려야 한다 - await 하면 빈 창이 뜬다.
+   그래서 시트를 열 때 preloadKakao()로 미리 받아두고 여기선 동기로 연다.
+   아직 로드 전이면(느린 회선) 열지 않고 링크 복사로 안내한다 */
+function shareKakao() {
+  shareOpen.value = false
+  const opened = shareToKakao({
+    title: s.value.n,
+    description: s.value.addr || [s.value.c, s.value.r].filter(Boolean).join(' · '),
+    imageUrl: ktoImages.value[0]?.url ?? null,
+    url: shareUrl.value,
+  })
+  if (!opened) toast('카카오톡 준비 중이에요 — 잠시 후 다시 누르거나 링크 복사를 이용해 주세요')
+}
+
+/** OS 공유 시트(모바일 브라우저 대부분, 데스크톱은 일부만 지원) */
+const canNative = typeof navigator.share === 'function'
+async function shareNative() {
+  shareOpen.value = false
+  try {
+    await navigator.share({ title: s.value.n, text: `${s.value.n} — 한갓지도`, url: shareUrl.value })
+  } catch { /* 사용자가 시트를 닫은 것 - 정상 */ }
+}
+
 </script>
 
 <template>
@@ -166,7 +200,14 @@ function delImg(i) {
         </div>
         <!-- MAP_009 찜 -->
         <button class="fav" :class="{ on: isFav(s.n) }" aria-label="찜하기" @click="toggleFav(s.n)">♥</button>
-        <button class="share" @click="toast('현재 화면 주소를 복사해 공유하세요 (URL에 상태 저장됨)')">친구에게 공유</button>
+        <div class="share-wrap">
+          <button class="share" :aria-expanded="shareOpen" @click="toggleShare">공유하기</button>
+          <div v-if="shareOpen" class="share-sheet">
+            <button @click="shareKakao"><i class="si ka"></i>카카오톡</button>
+            <button @click="copyLink"><i class="si cp"></i>링크 복사</button>
+            <button v-if="canNative" @click="shareNative"><i class="si nt"></i>더보기</button>
+          </div>
+        </div>
         <button class="pox" @click="emit('close')">×</button>
       </div>
 
@@ -184,7 +225,8 @@ function delImg(i) {
         <span class="ar">›</span>
       </button>
 
-      <!-- 장소 사진(MAP-08): KTO 실사진이 있으면 그것만, 없으면 데모 업로드 -->
+      <!-- 장소 사진(MAP-08): 관광공사(KTO) 공식 사진만 싣는다.
+           사용자 사진은 방문 후기(MAP_008)에서만 올린다 - 상세 직접 업로드(데모)는 2026-09-03 제거 -->
       <div v-if="ktoImages.length" class="pimg">
         <img v-for="(p, i) in ktoImages" :key="p.url" :src="p.thumb" :alt="p.caption || `${s.n} 사진`"
           title="클릭하면 크게 보기" style="cursor:zoom-in"
@@ -192,14 +234,6 @@ function delImg(i) {
       </div>
       <div v-if="ktoImages.length && detail?.imageAttribution" class="pimg-src">
         {{ detail.imageAttribution }}
-      </div>
-      <div v-if="!ktoImages.length" class="pimg">
-        <img v-for="(p, i) in photos" :key="i" :src="p" :alt="`${s.n} 사진`"
-          title="더블클릭하면 삭제 (데모)" @dblclick="delImg(i)">
-        <button v-if="photos.length < 5" class="add" @click="imgInput.click()">
-          <span style="font-size:17px">＋</span>사진 추가<span style="font-size:9px;opacity:.7">데모</span>
-        </button>
-        <input ref="imgInput" type="file" accept="image/*" multiple style="display:none" @change="onImgFiles">
       </div>
 
       <div class="lead">
