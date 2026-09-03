@@ -6,7 +6,7 @@ import vue from '@vitejs/plugin-vue'
 /**
  * index.html 의 %CSP% 를 모드에 맞는 Content-Security-Policy 로 바꾼다.
  *
- * - script-src: 'self' + 인라인 테마 스크립트의 sha256 해시.
+ * - script-src: 'self' + Cloudflare RUM·카카오 SDK + 인라인 테마 스크립트의 sha256 해시.
  *   해시를 쓰면 'unsafe-inline' 없이도 그 블록 하나만 허용된다.
  * - style-src: 'unsafe-inline' 이 필요하다. 개발 모드에서 Vue SFC 의 <style> 이
  *   런타임 JS 로 주입되고, 일부 데이터 시각화가 동적 style 속성을 사용한다.
@@ -57,7 +57,8 @@ function htmlCspPlugin () {
           /* dapi.kakao.com 의 sdk.js 는 로더일 뿐이고, 실제 지도 코드는
              t1.daumcdn.net/mapjsapi/... 에서 2차로 내려온다. 둘 다 열어야 한다. */
           /* t1.kakaocdn.net: 카카오톡 공유 SDK(kakao.min.js) - useKakaoShare.js 가 내려받는다 */
-          `script-src 'self' https://dapi.kakao.com http://t1.daumcdn.net https://t1.daumcdn.net https://t1.kakaocdn.net ${hashes.join(' ')}`.trim(),
+          /* static.cloudflareinsights.com: Cloudflare가 자동 삽입하는 Web Analytics RUM 비콘 */
+          `script-src 'self' https://static.cloudflareinsights.com https://dapi.kakao.com http://t1.daumcdn.net https://t1.daumcdn.net https://t1.kakaocdn.net ${hashes.join(' ')}`.trim(),
           "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
           /* 지도 타일은 mts.daumcdn.net, 마커·아이콘은 t1.daumcdn.net 에서 온다.
              카카오 SDK 가 http 로 요청하므로 http 와일드카드도 필요하다
