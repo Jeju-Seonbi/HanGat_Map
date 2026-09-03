@@ -46,7 +46,6 @@ export const state = reactive({
   F: { reg: '서부', bud: 150000, cat: '' },   // cat='' = 모든 종류
   L: { crowd: 1, spot: 1, food: 1, dine: 0, cafe: 0, cvs: 0, stay: 0, mart: 0, rain: 1 },
   favs: readLS('hangat_favs', []),
-  placeImgs: readLS('hangat_place_imgs', {}),
   courses: readLS('hangat_courses', []),
   toast: '',
 })
@@ -87,6 +86,30 @@ export async function toggleLayer (key) {
   layerLoading.delete(key)
   if (rows) state.layers[key] = rows
   else toast('데이터를 불러오지 못했어요 — 칩을 껐다 다시 켜 주세요')
+}
+
+/**
+ * 딥링크(?place=id) 복원 — 공유 링크·마이페이지 "장소 보기"가 이걸 탄다.
+ * 이미 받아온 레이어에서 먼저 찾고, 없으면 지연 레이어(카페·편의점·마트)를
+ * 하나씩 내려받아 찾는다. 찾은 장소의 업종 칩은 켠다 - 핀이 보여야 상세가 말이 된다.
+ */
+export async function findPlaceById (id) {
+  for (const [k, rows] of Object.entries(state.layers)) {
+    const p = rows.find(x => x.id === id)
+    if (p) { state.L[k] = 1; return p }
+  }
+  if (!state.live) return null
+  for (const k of LAZY_LAYERS) {
+    if (state.layers[k].length || layerLoading.has(k)) continue
+    layerLoading.add(k)
+    const rows = await MapPlaceService.getLayer(k)
+    layerLoading.delete(k)
+    if (!rows) continue
+    state.layers[k] = rows
+    const p = rows.find(x => x.id === id)
+    if (p) { state.L[k] = 1; return p }
+  }
+  return null
 }
 
 /**
@@ -138,10 +161,6 @@ export function toggleFav(name) {
   return true
 }
 export const isFav = name => state.favs.includes(name)
-
-export function savePlaceImgs() {
-  if (!writeLS('hangat_place_imgs', state.placeImgs)) toast('저장 공간이 가득 찼어요 (데모 한계)')
-}
 
 /* ── 코스 저장 (MY_001) ── */
 /** 같은 조건·같은 경유지면 같은 코스로 보고 중복 저장을 막는다 */
