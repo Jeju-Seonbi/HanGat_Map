@@ -114,6 +114,7 @@
      A 헤더는 80px, 이후경님 hangat.css 는 58px 를 하드코딩했다.
      지도가 calc(100% - 58px) 로 높이를 잡아 어긋나던 것을 한 곳으로 모았다. */
   --nav-h:80px;
+  --mobile-tabbar-h:0px;
 
   /* ══ 4) 그림자 · 기타 ════════════════════════════════════ */
   --sh:var(--shadow);
@@ -128,6 +129,14 @@
   --hero-veil:linear-gradient(to top, rgba(0,0,0,.55) 0%, rgba(0,0,0,.12) 45%, transparent 100%);
 
   color-scheme:light;
+}
+
+/* 모바일 앱 셸 높이. 홈 인디케이터까지 포함해 지도·회원 화면이 메뉴에 가리지 않게 한다. */
+@media(max-width:768px){
+  :root{
+    --nav-h:60px;
+    --mobile-tabbar-h:calc(56px + env(safe-area-inset-bottom, 0px));
+  }
 }
 
 /* ══ 정동현 화면 전용 리스킨 토큰 (Toss풍) ═════════════════
