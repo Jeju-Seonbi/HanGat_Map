@@ -10,6 +10,7 @@ import com.example.hangat.map.model.entity.ReviewImage;
 import com.example.hangat.map.model.enums.ReviewStatus;
 import com.example.hangat.map.review.model.ReviewCreateRequest;
 import com.example.hangat.map.review.model.ReviewResponse;
+import com.example.hangat.user.model.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -70,6 +71,30 @@ class ReviewServiceTest {
         assertThat(page.getContent()).hasSize(1);
         assertThat(page.getContent().get(0).getImageUrls()).containsExactly("https://cdn.hangat.dev/1.jpg");
         assertThat(page.getContent().get(0).getUserId()).isEqualTo(7L);
+    }
+
+    @Test
+    void 작성자_닉네임이_함께_나온다() {
+        User user = em.persist(User.signUpWithSocial("nick@test.local", "제주도침략자"));
+        em.persist(Review.builder()
+                .userId(user.getId()).place(감귤박물관)
+                .rating((byte) 5).status(ReviewStatus.ACTIVE)
+                .build());
+        em.flush();
+
+        PageResponse<ReviewResponse> page = service.getReviews(감귤박물관.getId(), 0, 6);
+
+        assertThat(page.getContent().get(0).getNickname()).isEqualTo("제주도침략자");
+    }
+
+    @Test
+    void 유저가_없으면_닉네임은_null이다() {
+        review("작성자가 탈퇴한 후기");   // userId 7L - users 에 없는 id
+        em.flush();
+
+        PageResponse<ReviewResponse> page = service.getReviews(감귤박물관.getId(), 0, 6);
+
+        assertThat(page.getContent().get(0).getNickname()).isNull();
     }
 
     @Test

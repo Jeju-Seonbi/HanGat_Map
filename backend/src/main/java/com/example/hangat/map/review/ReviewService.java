@@ -13,6 +13,8 @@ import com.example.hangat.map.repository.PlaceRepository;
 import com.example.hangat.map.repository.ReviewImageRepository;
 import com.example.hangat.map.repository.ReviewRepository;
 import com.example.hangat.map.review.model.ReviewResponse;
+import com.example.hangat.user.model.User;
+import com.example.hangat.user.repository.UserRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -35,13 +37,16 @@ public class ReviewService {
     private final ReviewRepository reviewRepository;
     private final ReviewImageRepository imageRepository;
     private final PlaceRepository placeRepository;
+    private final UserRepository userRepository;
 
     public ReviewService(ReviewRepository reviewRepository,
                          ReviewImageRepository imageRepository,
-                         PlaceRepository placeRepository) {
+                         PlaceRepository placeRepository,
+                         UserRepository userRepository) {
         this.reviewRepository = reviewRepository;
         this.imageRepository = imageRepository;
         this.placeRepository = placeRepository;
+        this.userRepository = userRepository;
     }
 
     /** 장소별 후기 목록 - 삭제분 제외, 최신순 */
@@ -59,8 +64,21 @@ public class ReviewService {
                 : imageRepository.findByReviewIdInOrderBySortOrder(ids).stream()
                         .collect(Collectors.groupingBy(i -> i.getReview().getId()));
 
+        Map<Long, String> nicknames = nicknamesOf(
+                reviews.getContent().stream().map(Review::getUserId).toList());
         return PageResponse.from(reviews.map(r ->
-                ReviewResponse.from(r, imagesByReview.getOrDefault(r.getId(), List.of()))));
+                ReviewResponse.from(r, imagesByReview.getOrDefault(r.getId(), List.of()),
+                        nicknames.get(r.getUserId()))));
+    }
+
+    /** 작성자 닉네임 - 페이지당 쿼리 한 번(IN). 탈퇴 등으로 유저가 없으면 맵에서 빠져 null 로 내려간다 */
+    private Map<Long, String> nicknamesOf(List<Long> userIds) {
+        if (userIds.isEmpty()) {
+            return Map.of();
+        }
+        return userRepository.findAllById(userIds).stream()
+                .filter(u -> u.getNickname() != null)
+                .collect(Collectors.toMap(User::getId, User::getNickname, (a, b) -> a));
     }
 
     @Transactional
@@ -92,7 +110,7 @@ public class ReviewService {
         }
 
         refreshSummary(place);
-        return ReviewResponse.from(review, images);
+        return ReviewResponse.from(review, images, nicknamesOf(List.of(userId)).get(userId));
     }
 
     @Transactional
