@@ -14,6 +14,19 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 class KakaoLocalClientTest {
+    @Test
+    void routeSearchUsesBoundedKeywordAndParkingRequests() {
+        Fixture f=fixture();
+        f.server.expect(requestTo(containsString("/v2/local/search/keyword.json")))
+                .andExpect(requestTo(containsString("radius=1000")))
+                .andRespond(withSuccess("{\"documents\":[]}",MediaType.APPLICATION_JSON));
+        f.server.expect(requestTo(containsString("category_group_code=PK6")))
+                .andRespond(withSuccess("{\"documents\":[]}",MediaType.APPLICATION_JSON));
+        assertThat(f.client.searchRouteAccessPoints("어승생 입구",new BigDecimal("126.5"),new BigDecimal("33.4"),1000)).isEmpty();
+        assertThat(f.client.searchRouteAccessPoints(null,new BigDecimal("126.5"),new BigDecimal("33.4"),1000)).isEmpty();
+        f.server.verify();
+    }
+
 
     @Test
     void 기존_주소_좌표_계약을_유지한다() {

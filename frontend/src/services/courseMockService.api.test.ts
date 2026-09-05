@@ -275,6 +275,34 @@ describe('courseMockService Backend generation', () => {
     expect(recommendations.every(item => !item.source_place_id.startsWith('MOCK_KAKAO_'))).toBe(true)
   })
 
+  it('loads the car route after the course without changing the itinerary', async () => {
+    const before = structuredClone(response)
+    const route = {
+      course_id: 101,
+      transport: 'RENTAL_CAR' as const,
+      provider: 'KAKAO_MOBILITY' as const,
+      priority: 'RECOMMEND' as const,
+      cached: false,
+      fetched_at: '2026-09-03T12:00:00+09:00',
+      days: [{
+        day_no: 1,
+        visit_date: condition.start_date,
+        total_distance_meters: 12500,
+        total_duration_seconds: 1800,
+        legs: [],
+        polyline: [{ latitude: 33.45, longitude: 126.55 }],
+      }],
+    }
+    const requestMock = vi.mocked(apiRequest).mockResolvedValue(route)
+
+    expect(await courseMockService.getCarRoute(response)).toBe(route)
+    expect(requestMock).toHaveBeenCalledWith('/courses/101/routes/car', {
+      method: 'GET',
+      auth: false,
+    })
+    expect(response).toEqual(before)
+  })
+
   it('uses the authenticated owner boundary for a SAVED course', async () => {
     const savedCourse: CourseResult = {
       ...response,

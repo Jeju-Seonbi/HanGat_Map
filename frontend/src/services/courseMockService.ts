@@ -8,6 +8,7 @@ import type {
   CourseItem,
   CourseItemCost,
   CourseResult,
+  CarRouteResult,
   CongestionRescheduleOption,
   IndoorOutdoor,
   PlacePreference,
@@ -694,6 +695,13 @@ async function getRecommendedAccommodations(
   }))
 }
 
+async function getCarRoute(course: CourseResult): Promise<CarRouteResult> {
+  return await apiRequest(`/courses/${course.id}/routes/car`, {
+    method: 'GET',
+    auth: !course.claim_token && course.status === 'SAVED',
+  }) as CarRouteResult
+}
+
 export const generateMockCourseForTest = generateMockCourse
 
 export const courseMockService = {
@@ -701,6 +709,7 @@ export const courseMockService = {
   regenerateCourse: (_condition: CourseCondition): Promise<CourseResult> => Promise.reject(new Error('코스 재생성은 아직 지원되지 않습니다.')),
   updateAccommodation,
   getRecommendedAccommodations,
+  getCarRoute,
   applyAccommodationSelection,
   recalculateRouteWithAccommodation: (condition: CourseCondition, accommodation: AccommodationInput) => generateMockCourse({
     ...JSON.parse(JSON.stringify(condition)) as CourseCondition,
