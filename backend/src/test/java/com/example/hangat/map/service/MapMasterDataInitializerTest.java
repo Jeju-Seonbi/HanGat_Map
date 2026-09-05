@@ -4,6 +4,7 @@ import com.example.hangat.map.model.entity.Region;
 import com.example.hangat.map.repository.DataSourceRepository;
 import com.example.hangat.map.repository.RegionRepository;
 import jakarta.persistence.EntityManager;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +30,17 @@ class MapMasterDataInitializerTest {
     @Autowired RegionRepository regionRepository;
     @Autowired DataSourceRepository dataSourceRepository;
     @Autowired EntityManager em;
+
+    /**
+     * 스위트 관례: 마스터가 비워진 컨텍스트(다른 테스트가 regions·data_sources를 deleteAll한 뒤)를 이어받아도
+     * 자립한다. 초기화는 멱등이라 부팅 때 이미 돌았어도 다시 불러 해가 없다.
+     */
+    @BeforeEach
+    void initialize() {
+        initializer.run(null);
+        em.flush();
+        em.clear();
+    }
 
     @Test
     @DisplayName("빈 DB 기동 시 권역 4행에 기상청 격자가 함께 들어간다 - 북부는 기존 단일 격자 52/38과 같다")
