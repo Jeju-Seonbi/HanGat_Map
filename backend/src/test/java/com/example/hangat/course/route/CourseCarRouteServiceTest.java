@@ -18,6 +18,90 @@ import static org.mockito.Mockito.when;
 
 class CourseCarRouteServiceTest {
     @Test
+    void noAccommodationUsesOnlyOrderedPlacesAndPreservesPartialLegs() {
+        for (int code : new int[]{102, 103, 104}) {
+            var query = mock(CourseQueryService.class);
+            var client = mock(KakaoMobilityClient.class);
+            var resolver = mock(RouteAccessPointResolver.class);
+            var original = course(List.of(item(1,33.43,126.76),item(2,33.41,126.68),item(3,33.43,126.92)));
+            when(query.detail(10L,null)).thenReturn(original);
+            when(client.route(org.mockito.ArgumentMatchers.anyList())).thenThrow(new RouteCoordinateException(code));
+            when(client.routeOnce(org.mockito.ArgumentMatchers.anyList()))
+                    .thenThrow(new RouteCoordinateException(102)).thenReturn(success())
+                    .thenThrow(new RouteCoordinateException(102)).thenReturn(success());
+            var service = new CourseCarRouteService(query,client,resolver,Duration.ofMinutes(10),2);
+            var before = List.copyOf(original.days().get(0).items());
+            var result = service.route(10L,null);
+            assertThat(result.days().get(0).totalDistanceMeters()).isNull();
+            assertThat(result.days().get(0).legs().get(0).durationSeconds()).isNull();
+            assertThat(result.days().get(0).legs().get(0).polyline()).isEmpty();
+            assertThat(result.days().get(0).legs().get(1).distanceMeters()).isEqualTo(1000);
+            assertThat(result.days().get(0).polyline()).isEmpty();
+            assertThat(service.route(10L,null).cached()).isFalse();
+            assertThat(original.days().get(0).items()).containsExactlyElementsOf(before);
+            verify(client,times(2)).route(org.mockito.ArgumentMatchers.argThat(points ->
+                    points.size()==3 && points.stream().allMatch(p->p.type().equals("COURSE_ITEM"))
+                    && points.get(0).id().equals("1") && points.get(2).id().equals("3")));
+        }
+    }
+
+    @Test
+    void oneFailedDayDoesNotDiscardOtherDaysForEveryBusinessError() {
+        for (int code : new int[]{101,102,103,104}) {
+            var query=mock(CourseQueryService.class);var client=mock(KakaoMobilityClient.class);
+            var original=course(List.of(item(1,33.24,126.57),item(2,33.25,126.56)));
+            var days = List.of(
+                    new CourseDetailResponse.DayDto(1,LocalDate.of(2026,9,3),List.of(item(1,33.24,126.57),item(2,33.25,126.56))),
+                    new CourseDetailResponse.DayDto(2,LocalDate.of(2026,9,4),List.of(item(3,33.26,126.55),item(4,33.27,126.54))));
+            when(original.days()).thenReturn(days);
+            when(query.detail(10L,null)).thenReturn(original);
+            when(client.route(org.mockito.ArgumentMatchers.anyList())).thenThrow(new RouteCoordinateException(code)).thenReturn(success());
+            var result=new CourseCarRouteService(query,client,Duration.ofMinutes(10),2).route(10L,null);
+            assertThat(result.days()).hasSize(2);
+            assertThat(result.days().get(0).legs().get(0).distanceMeters()).isNull();
+            assertThat(result.days().get(1).totalDistanceMeters()).isEqualTo(1000);
+            assertThat(result.days().get(1).totalDurationSeconds()).isEqualTo(120);
+        }
+    }
+
+    @Test
+    void unresolvedEndpointWithNoSuccessfulLegRetainsFailure() {
+        var query=mock(CourseQueryService.class);var client=mock(KakaoMobilityClient.class);
+        var original=course(List.of(item(1,33.24,126.57),item(2,33.25,126.56),item(3,33.26,126.55)));
+        when(query.detail(10L,null)).thenReturn(original);
+        when(client.route(org.mockito.ArgumentMatchers.anyList())).thenThrow(new RouteCoordinateException(102));
+        when(client.routeOnce(org.mockito.ArgumentMatchers.anyList())).thenThrow(new RouteCoordinateException(102));
+        assertThatThrownBy(()->new CourseCarRouteService(query,client,Duration.ofMinutes(10),2).route(10L,null))
+                .isInstanceOf(RouteCoordinateException.class);
+    }
+
+    @Test
+    void accommodationAddsDepartureAndReturnAndInvalidatesSuccessfulCache() {
+        var query=mock(CourseQueryService.class);var client=mock(KakaoMobilityClient.class);
+        var original=course(List.of(item(1,33.24,126.57),item(2,33.25,126.56)));
+        when(query.detail(10L,null)).thenReturn(original);
+        when(client.route(org.mockito.ArgumentMatchers.anyList())).thenAnswer(invocation->{
+            List<KakaoMobilityClient.RoutePoint> points=invocation.getArgument(0);
+            return new KakaoMobilityClient.Route(1000*(points.size()-1),120*(points.size()-1),
+                    java.util.Collections.nCopies(points.size()-1,success().sections().get(0)));
+        });
+        var service=new CourseCarRouteService(query,client,Duration.ofMinutes(10),2);
+        assertThat(service.route(10L,null).cached()).isFalse();
+        assertThat(service.route(10L,null).cached()).isTrue();
+        var stay=mock(com.example.hangat.course.model.AccommodationDto.class);
+        when(stay.getLatitude()).thenReturn(33.3);when(stay.getLongitude()).thenReturn(126.6);
+        when(stay.getSourcePlaceId()).thenReturn("verified-stay");
+        when(original.accommodation()).thenReturn(stay);
+        assertThat(service.route(10L,null).cached()).isFalse();
+        verify(client).route(org.mockito.ArgumentMatchers.argThat(p->p.size()==4
+                &&p.get(0).type().equals("ACCOMMODATION")&&p.get(3).type().equals("ACCOMMODATION")));
+    }
+
+    private KakaoMobilityClient.Route success() {
+        return new KakaoMobilityClient.Route(1000,120,List.of(new KakaoMobilityClient.RouteSection(
+                1000,120,List.of(new CarRouteResponse.Coordinate(33.25,126.56)))));
+    }
+    @Test
     void observedYeolanjiRuntimeFailuresRemainMissingWithoutInventingAccess() {
         // Public runtime evidence: KTO:1925366, 33.4265967334/126.5207167107.
         // Eorimok -> Yeolanji = 103; Yeolanji -> Bangseonmun = 102; Local candidates = 0.

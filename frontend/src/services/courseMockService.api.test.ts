@@ -303,6 +303,24 @@ describe('courseMockService Backend generation', () => {
     expect(response).toEqual(before)
   })
 
+  it('preserves a no-accommodation itinerary on full route failure and later re-queries after selection', async () => {
+    const original: CourseResult = { ...structuredClone(response), accommodation: null }
+    const before = structuredClone(original)
+    const request = vi.mocked(apiRequest).mockRejectedValueOnce(new Error('route unavailable'))
+    await expect(courseMockService.getCarRoute(original)).rejects.toThrow('route unavailable')
+    expect(original).toEqual(before)
+    const partial = { days: [{ total_distance_meters: null, total_duration_seconds: null,
+      legs: [{ distance_meters: null, duration_seconds: null }, { distance_meters: 1000, duration_seconds: 120 }] }] }
+    request.mockResolvedValueOnce(partial)
+    expect(await courseMockService.getCarRoute(original)).toEqual(partial)
+    const selected = { ...original, accommodation: condition.accommodation }
+    request.mockResolvedValueOnce({ days: [] })
+    await courseMockService.getCarRoute(selected)
+    expect(request).toHaveBeenCalledTimes(3)
+    expect(selected.days).toEqual(before.days)
+    expect(original.accommodation).toBeNull()
+  })
+
   it('uses the authenticated owner boundary for a SAVED course', async () => {
     const savedCourse: CourseResult = {
       ...response,

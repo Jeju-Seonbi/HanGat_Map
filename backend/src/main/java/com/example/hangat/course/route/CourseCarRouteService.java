@@ -90,8 +90,10 @@ public class CourseCarRouteService {
     private CarRouteResponse calculate(CourseDetailResponse course) {
         List<CarRouteResponse.DayRoute> days = new ArrayList<>();
         Map<Long, java.util.Optional<CarRouteResponse.AccessPoint>> resolved = new java.util.HashMap<>();
+        RouteCoordinateException unavailableDay = null;
         for (CourseDetailResponse.DayDto day : course.days()) {
             List<RoutePoint> points = points(day, course.accommodation());
+            try {
             if (points.size() < 2) {
                 days.add(new CarRouteResponse.DayRoute(day.dayNo(), day.visitDate(), null, null,
                         List.of(), List.of()));
@@ -107,11 +109,17 @@ public class CourseCarRouteService {
                     continue;
                 }
                 int index = failure.resultCode() == 102 ? 0 : failure.resultCode() == 103 ? points.size() - 1 : -1;
-                if (index < 0 || !resolve(day, points, index, accessPoints, resolved)) throw failure;
+                if (index < 0 || !resolve(day, points, index, accessPoints, resolved)) {
+                    if (points.size() <= 2) throw failure;
+                    unavailableDay = failure;
+                    days.add(diagnose(day, points, accessPoints, resolved));
+                    continue;
+                }
                 try {
                     route = client.routeOnce(points);
                 } catch (RouteCoordinateException repairedFailure) {
-                    if (repairedFailure.resultCode() != 101 || points.size() <= 2) throw repairedFailure;
+                    if (points.size() <= 2) throw repairedFailure;
+                    if (repairedFailure.resultCode() != 101) unavailableDay = repairedFailure;
                     days.add(diagnose(day, points, accessPoints, resolved));
                     continue;
                 }
@@ -131,7 +139,20 @@ public class CourseCarRouteService {
             days.add(new CarRouteResponse.DayRoute(day.dayNo(), day.visitDate(),
                     route.distanceMeters(), route.durationSeconds(), List.copyOf(legs),
                     List.copyOf(polyline)));
+            } catch (RouteCoordinateException failure) {
+                // A provider business error belongs to this day, not to the whole itinerary.
+                unavailableDay = failure;
+                List<CarRouteResponse.Leg> missing = new ArrayList<>();
+                for (int i = 0; i < points.size() - 1; i++) {
+                    missing.add(new CarRouteResponse.Leg(stop(points.get(i), null),
+                            stop(points.get(i + 1), null), null, null, List.of()));
+                }
+                days.add(new CarRouteResponse.DayRoute(day.dayNo(), day.visitDate(),
+                        null, null, List.copyOf(missing), List.of()));
+            }
         }
+        if (unavailableDay != null && days.stream().flatMap(d -> d.legs().stream())
+                .noneMatch(l -> l.distanceMeters() != null && l.durationSeconds() != null)) throw unavailableDay;
         return new CarRouteResponse(course.id(), course.transport(), PROVIDER, PRIORITY, false,
                 OffsetDateTime.now(), List.copyOf(days));
     }
