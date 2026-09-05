@@ -1,4 +1,6 @@
--- V2: 권역 날씨 예보(테이블 명세서 17.0) + course_items 날씨 스냅숏 FK 전환
+-- V3: 권역 날씨 예보(테이블 명세서 17.0) + course_items 날씨 스냅숏 FK 전환
+-- (V2는 숙소 저장 연동이 먼저 썼다. 새 스크립트는 git ls-tree origin/dev backend/src/main/resources/db/migration 으로
+--  현재 최대 버전을 확인하고 그 다음 번호를 쓴다 - FlywayMigrationResolutionTest가 중복을 잡는다.)
 --
 -- 발표 시각(base_at)별 append 이력이다 - UPSERT로 덮어쓰면 "저장 시점 예보 vs 최신 예보" 비교(MY_008)가
 -- 불가능해진다. congestion_forecasts(16.0)와 같은 구조.

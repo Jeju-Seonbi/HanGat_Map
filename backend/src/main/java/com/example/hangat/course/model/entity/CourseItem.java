@@ -123,7 +123,7 @@ public class CourseItem {
      * 저장 시점 날씨 예보 스냅숏(권역 DAILY 행, {@link WeatherForecast}). 혼잡 스냅숏과 같은 이유로
      * ON DELETE SET NULL - 날씨 적재가 같은 발표 버전을 지우고 다시 넣을 때 코스가 FK로 막으면 안 되고,
      * 지워지면 '날씨 정보 없음'으로 정직하게 돌아간다. 예보가 없던 날·권역은 NULL.
-     * (V1까지는 참조 테이블이 없어 Long이었다 - Flyway V2에서 FK 전환.)
+     * (V1까지는 참조 테이블이 없어 Long이었다 - Flyway V3에서 FK 전환.)
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "planned_weather_forecast_id",
