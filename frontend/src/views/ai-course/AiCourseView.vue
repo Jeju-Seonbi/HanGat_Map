@@ -10,7 +10,8 @@ import CongestionRescheduleModal from '../../components/course/CongestionResched
 import AccommodationRecommendations from '../../components/course/AccommodationRecommendations.vue'
 import { courseGenerationErrorMessage, courseMockService } from '../../services/courseMockService'
 import { storePendingCourseClaim, takePendingCourseClaim } from '../../services/pendingCourseClaim'
-import type { AccommodationInput, AccommodationRecommendation, AlternativePlace, CongestionRescheduleOption, CourseCondition, CourseItem, CourseResult } from '../../assets/types/course'
+import { routeSummary, accessNotices } from '../../services/course/courseSummary'
+import type { AccommodationInput, AccommodationRecommendation, AlternativePlace, CarDayRoute, CarRouteLeg, CongestionRescheduleOption, CourseCondition, CourseItem, CourseResult } from '../../assets/types/course'
 
 const now = new Date()
 const later = new Date(now)
@@ -41,6 +42,8 @@ const rescheduleLoading = ref(false)
 const recommendedAccommodations = ref<AccommodationRecommendation[]>([])
 const accommodationLoading = ref(false)
 const accommodationError = ref('')
+const routeLoading = ref(false)
+const routeError = ref('')
 const saveOpen = ref(false)
 const title = ref('')
 const saveError = ref('')
@@ -49,13 +52,34 @@ const toast = ref('')
 const auth = useAuthStore()
 const router = useRouter()
 
-/* MAP-06: 결과를 지도 코스로 전달한다 - 저장은 CourseBridge, 표시는 지도 페이지가 맡는다 */
+/* Navigate through the existing saved-course URL without sharing route geometry. */
 async function viewOnMap() {
   if (!result.value) return
-  const { stashAiCourse } = await import('@/services/map/CourseBridge')
-  stashAiCourse(result.value as never)
-  await router.push({ path: '/map', query: { course: 'ai' } })
+  if (result.value.status !== 'SAVED') {
+    toast.value = '코스를 저장한 뒤 지도에서 확인해 주세요.'
+    return
+  }
+  await router.push({ path: '/map', query: { course: String(result.value.id) } })
 }
+
+async function loadCarRoute() {
+  if (!result.value || result.value.transport !== 'RENTAL_CAR') return
+  routeLoading.value = true
+  routeError.value = ''
+  try {
+    result.value = { ...result.value, car_route: await courseMockService.getCarRoute(result.value) }
+  } catch {
+    routeError.value = '이동 경로를 불러오지 못했어요.'
+  } finally {
+    routeLoading.value = false
+  }
+}
+
+const routeForDay = (dayNo: number): CarDayRoute | undefined =>
+  result.value?.car_route?.days.find(day => day.day_no === dayNo)
+const inboundRoute = (dayNo: number, itemId: number): CarRouteLeg | undefined =>
+  routeForDay(dayNo)?.legs.find(leg => leg.to.type === 'COURSE_ITEM' && leg.to.id === String(itemId))
+const formatDuration = (seconds?: number | null) => seconds == null ? '정보 없음' : `${Math.round(seconds / 60)}분`
 
 const transportLabel = {
   RENTAL_CAR: '렌터카',
@@ -89,6 +113,7 @@ async function generate(next: CourseCondition, regenerate = false) {
       : await courseMockService.generateCourse(condition)
     recommendedAccommodations.value = []
     editing.value = false
+    void loadCarRoute()
     if (!condition.accommodation) {
       accommodationLoading.value = true
       accommodationError.value = ''
@@ -123,6 +148,8 @@ async function selectRecommendedAccommodation(accommodation: AccommodationInput)
       result.value,
       savedAccommodation,
     )
+    delete result.value.car_route
+    void loadCarRoute()
     recommendedAccommodations.value = []
   } catch {
     error.value = '숙소를 저장하지 못했어요. 기존 일정은 그대로 유지됩니다.'
@@ -235,7 +262,7 @@ const formatShortDate = (value: string) => new Intl.DateTimeFormat('ko-KR', {
   timeZone: 'UTC',
 }).format(new Date(`${value}T00:00:00Z`))
 
-const formatDistance = (metres?: number) => metres == null ? '' : `${(metres / 1000).toFixed(1)}km`
+const formatDistance = (metres?: number | null) => metres == null ? '정보 없음' : `${(metres / 1000).toFixed(1)}km`
 </script>
 
 <template>
@@ -285,12 +312,24 @@ const formatDistance = (metres?: number) => metres == null ? '' : `${(metres / 1
         <main>
           <section v-for="day in result.days" :key="day.day_no" class="course-day">
             <header><b>DAY {{ day.day_no }}</b><span>{{ formatDate(day.visit_date) }}</span></header>
+            <p v-if="result.transport === 'RENTAL_CAR'" class="route-summary">
+              총 이동 {{ routeSummary([routeForDay(day.day_no) ?? {}], routeLoading) }}
+            </p>
             <div class="day-timeline">
+              <p v-for="notice in accessNotices(routeForDay(day.day_no) ? [routeForDay(day.day_no)!] : [])" :key="notice" class="route-status">{{ notice }}</p>
               <div v-if="result.accommodation" class="travel-line"><span>↓</span> 숙소 출발 · {{ result.accommodation.place_name }}<template v-if="day.accommodation_departure_travel_minutes"> · {{ transportLabel[result.transport] }} {{ day.accommodation_departure_travel_minutes }}분 · {{ formatDistance(day.accommodation_departure_distance_m) }}</template></div>
-              <CourseItemCard v-for="item in day.items" :key="item.id" :item="item" :transport="result.transport" @alternative="openAlternatives" @reschedule="openReschedule" />
+              <template v-for="item in day.items" :key="item.id">
+                <div v-if="inboundRoute(day.day_no, item.id)" class="travel-line">
+                  <span>↓</span> 이동 약 {{ formatDuration(inboundRoute(day.day_no, item.id)?.duration_seconds) }} ·
+                  {{ formatDistance(inboundRoute(day.day_no, item.id)?.distance_meters) }}
+                </div>
+                <CourseItemCard :item="item" :transport="result.transport" @alternative="openAlternatives" @reschedule="openReschedule" />
+              </template>
               <div v-if="result.accommodation" class="travel-line"><span>↓</span> 숙소 복귀 · {{ result.accommodation.place_name }}<template v-if="day.accommodation_return_travel_minutes"> · {{ transportLabel[result.transport] }} {{ day.accommodation_return_travel_minutes }}분 · {{ formatDistance(day.accommodation_return_distance_m) }}</template></div>
             </div>
           </section>
+          <p v-if="routeLoading" class="route-status">자동차 이동 경로를 불러오는 중이에요.</p>
+          <p v-else-if="routeError" class="course-error">{{ routeError }}</p>
         </main>
 
         <aside class="course-side">

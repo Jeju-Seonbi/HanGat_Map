@@ -275,6 +275,52 @@ describe('courseMockService Backend generation', () => {
     expect(recommendations.every(item => !item.source_place_id.startsWith('MOCK_KAKAO_'))).toBe(true)
   })
 
+  it('loads the car route after the course without changing the itinerary', async () => {
+    const before = structuredClone(response)
+    const route = {
+      course_id: 101,
+      transport: 'RENTAL_CAR' as const,
+      provider: 'KAKAO_MOBILITY' as const,
+      priority: 'RECOMMEND' as const,
+      cached: false,
+      fetched_at: '2026-09-03T12:00:00+09:00',
+      days: [{
+        day_no: 1,
+        visit_date: condition.start_date,
+        total_distance_meters: 12500,
+        total_duration_seconds: 1800,
+        legs: [],
+        polyline: [{ latitude: 33.45, longitude: 126.55 }],
+      }],
+    }
+    const requestMock = vi.mocked(apiRequest).mockResolvedValue(route)
+
+    expect(await courseMockService.getCarRoute(response)).toBe(route)
+    expect(requestMock).toHaveBeenCalledWith('/courses/101/routes/car', {
+      method: 'GET',
+      auth: false,
+    })
+    expect(response).toEqual(before)
+  })
+
+  it('preserves a no-accommodation itinerary on full route failure and later re-queries after selection', async () => {
+    const original: CourseResult = { ...structuredClone(response), accommodation: null }
+    const before = structuredClone(original)
+    const request = vi.mocked(apiRequest).mockRejectedValueOnce(new Error('route unavailable'))
+    await expect(courseMockService.getCarRoute(original)).rejects.toThrow('route unavailable')
+    expect(original).toEqual(before)
+    const partial = { days: [{ total_distance_meters: null, total_duration_seconds: null,
+      legs: [{ distance_meters: null, duration_seconds: null }, { distance_meters: 1000, duration_seconds: 120 }] }] }
+    request.mockResolvedValueOnce(partial)
+    expect(await courseMockService.getCarRoute(original)).toEqual(partial)
+    const selected = { ...original, accommodation: condition.accommodation }
+    request.mockResolvedValueOnce({ days: [] })
+    await courseMockService.getCarRoute(selected)
+    expect(request).toHaveBeenCalledTimes(3)
+    expect(selected.days).toEqual(before.days)
+    expect(original.accommodation).toBeNull()
+  })
+
   it('uses the authenticated owner boundary for a SAVED course', async () => {
     const savedCourse: CourseResult = {
       ...response,

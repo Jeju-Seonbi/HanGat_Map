@@ -100,6 +100,23 @@ public class KakaoLocalClient {
                 .header("Authorization", "KakaoAK " + restKey)
                 .retrieve()
                 .body(JsonNode.class);
+        return parsePlaces(body);
+    }
+
+    /** One bounded page of route-only parking/entrance candidates; never persisted. */
+    public List<KakaoPlace> searchRouteAccessPoints(String query, BigDecimal longitude,
+            BigDecimal latitude, int radiusMeters) {
+        requireKey();
+        var uri = UriComponentsBuilder.fromPath(query == null ? CATEGORY_PATH : "/v2/local/search/keyword.json")
+                .queryParam("x", longitude.toPlainString()).queryParam("y", latitude.toPlainString())
+                .queryParam("radius", radiusMeters).queryParam("size", 15).queryParam("sort", "distance");
+        if (query == null) uri.queryParam("category_group_code", "PK6");
+        else uri.queryParam("query", query);
+        return parsePlaces(restClient.get().uri(uri.build().toUriString())
+                .header("Authorization", "KakaoAK " + restKey).retrieve().body(JsonNode.class));
+    }
+
+    private List<KakaoPlace> parsePlaces(JsonNode body) {
         JsonNode docs = documents(body);
         if (docs == null) {
             return List.of();
