@@ -32,6 +32,28 @@ public interface WeatherForecastRepository extends JpaRepository<WeatherForecast
     List<WeatherForecast> findByRegionIdAndBaseAtAndGranularityOrderByForecastAtAsc(
             Short regionId, LocalDateTime baseAt, WeatherGranularity granularity);
 
+    /**
+     * 한 권역의 날짜 구간을 <b>날짜마다 가장 최근 발표분</b>으로 - 메인 주간 날씨·권역 레이어의 기본 조회.
+     *
+     * <p>버전을 전역 하나로 고정하지 않는 이유: 단기(05시 발표)와 중기(06시 발표)가 다른 base_at을 갖고,
+     * 어제 중기가 덮던 날짜를 오늘 단기가 덮으면 그 날짜만 새 버전으로 바뀐다. 날짜별 최신을 골라야
+     * 한 주가 "가능한 가장 새 예보"로 채워진다.
+     */
+    @Query("""
+            select f from WeatherForecast f
+            where f.region.id = :regionId
+              and f.granularity = :granularity
+              and f.forecastAt between :fromUtc and :toUtc
+              and f.baseAt = (
+                  select max(g.baseAt) from WeatherForecast g
+                  where g.region = f.region and g.forecastAt = f.forecastAt and g.granularity = f.granularity)
+            order by f.forecastAt
+            """)
+    List<WeatherForecast> findLatestPerDate(@Param("regionId") Short regionId,
+                                            @Param("fromUtc") LocalDateTime fromUtc,
+                                            @Param("toUtc") LocalDateTime toUtc,
+                                            @Param("granularity") WeatherGranularity granularity);
+
     /** 한 권역·한 날짜의 최신 발표 예보 - 코스가 저장 시점 스냅숏을 박을 때 쓴다. */
     Optional<WeatherForecast> findFirstByRegionIdAndForecastAtAndGranularityOrderByBaseAtDesc(
             Short regionId, LocalDateTime forecastAt, WeatherGranularity granularity);

@@ -23,6 +23,7 @@ import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 /**
  * weather_forecasts(17.0) 엔티티·리포지토리 - 발표 버전 append 이력 규칙을 못 박는다.
@@ -111,6 +112,11 @@ class WeatherForecastPersistenceTest {
 
         assertThat(repository.findByBaseAtAndGranularityOrderByRegionIdAscForecastAtAsc(
                 BASE_NEW, WeatherGranularity.DAILY)).hasSize(3);
+
+        // 날짜별 최신: DAY1은 BASE_NEW 행만, DAY2도 포함, 동부는 제외
+        assertThat(repository.findLatestPerDate(north.getId(), DAY1, DAY2, WeatherGranularity.DAILY))
+                .extracting(WeatherForecast::getForecastAt, WeatherForecast::getBaseAt)
+                .containsExactly(tuple(DAY1, BASE_NEW), tuple(DAY2, BASE_NEW));
 
         int removed = repository.deleteVersion(BASE_NEW, WeatherGranularity.DAILY);
         assertThat(removed).isEqualTo(3);

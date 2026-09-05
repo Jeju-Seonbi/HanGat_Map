@@ -6,6 +6,8 @@ import com.example.hangat.domain.weather.model.DailyWeather;
 import com.example.hangat.domain.weather.model.MidLandItem;
 import com.example.hangat.domain.weather.model.MidTaItem;
 import com.example.hangat.domain.weather.model.ShortTermItem;
+import com.example.hangat.domain.weather.repository.WeatherForecastRepository;
+import com.example.hangat.map.repository.RegionRepository;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
@@ -19,14 +21,20 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-/** 병합 로직 검증 - WeatherClient는 목으로 대체 (실호출 없음) */
+/**
+ * 라이브 병합 로직 검증 - WeatherClient는 목으로 대체(실호출 없음).
+ * 리포지토리 목은 기본값(빈 결과)이라 DB 미적재 상태 = 라이브 폴백 경로를 그대로 검증한다.
+ * DB 우선 경로는 {@link WeatherServiceStoreReadTest}.
+ */
 class WeatherServiceTest {
 
     private static final DateTimeFormatter YMD = DateTimeFormatter.BASIC_ISO_DATE;
 
     private final LocalDate today = LocalDate.now();
     private final WeatherClient client = mock(WeatherClient.class);
-    private final WeatherService service = new WeatherService(client);
+    private final WeatherForecastRepository forecastRepository = mock(WeatherForecastRepository.class);
+    private final RegionRepository regionRepository = mock(RegionRepository.class);
+    private final WeatherService service = new WeatherService(client, forecastRepository, regionRepository);
 
     /** D+0~3 각 날짜에 TMN/TMX/TMP/SKY/PTY/POP 행을 깔아주는 헬퍼 */
     private List<ShortTermItem> fakeShortTerm() {
