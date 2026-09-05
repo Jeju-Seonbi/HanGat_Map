@@ -30,6 +30,31 @@ public enum PrecipitationType {
         };
     }
 
+    /**
+     * 중기예보 하늘 텍스트("흐리고 비", "구름많고 눈" 등)에서 강수 형태. 중기는 PTY 코드를 주지 않는다.
+     * 텍스트가 없으면 null - 모른다고 NONE으로 단정하지 않는다.
+     */
+    public static PrecipitationType fromForecastText(String text) {
+        if (text == null || text.isBlank()) {
+            return null;
+        }
+        if (text.contains("소나기")) {
+            return SHOWER;
+        }
+        boolean rain = text.contains("비");
+        boolean snow = text.contains("눈");
+        if (rain && snow) {
+            return RAIN_SNOW;
+        }
+        if (snow) {
+            return SNOW;
+        }
+        if (rain) {
+            return RAIN;
+        }
+        return NONE;
+    }
+
     /** 비·눈·소나기 어느 쪽이든 강수가 있는 예보인가 - 실내 우선 배치 판단에 쓴다. */
     public boolean isWet() {
         return this == RAIN || this == RAIN_SNOW || this == SNOW || this == SHOWER;
