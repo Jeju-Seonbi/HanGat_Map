@@ -19,7 +19,8 @@ import java.util.Objects;
  *
  * <ul>
  *   <li>단기예보: TMN/TMX 우선, 없으면 시간별 TMP의 최소/최대. 강수확률은 하루 최대. 하늘은 정오 값 대표</li>
- *   <li>중기예보: 발표일 기준 며칠째인지로 필드를 고른다(폴백으로 발표일이 밀려도 어긋나지 않게)</li>
+ *   <li>중기예보: 발표일 기준 며칠째인지로 필드를 고르고, 오전·오후를 하루로 접는다 - 강수확률은 큰 쪽,
+ *       하늘은 비·눈이 있는 쪽 우선. 오전만 보면 오후 비를 '맑음'으로 저장하게 된다</li>
  *   <li>값이 없으면 null - 0으로 메우지 않는다</li>
  * </ul>
  */
@@ -89,12 +90,25 @@ final class WeatherDailySummarizer {
     static DailySummary fromMid(LocalDate date, LocalDate midBaseDate, MidTaItem ta, MidLandItem land) {
         int day = (int) (date.toEpochDay() - midBaseDate.toEpochDay());
         return switch (day) {
-            case 4 -> new DailySummary(date, ta.taMin4(), ta.taMax4(), land.wf4Am(), land.rnSt4Am(), null);
-            case 5 -> new DailySummary(date, ta.taMin5(), ta.taMax5(), land.wf5Am(), land.rnSt5Am(), null);
-            case 6 -> new DailySummary(date, ta.taMin6(), ta.taMax6(), land.wf6Am(), land.rnSt6Am(), null);
-            case 7 -> new DailySummary(date, ta.taMin7(), ta.taMax7(), land.wf7Am(), land.rnSt7Am(), null);
+            case 4 -> mid(date, ta.taMin4(), ta.taMax4(), land.wf4Am(), land.wf4Pm(), land.rnSt4Am(), land.rnSt4Pm());
+            case 5 -> mid(date, ta.taMin5(), ta.taMax5(), land.wf5Am(), land.wf5Pm(), land.rnSt5Am(), land.rnSt5Pm());
+            case 6 -> mid(date, ta.taMin6(), ta.taMax6(), land.wf6Am(), land.wf6Pm(), land.rnSt6Am(), land.rnSt6Pm());
+            case 7 -> mid(date, ta.taMin7(), ta.taMax7(), land.wf7Am(), land.wf7Pm(), land.rnSt7Am(), land.rnSt7Pm());
             default -> new DailySummary(date, null, null, null, null, null);
         };
+    }
+
+    /** 오전·오후를 하루로 접는다 - 강수확률은 큰 쪽, 하늘은 비·눈이 있는 쪽 우선(둘 다 없으면 오전, 오전이 없으면 오후). */
+    private static DailySummary mid(LocalDate date, Integer min, Integer max,
+                                    String skyAm, String skyPm, Integer popAm, Integer popPm) {
+        Integer pop = popAm == null ? popPm : popPm == null ? popAm : Math.max(popAm, popPm);
+        String sky = isWet(skyAm) ? skyAm : isWet(skyPm) ? skyPm : (skyAm != null ? skyAm : skyPm);
+        return new DailySummary(date, min, max, sky, pop, null);
+    }
+
+    private static boolean isWet(String text) {
+        PrecipitationType type = PrecipitationType.fromForecastText(text);
+        return type != null && type.isWet();
     }
 
     /** 정오 SKY/PTY를 하루 대표값으로 - 강수(PTY)가 있으면 우선. */

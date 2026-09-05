@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -39,8 +40,10 @@ import static org.mockito.Mockito.verifyNoInteractions;
 class WeatherServiceStoreReadTest {
 
     private static final DateTimeFormatter YMD = DateTimeFormatter.BASIC_ISO_DATE;
-    private static final LocalDateTime BASE_OLD = LocalDateTime.of(2026, 9, 1, 20, 0);
-    private static final LocalDateTime BASE_NEW = LocalDateTime.of(2026, 9, 2, 20, 0);
+    /** base_at은 UTC. 신선도 기준(36시간)에 걸리지 않게 지금 기준 상대 시각으로 만든다 */
+    private static final LocalDateTime BASE_NEW = LocalDateTime.now(ZoneOffset.UTC).minusHours(2).withNano(0);
+    private static final LocalDateTime BASE_OLD = LocalDateTime.now(ZoneOffset.UTC).minusHours(8).withNano(0);
+    private static final LocalDateTime BASE_STALE = LocalDateTime.now(ZoneOffset.UTC).minusDays(3).withNano(0);
 
     @Autowired WeatherService service;
     @Autowired WeatherForecastRepository repository;
@@ -107,7 +110,8 @@ class WeatherServiceStoreReadTest {
         store(east, today, BASE_NEW, "맑음", 25, 30, 0);
         given(client.fetchShortTerm(anyString(), anyString())).willReturn(liveShortTerm());
         given(client.fetchMidTemperature(anyString())).willReturn(new MidTaItem(null, null, 24, 31, 25, 32, 26, 33, 27, 34));
-        given(client.fetchMidLand(anyString())).willReturn(new MidLandItem(null, "구름많음", "흐림", "맑음", "흐림", null, 30, 40, 60, 70));
+        given(client.fetchMidLand(anyString())).willReturn(new MidLandItem(null, "구름많음", "흐림", "맑음", "흐림", null, 30, 40, 60, 70,
+                null, null, null, null, null, null, null, null));
 
         List<DailyWeather> week = service.getWeeklyForecast();
 
@@ -116,6 +120,57 @@ class WeatherServiceStoreReadTest {
         assertThat(week.get(0).sky()).isEqualTo("구름많음");
         assertThat(week.get(4).minTemp()).isEqualTo(24);
         verify(client).fetchShortTerm(today.format(YMD), "0500");
+    }
+
+    @Test
+    @DisplayName("낡은 발표분(36시간 초과)은 지금 예보로 내보내지 않는다 - 메인은 라이브로 폴백")
+    void staleRowsAreNotServed() {
+        for (int offset = 0; offset < 7; offset++) {
+            store(north, today.plusDays(offset), BASE_STALE, "맑음", 20, 28, 10);
+        }
+        given(client.fetchShortTerm(anyString(), anyString())).willReturn(liveShortTerm());
+        given(client.fetchMidTemperature(anyString())).willReturn(new MidTaItem(null, null, 24, 31, 25, 32, 26, 33, 27, 34));
+        given(client.fetchMidLand(anyString())).willReturn(new MidLandItem(null, "구름많음", "흐림", "맑음", "흐림", null, 30, 40, 60, 70,
+                null, null, null, null, null, null, null, null));
+
+        List<DailyWeather> week = service.getWeeklyForecast();
+
+        assertThat(week.get(0).sky()).isEqualTo("구름많음");   // 라이브 값(맑음이 아니다)
+        verify(client).fetchShortTerm(today.format(YMD), "0500");
+    }
+
+    @Test
+    @DisplayName("다른 권역은 저장값이 없으면 7일 전부 null - 제주시 격자 라이브 값을 그 권역인 척 빌리지 않는다")
+    void otherRegionWithoutRowsReturnsNullWeek() {
+        store(north, today, BASE_NEW, "맑음", 25, 30, 0);
+
+        List<DailyWeather> week = service.getWeeklyForecast("EAST");
+
+        assertThat(week).hasSize(7);
+        assertThat(week).allSatisfy(day -> {
+            assertThat(day.minTemp()).isNull();
+            assertThat(day.sky()).isNull();
+        });
+        assertThat(week.get(0).date()).isEqualTo(today);
+        verifyNoInteractions(client);
+    }
+
+    @Test
+    @DisplayName("다른 권역의 저장값은 그 권역 격자 값 그대로 - 북부 값과 섞이지 않는다")
+    void otherRegionReadsItsOwnRows() {
+        store(north, today, BASE_NEW, "맑음", 25, 30, 0);
+        store(east, today, BASE_NEW, "비", 21, 26, 80);
+
+        assertThat(service.getWeeklyForecast("EAST").get(0).sky()).isEqualTo("비");
+        assertThat(service.getWeeklyForecast("NORTH").get(0).sky()).isEqualTo("맑음");
+        verifyNoInteractions(client);
+    }
+
+    @Test
+    @DisplayName("모르는 권역 코드는 빈 목록 - 지어낸 한 주를 돌려주지 않는다")
+    void unknownRegionReturnsEmpty() {
+        assertThat(service.getWeeklyForecast("NOPE")).isEmpty();
+        verifyNoInteractions(client);
     }
 
     private void store(Region region, LocalDate day, LocalDateTime baseAtUtc,

@@ -15,7 +15,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -42,6 +45,11 @@ public class WeatherService {
      */
     static final String MAIN_REGION_CODE = "NORTH";
     static final int WEEK_DAYS = 7;
+    /**
+     * 이보다 오래된 발표분은 '지금 예보'로 내보내지 않는다. 적재가 하루 두 번(03:30·06:30)이라 36시간이면
+     * 두 번 연속 실패한 뒤다 - 그때는 낡은 값을 그럴듯하게 보여주느니 라이브 호출(메인)이나 '정보 없음'(권역)으로 간다.
+     */
+    static final Duration STALE_AFTER = Duration.ofHours(36);
 
     private final WeatherClient client;
     private final WeatherForecastRepository forecastRepository;
@@ -60,33 +68,44 @@ public class WeatherService {
     }
 
     /**
-     * 오늘부터 7일. DB에 그 권역 예보가 하나라도 있으면 DB만 쓴다 - 빠진 날짜는 지어내지 않고 null('정보 없음').
-     * 하나도 없을 때만 라이브 호출로 폴백한다.
+     * 오늘부터 7일. DB에 그 권역의 신선한({@link #STALE_AFTER}) 예보가 하나라도 있으면 DB만 쓴다 -
+     * 빠진 날짜는 지어내지 않고 null('정보 없음').
+     *
+     * <p>하나도 없을 때의 폴백은 권역마다 다르다. 메인 기준 권역(북부)만 라이브 호출로 간다 - 라이브 호출은
+     * 제주시 격자에 고정돼 있어 다른 권역 값이 아니다. 다른 권역은 7일 전부 null, 모르는 코드는 빈 목록이다.
      */
     public List<DailyWeather> getWeeklyForecast(String regionCode) {
         // KST 고정 - 서버 시계가 UTC(OCI 기본)면 KST 새벽에 now()가 어제 날짜라 발표분·주간 창이 하루 밀린다
         LocalDate today = LocalDate.now(KmaIssueTimes.KST);
 
-        List<DailyWeather> stored = fromStore(regionCode, today);
+        Optional<Region> region = regionRepository.findByCode(regionCode);
+        if (region.isEmpty()) {
+            log.warn("알 수 없는 권역 코드 {} - 주간 날씨를 만들지 않는다", regionCode);
+            return List.of();
+        }
+        List<DailyWeather> stored = fromStore(region.get(), today);
         if (!stored.isEmpty()) {
             return stored;
         }
-        log.info("weather_forecasts에 {} 권역 주간 예보가 없어 기상청 라이브 호출로 폴백한다", regionCode);
-        return fetchLive(today);
+        if (MAIN_REGION_CODE.equals(regionCode)) {
+            log.info("weather_forecasts에 {} 권역의 신선한 주간 예보가 없어 기상청 라이브 호출로 폴백한다", regionCode);
+            return fetchLive(today);
+        }
+        return nullWeek(today);
     }
 
-    private List<DailyWeather> fromStore(String regionCode, LocalDate today) {
-        Optional<Region> region = regionRepository.findByCode(regionCode);
-        if (region.isEmpty()) {
-            return List.of();
-        }
+    private List<DailyWeather> fromStore(Region region, LocalDate today) {
         LocalDate last = today.plusDays(WEEK_DAYS - 1);
+        LocalDateTime freshAfter = LocalDateTime.now(ZoneOffset.UTC).minus(STALE_AFTER);   // base_at은 UTC
         Map<LocalDate, WeatherForecast> byDate = new LinkedHashMap<>();
         for (WeatherForecast forecast : forecastRepository.findLatestPerDate(
-                region.get().getId(),
+                region.getId(),
                 PlaceNameNormalizer.jejuDayToUtc(today),
                 PlaceNameNormalizer.jejuDayToUtc(last),
                 WeatherGranularity.DAILY)) {
+            if (forecast.getBaseAt().isBefore(freshAfter)) {
+                continue;   // 낡은 발표분은 지금 예보가 아니다
+            }
             byDate.putIfAbsent(PlaceNameNormalizer.utcToJejuDay(forecast.getForecastAt()), forecast);
         }
         if (byDate.isEmpty()) {
@@ -103,6 +122,15 @@ public class WeatherService {
                             forecast.getTempMax() == null ? null : forecast.getTempMax().intValue(),
                             forecast.getSkyCode(),
                             forecast.rainProbabilityPercent()));
+        }
+        return week;
+    }
+
+    /** 값이 없는 한 주 - 라이브로 메우거나 다른 권역 값을 빌리지 않는다. */
+    private static List<DailyWeather> nullWeek(LocalDate today) {
+        List<DailyWeather> week = new ArrayList<>(WEEK_DAYS);
+        for (int offset = 0; offset < WEEK_DAYS; offset++) {
+            week.add(new DailyWeather(today.plusDays(offset), null, null, null, null));
         }
         return week;
     }

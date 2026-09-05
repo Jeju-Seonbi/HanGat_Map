@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.core.annotation.Order;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -58,7 +59,12 @@ public class WeatherIngestScheduler {
         run("스케줄");
     }
 
-    /** ApplicationReadyEvent 리스너의 예외는 기동 실패로 번지므로 {@link #run}이 전부 삼킨다. */
+    /**
+     * ApplicationReadyEvent 리스너의 예외는 기동 실패로 번지므로 {@link #run}이 전부 삼킨다.
+     * {@code @Order(1)}: 같은 이벤트를 듣는 샘플 코스 기동 생성(기본 순서 = 마지막)보다 먼저 돌아
+     * 코스가 비 예보와 날씨 스냅숏을 볼 수 있게 한다. 마스터 초기화(ApplicationRunner)는 이 이벤트 전에 끝난다.
+     */
+    @Order(1)
     @EventListener(ApplicationReadyEvent.class)
     public void onStartup() {
         if (onStartup) {
