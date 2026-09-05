@@ -28,15 +28,16 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * 권역 날씨 예보 - 테이블 명세서 17.0 (Flyway V2)
+ * 권역 날씨 예보 - 테이블 명세서 17.0 (Flyway V3)
  *
  * <p>메인 주간 날씨(MAIN), 권역 날씨 레이어(MAP_005), 코스 생성의 실내 우선 판단(COURSE_004),
  * 저장 코스의 "그때 예보 vs 지금 예보" 비교(MY_001, MY_008)가 이 테이블을 본다.
- * 출처는 기상청 단기예보(KMA_SHORT, D+0~3)와 중기예보(KMA_MID, D+4~10).
+ * 출처는 기상청 단기예보(KMA_SHORT, D+0~3)와 중기예보(KMA_MID, D+4~7).
  *
  * <p><b>발표 시각(base_at)별 append 이력이다.</b> {@link com.example.hangat.map.model.entity.CongestionForecast}와
- * 같은 구조로, 최신 예보로 덮어쓰지 않는다. 덮어쓰면 코스가 저장될 때 본 예보를 잃어 "예보가 바뀌었어요"를
- * 말할 수 없다. 그래서 created_at/updated_at도 없다 - 한 번 쓰고 고치지 않는다.
+ * 같은 구조로, 다른 발표분을 덮어쓰지 않는다. 덮어쓰면 코스가 저장될 때 본 예보를 잃어 "예보가 바뀌었어요"를
+ * 말할 수 없다. 그래서 created_at/updated_at도 없다. <b>같은 발표분</b>을 다시 적재할 때만 {@link #refreshFrom}으로
+ * 값을 갱신한다 - 지우고 다시 넣으면 id가 바뀌어 course_items 스냅숏(ON DELETE SET NULL)이 조용히 사라진다.
  *
  * <p><b>정직성</b>: 단기예보는 권역 대표 격자(regions.kma_grid_x/y) 값이라 권역별로 다르지만,
  * 중기예보는 기상청이 제주도 단위로만 발표하므로 네 권역에 같은 값이 들어간다. 출처 코드로 구분되니
@@ -156,6 +157,20 @@ public class WeatherForecast {
                 .tempMax(tempMax == null ? null : BigDecimal.valueOf(tempMax))
                 .rainProbability(rainProbability == null ? null : rainProbability.byteValue())
                 .build();
+    }
+
+    /**
+     * 같은 발표분 재적재 - 예보 값과 수집 시각만 갱신한다. 키(권역·대상 시각·발표 시각·단위)와 id는 그대로라
+     * 이 행을 가리키는 코스 스냅숏이 살아남는다.
+     */
+    public void refreshFrom(WeatherForecast fresh) {
+        this.skyCode = fresh.skyCode;
+        this.precipitationType = fresh.precipitationType;
+        this.tempMin = fresh.tempMin;
+        this.tempMax = fresh.tempMax;
+        this.rainProbability = fresh.rainProbability;
+        this.source = fresh.source;
+        this.fetchedAt = LocalDateTime.now();
     }
 
     /** 강수확률을 화면·계산이 쓰기 편한 Integer로. NULL이면 그대로 NULL. */

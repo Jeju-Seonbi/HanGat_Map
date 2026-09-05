@@ -59,9 +59,9 @@ public interface WeatherForecastRepository extends JpaRepository<WeatherForecast
             Short regionId, LocalDateTime forecastAt, WeatherGranularity granularity);
 
     /**
-     * 같은 발표 버전을 지우고 다시 넣을 수 있게 한다(개발 중 재실행·부분 실패 복구).
-     * 다른 버전은 건드리지 않는다 - "어제 발표를 오늘 발표로 덮지 말라"는 명세서 규칙은 그대로다.
-     * course_items 스냅숏 FK가 ON DELETE SET NULL이라 코스가 이 삭제를 막지 않는다.
+     * 한 발표 버전 삭제 - <b>적재는 쓰지 않는다</b>(재적재는 {@code WeatherIngestWriter#upsertVersion}이 값만 갱신).
+     * 수동 정리·테스트용. course_items 스냅숏 FK가 ON DELETE SET NULL이라 코스가 이 삭제를 막지는 않지만,
+     * 지운 행을 가리키던 스냅숏은 '날씨 정보 없음'이 된다.
      */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("delete from WeatherForecast f where f.baseAt = :baseAt and f.granularity = :granularity")

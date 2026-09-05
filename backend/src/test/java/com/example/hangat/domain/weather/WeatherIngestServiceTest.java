@@ -79,8 +79,8 @@ class WeatherIngestServiceTest {
         assertThat(result.regions()).isEqualTo(4);
         assertThat(result.shortRows()).isEqualTo(16);
         assertThat(result.midRows()).isEqualTo(16);
-        assertThat(result.saved()).isEqualTo(32);
-        assertThat(result.removedSameVersion()).isZero();
+        assertThat(result.inserted()).isEqualTo(32);
+        assertThat(result.updated()).isZero();
         assertThat(result.shortFailures()).isZero();
         assertThat(result.midFailed()).isFalse();
         assertThat(result.shortIssuedAtKst()).isEqualTo("202609100500");
@@ -120,17 +120,60 @@ class WeatherIngestServiceTest {
                 .stream().filter(f -> f.getForecastAt().equals(PlaceNameNormalizer.jejuDayToUtc(TODAY.plusDays(5)))))
                 .hasSize(4);
         assertThat(latest(north, TODAY.plusDays(7)).getPrecipitationType()).isEqualTo(PrecipitationType.RAIN_SNOW);
+
+        // 중기 9/16(발표일 +6): 오전 '맑음' 10% / 오후 '흐리고 비' 60% → 하루는 비, 60% - 오전만 보면 '맑음'이 된다
+        WeatherForecast pmRain = latest(north, TODAY.plusDays(6));
+        assertThat(pmRain.getSkyCode()).isEqualTo("흐리고 비");
+        assertThat(pmRain.getPrecipitationType()).isEqualTo(PrecipitationType.RAIN);
+        assertThat(pmRain.rainProbabilityPercent()).isEqualTo(60);
     }
 
     @Test
-    @DisplayName("같은 발표분을 다시 돌리면 그 버전만 지우고 다시 넣는다 - 행이 늘지 않는다")
-    void rerunSameIssueIsIdempotent() {
+    @DisplayName("같은 발표분을 다시 돌리면 값만 갱신한다 - 행이 늘지 않고 id가 그대로라 코스 스냅숏이 산다")
+    void rerunSameIssueUpdatesInPlace() {
         service.ingest(MORNING);
+        Long idBefore = latest(north, TODAY.plusDays(1)).getId();
+
         WeatherIngestResult second = service.ingest(MORNING);
 
-        assertThat(second.removedSameVersion()).isEqualTo(32);
-        assertThat(second.saved()).isEqualTo(32);
+        assertThat(second.updated()).isEqualTo(32);
+        assertThat(second.inserted()).isZero();
         assertThat(repository.count()).isEqualTo(32);
+        assertThat(latest(north, TODAY.plusDays(1)).getId()).isEqualTo(idBefore);
+    }
+
+    @Test
+    @DisplayName("재실행에서 한 권역만 실패하면 그 권역의 기존 행은 그대로 남는다 - 부분 실패가 삭제로 번지지 않는다")
+    void partialRerunKeepsPreviouslyStoredRegion() {
+        service.ingest(MORNING);
+        given(client.fetchShortTerm(eq("20260910"), eq("0500"), anyInt(), eq(37)))
+                .willThrow(new BaseException(BaseResponseStatus.EXTERNAL_API_ERROR, "timeout"));
+
+        WeatherIngestResult second = service.ingest(MORNING);
+
+        assertThat(second.shortFailures()).isEqualTo(1);
+        assertThat(second.updated()).isEqualTo(28);
+        assertThat(repository.count()).isEqualTo(32);
+        assertThat(latest(east, TODAY).getSource().getCode()).isEqualTo("KMA_SHORT");
+    }
+
+    @Test
+    @DisplayName("범위 밖 값은 NULL - 깨진 값 하나가 행을 막지도, 그럴듯한 값으로 남지도 않는다")
+    void clampsOutOfRangeValuesToNull() {
+        given(client.fetchShortTerm(eq("20260910"), eq("0500"), anyInt(), eq(38)))
+                .willReturn(List.of(
+                        new ShortTermItem("TMN", "20260910", "0600", "-99"),
+                        new ShortTermItem("TMX", "20260910", "1500", "27"),
+                        new ShortTermItem("POP", "20260910", "1200", "150"),
+                        new ShortTermItem("SKY", "20260910", "1200", "1")));
+
+        service.ingest(MORNING);
+
+        WeatherForecast row = latest(north, TODAY);
+        assertThat(row.getTempMin()).isNull();
+        assertThat(row.getTempMax()).isEqualByComparingTo(new BigDecimal("27"));
+        assertThat(row.rainProbabilityPercent()).isNull();
+        assertThat(row.getSkyCode()).isEqualTo("맑음");
     }
 
     @Test
@@ -209,8 +252,8 @@ class WeatherIngestServiceTest {
 
         assertThat(result.shortFailures()).isEqualTo(4);
         assertThat(result.midFailed()).isTrue();
-        assertThat(result.saved()).isZero();
-        assertThat(result.removedSameVersion()).isZero();
+        assertThat(result.inserted()).isZero();
+        assertThat(result.updated()).isZero();
         assertThat(repository.count()).isEqualTo(32);
     }
 
@@ -245,8 +288,11 @@ class WeatherIngestServiceTest {
         return new MidTaItem(20, 26, 21, 27, 22, 28, 23, 29, 24, 30);
     }
 
+    /** 오전: 맑음/구름많음/흐리고 비/맑음/흐리고 비·눈, 오후: +6일만 '흐리고 비' 60%로 오전과 다르게 - 병합 검증용 */
     private static MidLandItem midLand() {
         return new MidLandItem("맑음", "구름많음", "흐리고 비", "맑음", "흐리고 비/눈",
-                10, 20, 70, 10, 40);
+                10, 20, 70, 10, 40,
+                "구름많음", "맑음", "흐리고 비", "흐리고 비/눈",
+                20, 20, 60, 40);
     }
 }

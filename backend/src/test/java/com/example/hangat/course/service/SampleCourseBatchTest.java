@@ -14,6 +14,7 @@ import com.example.hangat.domain.weather.WeatherService;
 import com.example.hangat.domain.weather.model.DailyWeather;
 import com.example.hangat.domain.weather.model.entity.WeatherForecast;
 import com.example.hangat.domain.weather.model.enums.PrecipitationType;
+import com.example.hangat.domain.weather.model.enums.WeatherGranularity;
 import com.example.hangat.domain.weather.repository.WeatherForecastRepository;
 import com.example.hangat.map.model.entity.CongestionForecast;
 import com.example.hangat.map.model.entity.DataSource;
@@ -250,6 +251,14 @@ class SampleCourseBatchTest {
         // 예보가 없는 권역은 지어내지 않는다 - '날씨 정보 없음'
         List<CourseItem> 동부 = itemRepository.findItemsWithPlace(courseByTitle("동부 한산 2박 3일").getId());
         assertThat(동부).isNotEmpty().allSatisfy(i -> assertThat(i.getPlannedWeatherForecast()).isNull());
+
+        // 발표 버전을 지워도(수동 정리) 코스가 막지 않고 스냅숏만 '정보 없음'으로 돌아간다 - ON DELETE SET NULL
+        // (혼잡 스냅숏의 CourseDomainTest와 같은 규칙. 적재는 삭제 대신 값 갱신이라 평소엔 일어나지 않는다)
+        weatherForecastRepository.deleteVersion(오늘발표, WeatherGranularity.DAILY);
+        em.flush();
+        em.clear();
+        List<CourseItem> 남부_이후 = itemRepository.findItemsWithPlace(courseByTitle("남부 여유 2박 3일").getId());
+        assertThat(남부_이후).hasSize(9).allSatisfy(i -> assertThat(i.getPlannedWeatherForecast()).isNull());
     }
 
     @Test

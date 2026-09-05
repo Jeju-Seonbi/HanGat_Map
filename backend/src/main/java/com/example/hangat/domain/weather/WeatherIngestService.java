@@ -29,11 +29,11 @@ import java.util.List;
  * 단기예보(D+0~3)는 권역 대표 격자(regions.kma_grid_x/y)로 권역마다 따로 부르고,
  * 중기예보(D+4~7)는 기상청이 제주도 단위로만 발표하므로 한 번 받아 네 권역에 같은 값을 넣는다(출처 KMA_MID로 구분).
  *
- * <p><b>발표 버전</b>: base_at은 기상청 발표 시각(UTC)이다. 같은 발표분을 다시 돌리면 그 버전만 지우고 다시 넣고,
+ * <p><b>발표 버전</b>: base_at은 기상청 발표 시각(UTC)이다. 같은 발표분을 다시 돌리면 값만 갱신하고(id 보존),
  * 다른 발표분은 이력으로 남는다 - 코스가 저장될 때 본 예보와 최신 예보를 비교하는 근거다.
  *
- * <p><b>실패 격리</b>: 한 권역의 단기예보가 실패해도 나머지 권역과 중기예보는 저장한다. 받은 게 하나도 없는
- * 출처는 기존 버전을 지우지 않는다 - 실패가 데이터 손실로 번지지 않게.
+ * <p><b>실패 격리</b>: 한 권역의 단기예보가 실패해도 나머지 권역과 중기예보는 저장한다. 받지 못한 권역·날짜의
+ * 기존 행은 손대지 않는다 - 실패가 데이터 손실로 번지지 않게.
  */
 @Service
 public class WeatherIngestService {
@@ -68,7 +68,7 @@ public class WeatherIngestService {
      * 적재 결과. 실패 건수와 발표 시각을 같이 돌려주는 것이 핵심이다 - 저장 자체는 성공하면서 한 권역이 조용히
      * 빠질 수 있으므로, 이 수치가 없으면 "왜 서부만 날씨가 없지"를 한참 뒤에야 알게 된다.
      */
-    public record WeatherIngestResult(int regions, int shortRows, int midRows, int saved, int removedSameVersion,
+    public record WeatherIngestResult(int regions, int shortRows, int midRows, int inserted, int updated,
                                       int shortFailures, boolean midFailed,
                                       String shortIssuedAtKst, String midIssuedAtKst) {
     }
@@ -142,21 +142,21 @@ public class WeatherIngestService {
             log.warn("중기예보 수집 실패 issue={} - {}", midIssue.tmFc(), e.getMessage());
         }
 
-        int removed = 0;
-        int saved = 0;
+        int inserted = 0;
+        int updated = 0;
         if (!shortRows.isEmpty()) {
-            WeatherIngestWriter.Replaced replaced = writer.replaceVersion(shortIssue.issuedAtUtc(), shortRows);
-            removed += replaced.removed();
-            saved += replaced.saved();
+            WeatherIngestWriter.Upserted upserted = writer.upsertVersion(shortIssue.issuedAtUtc(), shortRows);
+            inserted += upserted.inserted();
+            updated += upserted.updated();
         }
         if (!midRows.isEmpty()) {
-            WeatherIngestWriter.Replaced replaced = writer.replaceVersion(midIssue.issuedAtUtc(), midRows);
-            removed += replaced.removed();
-            saved += replaced.saved();
+            WeatherIngestWriter.Upserted upserted = writer.upsertVersion(midIssue.issuedAtUtc(), midRows);
+            inserted += upserted.inserted();
+            updated += upserted.updated();
         }
 
         WeatherIngestResult result = new WeatherIngestResult(regions.size(), shortRows.size(), midRows.size(),
-                saved, removed, shortFailures, midFailed, shortIssue.tmFc(), midIssue.tmFc());
+                inserted, updated, shortFailures, midFailed, shortIssue.tmFc(), midIssue.tmFc());
         log.info("날씨 적재 완료 {}", result);
         if (shortFailures > 0 || midFailed) {
             log.warn("날씨 적재 일부 실패 - 단기 실패 권역 {}곳, 중기 실패 {} (빠진 날짜·권역은 화면에서 '정보 없음')",
