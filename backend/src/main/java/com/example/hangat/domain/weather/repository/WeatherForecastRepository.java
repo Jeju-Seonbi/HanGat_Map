@@ -1,0 +1,48 @@
+package com.example.hangat.domain.weather.repository;
+
+import com.example.hangat.domain.weather.model.entity.WeatherForecast;
+import com.example.hangat.domain.weather.model.enums.WeatherGranularity;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * 권역 날씨 예보 조회.
+ *
+ * <p>같은 날짜에 발표 버전이 여러 개 쌓이므로 화면용 조회는 <b>{@code base_at}을 고정</b>해야 한다 -
+ * 안 그러면 어제 발표와 오늘 발표가 같이 나와 한 날짜가 두 줄로 보인다.
+ * 적재가 한 번에 네 권역을 다 넣으므로 단위별 전역 최신 {@code base_at} 하나면 충분하다.
+ */
+public interface WeatherForecastRepository extends JpaRepository<WeatherForecast, Long> {
+
+    /** 가장 최근 발표 버전. 데이터가 없으면 비어 있다 - 그때 화면은 라이브 호출로 폴백한다. */
+    @Query("select max(f.baseAt) from WeatherForecast f where f.granularity = :granularity")
+    Optional<LocalDateTime> findLatestBaseAt(@Param("granularity") WeatherGranularity granularity);
+
+    /** 한 발표 버전의 전 권역 예보 - 메인 주간 날씨·권역 레이어용. */
+    List<WeatherForecast> findByBaseAtAndGranularityOrderByRegionIdAscForecastAtAsc(
+            LocalDateTime baseAt, WeatherGranularity granularity);
+
+    /** 한 권역·한 발표 버전의 날짜별 예보. */
+    List<WeatherForecast> findByRegionIdAndBaseAtAndGranularityOrderByForecastAtAsc(
+            Short regionId, LocalDateTime baseAt, WeatherGranularity granularity);
+
+    /** 한 권역·한 날짜의 최신 발표 예보 - 코스가 저장 시점 스냅숏을 박을 때 쓴다. */
+    Optional<WeatherForecast> findFirstByRegionIdAndForecastAtAndGranularityOrderByBaseAtDesc(
+            Short regionId, LocalDateTime forecastAt, WeatherGranularity granularity);
+
+    /**
+     * 같은 발표 버전을 지우고 다시 넣을 수 있게 한다(개발 중 재실행·부분 실패 복구).
+     * 다른 버전은 건드리지 않는다 - "어제 발표를 오늘 발표로 덮지 말라"는 명세서 규칙은 그대로다.
+     * course_items 스냅숏 FK가 ON DELETE SET NULL이라 코스가 이 삭제를 막지 않는다.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("delete from WeatherForecast f where f.baseAt = :baseAt and f.granularity = :granularity")
+    int deleteVersion(@Param("baseAt") LocalDateTime baseAt,
+                      @Param("granularity") WeatherGranularity granularity);
+}
