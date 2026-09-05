@@ -20,7 +20,11 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * 기상청 예보를 weather_forecasts(17.0)에 적재한다 - 담당 정동현.
@@ -28,6 +32,9 @@ import java.util.List;
  * <p><b>무엇을 넣나</b>: 권역 4곳 × 날짜별 DAILY 행.
  * 단기예보(D+0~3)는 권역 대표 격자(regions.kma_grid_x/y)로 권역마다 따로 부르고,
  * 중기예보(D+4~7)는 기상청이 제주도 단위로만 발표하므로 한 번 받아 네 권역에 같은 값을 넣는다(출처 KMA_MID로 구분).
+ * 중기예보는 발표 시각에 따라 시작 날짜가 다르다(2026-09 실측: 06시 발표분은 발표일 +4부터, 18시 발표분은 +5부터).
+ * 18시 발표분으로 D+4가 비면 같은 날 06시 발표분에서 채운다 - 스케줄(03:30·06:30)만 돌면 원래 비지 않지만
+ * 저녁 기동 적재·수동 실행이 D+4를 '정보 없음'으로 남기지 않게.
  *
  * <p><b>발표 버전</b>: base_at은 기상청 발표 시각(UTC)이다. 같은 발표분을 다시 돌리면 값만 갱신하고(id 보존),
  * 다른 발표분은 이력으로 남는다 - 코스가 저장될 때 본 예보와 최신 예보를 비교하는 근거다.
@@ -120,10 +127,11 @@ public class WeatherIngestService {
         // 중기: 제주도 단위 한 번 호출 → 전 권역 같은 값. 단기가 덮는 날짜(D+0~3)는 단기만 남긴다
         List<WeatherForecast> midRows = new ArrayList<>();
         boolean midFailed = false;
+        LocalDate firstMidDay = today.plusDays(SHORT_TERM_DAYS);
+        Set<LocalDate> midDaysCovered = new HashSet<>();
         try {
             MidTaItem ta = client.fetchMidTemperature(midIssue.tmFc());
             MidLandItem land = client.fetchMidLand(midIssue.tmFc());
-            LocalDate firstMidDay = today.plusDays(SHORT_TERM_DAYS);
             for (int offset = MID_FROM; offset <= MID_TO; offset++) {
                 LocalDate day = midIssue.issueDate().plusDays(offset);
                 if (day.isBefore(firstMidDay)) {
@@ -136,21 +144,43 @@ public class WeatherIngestService {
                 for (Region region : regions) {
                     midRows.add(row(region, midSource, day, midIssue, summary));
                 }
+                midDaysCovered.add(day);
             }
         } catch (BaseException e) {
             midFailed = true;
             log.warn("중기예보 수집 실패 issue={} - {}", midIssue.tmFc(), e.getMessage());
         }
+        // 18시 발표분은 +5부터라 그 발표일 +4(= 오늘 D+4)가 빈다 → 같은 날 06시 발표분으로 보충
+        if (!midFailed && !midDaysCovered.contains(firstMidDay)
+                && midIssue.issuedAtKst().getHour() == 18
+                && firstMidDay.equals(midIssue.issueDate().plusDays(MID_FROM))) {
+            Issue morning = new Issue(midIssue.issueDate().atTime(6, 0));
+            try {
+                DailySummary summary = WeatherDailySummarizer.fromMid(firstMidDay, morning.issueDate(),
+                        client.fetchMidTemperature(morning.tmFc()), client.fetchMidLand(morning.tmFc()));
+                if (!summary.isEmpty()) {
+                    for (Region region : regions) {
+                        midRows.add(row(region, midSource, firstMidDay, morning, summary));
+                    }
+                }
+            } catch (BaseException e) {
+                log.warn("D+4 보충용 06시 중기 발표분 수집 실패 issue={} - D+4는 '정보 없음'으로 남는다: {}",
+                        morning.tmFc(), e.getMessage());
+            }
+        }
 
+        // 발표분(base_at)별로 upsert - 보충 행은 06시 발표분이라 18시 발표분과 버전이 다르다
+        Map<LocalDateTime, List<WeatherForecast>> byIssue = new LinkedHashMap<>();
+        for (WeatherForecast row : shortRows) {
+            byIssue.computeIfAbsent(row.getBaseAt(), k -> new ArrayList<>()).add(row);
+        }
+        for (WeatherForecast row : midRows) {
+            byIssue.computeIfAbsent(row.getBaseAt(), k -> new ArrayList<>()).add(row);
+        }
         int inserted = 0;
         int updated = 0;
-        if (!shortRows.isEmpty()) {
-            WeatherIngestWriter.Upserted upserted = writer.upsertVersion(shortIssue.issuedAtUtc(), shortRows);
-            inserted += upserted.inserted();
-            updated += upserted.updated();
-        }
-        if (!midRows.isEmpty()) {
-            WeatherIngestWriter.Upserted upserted = writer.upsertVersion(midIssue.issuedAtUtc(), midRows);
+        for (Map.Entry<LocalDateTime, List<WeatherForecast>> entry : byIssue.entrySet()) {
+            WeatherIngestWriter.Upserted upserted = writer.upsertVersion(entry.getKey(), entry.getValue());
             inserted += upserted.inserted();
             updated += upserted.updated();
         }

@@ -240,6 +240,55 @@ class WeatherIngestServiceTest {
     }
 
     @Test
+    @DisplayName("저녁 18시 중기 발표분은 +5일부터라 D+4가 빈다 - 같은 날 06시 발표분으로 D+4를 채우고, 재실행도 발표분별 upsert라 안전하다")
+    void eveningMidIssueFillsDayFourFromMorningIssue() {
+        // 18시 발표분: +4 필드 없음(2026-09 실측), +5~+7만
+        given(client.fetchMidTemperature("202609101800"))
+                .willReturn(new MidTaItem(null, null, null, null, 22, 28, 23, 29, 24, 30));
+        given(client.fetchMidLand("202609101800"))
+                .willReturn(new MidLandItem(null, null, "흐리고 비", "맑음", "흐리고 비/눈",
+                        null, null, 70, 10, 40,
+                        null, "맑음", "흐리고 비", "흐리고 비/눈",
+                        null, 20, 60, 40));
+        // 같은 날 06시 발표분에는 +4가 있다 (setUp의 midTa/midLand)
+
+        WeatherIngestResult result = service.ingest(TODAY.atTime(20, 0));
+
+        assertThat(result.midIssuedAtKst()).isEqualTo("202609101800");
+        assertThat(result.midRows()).isEqualTo(16);
+        WeatherForecast dayFour = latest(north, TODAY.plusDays(4));
+        assertThat(dayFour.getBaseAt()).isEqualTo(MID_BASE_UTC);                            // 06:00 KST 발표분
+        assertThat(dayFour.getTempMin()).isEqualByComparingTo(new BigDecimal("21"));
+        assertThat(latest(north, TODAY.plusDays(5)).getBaseAt()).isEqualTo(LocalDateTime.of(2026, 9, 10, 9, 0));   // 18:00 KST
+        assertThat(latest(north, TODAY.plusDays(5)).getTempMin()).isEqualByComparingTo(new BigDecimal("22"));
+
+        WeatherIngestResult again = service.ingest(TODAY.atTime(20, 0));
+        assertThat(again.inserted()).isZero();
+        assertThat(again.updated()).isEqualTo(32);
+        assertThat(repository.count()).isEqualTo(32);
+    }
+
+    @Test
+    @DisplayName("D+4 보충용 06시 발표분 수집이 실패해도 나머지는 저장되고 D+4만 비어 있다")
+    void dayFourFillFailureIsIsolated() {
+        given(client.fetchMidTemperature("202609101800"))
+                .willReturn(new MidTaItem(null, null, null, null, 22, 28, 23, 29, 24, 30));
+        given(client.fetchMidLand("202609101800"))
+                .willReturn(new MidLandItem(null, null, "흐리고 비", "맑음", "흐리고 비/눈",
+                        null, null, 70, 10, 40, null, "맑음", "흐리고 비", "흐리고 비/눈", null, 20, 60, 40));
+        given(client.fetchMidTemperature("202609100600"))
+                .willThrow(new BaseException(BaseResponseStatus.EXTERNAL_API_ERROR, "down"));
+
+        WeatherIngestResult result = service.ingest(TODAY.atTime(20, 0));
+
+        assertThat(result.midFailed()).isFalse();
+        assertThat(result.midRows()).isEqualTo(12);
+        assertThat(repository.findFirstByRegionIdAndForecastAtAndGranularityOrderByBaseAtDesc(
+                north.getId(), PlaceNameNormalizer.jejuDayToUtc(TODAY.plusDays(4)), WeatherGranularity.DAILY)).isEmpty();
+        assertThat(latest(north, TODAY.plusDays(5)).getTempMin()).isEqualByComparingTo(new BigDecimal("22"));
+    }
+
+    @Test
     @DisplayName("받은 게 하나도 없으면 기존 버전을 지우지 않는다 - 실패가 데이터 손실로 번지지 않게")
     void doesNotDeleteExistingVersionWhenNothingFetched() {
         service.ingest(MORNING);
