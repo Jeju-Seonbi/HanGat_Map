@@ -101,9 +101,22 @@ final class WeatherDailySummarizer {
     /** 오전·오후를 하루로 접는다 - 강수확률은 큰 쪽, 하늘은 비·눈이 있는 쪽 우선(둘 다 없으면 오전, 오전이 없으면 오후). */
     private static DailySummary mid(LocalDate date, Integer min, Integer max,
                                     String skyAm, String skyPm, Integer popAm, Integer popPm) {
-        Integer pop = popAm == null ? popPm : popPm == null ? popAm : Math.max(popAm, popPm);
         String sky = isWet(skyAm) ? skyAm : isWet(skyPm) ? skyPm : (skyAm != null ? skyAm : skyPm);
-        return new DailySummary(date, min, max, sky, pop, null);
+        return new DailySummary(date, min, max, sky, maxNullable(popAm, popPm), null);
+    }
+
+    /**
+     * 둘 다 없으면 null. 삼항식 한 줄로 쓰면 {@code Math.max}(int) 때문에 전체가 int로 승격돼 null이 언박싱되며
+     * NPE가 난다 - 운영 첫 적재에서 실제로 터졌던 자리라 if로 푼다.
+     */
+    private static Integer maxNullable(Integer a, Integer b) {
+        if (a == null) {
+            return b;
+        }
+        if (b == null) {
+            return a;
+        }
+        return Math.max(a, b);
     }
 
     private static boolean isWet(String text) {
