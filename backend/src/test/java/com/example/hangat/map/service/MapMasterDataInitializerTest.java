@@ -49,18 +49,26 @@ class MapMasterDataInitializerTest {
                 .collect(Collectors.toMap(Region::getCode, region -> region));
 
         assertThat(byCode).containsKeys("NORTH", "EAST", "SOUTH", "WEST");
-        assertThat(byCode.get("NORTH").getKmaGridX()).isEqualTo((short) 52);
-        assertThat(byCode.get("NORTH").getKmaGridY()).isEqualTo((short) 38);
-        byCode.values().forEach(region -> {
-            assertThat(region.getKmaGridX()).as("%s gridX", region.getCode()).isNotNull();
-            assertThat(region.getKmaGridY()).as("%s gridY", region.getCode()).isNotNull();
-        });
+        // 권역 중심 좌표를 기상청 LCC 변환식에 넣은 값(2026-09-03). 북부는 기존 단일 격자 상수와 같다
+        assertGrid(byCode.get("NORTH"), 52, 38);
+        assertGrid(byCode.get("EAST"), 57, 37);
+        assertGrid(byCode.get("SOUTH"), 52, 32);
+        assertGrid(byCode.get("WEST"), 49, 35);
+    }
+
+    private static void assertGrid(Region region, int x, int y) {
+        assertThat(region.getKmaGridX()).as("%s gridX", region.getCode()).isEqualTo((short) x);
+        assertThat(region.getKmaGridY()).as("%s gridY", region.getCode()).isEqualTo((short) y);
     }
 
     @Test
     @DisplayName("권역이 먼저 들어간 DB(운영)는 행을 그대로 두고 비어 있는 격자만 채운다")
     void backfillsMissingGridWithoutTouchingRows() {
         em.createQuery("update Region r set r.kmaGridX = null, r.kmaGridY = null").executeUpdate();
+        em.clear();
+        // 동부만 운영자가 손으로 넣어둔 격자 - 보강이 이 값을 덮으면 '비어 있는 것만 채운다'가 아니다
+        regionRepository.findByCode("EAST").orElseThrow().assignKmaGrid((short) 1, (short) 1);
+        em.flush();
         em.clear();
         long before = regionRepository.count();
 
@@ -69,10 +77,12 @@ class MapMasterDataInitializerTest {
         em.clear();
 
         assertThat(regionRepository.count()).isEqualTo(before);
-        regionRepository.findAll().forEach(region -> {
-            assertThat(region.getKmaGridX()).as("%s gridX", region.getCode()).isNotNull();
-            assertThat(region.getKmaGridY()).as("%s gridY", region.getCode()).isNotNull();
-        });
+        Map<String, Region> byCode = regionRepository.findAll().stream()
+                .collect(Collectors.toMap(Region::getCode, region -> region));
+        assertGrid(byCode.get("EAST"), 1, 1);
+        assertGrid(byCode.get("NORTH"), 52, 38);
+        assertGrid(byCode.get("SOUTH"), 52, 32);
+        assertGrid(byCode.get("WEST"), 49, 35);
     }
 
     @Test
