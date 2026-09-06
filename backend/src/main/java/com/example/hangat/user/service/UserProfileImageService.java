@@ -20,7 +20,7 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 
 /**
- * 내 프로필 사진 저장 / 조회 - 인증된 회원 본인의 사진만 다룬다.
+ * 프로필 사진 저장 / 조회 - 변경은 본인만, 현재 활성 계정의 사진 조회는 공개한다.
  * 공통 이미지 검증과 저장소를 재사용하며 DB 커밋 전에는 기존 파일을 삭제하지 않는다.
  */
 @Service
@@ -86,10 +86,19 @@ public class UserProfileImageService {
     /** URL의 UUID뿐 아니라 DB의 현재 키도 일치해야 한다. 다른 회원이나 교체 전 사진은 404다. */
     public InputStream open(Long userId, String filename) {
         requireActive(userId);
+        return openPublic(userId, filename);
+    }
+
+    // ────────────────────────── 공개 사진 조회 ──────────────────────────
+
+    /** 요청 경로와 DB의 현재 키를 함께 검증한다. 미등록·교체 전·탈퇴·정지 사진은 모두 404다. */
+    public InputStream openPublic(Long userId, String filename) {
         if (!FILENAME.matcher(filename).matches()) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         String key = "profiles/" + userId + "/" + filename;
-        var user = users.findById(userId).orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
-        if (!key.equals(user.getProfileImageKey())) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        var user = users.findById(userId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (user.getStatus() != UserStatus.ACTIVE || !key.equals(user.getProfileImageKey())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
         return storage.open(key);
     }
 

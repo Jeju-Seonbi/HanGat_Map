@@ -65,21 +65,20 @@ public class ReviewService {
                 : imageRepository.findByReviewIdInOrderBySortOrder(ids).stream()
                         .collect(Collectors.groupingBy(i -> i.getReview().getId()));
 
-        Map<Long, String> nicknames = nicknamesOf(
+        Map<Long, User> authors = authorsOf(
                 reviews.getContent().stream().map(Review::getUserId).toList());
         return PageResponse.from(reviews.map(r ->
                 ReviewResponse.from(r, imagesByReview.getOrDefault(r.getId(), List.of()),
-                        nicknames.get(r.getUserId()))));
+                        authors.get(r.getUserId()))));
     }
 
-    /** 작성자 닉네임 - 페이지당 쿼리 한 번(IN). 탈퇴 등으로 유저가 없으면 맵에서 빠져 null 로 내려간다 */
-    private Map<Long, String> nicknamesOf(List<Long> userIds) {
+    /** 닉네임과 현재 프로필 사진을 페이지당 쿼리 한 번(IN)으로 읽는다. 사용자 엔티티 자체는 응답하지 않는다. */
+    private Map<Long, User> authorsOf(List<Long> userIds) {
         if (userIds.isEmpty()) {
             return Map.of();
         }
         return userRepository.findAllById(userIds).stream()
-                .filter(u -> u.getNickname() != null)
-                .collect(Collectors.toMap(User::getId, User::getNickname, (a, b) -> a));
+                .collect(Collectors.toMap(User::getId, u -> u, (a, b) -> a));
     }
 
     // ────────────────────────── 후기 작성 및 삭제 ──────────────────────────
@@ -115,7 +114,7 @@ public class ReviewService {
         }
 
         refreshSummary(place);
-        return ReviewResponse.from(review, images, nicknamesOf(List.of(userId)).get(userId));
+        return ReviewResponse.from(review, images, authorsOf(List.of(userId)).get(userId));
     }
 
     /** 본인 후기만 논리 삭제하고, 커밋이 성공한 경우에만 사진 정리를 진행한다. */

@@ -54,13 +54,20 @@ public class User {
     @Column(name = "birth_date")
     private LocalDate birthDate;
 
-    /** 비공개 저장소 내부 키. 응답에는 MinIO 주소나 키 대신 본인 전용 조회 경로를 내보낸다. */
+    /** 비공개 저장소 내부 키. 응답에는 MinIO 주소나 키 대신 백엔드 조회 경로를 내보낸다. */
     @Column(name = "profile_image_key", length = 200)
     private String profileImageKey;
 
     /** 검증·저장이 끝난 사진으로 교체한다. 이전 파일 정리는 서비스가 커밋 후 처리한다. */
     public void updateProfileImage(String key) {
         this.profileImageKey = key;
+    }
+
+    /** 리뷰와 내 정보에서 공통으로 쓰는 공개 사진 주소. 비활성 계정·미등록 사진은 노출하지 않는다. */
+    public String publicProfileImageUrl() {
+        if (id == null || status != UserStatus.ACTIVE || profileImageKey == null) return null;
+        return "/users/" + id + "/profile-image/"
+                + profileImageKey.substring(profileImageKey.lastIndexOf('/') + 1);
     }
 
     @Builder.Default

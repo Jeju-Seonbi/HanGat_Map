@@ -86,7 +86,9 @@ class ProfileImageIntegrationTest {
     }
 
     @Test void 업로드한_사진은_본인만_읽고_교체하면_이전_파일이_삭제된다() throws Exception {
-        String first = upload();
+        String uploaded = upload();
+        // 이전 프론트가 가진 본인 전용 URL도 계속 지원한다.
+        String first = "/users/me/profile-image/" + uploaded.substring(uploaded.lastIndexOf('/') + 1);
         mvc.perform(get(first).header("Authorization", token(owner)))
                 .andExpect(status().isOk()).andExpect(content().bytes(png))
                 .andExpect(header().string("Cache-Control", "no-store"));
@@ -190,10 +192,63 @@ class ProfileImageIntegrationTest {
         String path = upload();
         owner.withdraw();
         users.saveAndFlush(owner);
-        mvc.perform(get(path).header("Authorization", token(owner))).andExpect(status().isForbidden());
+        String privatePath = "/users/me/profile-image/" + path.substring(path.lastIndexOf('/') + 1);
+        mvc.perform(get(privatePath).header("Authorization", token(owner))).andExpect(status().isForbidden());
         mvc.perform(multipart("/users/me/profile-image")
                         .file(new MockMultipartFile("file", png))
                         .with(r -> { r.setMethod("PUT"); return r; }).header("Authorization", token(owner)))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test void 공개_프로필은_다른_회원과_비회원도_읽지만_변경할_수_없다() throws Exception {
+        String privatePath = upload();
+        assertThat(privatePath).startsWith("/users/me/profile-image/");
+        String path = privatePath.replace("/users/me/", "/users/" + owner.getId() + "/");
+        mvc.perform(get(path)).andExpect(status().isOk()).andExpect(content().bytes(png))
+                .andExpect(header().string("Cache-Control", "no-store"));
+        mvc.perform(head(path)).andExpect(status().isOk()).andExpect(content().bytes(new byte[0]));
+        var other = user();
+        mvc.perform(get(path).header("Authorization", token(other))).andExpect(content().bytes(png));
+        mvc.perform(get(path.replace("/users/" + owner.getId() + "/", "/users/" + other.getId() + "/")))
+                .andExpect(status().isNotFound());
+        mvc.perform(put(path)).andExpect(status().isUnauthorized());
+        mvc.perform(multipart("/users/" + owner.getId() + "/profile-image")
+                        .file(new MockMultipartFile("file", png)).with(r -> { r.setMethod("PUT"); return r; })
+                        .header("Authorization", token(other)))
+                .andExpect(status().isNotFound());
+        upload();
+        mvc.perform(get(path)).andExpect(status().isNotFound());
+        mvc.perform(get("/users/me")).andExpect(status().isUnauthorized());
+    }
+
+    @Test void 리뷰_목록과_작성_응답은_현재_프로필만_제공하며_탈퇴한_사진은_숨긴다() throws Exception {
+        String first = upload().replace("/users/me/", "/users/" + owner.getId() + "/");
+        Long placeId = new TransactionTemplate(transactionManager).execute(status -> {
+            var region = com.example.hangat.map.model.entity.Region.builder()
+                    .code("PHOTO").name("사진테스트").displayOrder((byte) 99).build();
+            var category = com.example.hangat.map.model.entity.PlaceCategory.builder().code("PHOTO").name("사진테스트").build();
+            entityManager.persist(region);
+            entityManager.persist(category);
+            var place = com.example.hangat.map.model.entity.Place.builder().name("프로필 테스트 장소")
+                    .normalizedName("프로필테스트장소").region(region).primaryCategory(category).build();
+            entityManager.persist(place);
+            return place.getId();
+        });
+        mvc.perform(post("/places/" + placeId + "/reviews").header("Authorization", token(owner))
+                        .contentType("application/json").content("{\"rating\":5,\"content\":\"사진 테스트\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.result.profileImageUrl").value(first));
+        String second = upload().replace("/users/me/", "/users/" + owner.getId() + "/");
+        mvc.perform(get("/places/" + placeId + "/reviews"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.content[0].profileImageUrl").value(second))
+                .andExpect(jsonPath("$.result.content[0].email").doesNotExist())
+                .andExpect(jsonPath("$.result.content[0].profileImageKey").doesNotExist());
+        mvc.perform(get(first)).andExpect(status().isNotFound());
+        var current = users.findById(owner.getId()).orElseThrow();
+        current.withdraw();
+        users.saveAndFlush(current);
+        mvc.perform(get(second)).andExpect(status().isNotFound());
+        mvc.perform(get("/places/" + placeId + "/reviews"))
+                .andExpect(jsonPath("$.result.content[0].profileImageUrl").isEmpty());
     }
 }
