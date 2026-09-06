@@ -171,13 +171,19 @@ async function copyLink() {
    아직 로드 전이면(느린 회선) 열지 않고 링크 복사로 안내한다 */
 function shareKakao() {
   shareOpen.value = false
-  const opened = shareToKakao({
-    title: s.value.n,
-    description: s.value.addr || [s.value.c, s.value.r].filter(Boolean).join(' · '),
-    imageUrl: ktoImages.value[0]?.url ?? null,
-    url: shareUrl.value,
-  })
-  if (!opened) toast('카카오톡 준비 중이에요 — 잠시 후 다시 누르거나 링크 복사를 이용해 주세요')
+  try {
+    const opened = shareToKakao({
+      title: s.value.n,
+      description: s.value.addr || [s.value.c, s.value.r].filter(Boolean).join(' · '),
+      imageUrl: ktoImages.value[0]?.url ?? null,
+      url: shareUrl.value,
+    })
+    if (!opened) toast('카카오톡 준비 중이에요 — 잠시 후 다시 누르거나 링크 복사를 이용해 주세요')
+  } catch (e) {
+    // SDK가 던지는 경우(템플릿 검증 실패·도메인 미등록 등) - 조용히 죽지 않고 대안을 안내한다
+    console.error('카카오톡 공유 실패', e)
+    toast('카카오톡 공유를 열지 못했어요 — 링크 복사를 이용해 주세요')
+  }
 }
 
 /** OS 공유 시트(모바일 브라우저 대부분, 데스크톱은 일부만 지원) */
