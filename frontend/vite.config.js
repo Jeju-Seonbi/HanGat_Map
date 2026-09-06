@@ -13,7 +13,7 @@ import vue from '@vitejs/plugin-vue'
  *   script-src 의 'unsafe-inline' 과 달리 style-src 쪽은 XSS 실행 경로가 아니라 위험이 훨씬 낮다.
  * - connect-src: 설정된 백엔드 API + HIBP Pwned Passwords(k-익명성 유출 조회)
  *   + 개발 모드 HMR 웹소켓.
- * - img-src: 지도 타일 CDN + data: (플레이스홀더).
+ * - img-src: 백엔드 후기 사진 + 지도 타일 CDN + data:/blob: 미리보기.
  *
  * ⚠️ meta 태그로 전달한 CSP 는 frame-ancestors 를 무시한다(스펙상).
  *    클릭재킹 차단은 서버 헤더로 넣어야 한다. README 참고.
@@ -65,7 +65,8 @@ function htmlCspPlugin () {
              (운영 빌드는 upgrade-insecure-requests 가 https 로 승격시킨다). */
           /* tong.visitkorea.or.kr: TourAPI 장소 사진(한산 장소 캐러셀 등) - 공사 이미지는 http 원본이라
              http도 열되, 운영 빌드는 upgrade-insecure-requests 가 https 로 승격시킨다. */
-          "img-src 'self' data: blob: http://*.daumcdn.net https://*.daumcdn.net http://*.kakaocdn.net https://*.kakaocdn.net http://tong.visitkorea.or.kr https://tong.visitkorea.or.kr",
+          /* 후기는 비공개 MinIO가 아니라 백엔드 조회 API에서 읽는다. */
+          `img-src 'self'${apiOrigin ? ` ${apiOrigin}` : ''} data: blob: http://*.daumcdn.net https://*.daumcdn.net http://*.kakaocdn.net https://*.kakaocdn.net http://tong.visitkorea.or.kr https://tong.visitkorea.or.kr${dev ? ' http://localhost:8080 http://127.0.0.1:8080' : ''}`,
           /* 동일 출처 /api는 'self'로, 별도 API 서브도메인은 VITE_API_BASE_URL의
              origin을 빌드 시점에 추가해 운영 요청이 CSP에 막히지 않게 한다. */
           `connect-src 'self'${apiOrigin ? ` ${apiOrigin}` : ''} https://api.pwnedpasswords.com https://dapi.kakao.com http://dapi.kakao.com${dev ? ' http://localhost:8080 ws: wss:' : ''}`,

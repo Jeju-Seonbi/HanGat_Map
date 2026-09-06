@@ -19,7 +19,7 @@ afterEach(async () => {
 })
 
 describe('production Content-Security-Policy', () => {
-  it('allows the configured backend API origin in connect-src', async () => {
+  it('allows backend API calls and review images without exposing MinIO', async () => {
     vi.stubEnv('VITE_API_BASE_URL', 'https://api.hangatjeju.com')
     outputDirectory = await mkdtemp(join(tmpdir(), 'hangat-csp-'))
 
@@ -37,5 +37,9 @@ describe('production Content-Security-Policy', () => {
     expect(html).toContain(
       "connect-src 'self' https://api.hangatjeju.com "
     )
+    expect(html).toContain(
+      "img-src 'self' https://api.hangatjeju.com "
+    )
+    expect(html).not.toContain('minio.fileinnout.svc.cluster.local')
   })
 })
