@@ -1,5 +1,7 @@
-package com.example.hangat.map.service;
+package com.example.hangat.map.place;
 
+import com.example.hangat.map.service.PlaceNameNormalizer;
+import com.example.hangat.map.service.RegionResolver;
 import com.example.hangat.map.client.PublicApiClient;
 import com.example.hangat.map.model.dto.KtoPlaceItem;
 import com.example.hangat.map.model.dto.TourApiResponse;
