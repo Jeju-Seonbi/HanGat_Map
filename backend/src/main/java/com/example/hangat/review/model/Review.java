@@ -1,7 +1,7 @@
-package com.example.hangat.map.model.entity;
+package com.example.hangat.review.model;
 
+import com.example.hangat.map.model.entity.Place;
 import com.example.hangat.map.model.enums.CongestionLevel;
-import com.example.hangat.map.model.enums.ReviewStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -20,6 +20,7 @@ import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 
@@ -38,6 +39,7 @@ import java.time.LocalDateTime;
 @Getter
 @Builder
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Review {
 
     @Id
@@ -46,9 +48,8 @@ public class Review {
     private Long id;
 
     /**
-     * 작성자 id. 삭제 권한 검사 기준.
-     * User 엔티티 참조가 아닌 이유: dev의 user 패키지가 컴파일 제외 상태다(build.gradle TODO).
-     * 복구되면 FK 제약만 추가하면 된다 - JWT 도 Long userId 를 준다
+     * 작성자 ID - 삭제 권한 검사의 기준이다.
+     * 사용자 엔티티를 직접 로딩하지 않고 닉네임은 목록 조회 시 별도로 일괄 조회한다.
      */
     @Column(name = "user_id", nullable = false)
     private Long userId;
@@ -84,8 +85,7 @@ public class Review {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
-    protected Review() {
-    }
+    // ────────────────────────── 후기 상태 변경 ──────────────────────────
 
     /** 논리 삭제 - 물리 DELETE 금지(명세서) */
     public void delete() {
@@ -93,12 +93,16 @@ public class Review {
         this.deletedAt = LocalDateTime.now();
     }
 
+    // ────────────────────────── 저장 시각 관리 ──────────────────────────
+
+    /** 첫 저장 시 생성/수정 시각을 같은 값으로 기록한다. */
     @PrePersist
     void onCreate() {
         this.createdAt = LocalDateTime.now();
         this.updatedAt = this.createdAt;
     }
 
+    /** 후기 상태 등 엔티티 값이 갱신될 때 수정 시각을 기록한다. */
     @PreUpdate
     void onUpdate() {
         this.updatedAt = LocalDateTime.now();
