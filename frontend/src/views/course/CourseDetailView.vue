@@ -29,7 +29,9 @@ const swapTarget = ref<Stop | null>(null)
 const alternatives = ref<AlternativePlace[]>([])
 const altLoading = ref(false)
 const altNotice = ref('')
+const swapping = ref(false)
 const toast = ref('')
+let toastTimer: ReturnType<typeof setTimeout> | undefined
 
 onMounted(async () => {
   live.value = await CourseService.getCourseDetail(courseId)
@@ -219,7 +221,8 @@ const modalItem = computed<CourseItem | null>(() => {
 
 const showToast = (text: string) => {
   toast.value = text
-  setTimeout(() => { toast.value = '' }, 2600)
+  if (toastTimer) clearTimeout(toastTimer)   // 연달아 뜨면 앞 타이머가 새 토스트를 지운다
+  toastTimer = setTimeout(() => { toast.value = '' }, 2600)
 }
 
 async function openSwap (stop: Stop) {
@@ -245,17 +248,28 @@ async function openSwap (stop: Stop) {
 
 async function applySwap (alternative: AlternativePlace) {
   const target = swapTarget.value?.liveItem
-  if (!target || !live.value) return
+  if (!target || !live.value || swapping.value) return   // 더블클릭이면 두 번째 스왑이 첫 교체를 '원래 장소'로 덮는다
+  swapping.value = true
+  altNotice.value = ''
   try {
     const summary = await CourseService.swapItem(courseId, target.id, alternative.place_id, live.value.manageable)
     // 서버가 교체 칸과 다음 칸 이동, 평균을 다시 계산했으니 상세를 다시 읽는다 - 로컬에서 흉내 내지 않는다
-    live.value = await CourseService.getCourseDetail(courseId)
+    const refreshed = await CourseService.getCourseDetail(courseId)
     swapTarget.value = null
-    showToast(summary.levelLabel
-      ? `${alternative.place_name}(으)로 바꿨어요. 평균 혼잡도는 ${summary.levelLabel}이에요.`
-      : `${alternative.place_name}(으)로 바꿨어요.`)
+    if (refreshed) {
+      live.value = refreshed
+      showToast(summary.levelLabel
+        ? `${alternative.place_name}(으)로 바꿨어요. 평균 혼잡도는 ${summary.levelLabel}이에요.`
+        : `${alternative.place_name}(으)로 바꿨어요.`)
+    } else {
+      // 교체는 됐는데 재조회가 실패 - 화면을 비우지 않고 알린다
+      showToast(`${alternative.place_name}(으)로 바꿨지만 최신 일정을 불러오지 못했어요. 새로고침해 주세요.`)
+    }
   } catch (failure) {
-    showToast(failure instanceof ApiError ? `바꾸지 못했어요. ${failure.message}` : '장소를 바꾸지 못했어요. 기존 일정은 그대로예요.')
+    // 서버 메시지(중복 장소·권한·예보 없음)는 모달 안에 - 토스트는 모달 뒤에 가려진다
+    altNotice.value = failure instanceof ApiError ? `바꾸지 못했어요. ${failure.message}` : '장소를 바꾸지 못했어요. 기존 일정은 그대로예요.'
+  } finally {
+    swapping.value = false
   }
 }
 </script>
@@ -437,6 +451,7 @@ async function applySwap (alternative: AlternativePlace) {
     :alternatives="alternatives"
     :loading="altLoading"
     :notice="altNotice"
+    :busy="swapping"
     @close="swapTarget = null"
     @select="applySwap"
   />

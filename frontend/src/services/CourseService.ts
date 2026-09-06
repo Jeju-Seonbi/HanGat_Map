@@ -8,7 +8,7 @@
  * 그쪽이 처리한다.
  */
 import { apiGet } from './apiClient'
-import { apiRequest } from '../api/backendClient'
+import { apiRequest, getBackendUserId } from '../api/backendClient'
 import { homeCourses } from '../data/courses'
 import type { CongestionLevel } from '../assets/types'
 import type { AlternativePlace } from '../assets/types/course'
@@ -300,11 +300,14 @@ export const CourseService = {
   /**
    * 코스 상세. 숫자 id만 백엔드에 묻는다 - 목업 코스는 'sample-aewol' 같은 문자열 id라
    * 전환기 동안 두 경로가 공존한다.
+   *
+   * 로그인돼 있으면 JWT를 붙인다 - 소유자가 있는 저장 코스는 본인 확인(3307)을 통과해야 열리고,
+   * 그래야 swappable/manageable이 참이 되어 교체·이름 변경이 가능하다. 비로그인은 공개 경로.
    */
   async getCourseDetail (id: string): Promise<CourseDetail | null> {
     if (!/^\d+$/.test(id)) return null
     try {
-      const row = await apiGet<BackendCourseDetail>(`/courses/${id}`)
+      const row = await apiRequest(`/courses/${id}`, { auth: getBackendUserId() != null }) as BackendCourseDetail
       return {
         id: String(row.id),
         title: row.title,
