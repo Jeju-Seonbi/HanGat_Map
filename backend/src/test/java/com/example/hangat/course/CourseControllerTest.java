@@ -147,10 +147,10 @@ class CourseControllerTest {
                 null,
                 null,
                 new BigDecimal("22.5"),
-                com.example.hangat.course.model.CongestionLevel.QUIET,
+                com.example.hangat.map.model.enums.CongestionLevel.QUIET,
                 List.of(new CourseResponseDto.CongestionFactDto(
                         LocalDate.of(2026, 8, 28), new BigDecimal("22.5"),
-                        com.example.hangat.course.model.CongestionLevel.QUIET)),
+                        com.example.hangat.map.model.enums.CongestionLevel.QUIET)),
                 List.of(new CourseResponseDto.WeatherFactDto(
                         LocalDate.of(2026, 8, 28), LocalTime.of(9, 0),
                         new BigDecimal("27.5"), 20, "0", "1",

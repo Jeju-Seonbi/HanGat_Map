@@ -57,7 +57,8 @@ final class CourseCandidateNormalizer {
                     || candidate.getPreferenceType() == PreferenceType.AVOID) {
                 continue;
             }
-            CourseCandidate normalizedCandidate = normalizeKtoCandidate(request, candidate);
+            CourseCandidate normalizedCandidate = candidate.getStoredCandidate() == null
+                    ? normalizeKtoCandidate(request, candidate) : candidate.getStoredCandidate();
             String candidateId = normalizedCandidate.identity().candidateId();
             if (!candidateIds.add(candidateId)) {
                 throw new IllegalArgumentException("중복된 AI 후보 식별자입니다: " + candidateId);
@@ -75,7 +76,7 @@ final class CourseCandidateNormalizer {
                 int matchedIndex = findMatchingCandidateIndex(preference, normalized);
                 if (matchedIndex >= 0) {
                     CourseCandidate matched = normalized.get(matchedIndex);
-                    if (isKakaoPreference(preference)) {
+                    if (isKakaoPreference(preference) && matched.identity().placeId() == null) {
                         normalized.set(matchedIndex, normalizeKakaoWant(
                                 matched.identity().candidateId(), preference));
                     } else if (matched.userConstraint().preferenceType() != PreferenceType.WANT) {
@@ -294,8 +295,9 @@ final class CourseCandidateNormalizer {
         for (int index = 0; index < candidates.size(); index++) {
             CourseCandidate candidate = candidates.get(index);
             if (sameSourceIdentity(preference, candidate)
-                    || sameInternalIdentity(preference, candidate)
-                    || sameNameAndCoordinates(preference, candidate)) {
+                    || (candidate.identity().placeId() == null && (
+                    sameInternalIdentity(preference, candidate)
+                    || sameNameAndCoordinates(preference, candidate)))) {
                 return index;
             }
         }

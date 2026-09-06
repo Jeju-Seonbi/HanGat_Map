@@ -180,7 +180,7 @@ class CourseQueryApiTest {
         CourseDetailResponse.ItemDto 성산 = detail.days().get(0).items().get(0);
         assertThat(성산.placeName()).isEqualTo("성산일출봉");
         assertThat(성산.congestionRate()).isEqualTo(35.0);          // 지금 예보
-        assertThat(성산.congestionLabel()).isEqualTo("여유");
+        assertThat(성산.congestionLabel()).isEqualTo("한산");
         assertThat(성산.plannedCongestionRate()).isEqualTo(80.0);   // 저장 시점 스냅숏
         assertThat(성산.regionName()).isEqualTo("동부");
         assertThat(성산.latitude()).isNotNull();
@@ -251,7 +251,7 @@ class CourseQueryApiTest {
         assertThat(card.regionName()).isEqualTo("동부");
         assertThat(card.durationText()).isEqualTo("1박 2일");
         assertThat(card.savedAt()).isNotNull();
-        assertThat(card.congestionLabel()).isEqualTo("여유");
+        assertThat(card.congestionLabel()).isEqualTo("한산");
 
         // 임시 코스(미저장)와 남의 목록에는 안 잡힌다
         assertThat(mine).noneMatch(c -> c.id().equals(임시코스.getId()));
@@ -342,7 +342,7 @@ class CourseQueryApiTest {
 
         // 지금 예보 (35 + 23 + 41) / 3 = 33.00, 저장된 캐시는 생성 당시 값 33.00
         assertThat(detail.averageCongestionRate()).isEqualByComparingTo("33.00");
-        assertThat(detail.congestionLabel()).isEqualTo("여유");
+        assertThat(detail.congestionLabel()).isEqualTo("한산");
         assertThat(detail.plannedAverageCongestionRate()).isEqualByComparingTo("33.00");
         // 임시 코스는 스왑은 되지만 이름변경·삭제 대상이 아니다
         assertThat(detail.swappable()).isTrue();

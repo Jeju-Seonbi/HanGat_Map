@@ -14,6 +14,7 @@ import { setLatency } from './client.js'
 import { ApiError } from './errors.js'
 import { _resetSessionState } from './session.js'
 import { PASSWORD_POLICY } from '../components/security/passwordPolicy.js'
+import { todayKst, addCalendarDays } from '../utils/format.js'
 import { login, logout } from './auth.js'
 import {
   listSavedCourses, getSavedCourse, deleteSavedCourse,
@@ -349,7 +350,7 @@ describe('로그인이 필요한 API', () => {
 describe('알림 보관 기간', () => {
   const DAY_MS = 24 * 60 * 60 * 1000
   const ago = d => new Date(Date.now() - d * DAY_MS).toISOString()
-  const inDays = d => new Date(Date.now() + d * DAY_MS).toISOString().slice(0, 10)
+  const inDays = d => addCalendarDays(todayKst(), d)
 
   beforeEach(async () => {
     await login({ email: TEST_ACCOUNT.email, password: TEST_ACCOUNT.password })

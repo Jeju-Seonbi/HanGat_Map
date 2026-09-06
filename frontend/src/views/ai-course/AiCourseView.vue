@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import { congestionLabel } from '../../utils/congestion'
+import { todayKst, addCalendarDays, formatCalendarDate } from '../../utils/format.js'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../app/stores/auth'
 import CourseConditionForm from '../../components/course/CourseConditionForm.vue'
@@ -12,18 +14,13 @@ import { courseGenerationErrorMessage, courseMockService } from '../../services/
 import { storePendingCourseClaim, takePendingCourseClaim } from '../../services/pendingCourseClaim'
 import { routeSummary, accessNotices } from '../../services/course/courseSummary'
 import { ApiError } from '../../api/errors.js'
-import { levelOf } from '../../utils/congestion'
-import { levelLabel } from '../../data/data'
 import type { AccommodationInput, AccommodationRecommendation, AlternativePlace, CarDayRoute, CarRouteLeg, CongestionRescheduleOption, CourseCondition, CourseItem, CourseResult } from '../../assets/types/course'
 
-const now = new Date()
-const later = new Date(now)
-later.setDate(now.getDate() + 2)
-const iso = (date: Date) => date.toISOString().slice(0, 10)
+const today = todayKst()
 
 const condition = reactive<CourseCondition>({
-  start_date: iso(now),
-  end_date: iso(later),
+  start_date: today,
+  end_date: addCalendarDays(today, 2),
   people: 2,
   budget_total: 400000,
   transport: 'RENTAL_CAR',
@@ -106,8 +103,6 @@ const estimatedCost = computed(() => {
     ? `${summary.total_expected_max.toLocaleString()}원`
     : `${summary.total_expected_min.toLocaleString()} ~ ${summary.total_expected_max.toLocaleString()}원`
 })
-// 팀 표준 3단계(여유 <40 / 보통 <70 / 혼잡) - 백엔드 CongestionLevel.from과 같은 컷. 화면마다 다른 컷을 쓰면 같은 평균이 다른 등급으로 보인다
-const congestionLabel = (rate?: number) => rate == null ? '-' : levelLabel[levelOf(rate)]
 
 async function generate(next: CourseCondition, regenerate = false) {
   Object.assign(condition, JSON.parse(JSON.stringify(next)) as CourseCondition)
@@ -273,18 +268,8 @@ onMounted(async () => {
   }
 })
 
-const formatDate = (value: string) => new Intl.DateTimeFormat('ko-KR', {
-  month: 'long',
-  day: 'numeric',
-  weekday: 'short',
-  timeZone: 'UTC',
-}).format(new Date(`${value}T00:00:00Z`))
-
-const formatShortDate = (value: string) => new Intl.DateTimeFormat('ko-KR', {
-  month: 'numeric',
-  day: 'numeric',
-  timeZone: 'UTC',
-}).format(new Date(`${value}T00:00:00Z`))
+const formatDate = (value: string) => formatCalendarDate(value)
+const formatShortDate = (value: string) => formatCalendarDate(value, { month: 'numeric', day: 'numeric' })
 
 const formatDistance = (metres?: number | null) => metres == null ? '정보 없음' : `${(metres / 1000).toFixed(1)}km`
 </script>

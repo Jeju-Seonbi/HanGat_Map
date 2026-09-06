@@ -18,6 +18,7 @@ import type { AccommodationInput,
 import { getMockWeather, weatherRecommendationAdjustment, weatherWarning } from './weatherMockService'
 import { savedCourseMockService } from './savedCourseMockService'
 import { apiRequest } from '../api/backendClient.js'
+import { addCalendarDays as dateAt, calendarDayOffset as dayOffset } from '../utils/format.js'
 import { ApiError } from '../api/errors.js'
 
 const pause = (ms = 650) => new Promise(resolve => setTimeout(resolve, ms))
@@ -88,14 +89,6 @@ const regionCentres: Record<RegionCode, { lat: number; lng: number }> = {
   NORTH: { lat: 33.48, lng: 126.55 },
 }
 
-const dateAt = (start: string, offset: number) => {
-  const date = new Date(`${start}T00:00:00Z`)
-  date.setUTCDate(date.getUTCDate() + offset)
-  return date.toISOString().slice(0, 10)
-}
-
-const dayOffset = (start: string, date: string) =>
-  Math.round((new Date(`${date}T00:00:00Z`).getTime() - new Date(`${start}T00:00:00Z`).getTime()) / 86400000)
 const normalizePlaceName = (name: string) => name.normalize('NFKC').replace(/\s+/g, '').toLocaleLowerCase('ko-KR')
 const minutesFromTime = (time: string) => {
   const [hours, minutes] = time.split(':').map(Number)
@@ -230,7 +223,7 @@ function makeWantItem(courseId: number, itemId: number, preference: PlacePrefere
     end_time: endTime,
     item_source: fixed ? 'USER_FIXED' : 'AI_RECOMMENDED',
     congestion_rate: rate,
-    congestion_level: rate < 35 ? 'QUIET' : rate < 65 ? 'NORMAL' : 'CROWDED',
+    congestion_level: levelOf(rate),
     recommendation_reason_code: fixed ? 'ROUTE' : 'STYLE',
     recommendation_reason: fixed ? '사용자가 지정한 일정으로 유지했어요.' : '꼭 가고 싶은 장소로 선택해 일정에 포함했어요.',
     operating_hours_warning: metadata?.operatingHours ? !isWithinOperatingHours(metadata, startTime, endTime) : undefined,
@@ -259,7 +252,7 @@ function recommendationScore(place: MockPlace, condition: CourseCondition, dayRe
   if (!hasFixedSchedule) score += accommodationMatchScore(place, accommodation) * accommodationWeight
   if (preferredRegions.has(place.region)) score += 3
   if (styleMatches) score += 2
-  if (place.congestionRate < 35) score += 2
+  if (levelOf(place.congestionRate) === 'QUIET') score += 2
   if (place.region === dayRegion) score += 2
   if (previousPlace?.region === place.region) score += 2
   return score
@@ -283,7 +276,7 @@ function makeRecommendedItem(courseId: number, itemId: number, place: MockPlace,
     end_time: slot.end,
     item_source: 'AI_RECOMMENDED',
     congestion_rate: rate,
-    congestion_level: rate < 35 ? 'QUIET' : rate < 65 ? 'NORMAL' : 'CROWDED',
+    congestion_level: levelOf(rate),
     recommendation_reason_code: 'ROUTE',
     recommendation_reason: '',
     accommodation_influenced: accommodationInfluenced || undefined,
@@ -386,7 +379,7 @@ function mockCongestionAt(place: MockPlace, visitDate: string, startTime: string
 }
 
 function congestionLevel(rate: number): CourseItem['congestion_level'] {
-  return rate < 35 ? 'QUIET' : rate < 65 ? 'NORMAL' : 'CROWDED'
+  return levelOf(rate)
 }
 
 function rescheduleCandidates(course: CourseResult, itemId: number): CongestionRescheduleOption[] {
@@ -423,7 +416,7 @@ type ReasonCandidate = { key: string; code: CourseItem['recommendation_reason_co
 function buildRecommendationReason(item: CourseItem, place: MockPlace, condition: CourseCondition, previousPlace: MockPlace | undefined, usedReasonKeys: Set<string>): ReasonCandidate {
   const matchedRegion = condition.course_regions.find(region => region.code === place.region)
   const matchedStyle = condition.course_styles.find(style => place.styles.includes(style.code))
-  const isLowCongestion = place.congestionRate < 35
+  const isLowCongestion = levelOf(place.congestionRate) === 'QUIET'
   const isRouteEfficient = Boolean(item.inbound_distance_m && item.inbound_distance_m <= ROUTE_EFFICIENT_DISTANCE_M)
   const isSameRegionRoute = Boolean(matchedRegion && previousPlace?.region === place.region && isRouteEfficient)
   const candidates: ReasonCandidate[] = []
@@ -531,7 +524,7 @@ function placeFlexibleWants(days: CourseDay[], dayRegions: RegionCode[], prefere
 async function generateMockCourse(condition: CourseCondition, generationReason: CourseResult['generation_reason']): Promise<CourseResult> {
   await pause()
   const courseId = ++sequence
-  const dayCount = Math.max(1, Math.round((new Date(condition.end_date).getTime() - new Date(condition.start_date).getTime()) / 86400000) + 1)
+  const dayCount = Math.max(1, dayOffset(condition.start_date, condition.end_date) + 1)
   const days = Array.from({ length: dayCount }, (_, index) => ({ day_no: index + 1, visit_date: dateAt(condition.start_date, index), items: [] as CourseItem[] }))
   const wants = condition.course_place_preferences.filter(preference => preference.preference_type === 'WANT')
   const fixedWants = wants.filter(preference => preference.fixed_date || preference.fixed_time)
@@ -834,3 +827,4 @@ export const courseMockService = {
     return saved.course
   },
 }
+import { levelOf } from '../utils/congestion'

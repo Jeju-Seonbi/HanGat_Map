@@ -14,7 +14,7 @@ import com.example.hangat.course.facts.UserConstraint;
 import com.example.hangat.course.facts.WeatherFact;
 import com.example.hangat.course.facts.WeatherFactSet;
 import com.example.hangat.course.model.AccommodationDto;
-import com.example.hangat.course.model.CongestionLevel;
+import com.example.hangat.map.model.enums.CongestionLevel;
 import com.example.hangat.course.model.CourseResponseDto;
 import com.example.hangat.course.model.PreferenceType;
 import com.example.hangat.course.model.entity.Course;
