@@ -1,5 +1,5 @@
 <script setup>
-/** 내 프로필 사진 선택·미리보기·저장. 인증된 이미지 Blob은 이 화면에서만 보관한다. */
+/** 내 프로필 사진 선택·미리보기·저장. 변경은 본인만 가능하고 등록한 사진은 리뷰에도 공개된다. */
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useAuthStore } from '../../stores/auth.js'
 import { readProfileImage } from '../../api/userAuth.js'
@@ -134,6 +134,7 @@ onBeforeUnmount(() => {
           <div class="photo-preview">
             <img :src="previewUrl" alt="선택한 프로필 사진 미리보기" @error="error = '사진을 읽지 못했어요. 다른 파일을 선택해 주세요.'; clearSelection()" />
             <p class="photo-note">사진은 원형으로 표시돼요. JPG, PNG, WebP · 최대 5MB</p>
+            <p class="photo-note">등록한 프로필 사진은 리뷰에서 다른 사람에게도 보여요.</p>
             <p v-if="error" class="photo-error" role="alert">{{ error }}</p>
             <div class="photo-actions">
               <button type="button" class="btn2" :disabled="saving" @click="close">취소</button>

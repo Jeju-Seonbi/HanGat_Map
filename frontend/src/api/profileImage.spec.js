@@ -65,6 +65,21 @@ it('외부 사진 주소에는 인증 토큰을 보내지 않는다', () => {
   expect(fetch).not.toHaveBeenCalled()
 })
 
+it('공개 프로필 사진은 로그인 없이 토큰을 붙이지 않고 읽는다', async () => {
+  clearBackendSession()
+  const path = '/users/7/profile-image/12345678-1234-1234-1234-123456789abc.png'
+  const requests = []
+  vi.stubGlobal('fetch', vi.fn(async (url, options) => {
+    requests.push(url)
+    expect(options.headers.Authorization).toBeUndefined()
+    return new Response('public image', { headers: { 'Content-Type': 'image/png' } })
+  }))
+  const image = await readProfileImage(path)
+  expect(await image.text()).toBe('public image')
+  expect(requests).toHaveLength(1)
+  expect(requests[0]).toContain(path)
+})
+
 it('다른 탭에서 계정이 바뀌어도 새 계정의 토큰으로 사진을 재전송하지 않는다', async () => {
   const uploads = []
   vi.stubGlobal('fetch', vi.fn(async (url, options) => {

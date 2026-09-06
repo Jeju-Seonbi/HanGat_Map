@@ -7,6 +7,7 @@ import {
   syncAuthenticatedUser
 } from './backendClient.js'
 import { ApiError } from './errors.js'
+import { publicProfileImageUrl } from '../utils/profileImage.js'
 
 /** 백엔드 UserResponse를 기존 화면이 읽는 최소 사용자 모델로 맞춘다. */
 export function normalizeUser (user) {
@@ -123,8 +124,9 @@ export async function updateProfileImage (file) {
   }))
 }
 
-/** 비공개 사진은 Bearer 인증으로 받은 Blob을 화면에서만 사용한다. 외부 URL로 토큰을 보내지 않는다. */
+/** 공개 사진에는 인증을 붙이지 않는다. 이전 본인 전용 경로는 인증된 Blob 조회로 호환한다. */
 export function readProfileImage (path) {
+  if (publicProfileImageUrl(path)) return apiRequest(path, { responseType: 'blob' })
   if (!/^\/users\/me\/profile-image\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp)$/.test(path)) {
     throw new ApiError(400, 'INVALID_IMAGE_PATH', '사진 주소를 확인해주세요.')
   }

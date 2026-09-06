@@ -3,6 +3,7 @@
 import { ref, computed, watch } from 'vue'
 import StarIcon from './StarIcon.vue'
 import ReviewSection from './ReviewSection.vue'
+import ProfileAvatar from '../common/ProfileAvatar.vue'
 import { state, toggleFav, isFav, toast } from '@/stores/mapStore'
 
 import { crowd, tier, tierKo, rank30, bestDay, CROWD_KO } from '@/utils/crowd'
@@ -350,7 +351,7 @@ async function shareNative() {
         <template v-if="previewReviews.length">
           <div v-for="r in previewReviews" :key="r.id" class="rv-i">
             <div class="rv-h">
-              <span class="rv-av">{{ (r.nickname ?? '여')[0] }}</span>
+              <ProfileAvatar :src="r.profileImageUrl" :nickname="r.nickname" />
               <span class="rv-nm">{{ r.nickname ?? `여행자${r.userId}` }}</span>
               <span class="rv-dt">{{ rvDate(r.createdAt) }} 작성</span>
             </div>
