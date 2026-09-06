@@ -139,6 +139,14 @@
   }
 }
 
+/* 폭만 좁아진 데스크톱은 상단 헤더를 유지하고 하단 탭 공간을 만들지 않는다. */
+@media(max-width:768px) and (hover:hover) and (pointer:fine){
+  :root{
+    --nav-h:80px;
+    --mobile-tabbar-h:0px;
+  }
+}
+
 /* ══ 정동현 화면 전용 리스킨 토큰 (Toss풍) ═════════════════
    App.vue 가 route.meta.skin 을 보고 <html> 에 skin-toss 를 붙인다.
    붙는 화면: 메인(/) · 관광지 상세(/places/:placeId) · 저장한 코스(/courses)
