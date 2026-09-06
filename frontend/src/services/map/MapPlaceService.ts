@@ -1,15 +1,17 @@
 /**
  * 지도 페이지 장소 데이터 (MAP-01 ~ MAP-03).
  *
- * 1순위: 백엔드 `GET /places?type=` (KTO 관광정보 실적재 2,138곳)
- * 폴백: 백엔드가 죽어 있으면 기존 하드코딩(data/placesMap)으로 화면 유지 + live 플래그로 라벨 전환.
+ * 백엔드 `GET /places?type=` (KTO 관광정보 실적재 2,138곳 + 소상공인 상가).
+ * 실패 처리: 레이어별로 따로 받아 하나가 실패해도 나머지는 살린다(failed 목록으로 알림).
+ * 전부 실패하면 live=false - 화면이 "불러오지 못했어요 · 새로고침" 안내를 띄운다.
+ * ⚠️ 예전엔 실패 시 하드코딩 목업(data/placesMap)으로 바꿔치기했는데 2026-09-07 제거했다 -
+ *    운영에서 가짜 장소가 진짜처럼 보이고, id가 없어 후기·공유·찜이 전부 죽는 문제.
  *
  * ★ 백엔드는 전체 필드명(`name`/`latitude`/…)을 쓰고 화면은 축약 키(`n`/`y`/…)를 쓴다.
  *   변환을 여기 한 곳에 모아 두면 MapCanvas·SearchBox·PlaceDetail이 지금 코드 그대로 돈다.
  *   ⚠️ `x`가 경도, `y`가 위도다 - 뒤집으면 제주 전역 핀이 통째로 엉뚱한 곳에 찍힌다.
  */
 import { apiGet } from '../apiClient'
-import { SPOTS as MOCK_SPOTS, FOOD as MOCK_FOOD, DINE as MOCK_DINE, CAFE as MOCK_CAFE, CVS as MOCK_CVS, STAY as MOCK_STAY, MART as MOCK_MART } from '../../data/placesMap'
 
 /** 화면이 쓰는 장소 한 건. 기존 placesMap.js 한 줄과 같은 모양이다. */
 export interface MapPlace {
@@ -125,14 +127,11 @@ export type LayerKey = 'spot' | 'food' | 'dine' | 'cafe' | 'cvs' | 'stay' | 'mar
 export const LAZY_LAYERS: LayerKey[] = ['cafe', 'cvs', 'mart']
 
 export interface MapPlaces {
-  /** true = 백엔드 실데이터, false = 하드코딩 폴백 */
+  /** true = 레이어를 하나라도 받았다. false = 전부 실패(백엔드 다운) */
   live: boolean
   layers: Record<LayerKey, MapPlace[]>
-}
-
-const MOCK: Record<LayerKey, any[]> = {
-  spot: MOCK_SPOTS, food: MOCK_FOOD, dine: MOCK_DINE,
-  cafe: MOCK_CAFE, cvs: MOCK_CVS, stay: MOCK_STAY, mart: MOCK_MART
+  /** 이번 진입에서 못 받아온 레이어. 화면이 안내하고, 칩을 다시 켜면 그 레이어만 재시도한다 */
+  failed: LayerKey[]
 }
 
 export const MapPlaceService = {
@@ -143,14 +142,14 @@ export const MapPlaceService = {
    */
   async getAll (): Promise<MapPlaces> {
     const keys: LayerKey[] = ['spot', 'food', 'dine', 'stay']   // 기본 레이어만 - 대용량은 LAZY_LAYERS
-    try {
-      const results = await Promise.all(keys.map(k => apiGet<BackendPlace[]>(`/places?type=${k}`)))
-      const layers = emptyLayers()
-      keys.forEach((k, i) => { layers[k] = results[i].map(toMapPlace) })
-      return { live: true, layers }
-    } catch {
-      return { live: false, layers: mockLayers() }
-    }
+    const results = await Promise.allSettled(keys.map(k => apiGet<BackendPlace[]>(`/places?type=${k}`)))
+    const layers = emptyLayers()
+    const failed: LayerKey[] = []
+    results.forEach((r, i) => {
+      if (r.status === 'fulfilled') layers[keys[i]] = r.value.map(toMapPlace)
+      else failed.push(keys[i])
+    })
+    return { live: failed.length < keys.length, layers, failed }
   },
 
   /** 칩을 처음 켤 때 한 레이어만 받아온다. 실패하면 null - 호출부가 토스트로 알린다. */
@@ -237,35 +236,6 @@ export function hasCoords (p: MapPlace): boolean {
 
 function emptyLayers (): Record<LayerKey, MapPlace[]> {
   return { spot: [], food: [], dine: [], cafe: [], cvs: [], stay: [], mart: [] }
-}
-
-/** 목업 레이어 → 카테고리 코드. 검색 결과 핀 색이 폴백에서도 같게 보이게 한다. */
-const MOCK_CAT: Record<LayerKey, string> = {
-  spot: 'TOURIST', food: 'FOOD', dine: 'FOOD',
-  cafe: 'CAFE', cvs: 'CONVENIENCE', stay: 'LODGING', mart: 'MART'
-}
-
-/** 백엔드가 없을 때 쓰는 하드코딩 폴백 - 기존 화면과 똑같이 보인다. */
-function mockLayers (): Record<LayerKey, MapPlace[]> {
-  const layers = emptyLayers()
-  ;(Object.keys(MOCK) as LayerKey[]).forEach(k => {
-    layers[k] = MOCK[k].map(m => ({
-      id: null,
-      n: m.n, x: m.x, y: m.y, r: m.r,
-      c: m.c ?? m.m ?? '정보 없음',
-      cat: MOCK_CAT[k],
-      addr: m.addr ?? null, tel: m.tel ?? null, hours: m.hours ?? null,
-      good: k === 'food',   // 목업 food 레이어 = 착한가격 샘플
-      park: m.park ?? null, wc: m.wc ?? null,
-      // b는 그대로 넘긴다 - 폴백의 목적이 '백엔드가 죽어도 화면이 살아 있는 것'인데,
-      // 혼잡 값을 버리면 좌측 순위 목록까지 비어서 화면이 반쯤 죽는다.
-      // crowd()가 series 우선, 없으면 b로 계산하도록 되어 있다
-      series: null,
-      b: m.b ?? null,
-      fee: m.fee ?? null, d: m.d ?? null, in: m.in ?? null
-    }))
-  })
-  return layers
 }
 
 export default MapPlaceService

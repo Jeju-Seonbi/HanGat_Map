@@ -238,6 +238,14 @@
 .share-sheet .si.ka{background:#fee500}
 .share-sheet .si.cp{background:var(--ac-bg)}
 .share-sheet .si.nt{background:var(--surf2);border:1px solid var(--line2)}
+/* 장소를 하나도 못 받았을 때 지도 위 안내 - 목업으로 채우지 않는다 (2026-09-07) */
+.map-offline{position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:60;
+  display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:12px;
+  background:var(--surf);border:1px solid var(--line2);box-shadow:0 8px 24px rgba(0,0,0,.14);
+  font-size:13px;font-weight:700;color:var(--tx);white-space:nowrap}
+.map-offline button{background:var(--ac);color:#fff;border-radius:8px;padding:6px 11px;
+  font-size:12px;font-weight:800}
+.map-offline button:hover{filter:brightness(.95)}
 .pox{color:var(--tx3);font-size:17px;line-height:1;padding:2px 5px}
 .lead{font-size:13px;line-height:1.65;margin-bottom:12px}
 .lead b{font-weight:800}

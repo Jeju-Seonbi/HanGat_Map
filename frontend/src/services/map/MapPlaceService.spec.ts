@@ -69,3 +69,42 @@ describe('상세 조회 사진 매핑', () => {
     expect(await MapPlaceService.getDetail(9)).toBeNull()
   })
 })
+
+/** 실응답(2026-09-05 /places?type=cafe 첫 행) - toMapPlace 가 읽는 필드가 전부 있다 */
+const ROW = {
+  id: 3729, name: '리치망고협제점', latitude: 33.4024033, longitude: 126.2517715,
+  categoryCode: 'CAFE', categoryName: '카페', regionCode: 'WEST', regionName: '서부',
+  roadAddress: '제주특별자치도 제주시 한림읍 한림로 482', lotAddress: null, phone: null,
+  operatingHoursText: null, parkingAvailable: null, toiletAvailable: null,
+  goodPrice: false, hiddenGem: false, businessStatus: 'UNKNOWN', tagCode: null, tagName: null
+}
+
+function mockFetchByUrl (failWhen: (url: string) => boolean) {
+  vi.stubGlobal('fetch', vi.fn((url: string) => failWhen(url)
+    ? Promise.reject(new Error('down'))
+    : Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true, code: 2000, message: '', result: [ROW] }) })))
+}
+
+describe('getAll 부분 실패 - 목업으로 바꿔치기하지 않는다', () => {
+  it('한 레이어가 실패해도 나머지는 실데이터로 살아남고 실패 레이어만 보고한다', async () => {
+    mockFetchByUrl(url => url.includes('type=dine'))
+
+    const r = await MapPlaceService.getAll()
+
+    expect(r.live).toBe(true)
+    expect(r.failed).toEqual(['dine'])
+    expect(r.layers.spot).toHaveLength(1)
+    expect(r.layers.spot[0].id).toBe(3729)      // 목업이면 id가 null 이다
+    expect(r.layers.dine).toEqual([])
+  })
+
+  it('전부 실패하면 live=false 에 빈 레이어 - 가짜 장소를 만들어내지 않는다', async () => {
+    mockFetchByUrl(() => true)
+
+    const r = await MapPlaceService.getAll()
+
+    expect(r.live).toBe(false)
+    expect(r.failed).toEqual(['spot', 'food', 'dine', 'stay'])
+    expect(Object.values(r.layers).every(l => l.length === 0)).toBe(true)
+  })
+})

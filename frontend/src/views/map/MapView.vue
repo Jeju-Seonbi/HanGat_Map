@@ -131,26 +131,46 @@ watch(() => state.di, () => {
 async function openPlaceFromURL() {
   const raw = route.query.place ?? route.query.placeId
   if (!/^\d+$/.test(raw ?? '')) return
-  const p = await findPlaceById(+raw)
-  if (p) openPlace(p)
+  const { place, error } = await findPlaceById(+raw)
+  if (place) openPlace(place)
+  else if (error) toast('장소 정보를 불러오지 못했어요 — 새로고침해 주세요')
   else toast('공유받은 장소를 찾지 못했어요')
 }
 
 onMounted(async () => {
   // 장소·예보를 먼저 받아야 URL의 ?place= 로 들어온 장소를 찾을 수 있다
   await loadPlaces()
+  // 링크 복원은 단계마다 따로 감싼다 - 코스가 깨져도 장소 딥링크까지 조용히 죽지 않게
   let courseDrawn = false
-  if (route.query.course === 'ai') courseDrawn = loadAiCourse()
-  if (!courseDrawn && /^\d+$/.test(route.query.course ?? '')) courseDrawn = await loadSavedCourse(route.query.course)
+  try {
+    if (route.query.course === 'ai') courseDrawn = loadAiCourse()
+    if (!courseDrawn && /^\d+$/.test(route.query.course ?? '')) courseDrawn = await loadSavedCourse(route.query.course)
+  } catch (e) {
+    console.error('코스 링크 복원 실패', e)
+    toast('링크의 코스를 그리지 못했어요')
+  }
   if (!courseDrawn) loadFromURL()
   // 코스와 장소가 함께 온 링크도 있다(코스를 보다 장소를 열고 공유) - 코스를 그린 뒤 장소를 연다
-  await openPlaceFromURL()
+  try {
+    await openPlaceFromURL()
+  } catch (e) {
+    console.error('장소 링크 복원 실패', e)
+    toast('공유받은 장소를 여는 중 문제가 생겼어요')
+  }
 })
+
+const reload = () => location.reload()
 </script>
 
 <template>
   <div class="stage" :class="{ both: openCount === 2, 'sheet-open': openCount > 0 }">
     <MapCanvas @select="openPlace" @blank-click="closeDetail" />
+
+    <!-- 장소를 하나도 못 받은 상태(백엔드 다운). 가짜 데이터로 채우지 않고 사실대로 알린다 -->
+    <div v-if="!state.loading && !state.live" class="map-offline" role="alert">
+      장소 데이터를 불러오지 못했어요
+      <button type="button" @click="reload">새로고침</button>
+    </div>
 
     <FilterPanel :mobile-suppressed="openCount > 0"
       @open-place="openPlace" @toggle-course="toggleCourse" />
