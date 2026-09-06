@@ -6,6 +6,7 @@ import {
   reissueAccessToken,
   syncAuthenticatedUser
 } from './backendClient.js'
+import { ApiError } from './errors.js'
 
 /** 백엔드 UserResponse를 기존 화면이 읽는 최소 사용자 모델로 맞춘다. */
 export function normalizeUser (user) {
@@ -19,7 +20,8 @@ export function normalizeUser (user) {
     statusCode: user.status,
     emailVerified: !!user.emailVerified,
     lastLoginAt: user.lastLoginAt ?? null,
-    createdAt: user.createdAt ?? null
+    createdAt: user.createdAt ?? null,
+    profileImageUrl: user.profileImageUrl ?? null
   }
 }
 
@@ -112,6 +114,23 @@ export async function resetPassword ({ ticket, password, passwordConfirm }) {
 
 // ────────────────────────── 내 정보 ──────────────────────────
 
+/** 파일 원문만 백엔드에 전달한다. MinIO 자격 증명은 프론트에 두지 않는다. */
+export async function updateProfileImage (file) {
+  const body = new FormData()
+  body.append('file', file)
+  return normalizeUser(await apiRequest('/users/me/profile-image', {
+    method: 'PUT', body, auth: true, sessionBound: true
+  }))
+}
+
+/** 비공개 사진은 Bearer 인증으로 받은 Blob을 화면에서만 사용한다. 외부 URL로 토큰을 보내지 않는다. */
+export function readProfileImage (path) {
+  if (!/^\/users\/me\/profile-image\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp)$/.test(path)) {
+    throw new ApiError(400, 'INVALID_IMAGE_PATH', '사진 주소를 확인해주세요.')
+  }
+  return apiRequest(path, { auth: true, responseType: 'blob', sessionBound: true })
+}
+
 export async function me () {
   const user = normalizeUser(await apiRequest('/users/me', { auth: true }))
   syncAuthenticatedUser(user)
@@ -127,6 +146,7 @@ export async function updateNickname (nickname) {
   const user = normalizeUser(await apiRequest('/users/me/nickname', {
     method: 'PATCH',
     auth: true,
+    sessionBound: true,
     body: { nickname }
   }))
   syncAuthenticatedUser(user)
@@ -137,6 +157,7 @@ export async function updateBirthDate (birthDate) {
   const user = normalizeUser(await apiRequest('/users/me/birth-date', {
     method: 'PATCH',
     auth: true,
+    sessionBound: true,
     body: { birthDate: birthDate || null }
   }))
   syncAuthenticatedUser(user)

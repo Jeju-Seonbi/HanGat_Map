@@ -16,6 +16,7 @@ import { useAuthStore } from '../../stores/auth.js'
 import { useUiStore } from '../../stores/ui.js'
 import { listAlerts, listSavedCourses, listMyReviews } from '../../api/mypage.js'
 import AppIcon from '../../components/common/AppIcon.vue'
+import ProfileImageEditor from '../../components/mypage/ProfileImageEditor.vue'
 
 const auth = useAuthStore()
 const ui = useUiStore()
@@ -70,11 +71,7 @@ const TABS = [
         <span class="blob b2" aria-hidden="true" />
 
         <div class="hero-in">
-          <div class="avwrap">
-            <span class="avring">
-              <span class="av">{{ auth.initial }}</span>
-            </span>
-          </div>
+          <ProfileImageEditor />
 
           <div class="hero-txt">
             <h1>{{ auth.displayName }}님, 이번엔 어디로 떠나볼까요?</h1>
@@ -167,19 +164,6 @@ const TABS = [
   display: flex; align-items: flex-start; gap: var(--sp-lg);
 }
 
-/* 시안: `p-1 bg-gradient-to-tr from-primary to-primary-container` 링 */
-.avring {
-  display: block; width: 128px; height: 128px; border-radius: 50%; padding: 4px;
-  background: linear-gradient(to top right, var(--ac), var(--ac-soft));
-}
-.av {
-  width: 100%; height: 100%; border-radius: 50%;
-  border: 4px solid var(--surf);
-  background: var(--ac-bg); color: var(--ac-dk);
-  font-family: var(--font-head); font-size: 40px; font-weight: 900;
-  display: flex; align-items: center; justify-content: center;
-}
-
 .hero-txt { flex: 1; min-width: 0; padding-top: 6px; }
 h1 { font-size: 28px; letter-spacing: -.03em; margin-bottom: 8px; }
 .sub { font-size: 15px; color: var(--tx2); margin-bottom: var(--sp-md); }
@@ -234,8 +218,6 @@ h1 { font-size: 28px; letter-spacing: -.03em; margin-bottom: 8px; }
 @media (max-width: 900px) {
   .hero { padding: var(--sp-lg); border-radius: var(--r-xl); }
   .hero-in { flex-direction: column; align-items: center; text-align: center; }
-  .avring { width: 96px; height: 96px; }
-  .av { font-size: 30px; }
   .hero-txt { padding-top: 0; }
   h1 { font-size: 22px; }
   .stats { justify-content: center; }
