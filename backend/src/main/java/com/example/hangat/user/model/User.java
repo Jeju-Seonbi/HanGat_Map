@@ -29,6 +29,8 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 @Getter
+// 닉네임 등 다른 프로필 정보의 동시 수정이 새 사진 키를 덮어쓰지 않도록 변경 컬럼만 갱신한다.
+@org.hibernate.annotations.DynamicUpdate
 public class User {
 
     @Id
@@ -51,6 +53,15 @@ public class User {
     /** 프로필 선택 정보 (MY_009) */
     @Column(name = "birth_date")
     private LocalDate birthDate;
+
+    /** 비공개 저장소 내부 키. 응답에는 MinIO 주소나 키 대신 본인 전용 조회 경로를 내보낸다. */
+    @Column(name = "profile_image_key", length = 200)
+    private String profileImageKey;
+
+    /** 검증·저장이 끝난 사진으로 교체한다. 이전 파일 정리는 서비스가 커밋 후 처리한다. */
+    public void updateProfileImage(String key) {
+        this.profileImageKey = key;
+    }
 
     @Builder.Default
     @Enumerated(EnumType.STRING)

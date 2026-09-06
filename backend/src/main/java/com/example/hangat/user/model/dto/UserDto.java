@@ -45,7 +45,8 @@ public final class UserDto {
             UserStatus status,
             boolean emailVerified,
             LocalDateTime lastLoginAt,
-            LocalDateTime createdAt
+            LocalDateTime createdAt,
+            String profileImageUrl
     ) {
 
         public static UserResponse form(User user) {
@@ -57,7 +58,9 @@ public final class UserDto {
                     user.getStatus(),
                     user.isEmailVerified(),
                     user.getLastLoginAt(),
-                    user.getCreatedAt()
+                    user.getCreatedAt(),
+                    user.getProfileImageKey() == null ? null : "/users/me/profile-image/"
+                            + user.getProfileImageKey().substring(user.getProfileImageKey().lastIndexOf('/') + 1)
             );
         }
     }
