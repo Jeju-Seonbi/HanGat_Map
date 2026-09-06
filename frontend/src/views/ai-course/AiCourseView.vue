@@ -12,6 +12,8 @@ import { courseGenerationErrorMessage, courseMockService } from '../../services/
 import { storePendingCourseClaim, takePendingCourseClaim } from '../../services/pendingCourseClaim'
 import { routeSummary, accessNotices } from '../../services/course/courseSummary'
 import { ApiError } from '../../api/errors.js'
+import { levelOf } from '../../utils/congestion'
+import { levelLabel } from '../../data/data'
 import type { AccommodationInput, AccommodationRecommendation, AlternativePlace, CarDayRoute, CarRouteLeg, CongestionRescheduleOption, CourseCondition, CourseItem, CourseResult } from '../../assets/types/course'
 
 const now = new Date()
@@ -38,6 +40,7 @@ const selected = ref<CourseItem>()
 const alternatives = ref<AlternativePlace[]>([])
 const altLoading = ref(false)
 const altNotice = ref('')
+const swapping = ref(false)
 const rescheduleSelected = ref<CourseItem>()
 const rescheduleOptions = ref<CongestionRescheduleOption[]>([])
 const rescheduleLoading = ref(false)
@@ -103,7 +106,8 @@ const estimatedCost = computed(() => {
     ? `${summary.total_expected_max.toLocaleString()}원`
     : `${summary.total_expected_min.toLocaleString()} ~ ${summary.total_expected_max.toLocaleString()}원`
 })
-const congestionLabel = (rate?: number) => rate == null ? '-' : rate < 35 ? '한산' : rate < 65 ? '보통' : '혼잡'
+// 팀 표준 3단계(여유 <40 / 보통 <70 / 혼잡) - 백엔드 CongestionLevel.from과 같은 컷. 화면마다 다른 컷을 쓰면 같은 평균이 다른 등급으로 보인다
+const congestionLabel = (rate?: number) => rate == null ? '-' : levelLabel[levelOf(rate)]
 
 async function generate(next: CourseCondition, regenerate = false) {
   Object.assign(condition, JSON.parse(JSON.stringify(next)) as CourseCondition)
@@ -179,21 +183,26 @@ async function openAlternatives(item: CourseItem) {
 }
 
 async function replace(alternative: AlternativePlace) {
-  if (!result.value || !selected.value) return
+  if (!result.value || !selected.value || swapping.value) return   // 더블클릭이면 두 번째 스왑이 첫 교체를 '원래 장소'로 덮는다
   const previousAverage = result.value.average_congestion_rate
   const replacementName = alternative.place_name
+  swapping.value = true
+  altNotice.value = ''
   try {
     result.value = await courseMockService.replaceCourseItem(result.value, selected.value.id, alternative)
   } catch (failure) {
-    // 서버 메시지(중복 장소·권한·예보 없음)를 그대로 - 기존 일정은 그대로 남는다
-    toast.value = failure instanceof ApiError ? `바꾸지 못했어요. ${failure.message}` : '장소를 바꾸지 못했어요. 기존 일정은 그대로예요.'
-    setTimeout(() => { toast.value = '' }, 2600)
+    // 서버 메시지(중복 장소·권한·예보 없음)를 모달 안에 보여준다 - 토스트는 모달 뒤에 가려진다. 기존 일정은 그대로
+    altNotice.value = failure instanceof ApiError ? `바꾸지 못했어요. ${failure.message}` : '장소를 바꾸지 못했어요. 기존 일정은 그대로예요.'
     return
+  } finally {
+    swapping.value = false
   }
   selected.value = undefined
+  // 렌터카 경로는 교체된 장소 기준으로 다시 받는다 - 숙소 변경과 같은 처리
+  void loadCarRoute()
   toast.value = previousAverage != null && result.value.average_congestion_rate != null
     ? `${replacementName}으로 변경했어요. 평균 혼잡도는 ${congestionLabel(result.value.average_congestion_rate)}이에요.`
-    : `${replacementName}으로 변경하고 동선과 비용을 다시 계산했어요.`
+    : `${replacementName}으로 변경하고 동선을 다시 계산했어요.`
   setTimeout(() => { toast.value = '' }, 2600)
 }
 
@@ -378,7 +387,7 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
       </div>
     </section>
 
-    <AlternativePlaceModal v-if="selected" :item="selected" :alternatives="alternatives" :loading="altLoading" :notice="altNotice" @close="selected = undefined" @select="replace" />
+    <AlternativePlaceModal v-if="selected" :item="selected" :alternatives="alternatives" :loading="altLoading" :notice="altNotice" :busy="swapping" @close="selected = undefined" @select="replace" />
     <CongestionRescheduleModal v-if="rescheduleSelected" :item="rescheduleSelected" :options="rescheduleOptions" :loading="rescheduleLoading" @close="rescheduleSelected = undefined" @select="reschedule" />
     <div v-if="saveOpen" class="modal-backdrop" @click.self="saveOpen = false">
       <section class="course-modal save-modal">

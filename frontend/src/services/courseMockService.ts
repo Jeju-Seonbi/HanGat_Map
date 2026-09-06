@@ -319,14 +319,6 @@ function travelMinutes(distanceKm: number, transport: Transport) {
   return Math.max(5, Math.round(distanceKm / speed * 60 + transferMinutes))
 }
 
-const subcategoryLabel: Record<MockPlace['subcategory'], string> = {
-  OREUM: '오름', BEACH: '해변', CAFE: '카페', MARKET: '시장', FOREST: '숲·자연',
-  CULTURE: '문화', CAVE: '동굴', WATERFALL: '폭포', DRIVE: '드라이브',
-}
-const detailedCategory = (place: MockPlace) => place.category === subcategoryLabel[place.subcategory]
-  ? place.category
-  : `${place.category} · ${subcategoryLabel[place.subcategory]}`
-
 function routeLeg(from: { lat: number; lng: number; island?: boolean }, to: { lat: number; lng: number; island?: boolean }, transport: Transport) {
   if (from.island || to.island) return undefined
   const distanceKm = Math.max(1.2, haversineKm(from, to) * 1.28)
@@ -424,10 +416,6 @@ function rescheduleCandidates(course: CourseResult, itemId: number): CongestionR
     .sort((a, b) => a.congestion_rate - b.congestion_rate || a.visit_date.localeCompare(b.visit_date) || a.start_time.localeCompare(b.start_time))
     .slice(0, 3)
     .map(({ conflict: _conflict, ...option }) => option)
-}
-
-function replacementCosts(course: CourseResult, item: CourseItem, place: MockPlace) {
-  return [makePlaceCost(item.id + 9000, course.id, item.id, place, place.category, course.people)]
 }
 
 type ReasonCandidate = { key: string; code: CourseItem['recommendation_reason_code']; text: string }
@@ -794,8 +782,10 @@ export const courseMockService = {
         item.costs = []
       }
     }
-    recalc(copy)
+    // 비용 집계는 서버가 스왑에서 건드리지 않는다(실측 없는 비용을 지어내지 않음) - 로컬에서도 다시 계산하지 않는다
     if (swap.average_congestion_rate != null) copy.average_congestion_rate = swap.average_congestion_rate
+    // 렌터카 경로는 옛 장소 기준 구간이라 버린다 - 화면이 교체된 장소로 다시 받는다
+    delete copy.car_route
     return copy
   },
   async getQuieterTimeOptions(course: CourseResult, itemId: number) {

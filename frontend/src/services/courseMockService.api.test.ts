@@ -405,6 +405,7 @@ describe('alternative places and swap (backend, 담당 정동현)', () => {
     ...response,
     status,
     average_congestion_rate: 70,
+    car_route: { days: [] } as unknown as CourseResult['car_route'],
     days: [{
       day_no: 1,
       visit_date: '2026-08-28',
@@ -471,6 +472,8 @@ describe('alternative places and swap (backend, 담당 정동현)', () => {
     expect(changed.latitude).toBeUndefined()   // 옛 장소 좌표를 남기지 않는다
     expect(replaced.days[0].items[1]).toMatchObject({ place_id: 502, inbound_distance_m: 4500, inbound_travel_minutes: 7 })
     expect(replaced.average_congestion_rate).toBe(39.5)
+    expect(replaced.car_route).toBeUndefined()   // 옛 장소 기준 렌터카 구간은 버린다 - 화면이 다시 받는다
+    expect(replaced.cost_summary).toEqual(before.cost_summary)   // 비용 집계는 서버가 안 바꾸니 로컬도 안 바꾼다
     expect(before.days[0].items[0].place_id).toBe(501)   // 입력 코스는 건드리지 않는다
   })
 
