@@ -64,6 +64,11 @@ dependencies {
 
     // OAuth 추가
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
+
+    // minio 추가
+    implementation 'io.minio:minio:9.0.3'
+    // ImageIO 기본 리더가 지원하지 않는 WebP 파일 검증
+    runtimeOnly 'com.twelvemonkeys.imageio:imageio-webp:3.13.1'
 }
 
 bootJar {

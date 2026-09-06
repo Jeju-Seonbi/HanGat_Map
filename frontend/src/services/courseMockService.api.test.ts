@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { CourseCondition, CourseResult } from '../assets/types/course'
+import type { AlternativePlace, CourseCondition, CourseItem, CourseResult } from '../assets/types/course'
 import { apiRequest } from '../api/backendClient.js'
 import { ApiError } from '../api/errors.js'
 import {
@@ -275,6 +275,52 @@ describe('courseMockService Backend generation', () => {
     expect(recommendations.every(item => !item.source_place_id.startsWith('MOCK_KAKAO_'))).toBe(true)
   })
 
+  it('loads the car route after the course without changing the itinerary', async () => {
+    const before = structuredClone(response)
+    const route = {
+      course_id: 101,
+      transport: 'RENTAL_CAR' as const,
+      provider: 'KAKAO_MOBILITY' as const,
+      priority: 'RECOMMEND' as const,
+      cached: false,
+      fetched_at: '2026-09-03T12:00:00+09:00',
+      days: [{
+        day_no: 1,
+        visit_date: condition.start_date,
+        total_distance_meters: 12500,
+        total_duration_seconds: 1800,
+        legs: [],
+        polyline: [{ latitude: 33.45, longitude: 126.55 }],
+      }],
+    }
+    const requestMock = vi.mocked(apiRequest).mockResolvedValue(route)
+
+    expect(await courseMockService.getCarRoute(response)).toBe(route)
+    expect(requestMock).toHaveBeenCalledWith('/courses/101/routes/car', {
+      method: 'GET',
+      auth: false,
+    })
+    expect(response).toEqual(before)
+  })
+
+  it('preserves a no-accommodation itinerary on full route failure and later re-queries after selection', async () => {
+    const original: CourseResult = { ...structuredClone(response), accommodation: null }
+    const before = structuredClone(original)
+    const request = vi.mocked(apiRequest).mockRejectedValueOnce(new Error('route unavailable'))
+    await expect(courseMockService.getCarRoute(original)).rejects.toThrow('route unavailable')
+    expect(original).toEqual(before)
+    const partial = { days: [{ total_distance_meters: null, total_duration_seconds: null,
+      legs: [{ distance_meters: null, duration_seconds: null }, { distance_meters: 1000, duration_seconds: 120 }] }] }
+    request.mockResolvedValueOnce(partial)
+    expect(await courseMockService.getCarRoute(original)).toEqual(partial)
+    const selected = { ...original, accommodation: condition.accommodation }
+    request.mockResolvedValueOnce({ days: [] })
+    await courseMockService.getCarRoute(selected)
+    expect(request).toHaveBeenCalledTimes(3)
+    expect(selected.days).toEqual(before.days)
+    expect(original.accommodation).toBeNull()
+  })
+
   it('uses the authenticated owner boundary for a SAVED course', async () => {
     const savedCourse: CourseResult = {
       ...response,
@@ -347,5 +393,95 @@ describe('courseMockService Backend generation', () => {
     expect(result.budget_summary).toEqual(guestCourse.budget_summary)
     expect(result.claim_token).toBeUndefined()
     expect(result.claim_expires_at).toBeUndefined()
+  })
+})
+
+describe('alternative places and swap (backend, 담당 정동현)', () => {
+  const item = (id: number, place_id: number, place_name: string, extra: Partial<CourseItem> = {}): CourseItem => ({
+    id, course_id: 101, place_id, place_name, category_name: '관광지', day_no: 1, position: id, visit_date: '2026-08-28',
+    start_time: '09:00', end_time: '11:00', item_source: 'AI_RECOMMENDED', costs: [], latitude: 33.46, longitude: 126.94, ...extra,
+  })
+  const course = (status: CourseResult['status'] = 'READY'): CourseResult => ({
+    ...response,
+    status,
+    average_congestion_rate: 70,
+    car_route: { days: [] } as unknown as CourseResult['car_route'],
+    days: [{
+      day_no: 1,
+      visit_date: '2026-08-28',
+      items: [
+        item(1, 501, '성산일출봉', { congestion_level: 'CROWDED', congestion_rate: 82 }),
+        item(2, 502, '광치기해변', { congestion_level: 'NORMAL', congestion_rate: 58, inbound_distance_m: 3000, inbound_travel_minutes: 5 }),
+      ],
+    }],
+  })
+  const alternative: AlternativePlace = {
+    place_id: 601, place_name: '두산봉', category_name: '관광지', distance_m: 4200, congestion_rate: 21, congestion_level: 'QUIET',
+    recommendation_reason: '이 날짜 혼잡 예보가 여유예요', replacement_reason: '성산일출봉보다 집중률이 61 낮고 4.2km 거리예요', radius_km: 10,
+  }
+
+  it('asks the backend with the visit date and the other course places excluded, then drops AVOID places only', async () => {
+    const requestMock = vi.mocked(apiRequest).mockResolvedValue([
+      alternative,
+      { ...alternative, place_id: 602, place_name: '대수산봉' },
+    ])
+    const avoiding: CourseCondition = { ...condition, course_place_preferences: [{ place_id: 602, place_name: '대수산봉', preference_type: 'AVOID' }] }
+
+    const result = await courseMockService.getAlternativePlaces(course(), 1, avoiding)
+
+    expect(requestMock).toHaveBeenCalledWith('/places/501/alternatives?date=2026-08-28&limit=3&exclude=502')
+    expect(result.map(candidate => candidate.place_id)).toEqual([601])
+  })
+
+  it('passes a 3401 (no forecast for that date) through instead of pretending there are no alternatives', async () => {
+    vi.mocked(apiRequest).mockRejectedValue(new ApiError(400, 3401, '해당 날짜의 혼잡 예보가 없습니다.'))
+
+    await expect(courseMockService.getAlternativePlaces(course(), 1, condition)).rejects.toMatchObject({ code: 3401 })
+  })
+
+  it('posts the chosen place and overlays only the updated items - schedule, other items and server average stay authoritative', async () => {
+    const requestMock = vi.mocked(apiRequest).mockResolvedValue({
+      course_id: 101,
+      average_congestion_rate: 39.5,
+      congestion_level: 'QUIET',
+      congestion_label: '여유',
+      message: '두산봉으로 바꿨어요',
+      updated_items: [
+        {
+          item_id: 1, day_no: 1, position: 1, visit_date: '2026-08-28', place_id: 601, place_name: '두산봉', category_name: '관광지', image_url: 'https://img/601.jpg',
+          congestion_rate: 21, congestion_level: 'QUIET', congestion_label: '여유', recommendation_reason: '성산일출봉보다 집중률이 61 낮고 4.2km 거리예요',
+          replaced_from_place_id: 501, replaced_from_place_name: '성산일출봉', inbound_distance_m: null, inbound_travel_minutes: null,
+        },
+        {
+          item_id: 2, day_no: 1, position: 2, visit_date: '2026-08-28', place_id: 502, place_name: '광치기해변', category_name: '관광지', image_url: null,
+          congestion_rate: 58, congestion_level: 'NORMAL', congestion_label: '보통', recommendation_reason: null,
+          replaced_from_place_id: null, replaced_from_place_name: null, inbound_distance_m: 4500, inbound_travel_minutes: 7,
+        },
+      ],
+    })
+    const before = course()
+
+    const replaced = await courseMockService.replaceCourseItem(before, 1, alternative)
+
+    expect(requestMock).toHaveBeenCalledWith('/courses/101/items/1/swap', { method: 'POST', body: { place_id: 601 }, auth: false })
+    const changed = replaced.days[0].items[0]
+    expect(changed).toMatchObject({
+      id: 1, place_id: 601, place_name: '두산봉', item_source: 'REPLACEMENT', replaced_from_place_id: 501,
+      congestion_level: 'QUIET', congestion_rate: 21, visit_date: '2026-08-28', start_time: '09:00', end_time: '11:00', costs: [],
+    })
+    expect(changed.latitude).toBeUndefined()   // 옛 장소 좌표를 남기지 않는다
+    expect(replaced.days[0].items[1]).toMatchObject({ place_id: 502, inbound_distance_m: 4500, inbound_travel_minutes: 7 })
+    expect(replaced.average_congestion_rate).toBe(39.5)
+    expect(replaced.car_route).toBeUndefined()   // 옛 장소 기준 렌터카 구간은 버린다 - 화면이 다시 받는다
+    expect(replaced.cost_summary).toEqual(before.cost_summary)   // 비용 집계는 서버가 안 바꾸니 로컬도 안 바꾼다
+    expect(before.days[0].items[0].place_id).toBe(501)   // 입력 코스는 건드리지 않는다
+  })
+
+  it('sends the JWT only for saved courses - temporary courses swap on the public route', async () => {
+    const requestMock = vi.mocked(apiRequest).mockResolvedValue({ course_id: 101, average_congestion_rate: null, congestion_level: null, congestion_label: null, message: null, updated_items: [] })
+
+    await courseMockService.replaceCourseItem(course('SAVED'), 1, alternative)
+
+    expect(requestMock).toHaveBeenCalledWith('/courses/101/items/1/swap', expect.objectContaining({ auth: true }))
   })
 })
