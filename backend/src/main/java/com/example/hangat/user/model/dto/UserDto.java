@@ -45,7 +45,8 @@ public final class UserDto {
             UserStatus status,
             boolean emailVerified,
             LocalDateTime lastLoginAt,
-            LocalDateTime createdAt
+            LocalDateTime createdAt,
+            String profileImageUrl
     ) {
 
         public static UserResponse form(User user) {
@@ -57,7 +58,10 @@ public final class UserDto {
                     user.getStatus(),
                     user.isEmailVerified(),
                     user.getLastLoginAt(),
-                    user.getCreatedAt()
+                    user.getCreatedAt(),
+                    // 이미 열린 이전 프론트도 읽을 수 있도록 내 정보는 기존 본인 전용 주소를 유지한다.
+                    user.getProfileImageKey() == null ? null : "/users/me/profile-image/"
+                            + user.getProfileImageKey().substring(user.getProfileImageKey().lastIndexOf('/') + 1)
             );
         }
     }

@@ -3,6 +3,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import StarIcon from './StarIcon.vue'
+import ProfileAvatar from '../common/ProfileAvatar.vue'
 import { toast } from '@/stores/mapStore'
 import { useAuthStore } from '@/stores/auth.js'
 import ReviewApiService, { LEVEL_TO_KEY, absUrl } from '@/services/map/ReviewApiService'
@@ -173,7 +174,7 @@ async function removeReview (r) {
 
       <div v-for="r in items" :key="r.id" class="rv-i">
         <div class="rv-h">
-          <span class="rv-av">{{ (r.nickname ?? '여')[0] }}</span>
+          <ProfileAvatar :src="r.profileImageUrl" :nickname="r.nickname" />
           <!-- 탈퇴 등으로 닉네임이 없으면(null) 익명 표기로 대체한다 -->
           <span class="rv-nm">{{ r.nickname ?? `여행자${r.userId}` }}</span>
           <span class="rv-dt">{{ dateOf(r.createdAt) }} 작성</span>
