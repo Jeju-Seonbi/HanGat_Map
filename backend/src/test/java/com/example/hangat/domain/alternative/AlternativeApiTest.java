@@ -110,7 +110,7 @@ class AlternativeApiTest {
                 .andExpect(jsonPath("$.result.length()").value(2))   // 혼인지 + 광치기 (혼잡·원거리·카페 컷)
                 .andExpect(jsonPath("$.result[0].place_name").value("혼인지"))
                 .andExpect(jsonPath("$.result[0].congestion_level").value("QUIET"))
-                .andExpect(jsonPath("$.result[0].congestion_label").value("여유"))
+                .andExpect(jsonPath("$.result[0].congestion_label").value("한산"))
                 .andExpect(jsonPath("$.result[0].distance_m").value(org.hamcrest.Matchers.allOf(
                         org.hamcrest.Matchers.greaterThan(5000),
                         org.hamcrest.Matchers.lessThan(5700))))

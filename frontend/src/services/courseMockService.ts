@@ -230,7 +230,7 @@ function makeWantItem(courseId: number, itemId: number, preference: PlacePrefere
     end_time: endTime,
     item_source: fixed ? 'USER_FIXED' : 'AI_RECOMMENDED',
     congestion_rate: rate,
-    congestion_level: rate < 35 ? 'QUIET' : rate < 65 ? 'NORMAL' : 'CROWDED',
+    congestion_level: levelOf(rate),
     recommendation_reason_code: fixed ? 'ROUTE' : 'STYLE',
     recommendation_reason: fixed ? '사용자가 지정한 일정으로 유지했어요.' : '꼭 가고 싶은 장소로 선택해 일정에 포함했어요.',
     operating_hours_warning: metadata?.operatingHours ? !isWithinOperatingHours(metadata, startTime, endTime) : undefined,
@@ -259,7 +259,7 @@ function recommendationScore(place: MockPlace, condition: CourseCondition, dayRe
   if (!hasFixedSchedule) score += accommodationMatchScore(place, accommodation) * accommodationWeight
   if (preferredRegions.has(place.region)) score += 3
   if (styleMatches) score += 2
-  if (place.congestionRate < 35) score += 2
+  if (levelOf(place.congestionRate) === 'QUIET') score += 2
   if (place.region === dayRegion) score += 2
   if (previousPlace?.region === place.region) score += 2
   return score
@@ -283,7 +283,7 @@ function makeRecommendedItem(courseId: number, itemId: number, place: MockPlace,
     end_time: slot.end,
     item_source: 'AI_RECOMMENDED',
     congestion_rate: rate,
-    congestion_level: rate < 35 ? 'QUIET' : rate < 65 ? 'NORMAL' : 'CROWDED',
+    congestion_level: levelOf(rate),
     recommendation_reason_code: 'ROUTE',
     recommendation_reason: '',
     accommodation_influenced: accommodationInfluenced || undefined,
@@ -386,7 +386,7 @@ function mockCongestionAt(place: MockPlace, visitDate: string, startTime: string
 }
 
 function congestionLevel(rate: number): CourseItem['congestion_level'] {
-  return rate < 35 ? 'QUIET' : rate < 65 ? 'NORMAL' : 'CROWDED'
+  return levelOf(rate)
 }
 
 function rescheduleCandidates(course: CourseResult, itemId: number): CongestionRescheduleOption[] {
@@ -423,7 +423,7 @@ type ReasonCandidate = { key: string; code: CourseItem['recommendation_reason_co
 function buildRecommendationReason(item: CourseItem, place: MockPlace, condition: CourseCondition, previousPlace: MockPlace | undefined, usedReasonKeys: Set<string>): ReasonCandidate {
   const matchedRegion = condition.course_regions.find(region => region.code === place.region)
   const matchedStyle = condition.course_styles.find(style => place.styles.includes(style.code))
-  const isLowCongestion = place.congestionRate < 35
+  const isLowCongestion = levelOf(place.congestionRate) === 'QUIET'
   const isRouteEfficient = Boolean(item.inbound_distance_m && item.inbound_distance_m <= ROUTE_EFFICIENT_DISTANCE_M)
   const isSameRegionRoute = Boolean(matchedRegion && previousPlace?.region === place.region && isRouteEfficient)
   const candidates: ReasonCandidate[] = []
@@ -834,3 +834,4 @@ export const courseMockService = {
     return saved.course
   },
 }
+import { levelOf } from '../utils/congestion'

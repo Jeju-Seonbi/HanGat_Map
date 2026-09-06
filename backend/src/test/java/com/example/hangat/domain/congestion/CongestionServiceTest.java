@@ -33,7 +33,7 @@ class CongestionServiceTest {
 
     @Test
     void 등급_한글_라벨() {
-        assertThat(CongestionLevel.QUIET.label()).isEqualTo("여유");
+        assertThat(CongestionLevel.QUIET.label()).isEqualTo("한산");
         assertThat(CongestionLevel.NORMAL.label()).isEqualTo("보통");
         assertThat(CongestionLevel.CROWDED.label()).isEqualTo("혼잡");
     }

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import { congestionLabel } from '../../utils/congestion'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../app/stores/auth'
 import CourseConditionForm from '../../components/course/CourseConditionForm.vue'
@@ -106,8 +107,6 @@ const estimatedCost = computed(() => {
     ? `${summary.total_expected_max.toLocaleString()}원`
     : `${summary.total_expected_min.toLocaleString()} ~ ${summary.total_expected_max.toLocaleString()}원`
 })
-// 팀 표준 3단계(여유 <40 / 보통 <70 / 혼잡) - 백엔드 CongestionLevel.from과 같은 컷. 화면마다 다른 컷을 쓰면 같은 평균이 다른 등급으로 보인다
-const congestionLabel = (rate?: number) => rate == null ? '-' : levelLabel[levelOf(rate)]
 
 async function generate(next: CourseCondition, regenerate = false) {
   Object.assign(condition, JSON.parse(JSON.stringify(next)) as CourseCondition)

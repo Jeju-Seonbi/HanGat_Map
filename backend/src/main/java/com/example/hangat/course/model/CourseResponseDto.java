@@ -1,4 +1,5 @@
 package com.example.hangat.course.model;
+import com.example.hangat.map.model.enums.CongestionLevel;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;

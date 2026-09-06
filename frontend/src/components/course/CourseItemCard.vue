@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import type { CourseItem, Transport } from '../../assets/types/course'
+import { levelLabel as level } from '../../data/data'
 
 const props = defineProps<{ item: CourseItem; transport: Transport }>()
 defineEmits<{ alternative: [CourseItem]; reschedule: [CourseItem] }>()
 
-const level = { QUIET: '한산', NORMAL: '보통', CROWDED: '혼잡' }
 const accuracy = { VERIFIED: '검증가', ESTIMATED: '추정', UNKNOWN: '가격 정보 없음' }
 const weather = {
   SUNNY: ['☀', '맑음'], CLOUDY: ['☁', '흐림'], RAIN: ['🌧', '비'], SNOW: ['🌨', '눈'], STRONG_WIND: ['💨', '강풍'],
