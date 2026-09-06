@@ -47,8 +47,9 @@ describe('page CSS ownership', () => {
   it('ships the complete map controls with valid responsive offsets', () => {
     expect(builtCss).not.toContain('5var(')
     for (const selector of [
-      '.seg button{', '#cond-body{', '.cal-h button', '.savebox input{',
-      '.savebox button{', '.map-lightbox img', '.acts button{', '.rv-star button{',
+      // .savebox 는 지도 패널의 로컬 코스 저장 UI 였고 2026-09-07 죽은 코드로 제거됐다
+      '.seg button{', '#cond-body{', '.cal-h button',
+      '.map-lightbox img', '.acts button{', '.rv-star button{',
       '.rv-c button{', '.rv-in input{', '.rv-in button{', '.sb-eg button{',
       '.ftr button{'
     ]) expect(builtCss).toContain(selector)

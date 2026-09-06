@@ -192,9 +192,6 @@
 .stop .nm{font-size:14px;font-weight:700}
 .stop .why{font-size:11.5px;color:var(--tx3);margin-top:3px;line-height:1.5}
 .stop .pr{font-size:11.5px;color:var(--tx2);margin-top:2px;font-weight:600}
-.sw{margin-left:auto;font-size:10.5px;font-weight:600;color:var(--tx3);
-  background:var(--surf2);border-radius:var(--rp);padding:3px 9px}
-.sw:hover{background:var(--ac-bg);color:var(--ac-dk)}
 .mv{font-size:11px;color:var(--tx3);padding:2px 0 2px 48px}
 .empty{padding:38px 20px;text-align:center;color:var(--tx3);font-size:12.5px;line-height:1.9}
 .pf{padding:14px 18px;background:var(--surf2);border-radius:0 0 var(--r) var(--r)}
@@ -204,16 +201,6 @@
 .bar>i{display:block;height:100%;background:var(--ac);width:0;transition:width .4s;border-radius:5px}
 .bn{font-size:11px;color:var(--tx3);margin-top:8px;line-height:1.55}
 /* ── 코스 저장 (MY_001) ── */
-.save{width:100%;margin-top:11px;padding:11px;border-radius:12px;background:var(--ac);color:var(--on-ac);
-  font-size:13.5px;font-weight:800;letter-spacing:-.02em;box-shadow:0 4px 14px rgba(0,184,163,.34)}
-.save:hover{background:var(--ac-dk)}
-.save.done{background:var(--calm-bg);color:var(--calm);box-shadow:none;cursor:default}
-.savebox{display:flex;gap:6px;margin-top:11px}
-.savebox input{flex:1;min-width:0;background:var(--surf);border:1.5px solid var(--line2);
-  border-radius:11px;padding:9px 11px;font-size:12.5px;outline:none}
-.savebox input:focus{border-color:var(--ac)}
-.savebox button{background:var(--ac);color:var(--on-ac);border-radius:11px;padding:0 16px;
-  font-size:12.5px;font-weight:800;flex-shrink:0}
 
 /* ── 장소 상세 — 목록 카드 바로 옆(2열) ── */
 .pop{top:16px;left:320px;bottom:16px;width:344px;padding:18px 20px;z-index:1000;

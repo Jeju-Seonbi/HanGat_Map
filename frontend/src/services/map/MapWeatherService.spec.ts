@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import WeatherService, { skyToKind } from './WeatherService'
+import WeatherService, { skyToKind } from './MapWeatherService'
 
 /** 값은 2026-08-30 실호출 응답에서 그대로 가져왔다. */
 const REAL = [
