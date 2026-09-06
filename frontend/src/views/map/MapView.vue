@@ -9,7 +9,6 @@ import CoursePanel from '@/components/map/CoursePanel.vue'
 import PhotoLightbox from '@/components/map/PhotoLightbox.vue'
 import { state, toast, loadPlaces, findPlaceById } from '@/stores/mapStore'
 
-import { refreshCourse, courseFromNames } from '@/utils/course'
 import { at, iso, D0, FORECAST_DAYS } from '@/utils/date'
 import { useRouter, useRoute } from 'vue-router'
 import { popAiCourse, toMapCourse, toMapCourseFromDetail } from '@/services/map/CourseBridge'
@@ -90,16 +89,6 @@ async function loadSavedCourse(id) {
   return true
 }
 
-/* COM_002: 날짜는 순번이 아니라 실제 날짜로 저장한다 —
-   기준일(오늘)이 매일 바뀌므로 순번은 링크마다 뜻이 달라진다 */
-function syncURL() {
-  if (!state.course) return
-  history.replaceState(null, '', '?' + new URLSearchParams({
-    d: iso(at(state.di)), r: state.F.reg, b: state.course.bud,
-    s: state.course.stops.map(x => (x.o ? x.o.n : x.f.n)).join('|'),
-  }))
-}
-
 function loadFromURL() {
   const p = new URLSearchParams(location.search)
   const dp = p.get('d')
@@ -111,21 +100,7 @@ function loadFromURL() {
   const r = p.get('r')
   if (r && ['전체', '동부', '서부', '남부', '북부'].includes(r)) state.F.reg = r
   if (p.get('b')) state.F.bud = +p.get('b') || state.F.bud
-  const names = (p.get('s') || '').split('|').filter(Boolean)
-  if (!names.length) return
-  const c = courseFromNames(names, { region: state.F.reg, budget: state.F.bud, dayIndex: state.di })
-  if (c) { state.course = c; state.courseDay = 'all' }
 }
-
-/* 날짜가 바뀌면 코스의 혼잡도도 다시 계산한다 */
-watch(() => state.di, () => {
-  // AI·저장 코스의 혼잡은 여행일 기준 값이다 - 슬라이더로 재계산하면 거짓이 된다
-  if (state.course?.source) return
-  if (state.course) {
-    refreshCourse(state.course, { region: state.F.reg, dayIndex: state.di })
-    state.course = { ...state.course }
-  }
-})
 
 /** ?place=(공유 링크·마이페이지) 와 ?placeId=(장소 상세 페이지 링크) 둘 다 받는다 */
 async function openPlaceFromURL() {

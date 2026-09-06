@@ -1,4 +1,4 @@
-package com.example.hangat.map.service;
+package com.example.hangat.map.congestion;
 
 import com.example.hangat.map.model.entity.CongestionForecast;
 import com.example.hangat.map.model.entity.DataSource;

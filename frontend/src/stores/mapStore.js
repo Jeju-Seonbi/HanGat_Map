@@ -1,10 +1,10 @@
 import { reactive, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { crowd, tier } from '@/utils/crowd'
-import { at, iso, ago, D0 } from '@/utils/date'
+import { iso, D0 } from '@/utils/date'
 import MapPlaceService, { LAZY_LAYERS } from '@/services/map/MapPlaceService'
 import CrowdService, { attachSeries } from '@/services/map/CrowdService'
-import WeatherService from '@/services/map/WeatherService'
+import WeatherService from '@/services/map/MapWeatherService'
 
 /* 지도 페이지 전역 상태.
    Pinia와 같은 모양(state + action)으로 두어 나중에 옮기기 쉽게 했다.
@@ -48,7 +48,6 @@ export const state = reactive({
   F: { reg: '서부', bud: 150000, cat: '' },   // cat='' = 모든 종류
   L: { crowd: 1, spot: 1, food: 1, dine: 0, cafe: 0, cvs: 0, stay: 0, mart: 0, rain: 1 },
   favs: readLS('hangat_favs', []),
-  courses: readLS('hangat_courses', []),
   toast: '',
 })
 
@@ -171,7 +170,6 @@ export function toast(msg) {
 }
 
 const currentUser = () => useAuthStore().user
-const currentUserName = user => user?.nickname || user?.name || '한갓이'
 
 /** MAP_009 찜 — 회원 전용 */
 export function toggleFav(name) {
@@ -183,29 +181,5 @@ export function toggleFav(name) {
   return true
 }
 export const isFav = name => state.favs.includes(name)
-
-/* ── 코스 저장 (MY_001) ── */
-/** 같은 조건·같은 경유지면 같은 코스로 보고 중복 저장을 막는다 */
-export const courseKey = c =>
-  `${state.F.reg}|${iso(at(state.di))}|${c.stops.map(s => (s.o ? s.o.n : s.f.n)).join('|')}`
-
-export const isCourseSaved = () =>
-  !!state.course && state.courses.some(c => c.key === courseKey(state.course))
-
-export function saveCourse(title) {
-  if (!currentUser()) { toast('코스 저장은 로그인이 필요해요'); return false }
-  const c = state.course
-  if (!c) return false
-  const key = courseKey(c)
-  if (state.courses.some(x => x.key === key)) { toast('이미 저장한 코스예요'); return false }
-  state.courses.unshift({
-    key, title, region: state.F.reg, startDate: iso(at(state.di)), days: c.days,
-    budget: c.bud, spent: c.spent, avg: c.avg, move: c.move,
-    stops: c.stops.map(s => (s.o ? s.o.n : s.f.n)), savedAt: iso(new Date()),
-  })
-  if (!writeLS('hangat_courses', state.courses)) toast('저장 공간이 가득 찼어요 (데모 한계)')
-  else toast(`'${title}' 저장했어요 · 마이페이지에서 볼 수 있어요`)
-  return true
-}
 
 export { D0 }

@@ -1,11 +1,11 @@
 package com.example.hangat.map.controller;
 
 import com.example.hangat.common.model.BaseResponse;
-import com.example.hangat.map.service.CongestionIngestService;
+import com.example.hangat.map.congestion.CongestionIngestService;
 import com.example.hangat.map.detail.MenuIngestService;
 import com.example.hangat.map.detail.PlaceDetailIngestService;
 import com.example.hangat.map.image.PlaceImageIngestService;
-import com.example.hangat.map.service.PlaceIngestService;
+import com.example.hangat.map.place.PlaceIngestService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.context.annotation.Profile;
