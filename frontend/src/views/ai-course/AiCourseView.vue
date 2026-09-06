@@ -11,6 +11,7 @@ import AccommodationRecommendations from '../../components/course/AccommodationR
 import { courseGenerationErrorMessage, courseMockService } from '../../services/courseMockService'
 import { storePendingCourseClaim, takePendingCourseClaim } from '../../services/pendingCourseClaim'
 import { routeSummary, accessNotices } from '../../services/course/courseSummary'
+import { ApiError } from '../../api/errors.js'
 import type { AccommodationInput, AccommodationRecommendation, AlternativePlace, CarDayRoute, CarRouteLeg, CongestionRescheduleOption, CourseCondition, CourseItem, CourseResult } from '../../assets/types/course'
 
 const now = new Date()
@@ -36,6 +37,7 @@ const editing = ref(true)
 const selected = ref<CourseItem>()
 const alternatives = ref<AlternativePlace[]>([])
 const altLoading = ref(false)
+const altNotice = ref('')
 const rescheduleSelected = ref<CourseItem>()
 const rescheduleOptions = ref<CongestionRescheduleOption[]>([])
 const rescheduleLoading = ref(false)
@@ -162,9 +164,15 @@ async function openAlternatives(item: CourseItem) {
   if (!result.value) return
   selected.value = item
   alternatives.value = []
+  altNotice.value = ''
   altLoading.value = true
   try {
     alternatives.value = await courseMockService.getAlternativePlaces(result.value, item.id, condition)
+  } catch (failure) {
+    // 3401 = 그 날짜 혼잡 예보 없음. 빈 목록으로 뭉개지 않고 이유를 보여준다(정직성)
+    altNotice.value = failure instanceof ApiError && Number(failure.code) === 3401
+      ? '이 날짜의 혼잡 예보가 아직 없어 대안을 고를 수 없어요.'
+      : '대안을 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.'
   } finally {
     altLoading.value = false
   }
@@ -174,7 +182,14 @@ async function replace(alternative: AlternativePlace) {
   if (!result.value || !selected.value) return
   const previousAverage = result.value.average_congestion_rate
   const replacementName = alternative.place_name
-  result.value = await courseMockService.replaceCourseItem(result.value, selected.value.id, alternative)
+  try {
+    result.value = await courseMockService.replaceCourseItem(result.value, selected.value.id, alternative)
+  } catch (failure) {
+    // 서버 메시지(중복 장소·권한·예보 없음)를 그대로 - 기존 일정은 그대로 남는다
+    toast.value = failure instanceof ApiError ? `바꾸지 못했어요. ${failure.message}` : '장소를 바꾸지 못했어요. 기존 일정은 그대로예요.'
+    setTimeout(() => { toast.value = '' }, 2600)
+    return
+  }
   selected.value = undefined
   toast.value = previousAverage != null && result.value.average_congestion_rate != null
     ? `${replacementName}으로 변경했어요. 평균 혼잡도는 ${congestionLabel(result.value.average_congestion_rate)}이에요.`
@@ -363,7 +378,7 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
       </div>
     </section>
 
-    <AlternativePlaceModal v-if="selected" :item="selected" :alternatives="alternatives" :loading="altLoading" @close="selected = undefined" @select="replace" />
+    <AlternativePlaceModal v-if="selected" :item="selected" :alternatives="alternatives" :loading="altLoading" :notice="altNotice" @close="selected = undefined" @select="replace" />
     <CongestionRescheduleModal v-if="rescheduleSelected" :item="rescheduleSelected" :options="rescheduleOptions" :loading="rescheduleLoading" @close="rescheduleSelected = undefined" @select="reschedule" />
     <div v-if="saveOpen" class="modal-backdrop" @click.self="saveOpen = false">
       <section class="course-modal save-modal">

@@ -2,7 +2,8 @@
 import { computed } from 'vue'
 import type { AlternativePlace, CourseItem } from '../../assets/types/course'
 
-const props = defineProps<{ item: CourseItem; alternatives: AlternativePlace[]; loading: boolean }>()
+/** notice: 후보를 못 구한 '이유'(예: 그 날짜 예보 없음). 빈 목록의 기본 문구 대신 보여준다 */
+const props = defineProps<{ item: CourseItem; alternatives: AlternativePlace[]; loading: boolean; notice?: string }>()
 defineEmits<{ close: []; select: [AlternativePlace] }>()
 const crowded = computed(() => props.item.congestion_level === 'CROWDED')
 </script>
@@ -26,7 +27,8 @@ const crowded = computed(() => props.item.congestion_level === 'CROWDED')
           </div>
           <button class="btn primary select-alternative" @click="$emit('select', alt)">이곳으로 변경</button>
         </article>
-        <p v-if="!alternatives.length">{{ crowded ? '가까운 한산한 대안을 찾지 못했어요.' : '조건에 맞는 다른 장소를 찾지 못했어요.' }}</p>
+        <p v-if="notice" class="course-notice">{{ notice }}</p>
+        <p v-else-if="!alternatives.length">{{ crowded ? '가까운 한산한 대안을 찾지 못했어요.' : '조건에 맞는 다른 장소를 찾지 못했어요.' }}</p>
       </div>
     </section>
   </div>
