@@ -427,10 +427,13 @@ describe('alternative places and swap (backend, 담당 정동현)', () => {
     ])
     const avoiding: CourseCondition = { ...condition, course_place_preferences: [{ place_id: 602, place_name: '대수산봉', preference_type: 'AVOID' }] }
 
-    const result = await courseMockService.getAlternativePlaces(course(), 1, avoiding)
+    const original = course()
+    const datesBefore = original.days.map(day => ({ date: day.visit_date, slots: day.items.map(item => [item.visit_date, item.start_time, item.end_time]) }))
+    const result = await courseMockService.getAlternativePlaces(original, 1, avoiding)
 
     expect(requestMock).toHaveBeenCalledWith('/places/501/alternatives?date=2026-08-28&limit=3&exclude=502')
     expect(result.map(candidate => candidate.place_id)).toEqual([601])
+    expect(original.days.map(day => ({ date: day.visit_date, slots: day.items.map(item => [item.visit_date, item.start_time, item.end_time]) }))).toEqual(datesBefore)
   })
 
   it('passes a 3401 (no forecast for that date) through instead of pretending there are no alternatives', async () => {
@@ -462,6 +465,8 @@ describe('alternative places and swap (backend, 담당 정동현)', () => {
     const before = course()
 
     const replaced = await courseMockService.replaceCourseItem(before, 1, alternative)
+    expect(replaced.days.map(day => ({ date: day.visit_date, slots: day.items.map(item => [item.visit_date, item.start_time, item.end_time]) })))
+      .toEqual(before.days.map(day => ({ date: day.visit_date, slots: day.items.map(item => [item.visit_date, item.start_time, item.end_time]) })))
 
     expect(requestMock).toHaveBeenCalledWith('/courses/101/items/1/swap', { method: 'POST', body: { place_id: 601 }, auth: false })
     const changed = replaced.days[0].items[0]

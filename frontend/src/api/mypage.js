@@ -8,7 +8,7 @@
 import { call, ApiError, nextId } from './client.js'
 import { PLACE_BY_ID, PLACE_BY_NAME } from '../data/places.js'
 import { crowdOn, weatherOn, tier, drive } from '../utils/crowd.js'
-import { iso, toDate } from '../utils/format.js'
+import { iso, toDate, todayKst, tripPhase } from '../utils/format.js'
 
 /* ────────────────────────── 공통 ────────────────────────── */
 
@@ -121,7 +121,7 @@ function courseSummary (db, course, savedAt) {
     crowdTier: tier(avgCrowd),
     shared: !!share,
     shareToken: share ? share.token : null,
-    isPast: toDate(course.endDate) < new Date(new Date().toDateString())
+    isPast: tripPhase(course.startDate, course.endDate) === 'PAST'
   }
 }
 
@@ -498,10 +498,8 @@ export function isAlertLive (db, a, now = new Date()) {
 
   const end = alertTripEnd(db, a)
   if (!end) return false
-  // 종료일 당일까지는 남긴다 (자정 기준 비교)
-  const endOfTrip = toDate(end)
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  return endOfTrip >= today
+  // Date-only strings stay date-only. The last day includes KST 23:59:59.
+  return end >= todayKst(now)
 }
 
 export function listAlerts ({ onlyUnread = false } = {}) {

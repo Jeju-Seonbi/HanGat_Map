@@ -40,7 +40,7 @@ public class AlternativeController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @RequestParam(required = false, defaultValue = "") Set<Long> exclude,
             @RequestParam(defaultValue = "3") @Min(1) @Max(10) int limit) {
-        LocalDate target = date != null ? date : LocalDate.now();
+        LocalDate target = date != null ? date : com.example.hangat.common.util.DateTimes.todayKst();
         return BaseResponse.success(alternativeService.alternatives(placeId, target, exclude, limit));
     }
 }

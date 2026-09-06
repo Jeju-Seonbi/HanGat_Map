@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import type { CongestionRescheduleOption, CourseItem } from '../../assets/types/course'
+import { formatCalendarDate as dateLabel } from '../../utils/format.js'
 
 defineProps<{ item: CourseItem; options: CongestionRescheduleOption[]; loading: boolean }>()
 defineEmits<{ close: []; select: [CongestionRescheduleOption] }>()
-const dateLabel = (value: string) => new Intl.DateTimeFormat('ko-KR', { month: 'long', day: 'numeric', weekday: 'short', timeZone: 'UTC' }).format(new Date(`${value}T00:00:00Z`))
 const timeLabel = (value: string) => {
   const hour = Number(value.slice(0, 2))
   return `${hour < 12 ? '오전' : '오후'} ${hour % 12 || 12}:${value.slice(3)}`

@@ -18,6 +18,7 @@ import type { AccommodationInput,
 import { getMockWeather, weatherRecommendationAdjustment, weatherWarning } from './weatherMockService'
 import { savedCourseMockService } from './savedCourseMockService'
 import { apiRequest } from '../api/backendClient.js'
+import { addCalendarDays as dateAt, calendarDayOffset as dayOffset } from '../utils/format.js'
 import { ApiError } from '../api/errors.js'
 
 const pause = (ms = 650) => new Promise(resolve => setTimeout(resolve, ms))
@@ -88,14 +89,6 @@ const regionCentres: Record<RegionCode, { lat: number; lng: number }> = {
   NORTH: { lat: 33.48, lng: 126.55 },
 }
 
-const dateAt = (start: string, offset: number) => {
-  const date = new Date(`${start}T00:00:00Z`)
-  date.setUTCDate(date.getUTCDate() + offset)
-  return date.toISOString().slice(0, 10)
-}
-
-const dayOffset = (start: string, date: string) =>
-  Math.round((new Date(`${date}T00:00:00Z`).getTime() - new Date(`${start}T00:00:00Z`).getTime()) / 86400000)
 const normalizePlaceName = (name: string) => name.normalize('NFKC').replace(/\s+/g, '').toLocaleLowerCase('ko-KR')
 const minutesFromTime = (time: string) => {
   const [hours, minutes] = time.split(':').map(Number)
@@ -531,7 +524,7 @@ function placeFlexibleWants(days: CourseDay[], dayRegions: RegionCode[], prefere
 async function generateMockCourse(condition: CourseCondition, generationReason: CourseResult['generation_reason']): Promise<CourseResult> {
   await pause()
   const courseId = ++sequence
-  const dayCount = Math.max(1, Math.round((new Date(condition.end_date).getTime() - new Date(condition.start_date).getTime()) / 86400000) + 1)
+  const dayCount = Math.max(1, dayOffset(condition.start_date, condition.end_date) + 1)
   const days = Array.from({ length: dayCount }, (_, index) => ({ day_no: index + 1, visit_date: dateAt(condition.start_date, index), items: [] as CourseItem[] }))
   const wants = condition.course_place_preferences.filter(preference => preference.preference_type === 'WANT')
   const fixedWants = wants.filter(preference => preference.fixed_date || preference.fixed_time)
