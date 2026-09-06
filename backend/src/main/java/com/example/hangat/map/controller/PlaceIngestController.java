@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 개발 프로필에서만 빈이 만들어지므로 운영에는 <b>엔드포인트 자체가 존재하지 않는다</b>.
  *
  * <p>인증·권한 체계가 붙으면(회원 담당) 관리자 권한 검사로 바꾸고 프로필 제한을 걷어낸다.
- * 자동 스케줄(@Scheduled)은 적재 동작이 검증된 뒤에 붙인다.
+ * 혼잡 적재의 자동 스케줄은 CongestionIngestScheduler(운영 03:00 KST)가 맡는다 - 여기 엔드포인트는 dev 수동 실행용.
  */
 @Profile("dev")
 @Tag(name = "적재(개발용)", description = "공공 API에서 데이터를 받아 DB에 넣는다. 개발 프로필에서만 노출된다.")
