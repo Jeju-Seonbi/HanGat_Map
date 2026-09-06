@@ -92,6 +92,11 @@ weather:
     # 개발 머신마다 밤에 기상청을 부르지 않는다 - 수동 실행은 POST /admin/ingest/weather
     enabled: false
 
+congestion:
+  ingest:
+    # 개발 머신마다 밤에 집중률 API를 부르지 않는다 - 수동 실행은 POST /admin/ingest/congestion
+    enabled: false
+
 tour-api:
   base-url: ${TOUR_API_BASE_URL}
   service-key: ${TOUR_API_SERVICE_KEY}

@@ -104,6 +104,12 @@ weather:
     # 배포 직후 첫 스케줄까지 기다리지 않고 채우려면 true - 발표분 단위 멱등이라 재기동해도 중복 없음
     on-startup: ${WEATHER_INGEST_ON_STARTUP:false}
 
+congestion:
+  ingest:
+    enabled: true
+    # 배포 직후 첫 스케줄까지 기다리지 않고 채우려면 true - 같은 날 재실행은 그날 발표분만 교체해 중복 없음
+    on-startup: ${CONGESTION_INGEST_ON_STARTUP:false}
+
 tour-api:
   base-url: ${TOUR_API_BASE_URL}
   service-key: ${TOUR_API_SERVICE_KEY}

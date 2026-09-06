@@ -20,6 +20,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.util.matcher.RegexRequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -172,6 +173,9 @@ public class SecurityConfig {
                         "/courses/*/items/*/swap"
                 ).permitAll()
 
+                // 숫자 회원 ID의 사진 GET/HEAD만 공개한다. /users/me 및 사진 변경 권한은 열지 않는다.
+                .requestMatchers(new RegexRequestMatcher("^/users/[1-9][0-9]*/profile-image/[^/?]+$", "GET"),
+                        new RegexRequestMatcher("^/users/[1-9][0-9]*/profile-image/[^/?]+$", "HEAD")).permitAll()
                 // 그 외 API는 인증 필요
                 // 공개 후기 여부/미첨부 사진의 소유권은 ReviewPhotoService에서 검사한다.
                 .requestMatchers(HttpMethod.GET,
