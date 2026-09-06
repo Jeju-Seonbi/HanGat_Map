@@ -107,7 +107,7 @@ function toggleCourse() {
       <div class="rows">
         <div v-if="state.loading" class="empty">장소를 불러오는 중이에요…</div>
         <div v-else-if="!rankedRows.length" class="empty">
-          {{ state.live ? '이 조건에는 혼잡 예보가 있는 곳이 없어요' : '조건에 맞는 곳이 없어요' }}
+          {{ state.live ? '이 조건에는 혼잡 예보가 있는 곳이 없어요' : '장소 데이터를 불러오지 못했어요 · 새로고침해 주세요' }}
         </div>
         <!-- 혼잡 상태는 왼쪽 핀 색으로만 표시한다 (오른쪽 뱃지와 의미가 중복되어 제거) -->
         <div v-for="(o, i) in rankedRows" :key="o.s.n" class="row" :class="o.t"
