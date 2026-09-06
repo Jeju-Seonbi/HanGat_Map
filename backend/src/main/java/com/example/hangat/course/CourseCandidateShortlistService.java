@@ -156,7 +156,7 @@ class CourseCandidateShortlistService {
         return 2 * Math.asin(Math.sqrt(Math.min(1, a)));
     }
 
-    private int targetSize(CourseRequestDto request) {
+    static int targetSize(CourseRequestDto request) {
         long tripDays = ChronoUnit.DAYS.between(
                 request.getStartDate(), request.getEndDate()) + 1;
         long requested = tripDays * CANDIDATES_PER_TRIP_DAY;
