@@ -1,20 +1,23 @@
-package com.example.hangat.map.review;
+package com.example.hangat.review.service;
 
 import com.example.hangat.common.exception.BaseException;
 import com.example.hangat.common.model.BaseResponseStatus;
 import com.example.hangat.common.model.PageResponse;
 import com.example.hangat.map.model.entity.Place;
-import com.example.hangat.map.model.entity.Review;
-import com.example.hangat.map.model.entity.ReviewImage;
+import com.example.hangat.review.model.Review;
+import com.example.hangat.review.model.ReviewCreateRequest;
+import com.example.hangat.review.model.ReviewImage;
+import com.example.hangat.review.model.ReviewPhotosDeleted;
+import com.example.hangat.review.model.ReviewResponse;
 import com.example.hangat.map.model.enums.CongestionLevel;
-import com.example.hangat.map.model.enums.ReviewStatus;
-import com.example.hangat.map.review.model.ReviewCreateRequest;
+import com.example.hangat.review.model.ReviewStatus;
 import com.example.hangat.map.repository.PlaceRepository;
-import com.example.hangat.map.repository.ReviewImageRepository;
-import com.example.hangat.map.repository.ReviewRepository;
-import com.example.hangat.map.review.model.ReviewResponse;
+import com.example.hangat.review.repository.ReviewImageRepository;
+import com.example.hangat.review.repository.ReviewRepository;
 import com.example.hangat.user.model.User;
 import com.example.hangat.user.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -27,8 +30,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-/** 방문 후기 (MAP-09) */
+/**
+ * 후기 업무 처리 - 장소별 목록, 작성, 본인 삭제와 평점 요약을 관리한다.
+ * 사진 검증은 사진 서비스에 맡기고, DB 삭제 확정 후 파일 정리 이벤트를 전달한다.
+ */
 @Service
+@RequiredArgsConstructor
 public class ReviewService {
 
     public static final int MAX_IMAGES = 5;
@@ -38,16 +45,10 @@ public class ReviewService {
     private final ReviewImageRepository imageRepository;
     private final PlaceRepository placeRepository;
     private final UserRepository userRepository;
+    private final ReviewPhotoService photoService;
+    private final ApplicationEventPublisher events;
 
-    public ReviewService(ReviewRepository reviewRepository,
-                         ReviewImageRepository imageRepository,
-                         PlaceRepository placeRepository,
-                         UserRepository userRepository) {
-        this.reviewRepository = reviewRepository;
-        this.imageRepository = imageRepository;
-        this.placeRepository = placeRepository;
-        this.userRepository = userRepository;
-    }
+    // ────────────────────────── 후기 목록 조회 ──────────────────────────
 
     /** 장소별 후기 목록 - 삭제분 제외, 최신순 */
     @Transactional(readOnly = true)
@@ -81,11 +82,16 @@ public class ReviewService {
                 .collect(Collectors.toMap(User::getId, User::getNickname, (a, b) -> a));
     }
 
+    // ────────────────────────── 후기 작성 및 삭제 ──────────────────────────
+
+    /** 본인이 업로드한 사진만 첨부하고 후기와 장소의 평점 요약을 함께 저장한다. */
     @Transactional
     public ReviewResponse create(Long placeId, Long userId, ReviewCreateRequest req) {
         Place place = placeRepository.findById(placeId)
                 .orElseThrow(() -> new BaseException(BaseResponseStatus.PLACE_NOT_FOUND));
         validate(req);
+
+        var attachments = photoService.validateAttachments(req.getImageUrls(), userId);
 
         Review review = reviewRepository.save(Review.builder()
                 .userId(userId)
@@ -96,15 +102,14 @@ public class ReviewService {
                 .status(ReviewStatus.ACTIVE)
                 .build());
 
-        List<String> urls = req.getImageUrls() == null ? List.of() : req.getImageUrls();
         List<ReviewImage> images = new ArrayList<>();
-        for (int i = 0; i < urls.size(); i++) {
-            String url = urls.get(i);
+        for (int i = 0; i < attachments.size(); i++) {
+            var attachment = attachments.get(i);
             images.add(imageRepository.save(ReviewImage.builder()
                     .review(review)
-                    // 로컬 스토리지는 URL 마지막 조각이 곧 파일 키다 - S3 전환 시 업로드 API 가 키를 준다
-                    .storageKey(url.substring(url.lastIndexOf('/') + 1))
-                    .imageUrl(url)
+                    // 소유자 경로를 포함한 전체 키를 유지해야 조회·삭제 대상을 정확히 찾는다.
+                    .storageKey(attachment.key())
+                    .imageUrl(attachment.url())
                     .sortOrder(i)
                     .build()));
         }
@@ -113,6 +118,7 @@ public class ReviewService {
         return ReviewResponse.from(review, images, nicknamesOf(List.of(userId)).get(userId));
     }
 
+    /** 본인 후기만 논리 삭제하고, 커밋이 성공한 경우에만 사진 정리를 진행한다. */
     @Transactional
     public void delete(Long reviewId, Long userId) {
         Review review = reviewRepository.findById(reviewId)
@@ -124,8 +130,16 @@ public class ReviewService {
         }
         review.delete();
         refreshSummary(review.getPlace());
+        // 수신자는 AFTER_COMMIT이므로 DB 롤백 시 파일이 먼저 사라지지 않는다.
+        events.publishEvent(new ReviewPhotosDeleted(
+                imageRepository.findByReviewIdOrderBySortOrder(reviewId).stream()
+                        .map(ReviewImage::getStorageKey).toList()
+        ));
     }
 
+    // ────────────────────────── 입력 검증 및 평점 집계 ──────────────────────────
+
+    /** 별점/제보 중 하나는 필수이며 한줄평 길이와 사진 개수를 제한한다. */
     private void validate(ReviewCreateRequest req) {
         boolean noRating = req.getRating() == null;
         boolean noReport = req.getCongestionReport() == null || req.getCongestionReport().isBlank();
@@ -143,6 +157,7 @@ public class ReviewService {
         }
     }
 
+    /** 생략된 제보는 null로 두고 등록된 혼잡 단계 이외의 문자열은 거절한다. */
     private CongestionLevel parseReport(String report) {
         if (report == null || report.isBlank()) {
             return null;

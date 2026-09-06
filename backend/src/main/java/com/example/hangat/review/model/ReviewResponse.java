@@ -1,7 +1,5 @@
-package com.example.hangat.map.review.model;
+package com.example.hangat.review.model;
 
-import com.example.hangat.map.model.entity.Review;
-import com.example.hangat.map.model.entity.ReviewImage;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -10,7 +8,10 @@ import lombok.Getter;
 import java.time.LocalDateTime;
 import java.util.List;
 
-/** 후기 한 건 - 목록 응답용. */
+/**
+ * 후기 응답 - 작성 결과와 장소별 목록에서 같은 응답 형식을 사용한다.
+ * 엔티티 대신 필요한 정보와 사진 URL만 전달하며 저장 키를 별도 필드로 반환하지 않는다.
+ */
 @Getter
 @Builder
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
@@ -28,6 +29,9 @@ public class ReviewResponse {
     private final List<String> imageUrls;
     private final LocalDateTime createdAt;
 
+    // ────────────────────────── 응답 변환 ──────────────────────────
+
+    /** 조회한 사진 순서를 유지하고 닉네임·선택 입력의 null을 그대로 응답에 반영한다. */
     public static ReviewResponse from(Review review, List<ReviewImage> images, String nickname) {
         return ReviewResponse.builder()
                 .id(review.getId())

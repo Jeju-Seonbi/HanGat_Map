@@ -1,11 +1,14 @@
-package com.example.hangat.map.review.model;
+package com.example.hangat.review.model;
 
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.util.List;
 
-/** 후기 작성 요청. 별점 또는 혼잡 제보 중 하나는 있어야 한다(서비스 검증). */
+/**
+ * 후기 작성 요청 - 별점, 혼잡 제보, 한줄평과 업로드된 사진 URL을 전달한다.
+ * 별점 또는 제보 중 하나는 필수이며 교차 필드·사진 소유권 검증은 서비스가 담당한다.
+ */
 @Getter
 @NoArgsConstructor
 public class ReviewCreateRequest {

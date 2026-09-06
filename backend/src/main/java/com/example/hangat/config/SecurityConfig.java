@@ -173,6 +173,11 @@ public class SecurityConfig {
                 ).permitAll()
 
                 // 그 외 API는 인증 필요
+                // 공개 후기 여부/미첨부 사진의 소유권은 ReviewPhotoService에서 검사한다.
+                .requestMatchers(HttpMethod.GET,
+                        "/media/reviews/*/*", "/uploads/reviews/*").permitAll()
+                .requestMatchers(HttpMethod.HEAD,
+                        "/media/reviews/*/*", "/uploads/reviews/*").permitAll()
                 .anyRequest().authenticated()
         );
         http.exceptionHandling(exception ->
