@@ -102,7 +102,8 @@ export interface CarRouteResult {
   cached: boolean; fetched_at: string; days: CarDayRoute[]
 }
 export interface CourseResult {
-  id: number; course_type: CourseType; generation_reason: GenerationReason; status: CourseStatus; title?: string
+  id: number; course_type: CourseType; generation_reason?: GenerationReason; status: CourseStatus; title?: string
+  swappable?: boolean; manageable?: boolean
   claim_token?: string; claim_expires_at?: string
   start_date: string; end_date: string; people: number; budget_total?: number; transport: Transport
   estimated_cost_min?: number; estimated_cost_max?: number; average_congestion_rate?: number

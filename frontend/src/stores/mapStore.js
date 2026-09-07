@@ -1,13 +1,18 @@
 import { reactive, computed } from 'vue'
+import { useAuthStore } from '@/stores/auth'
 import { crowd, tier } from '@/utils/crowd'
 import { iso, D0 } from '@/utils/date'
 import MapPlaceService, { LAZY_LAYERS } from '@/services/map/MapPlaceService'
 import CrowdService, { attachSeries } from '@/services/map/CrowdService'
 import WeatherService from '@/services/map/MapWeatherService'
+import FavoriteApiService from '@/services/map/FavoriteApiService'
 
 /* 지도 페이지 전역 상태.
    Pinia와 같은 모양(state + action)으로 두어 나중에 옮기기 쉽게 했다.
    지금은 페이지가 하나뿐이라 의존성을 늘리지 않고 reactive() 하나로 충분하다 */
+
+/* 찜을 브라우저에 이름으로 저장하던 시절의 키 - 이제 백엔드가 단일 저장소라 남은 값은 지운다(2026-09-07) */
+try { localStorage.removeItem('hangat_favs') } catch { /* 저장소 접근 불가 - 무시 */ }
 
 export const REGIONS = ['전체', '동부', '서부', '남부', '북부']
 
@@ -39,6 +44,8 @@ export const state = reactive({
   filterOffset: 0,       // 업종 필터 캐러셀 위치
   F: { reg: '서부', bud: 150000, cat: '' },   // cat='' = 모든 종류
   L: { crowd: 1, spot: 1, food: 1, dine: 0, cafe: 0, cvs: 0, stay: 0, mart: 0, rain: 1 },
+  /** 로그인한 회원이 찜한 장소 ID (MAP_009). 백엔드 /favorites 가 원본이고 이건 화면용 사본. 비로그인이면 빈 배열 */
+  favIds: [],
   toast: '',
 })
 
@@ -158,6 +165,58 @@ export function toast(msg) {
   state.toast = msg
   clearTimeout(toastTimer)
   toastTimer = setTimeout(() => { state.toast = '' }, 1900)
+}
+
+const currentUser = () => useAuthStore().user
+
+/* ── MAP_009 찜 — 회원 전용. 백엔드 /favorites 가 단일 저장소라 마이페이지 찜 목록과 항상 같다 ── */
+
+let favOwner = null
+/**
+ * 로그인한 회원의 찜 장소 ID를 받아온다. MapView 가 로그인 상태가 바뀔 때마다 부른다(로그아웃이면 null).
+ * 실패해도 던지지 않는다 - 하트만 안 켜질 뿐 지도는 정상이어야 한다. 늦게 온 응답이 다른 계정 것을 덮지 않게 주인을 확인한다.
+ */
+export async function loadFavorites (userId) {
+  favOwner = userId ?? null
+  if (favOwner == null) { state.favIds = []; return }
+  try {
+    const ids = await FavoriteApiService.ids()
+    if (favOwner === userId) state.favIds = ids
+  } catch (e) {
+    console.error('찜 목록을 불러오지 못했어요', e)
+  }
+}
+
+export const isFav = place => place?.id != null && state.favIds.includes(place.id)
+
+function setFav (id, on) {
+  const i = state.favIds.indexOf(id)
+  if (on && i < 0) state.favIds.push(id)
+  if (!on && i >= 0) state.favIds.splice(i, 1)
+}
+
+/**
+ * 하트 토글. 화면을 먼저 바꾸고 서버에 알린다 - 응답을 기다렸다 바꾸면 늦게 켜지는 하트를 두 번 누르게 된다.
+ * 실패하면 되돌리고 알린다. 비로그인은 토스트만(로그인 페이지로 보내지 않는다 - 2026-09-07 결정).
+ * @returns {Promise<boolean>} 서버에 반영됐으면 true
+ */
+export async function toggleFav (place) {
+  if (!currentUser()) { toast('찜은 로그인이 필요해요'); return false }
+  if (place?.id == null) { toast('이 장소는 찜할 수 없어요'); return false }
+  const on = !isFav(place)
+  setFav(place.id, on)
+  try {
+    const res = on ? await FavoriteApiService.add(place.id) : await FavoriteApiService.remove(place.id)
+    setFav(place.id, res.favorited)   // 서버가 말한 상태가 정답이다(연타로 순서가 엇갈려도 마지막 응답 기준)
+    toast(res.favorited ? '찜했어요 — 마이페이지에서 볼 수 있어요' : '찜을 해제했어요')
+    return true
+  } catch (e) {
+    setFav(place.id, !on)
+    toast(e?.status === 401
+      ? '로그인이 만료됐어요 — 다시 로그인해 주세요'
+      : '찜을 저장하지 못했어요 — 잠시 후 다시 시도해 주세요')
+    return false
+  }
 }
 
 export { D0 }

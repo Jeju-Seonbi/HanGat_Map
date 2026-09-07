@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -92,18 +93,22 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
      * 좌표 없는 장소는 뺀다: 결과 클릭 = 지도 이동이라 좌표가 필수다.
      * 이름 일치를 메뉴 일치보다 앞세운다 - 검색 엔진 없이 내는 최소한의 연관도.
      * overview는 CLOB이라 SELECT에는 여전히 싣지 않고(§9.1) 조건으로만 쓴다.
+     *
+     * <p><b>{@code :q}는 서비스가 LIKE 특수문자를 이스케이프한 값이어야 한다</b>({@code PlaceService#escapeLike}).
+     * 사용자가 친 {@code %}·{@code _}가 그대로 들어가면 "아무 글자"로 해석돼 {@code %%}만 쳐도 전부 매칭된다.
+     * 이스케이프 문자는 {@code !} - 여기 {@code escape '!'}와 서비스가 짝이다. 한쪽만 바꾸면 검색이 조용히 틀린다.
      */
     String SEARCH_WHERE = """
 
              and p.latitude is not null and p.longitude is not null
              and (:region is null or r.code = :region)
-             and (p.name like concat('%', :q, '%') or p.overview like concat('%', :q, '%'))""";
+             and (p.name like concat('%', :q, '%') escape '!' or p.overview like concat('%', :q, '%') escape '!')""";
 
     /** 접두 일치 > 이름 포함 > 메뉴 매칭, 같은 급이면 짧은 이름 우선 - "성산" 검색에 성산일출봉이 성산점 지점명보다 위로 온다. */
     String SEARCH_ORDER = """
 
-            order by case when p.name like concat(:q, '%') then 0
-                          when p.name like concat('%', :q, '%') then 1
+            order by case when p.name like concat(:q, '%') escape '!' then 0
+                          when p.name like concat('%', :q, '%') escape '!' then 1
                           else 2 end,
                      length(p.name), p.id""";
 
@@ -139,6 +144,19 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
               and pt.sourceType = com.example.hangat.map.model.enums.TagSourceType.API
             """)
     List<Object[]> findApiTagOf(@Param("placeId") Long placeId);
+
+    /**
+     * 여러 장소의 세부분류를 한 번에 - 찜 목록(favorite)이 장소마다 {@link #findApiTagOf}를 부르면 N+1이라 묶어 읽는다.
+     * (placeId, tagName). 장소당 한 건이 전제지만 둘이어도 호출부가 첫 건을 쓴다.
+     */
+    @Query("""
+            select pt.place.id, t.name
+            from PlaceTag pt
+              join pt.tag t
+            where pt.place.id in :placeIds
+              and pt.sourceType = com.example.hangat.map.model.enums.TagSourceType.API
+            """)
+    List<Object[]> findApiTagNamesOf(@Param("placeIds") Collection<Long> placeIds);
 
     /**
      * 상세(detailIntro2)를 아직 안 받은 장소. 쿼터가 하루 1,000콜이라 나눠 도는데,
