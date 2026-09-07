@@ -1,5 +1,4 @@
 import { reactive, computed } from 'vue'
-import { useAuthStore } from '@/stores/auth'
 import { crowd, tier } from '@/utils/crowd'
 import { iso, D0 } from '@/utils/date'
 import MapPlaceService, { LAZY_LAYERS } from '@/services/map/MapPlaceService'
@@ -9,13 +8,6 @@ import WeatherService from '@/services/map/MapWeatherService'
 /* 지도 페이지 전역 상태.
    Pinia와 같은 모양(state + action)으로 두어 나중에 옮기기 쉽게 했다.
    지금은 페이지가 하나뿐이라 의존성을 늘리지 않고 reactive() 하나로 충분하다 */
-
-const readLS = (k, fallback) => {
-  try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fallback } catch { return fallback }
-}
-const writeLS = (k, v) => {
-  try { localStorage.setItem(k, JSON.stringify(v)); return true } catch { return false }
-}
 
 export const REGIONS = ['전체', '동부', '서부', '남부', '북부']
 
@@ -47,7 +39,6 @@ export const state = reactive({
   filterOffset: 0,       // 업종 필터 캐러셀 위치
   F: { reg: '서부', bud: 150000, cat: '' },   // cat='' = 모든 종류
   L: { crowd: 1, spot: 1, food: 1, dine: 0, cafe: 0, cvs: 0, stay: 0, mart: 0, rain: 1 },
-  favs: readLS('hangat_favs', []),
   toast: '',
 })
 
@@ -168,18 +159,5 @@ export function toast(msg) {
   clearTimeout(toastTimer)
   toastTimer = setTimeout(() => { state.toast = '' }, 1900)
 }
-
-const currentUser = () => useAuthStore().user
-
-/** MAP_009 찜 — 회원 전용 */
-export function toggleFav(name) {
-  if (!currentUser()) { toast('찜은 로그인이 필요해요'); return false }
-  const i = state.favs.indexOf(name)
-  if (i >= 0) state.favs.splice(i, 1); else state.favs.push(name)
-  writeLS('hangat_favs', state.favs)
-  toast(i >= 0 ? '찜을 해제했어요' : '찜했어요 — 마이페이지에서 볼 수 있어요')
-  return true
-}
-export const isFav = name => state.favs.includes(name)
 
 export { D0 }

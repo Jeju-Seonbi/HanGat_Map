@@ -4,7 +4,8 @@ import { ref, computed, watch } from 'vue'
 import StarIcon from './StarIcon.vue'
 import ReviewSection from './ReviewSection.vue'
 import ProfileAvatar from '../common/ProfileAvatar.vue'
-import { state, toggleFav, isFav, toast } from '@/stores/mapStore'
+import { state, toast } from '@/stores/mapStore'
+import FavoriteButton from '../common/FavoriteButton.vue'
 
 import { crowd, tier, tierKo, rank30, bestDay, CROWD_KO } from '@/utils/crowd'
 import { at, fmtK } from '@/utils/date'
@@ -206,7 +207,7 @@ async function shareNative() {
           <div class="sub">{{ s.c }} · {{ s.r }}</div>
         </div>
         <!-- MAP_009 찜 -->
-        <button class="fav" :class="{ on: isFav(s.n) }" aria-label="찜하기" @click="toggleFav(s.n)">♥</button>
+        <FavoriteButton :place-id="s.id" />
         <div class="share-wrap">
           <button class="share" :aria-expanded="shareOpen" @click="toggleShare">공유하기</button>
           <div v-if="shareOpen" class="share-sheet">

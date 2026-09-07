@@ -8,13 +8,15 @@
  *   ② 아래 2단 — 왼쪽 세로 알약 탭(아이콘 + 알림 점), 오른쪽 내용
  *   좁은 화면에서는 탭이 가로 스크롤로 눕는다(시안 `flex md:flex-col`).
  *
- * 지표는 **실제 개수**를 API 에서 읽는다. 시안의 5·12 는 목업 숫자라 쓰지 않았다.
+ * 리뷰 개수는 실제 서버에서 읽는다. 저장 코스·알림은 기존 API 전환 범위에 포함하지 않는다.
  */
-import { onMounted, ref, watch } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '../../stores/auth.js'
 import { useUiStore } from '../../stores/ui.js'
-import { listAlerts, listSavedCourses, listMyReviews } from '../../api/mypage.js'
+import { listAlerts, listSavedCourses } from '../../api/mypage.js'
+import { listMyReviews } from '../../api/myActivity.js'
+import { getBackendSessionVersion } from '../../api/backendClient.js'
 import AppIcon from '../../components/common/AppIcon.vue'
 import ProfileImageEditor from '../../components/mypage/ProfileImageEditor.vue'
 
@@ -25,6 +27,8 @@ const route = useRoute()
 const unread = ref(0)
 const courseCount = ref(null)
 const reviewCount = ref(null)
+let statsVersion = 0
+onBeforeUnmount(() => { statsVersion += 1 })
 
 async function loadUnread () {
   try {
@@ -35,17 +39,26 @@ async function loadUnread () {
 }
 
 async function loadStats () {
-  // 개수만 필요하므로 size 를 1 로 두고 total 만 읽는다
+  const version = ++statsVersion
+  const epoch = getBackendSessionVersion()
+  // 개수만 필요하므로 첫 페이지의 항목 하나만 요청한다.
   const [c, r] = await Promise.allSettled([
     listSavedCourses({ size: 1 }),
     listMyReviews({ size: 1 })
   ])
+  if (version !== statsVersion || epoch !== getBackendSessionVersion()) return
   courseCount.value = c.status === 'fulfilled' ? c.value.total : null
-  reviewCount.value = r.status === 'fulfilled' ? r.value.total : null
+  reviewCount.value = r.status === 'fulfilled' ? r.value.totalElements : null
 }
 
 onMounted(() => { loadUnread(); loadStats() })
 watch(() => [route.fullPath, ui.alertsVersion], () => { loadUnread(); loadStats() })
+watch(() => auth.user?.userId, () => {
+  statsVersion += 1
+  reviewCount.value = null
+  courseCount.value = null
+  if (auth.user) loadStats()
+}, { flush: 'sync' })
 
 /*
   ⚠️ 2026-08-15 — '저장한 코스' 탭을 뺐다.
@@ -116,11 +129,11 @@ const TABS = [
         </aside>
 
         <div class="body">
-          <RouterView />
+          <RouterView @reviews-changed="loadStats" />
         </div>
       </div>
 
-      <p class="foot note">
+      <p v-if="!['my-reviews', 'my-favorites', 'my-profile'].includes(route.name)" class="foot note">
         혼잡 · 날씨 · 주소는 <b>샘플 예보</b>라 실제와 다를 수 있어요.
         실서비스는 한국관광공사 · 행정안전부 · 기상청 자료를 씁니다.
       </p>
