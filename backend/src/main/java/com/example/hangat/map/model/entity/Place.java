@@ -193,8 +193,12 @@ public class Place {
         this.name = name;
         this.normalizedName = normalizedName;
         this.roadAddress = roadAddress;
-        this.latitude = latitude;
-        this.longitude = longitude;
+        // 원천 좌표가 비면(범위 밖으로 걸러진 손상값 포함) 기존 좌표를 지키지 않는다 - 손으로 보정한 값(V6 영주산)이 재적재로 되돌아간다.
+        // 한 축만 온 값은 쓰지 않는다 - 옛 위도에 새 경도를 섞으면 엉뚱한 자리가 된다
+        if (latitude != null && longitude != null) {
+            this.latitude = latitude;
+            this.longitude = longitude;
+        }
         this.phone = phone;
         this.imageUrl = imageUrl;
     }
