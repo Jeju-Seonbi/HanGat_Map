@@ -1,0 +1,81 @@
+{{- if .Values.batch.enabled }}
+{{- if and (not .Values.batch.suspend) .Values.backend.scheduling.enabled }}
+{{- fail "CronJob 활성화 전 backend.scheduling.enabled=false로 API 예약 작업을 중단하세요." }}
+{{- end }}
+{{- range $name, $job := .Values.batch.jobs }}
+{{- if not (has $name (list "congestion" "weather" "sample-courses")) }}
+{{- fail (printf "지원하지 않는 batch.jobs 작업입니다: %s" $name) }}
+{{- end }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  # CronJob 이름은 Job 이름 접미사를 위해 52자 이내로 제한한다.
+  name: {{ printf "%s-%s" (include "hangat.fullname" $ | trunc 37 | trimSuffix "-") $name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "hangat.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: batch
+spec:
+  schedule: {{ $job.schedule | quote }}
+  timeZone: {{ $.Values.batch.timeZone | quote }}
+  suspend: {{ $.Values.batch.suspend }}
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: {{ $.Values.batch.startingDeadlineSeconds }}
+  successfulJobsHistoryLimit: {{ $.Values.batch.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ $.Values.batch.failedJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      backoffLimit: {{ $.Values.batch.backoffLimit }}
+      activeDeadlineSeconds: {{ $.Values.batch.activeDeadlineSeconds }}
+      parallelism: 1
+      completions: 1
+      template:
+        metadata:
+          labels:
+            {{- include "hangat.selectorLabels" $ | nindent 12 }}
+            # API Service의 backend selector에 배치 Pod가 잡히지 않게 한다.
+            app.kubernetes.io/component: batch
+            hangat.io/batch-job: {{ $name }}
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          terminationGracePeriodSeconds: 30
+          {{- with $.Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          securityContext:
+            {{- toYaml $.Values.backend.podSecurityContext | nindent 12 }}
+          containers:
+            - name: batch
+              # Jenkins가 지정한 API와 동일한 커밋 이미지 태그로 실행한다.
+              image: "{{ $.Values.backend.image.repository }}:{{ $.Values.backend.image.tag }}"
+              imagePullPolicy: {{ $.Values.backend.image.pullPolicy }}
+              args:
+                - "--spring.profiles.active=prod,batch"
+                - "--spring.main.web-application-type=none"
+                - "--spring.flyway.enabled=false"
+                - "--spring.jpa.hibernate.ddl-auto=validate"
+                - "--hangat.scheduling.enabled=false"
+                - {{ printf "--hangat.batch.job=%s" $name | quote }}
+              # 동일 Spring 서비스 컨텍스트를 사용하므로 현재는 API의 환경설정을 재사용한다.
+              envFrom:
+                - configMapRef:
+                    name: {{ include "hangat.fullname" $ }}-backend-config
+                - secretRef:
+                    name: {{ include "hangat.fullname" $ }}-backend-secret
+              securityContext:
+                {{- toYaml $.Values.backend.containerSecurityContext | nindent 16 }}
+              resources:
+                {{- toYaml $.Values.batch.resources | nindent 16 }}
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          # 적재 배치는 사진을 읽고 쓰지 않는다. 사진 PVC는 연결하지 않는다.
+          volumes:
+            - name: tmp
+              emptyDir:
+                sizeLimit: {{ $.Values.backend.tmpSizeLimit }}
+{{- end }}
+{{- end }}
