@@ -18,6 +18,24 @@ function memory() { const m = new Map<string, string>(); return { getItem: (k: s
 const state: RestoreState = { mode: 'result', courseId: 29, condition }
 beforeEach(() => vi.clearAllMocks())
 describe('same-tab result restoration', () => {
+  it('reload uses latest server weather without snapshotting or regenerating, and tolerates missing weather', async () => {
+    const d = structuredClone(detail)
+    d.days[0].items[0].weather = [{ forecast_date: d.start_date, precipitation_probability: 30, daily_evidence: {
+      source_code: 'KMA_SHORT', region_code: 'EAST', spatial_scope: 'REGION', granularity: 'DAILY',
+      issued_at_utc: '2026-09-07T00:00:00', temp_min: 20, temp_max: 27 } }]
+    const port = memory(); rememberResult(resultFromDetail(d), condition, port)
+    expect(port.getItem(RESTORE_KEY)).not.toMatch(/weather|daily_evidence/)
+    vi.mocked(apiRequest).mockResolvedValue(d)
+    const restored = await fetchRestoredCourse(state, false)
+    expect(restored.days[0].items[0].weather).toEqual(d.days[0].items[0].weather)
+    d.days[0].items[0].weather = []
+    vi.mocked(apiRequest).mockResolvedValue(d)
+    const missing = await fetchRestoredCourse(state, false)
+    expect(missing.days[0].items[0].weather).toEqual([])
+    expect(missing.accommodation).toEqual(restored.accommodation)
+    expect(missing.days[0].items[0].start_time).toEqual(restored.days[0].items[0].start_time)
+    expect(apiRequest).toHaveBeenNthCalledWith(2, '/courses/29', { method: 'GET', auth: false })
+  })
   it('remembers only id, inputs and same-tab course proof, never itinerary or member auth', () => {
     const port = memory()
     const course = { ...resultFromDetail(detail), claim_token: 'not-stored', claim_expires_at: '2099-01-01T00:00:00Z' }

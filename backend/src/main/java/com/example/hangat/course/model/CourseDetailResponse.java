@@ -98,7 +98,8 @@ public record CourseDetailResponse(
             String recommendationReason,
             /** 스왑으로 바뀐 일정에만 값이 있다. id를 함께 줘야 교체 전 장소로 되짚을 수 있다. */
             Long replacedFromPlaceId,
-            String replacedFromPlaceName
+            String replacedFromPlaceName,
+            List<CourseResponseDto.WeatherFactDto> weather
     ) {
     }
 }

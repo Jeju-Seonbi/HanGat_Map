@@ -68,6 +68,8 @@ class CourseQueryApiTest {
     @Autowired CongestionForecastRepository forecastRepository;
     @Autowired RegionRepository regionRepository;
     @Autowired PlaceCategoryRepository categoryRepository;
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    com.example.hangat.course.DbCourseWeatherFactsProvider weatherProvider;
 
     private PlaceCategory tourist;
     private DataSource source;
@@ -80,6 +82,9 @@ class CourseQueryApiTest {
 
     @BeforeEach
     void seed() {
+        org.mockito.Mockito.when(weatherProvider.loadDates(org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anySet()))
+                .thenReturn(com.example.hangat.course.weather.CourseWeatherFacts.empty());
         forecastRepository.deleteAll();
 
         east = regionRepository.findByCode("EAST")
@@ -117,6 +122,32 @@ class CourseQueryApiTest {
         저장코스.markSaved(주인, "동부 한산 코스");
 
         em.flush();
+    }
+
+    @Test
+    void detailReadsCurrentWeatherByStoredDatesAndRegionWithoutChangingSchedule() throws Exception {
+        var evidence = new com.example.hangat.course.facts.DailyWeatherEvidence("KMA_SHORT", "EAST", "REGION",
+                "DAILY", 발표버전, new BigDecimal("20"), new BigDecimal("27"));
+        var fact = new com.example.hangat.course.facts.WeatherFact(1L, 출발일, null, null, 30,
+                "NONE", "흐림", null, null, evidence);
+        var set = new com.example.hangat.course.facts.WeatherFactSet("east", "KMA", 57, 37,
+                출발일, java.time.LocalTime.MIDNIGHT, List.of(fact));
+        org.mockito.Mockito.when(weatherProvider.loadDates(임시코스.getStartDate(), 임시코스.getEndDate(), java.util.Set.of("EAST")))
+                .thenReturn(new com.example.hangat.course.weather.CourseWeatherFacts(java.util.Map.of(), List.of(set)));
+        mockMvc.perform(get("/courses/{id}", 임시코스.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.days[0].items[0].weather[0].precipitation_probability").value(30))
+                .andExpect(jsonPath("$.result.days[0].items[0].weather[0].daily_evidence.region_code").value("EAST"))
+                .andExpect(jsonPath("$.result.days[1].items[0].weather").isEmpty());
+        var before = queryService.detail(임시코스.getId(), null);
+        org.mockito.Mockito.when(weatherProvider.loadDates(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anySet()))
+                .thenThrow(new org.springframework.dao.DataAccessResourceFailureException("unavailable"));
+        var after = queryService.detail(임시코스.getId(), null);
+        assertThat(after.days().get(0).items().get(0).weather()).isEmpty();
+        assertThat(after.days().get(0).items().get(0).id()).isEqualTo(before.days().get(0).items().get(0).id());
+        assertThat(after.days().get(0).items().get(0).startTime()).isEqualTo(before.days().get(0).items().get(0).startTime());
+        assertThat(after.accommodation()).isEqualTo(before.accommodation());
+        mockMvc.perform(get("/courses/{id}", 임시코스.getId())).andExpect(status().isOk());
     }
 
     private User 회원가입(String email) {

@@ -267,10 +267,7 @@ public class CourseResponseAssembler {
         }
         return factSet.facts().stream()
                 .filter(fact -> persistedItem.getVisitDate().equals(fact.forecastDate()))
-                .map(fact -> new WeatherFactDto(
-                        fact.forecastDate(), fact.forecastTime(), fact.temperature(),
-                        fact.precipitationProbability(), fact.precipitationTypeCode(),
-                        fact.skyConditionCode(), fact.windSpeed(), fact.humidity()))
+                .map(WeatherFactDto::from)
                 .toList();
     }
 

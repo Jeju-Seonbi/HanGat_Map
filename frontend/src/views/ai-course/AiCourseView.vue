@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { congestionLabel } from '../../utils/congestion'
+import { dayWeatherLabels } from '../../services/course/dailyWeather'
 import { todayKst, addCalendarDays, formatCalendarDate } from '../../utils/format.js'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../app/stores/auth'
@@ -436,6 +437,7 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
         <main>
           <section v-for="day in result.days" :key="day.day_no" class="course-day">
             <header><b>DAY {{ day.day_no }}</b><span>{{ formatDate(day.visit_date) }}</span></header>
+            <p v-for="weather in dayWeatherLabels(day.items)" :key="weather" class="daily-weather">{{ weather }}</p>
             <p v-if="result.transport === 'RENTAL_CAR'" class="route-summary">
               총 이동 {{ routeSummary([routeForDay(day.day_no) ?? {}], routeLoading) }}
             </p>

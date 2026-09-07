@@ -75,6 +75,9 @@ export interface CourseItem {
   recommendation_reason?: string; replaced_from_place_id?: number; gap_before?: CourseGap
   weather_condition?: WeatherCondition; temperature?: number; precipitation_probability?: number
   weather_warning?: string; weather_influenced?: boolean
+  weather?: Array<{ forecast_date: string; forecast_time?: string | null; sky_condition_code?: string | null; precipitation_type_code?: string | null;
+    precipitation_probability?: number | null; daily_evidence?: { source_code: string; region_code: string;
+      spatial_scope: string; granularity: string; issued_at_utc: string; temp_min?: number | null; temp_max?: number | null } | null }> | null
   operating_hours_warning?: boolean; accommodation_influenced?: boolean; costs: CourseItemCost[]
 }
 export interface CourseDay {

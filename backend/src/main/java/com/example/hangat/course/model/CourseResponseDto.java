@@ -224,8 +224,18 @@ public record CourseResponseDto(
             String precipitationTypeCode,
             String skyConditionCode,
             BigDecimal windSpeed,
-            Integer humidity
+            Integer humidity,
+            com.example.hangat.course.facts.DailyWeatherEvidence dailyEvidence
     ) {
+        public WeatherFactDto(LocalDate date, LocalTime time, BigDecimal temperature, Integer probability,
+                String precipitation, String sky, BigDecimal wind, Integer humidity) {
+            this(date, time, temperature, probability, precipitation, sky, wind, humidity, null);
+        }
+        public static WeatherFactDto from(com.example.hangat.course.facts.WeatherFact fact) {
+            return new WeatherFactDto(fact.forecastDate(), fact.forecastTime(), fact.temperature(),
+                    fact.precipitationProbability(), fact.precipitationTypeCode(), fact.skyConditionCode(),
+                    fact.windSpeed(), fact.humidity(), fact.dailyEvidence());
+        }
     }
 
     public enum ItemSource {
