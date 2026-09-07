@@ -25,6 +25,9 @@ function contrastRatio(foreground, background) {
 
 let builtCss = ''
 
+// viteCsp.spec.js와 같은 이유로 훅 기본 10초에 기대지 않는다 - 여기도 실제 프로덕션 빌드를 돈다.
+const BUILD_TIMEOUT_MS = 60_000
+
 beforeAll(async () => {
   const result = await build({
     root: frontendRoot,
@@ -36,7 +39,7 @@ beforeAll(async () => {
     .filter(item => item.type === 'asset' && item.fileName.endsWith('.css'))
     .map(item => String(item.source))
     .join('\n')
-})
+}, BUILD_TIMEOUT_MS)
 
 describe('page CSS ownership', () => {
   it('keeps content and map rules inside their layout scopes in the production CSS', () => {
