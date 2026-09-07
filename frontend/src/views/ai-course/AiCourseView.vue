@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { congestionLabel } from '../../utils/congestion'
 import { todayKst, addCalendarDays, formatCalendarDate } from '../../utils/format.js'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../app/stores/auth'
 import CourseConditionForm from '../../components/course/CourseConditionForm.vue'
 import CourseItemCard from '../../components/course/CourseItemCard.vue'
@@ -14,6 +14,7 @@ import { courseGenerationErrorMessage, courseMockService } from '../../services/
 import { storePendingCourseClaim, takePendingCourseClaim } from '../../services/pendingCourseClaim'
 import { routeSummary, accessNotices } from '../../services/course/courseSummary'
 import { ApiError } from '../../api/errors.js'
+import { readRestore, rememberResult, rememberEditing, useResultRestore, validProof, singleFlight, useClaimRenewal, clearCourseProof } from '../../services/course/resultRestore'
 import type { AccommodationInput, AccommodationRecommendation, AlternativePlace, CarDayRoute, CarRouteLeg, CongestionRescheduleOption, CourseCondition, CourseItem, CourseResult } from '../../assets/types/course'
 
 const today = todayKst()
@@ -44,6 +45,7 @@ const rescheduleLoading = ref(false)
 const recommendedAccommodations = ref<AccommodationRecommendation[]>([])
 const accommodationLoading = ref(false)
 const accommodationError = ref('')
+const accommodationPickerOpen = ref(false)
 const routeLoading = ref(false)
 const routeError = ref('')
 const saveOpen = ref(false)
@@ -53,6 +55,75 @@ const saveLoading = ref(false)
 const toast = ref('')
 const auth = useAuthStore()
 const router = useRouter()
+const route = useRoute()
+const restoration = useResultRestore()
+const renewal = useClaimRenewal()
+const { notice: renewalNotice, renewing } = renewal
+const { restoring, restoreError, terminal } = restoration
+const restoringState = ref(readRestore())
+// Same public numeric identifier pattern used by existing course links; never a claim credential.
+if (typeof route.query.course === 'string' && /^[1-9]\d{0,14}$/.test(route.query.course)) {
+  const id = Number(route.query.course)
+  if (restoringState.value?.courseId !== id) restoringState.value = { mode: 'result', courseId: id, condition: restoringState.value?.condition ?? { ...condition } }
+}
+// The form clones its initial props: hydrate before its first render, not onMounted.
+if (restoringState.value) Object.assign(condition, restoringState.value.condition)
+const fetchRoute = singleFlight(courseMockService.getCarRoute)
+const now = ref(Date.now())
+let clock: ReturnType<typeof setInterval> | undefined
+let viewEpoch = 0
+let routeEpoch = 0
+const canModify = computed(() => !!result.value && !renewing.value
+  && (result.value.status === 'SAVED' ? auth.isAuthenticated : validProof(result.value, now.value)))
+// Swap remains governed by its existing independent API contract, not the claim lifetime.
+const canSwap = computed(() => !!result.value && result.value.swappable !== false)
+function rememberCurrent() {
+  if (result.value) {
+    rememberResult(result.value, condition)
+    restoringState.value = readRestore()
+  }
+}
+function editConditions() {
+  restoration.cancel(); renewal.cancel(); viewEpoch++; routeEpoch++
+  if (result.value) clearCourseProof(result.value)
+  restoringState.value = null; editing.value = true; loading.value = false; routeLoading.value = false
+  selected.value = undefined; rescheduleSelected.value = undefined; saveOpen.value = false
+  accommodationPickerOpen.value = false
+  rememberEditing(condition)
+  if (route.query.course != null) void router.replace({ path: route.path, query: { ...route.query, course: undefined } })
+}
+watch(condition, () => { if (editing.value && !restoring.value) rememberEditing(condition) }, { deep: true })
+async function restoreResult() {
+  if (!restoringState.value || restoringState.value.mode !== 'result') return
+  const ticket = viewEpoch
+  const loaded = await restoration.restore(restoringState.value, auth.isAuthenticated)
+  if (!loaded || ticket !== viewEpoch) return
+  result.value = loaded
+  if (loaded.status === 'READY' && validProof(restoringState.value)) {
+    loaded.claim_token = restoringState.value.claim_token
+    loaded.claim_expires_at = restoringState.value.claim_expires_at
+  }
+  Object.assign(condition, {
+    start_date: loaded.start_date, end_date: loaded.end_date, people: loaded.people,
+    budget_total: loaded.budget_total ?? condition.budget_total, transport: loaded.transport,
+    accommodation: loaded.accommodation ?? undefined,
+  })
+  editing.value = false; rememberCurrent()
+  void loadCarRoute()
+  if (loaded.status === 'READY' && validProof(loaded)) {
+    const id = loaded.id
+    const proof = await renewal.renew(id, loaded)
+    if (proof && ticket === viewEpoch && result.value?.id === id && result.value.status === 'READY' && !editing.value) {
+      clearCourseProof(result.value)
+      Object.assign(result.value, proof)
+      rememberCurrent()
+    }
+  }
+}
+onUnmounted(() => { restoration.cancel(); renewal.cancel(); viewEpoch++; routeEpoch++; if (clock) clearInterval(clock) })
+watch(now, () => {
+  if (result.value?.claim_token && !validProof(result.value, now.value)) { clearCourseProof(result.value); rememberCurrent() }
+})
 
 /* Navigate through the existing saved-course URL without sharing route geometry. */
 async function viewOnMap() {
@@ -66,14 +137,17 @@ async function viewOnMap() {
 
 async function loadCarRoute() {
   if (!result.value || result.value.transport !== 'RENTAL_CAR') return
+  const course = result.value
+  const ticket = ++routeEpoch
   routeLoading.value = true
   routeError.value = ''
   try {
-    result.value = { ...result.value, car_route: await courseMockService.getCarRoute(result.value) }
+    const route = await fetchRoute(JSON.stringify([course.id, course.days, course.accommodation]), course)
+    if (ticket === routeEpoch && result.value?.id === course.id && !editing.value) result.value = { ...result.value, car_route: route }
   } catch {
-    routeError.value = '이동 경로를 불러오지 못했어요.'
+    if (ticket === routeEpoch) routeError.value = '이동 경로를 불러오지 못했어요.'
   } finally {
-    routeLoading.value = false
+    if (ticket === routeEpoch) routeLoading.value = false
   }
 }
 
@@ -105,38 +179,45 @@ const estimatedCost = computed(() => {
 })
 
 async function generate(next: CourseCondition, regenerate = false) {
+  if (loading.value) return
+  restoration.cancel(); renewal.cancel(); routeEpoch++
+  const ticket = ++viewEpoch
   Object.assign(condition, JSON.parse(JSON.stringify(next)) as CourseCondition)
   loading.value = true
   error.value = ''
   try {
-    result.value = regenerate
+    const generated = regenerate
       ? await courseMockService.regenerateCourse(condition)
       : await courseMockService.generateCourse(condition)
+    if (ticket !== viewEpoch) return
+    result.value = generated
     recommendedAccommodations.value = []
     editing.value = false
+    rememberCurrent()
     void loadCarRoute()
     if (!condition.accommodation) {
       accommodationLoading.value = true
       accommodationError.value = ''
       void courseMockService.getRecommendedAccommodations(result.value).then((items) => {
-        recommendedAccommodations.value = items
+        if (ticket === viewEpoch) recommendedAccommodations.value = items
       }).catch(() => {
+        if (ticket !== viewEpoch) return
         recommendedAccommodations.value = []
         accommodationError.value = '주변 숙소를 불러오지 못했어요.'
       }).finally(() => {
-        accommodationLoading.value = false
+        if (ticket === viewEpoch) accommodationLoading.value = false
       })
     }
     requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'smooth' }))
   } catch (generationFailure) {
-    error.value = courseGenerationErrorMessage(generationFailure)
+    if (ticket === viewEpoch) error.value = courseGenerationErrorMessage(generationFailure)
   } finally {
-    loading.value = false
+    if (ticket === viewEpoch) loading.value = false
   }
 }
 
 async function selectRecommendedAccommodation(accommodation: AccommodationInput) {
-  if (!result.value) return
+  if (!result.value || !canModify.value) return
   loading.value = true
   error.value = ''
   try {
@@ -152,6 +233,8 @@ async function selectRecommendedAccommodation(accommodation: AccommodationInput)
     delete result.value.car_route
     void loadCarRoute()
     recommendedAccommodations.value = []
+    accommodationPickerOpen.value = false
+    rememberCurrent()
   } catch {
     error.value = '숙소를 저장하지 못했어요. 기존 일정은 그대로 유지됩니다.'
   } finally {
@@ -159,8 +242,25 @@ async function selectRecommendedAccommodation(accommodation: AccommodationInput)
   }
 }
 
+async function chooseAccommodation() {
+  if (!result.value || !canModify.value || accommodationLoading.value) return
+  const course = result.value
+  const ticket = viewEpoch
+  accommodationPickerOpen.value = true
+  accommodationLoading.value = true
+  accommodationError.value = ''
+  try {
+    const items = await courseMockService.getRecommendedAccommodations(course)
+    if (ticket === viewEpoch && result.value?.id === course.id) recommendedAccommodations.value = items
+  } catch {
+    if (ticket === viewEpoch) accommodationError.value = '주변 숙소를 불러오지 못했어요. 기존 숙소는 유지됩니다.'
+  } finally {
+    if (ticket === viewEpoch) accommodationLoading.value = false
+  }
+}
+
 async function openAlternatives(item: CourseItem) {
-  if (!result.value) return
+  if (!result.value || !canSwap.value) return
   selected.value = item
   alternatives.value = []
   altNotice.value = ''
@@ -178,7 +278,7 @@ async function openAlternatives(item: CourseItem) {
 }
 
 async function replace(alternative: AlternativePlace) {
-  if (!result.value || !selected.value || swapping.value) return   // 더블클릭이면 두 번째 스왑이 첫 교체를 '원래 장소'로 덮는다
+  if (!result.value || !selected.value || swapping.value || !canSwap.value) return
   const previousAverage = result.value.average_congestion_rate
   const replacementName = alternative.place_name
   swapping.value = true
@@ -193,6 +293,7 @@ async function replace(alternative: AlternativePlace) {
     swapping.value = false
   }
   selected.value = undefined
+  rememberCurrent()
   // 렌터카 경로는 교체된 장소 기준으로 다시 받는다 - 숙소 변경과 같은 처리
   void loadCarRoute()
   toast.value = previousAverage != null && result.value.average_congestion_rate != null
@@ -202,7 +303,7 @@ async function replace(alternative: AlternativePlace) {
 }
 
 async function openReschedule(item: CourseItem) {
-  if (!result.value) return
+  if (!result.value || !canSwap.value) return
   rescheduleSelected.value = item
   rescheduleOptions.value = []
   rescheduleLoading.value = true
@@ -223,6 +324,7 @@ async function reschedule(option: CongestionRescheduleOption) {
 }
 
 function openSave() {
+  if (!canModify.value) return
   title.value = result.value?.title || ''
   saveError.value = ''
   saveOpen.value = true
@@ -241,6 +343,8 @@ async function save() {
       return
     }
     result.value = await courseMockService.saveCourse(result.value, clean)
+    renewal.cancel(); clearCourseProof(result.value)
+    rememberCurrent()
     saveOpen.value = false
     toast.value = '코스를 저장했어요.'
   } catch (saveFailure) {
@@ -251,15 +355,18 @@ async function save() {
 }
 
 onMounted(async () => {
-  if (!auth.isAuthenticated) return
-  const pending = takePendingCourseClaim()
-  if (!pending) return
+  clock = setInterval(() => { now.value = Date.now() }, 1000)
+  const pending = auth.isAuthenticated ? takePendingCourseClaim() : null
+  if (!pending) { await restoreResult(); return }
 
   saveLoading.value = true
   try {
     result.value = await courseMockService.saveCourse(pending.course, pending.title)
+    renewal.cancel(); clearCourseProof(result.value)
     Object.assign(condition, pending.condition)
     editing.value = false
+    rememberCurrent()
+    void loadCarRoute()
     toast.value = '코스를 저장했어요.'
   } catch {
     error.value = '로그인 전 생성한 코스를 저장하지 못했어요. 다시 생성해 주세요.'
@@ -284,7 +391,12 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
       </div>
     </header>
 
-    <section v-if="loading" class="course-shell generation-state" aria-live="polite">
+    <section v-if="restoring || restoreError" class="course-shell generation-state" aria-live="polite">
+      <h2>{{ restoring ? '저장된 코스를 다시 불러오고 있어요.' : restoreError }}</h2>
+      <button v-if="!restoring && !terminal" class="btn" @click="restoreResult">다시 불러오기</button>
+      <button class="btn" @click="editConditions">새 코스 만들기</button>
+    </section>
+    <section v-else-if="loading" class="course-shell generation-state" aria-live="polite">
       <div class="generation-spinner" aria-hidden="true" />
       <span class="result-label">AI 코스 생성 중</span>
       <h2>여행 조건을 분석하고 있어요.</h2>
@@ -292,7 +404,7 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
     </section>
 
     <section v-else-if="editing" class="course-shell">
-      <CourseConditionForm :initial="condition" :loading="loading" @submit="generate" />
+      <CourseConditionForm :initial="condition" :loading="loading" @submit="generate" @draft="draft => Object.assign(condition, draft, { accommodation: draft.accommodation })" />
       <p v-if="error" class="course-error">{{ error }} <button class="text-link" @click="generate(condition)">다시 시도</button></p>
     </section>
 
@@ -313,10 +425,13 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
         </div>
         <div class="result-actions-row">
           <button class="btn" @click="viewOnMap">지도에서 보기</button>
-          <button class="btn result-save" :disabled="result.status === 'SAVED'" @click="openSave">{{ result.status === 'SAVED' ? '저장 완료' : '코스 저장' }}</button>
+          <button class="btn result-save" :disabled="result.status === 'SAVED' || !canModify" @click="openSave">{{ result.status === 'SAVED' ? '저장 완료' : '코스 저장' }}</button>
         </div>
       </header>
 
+      <p v-if="renewing" class="route-status">코스 저장 증명을 갱신하고 있어요.</p>
+      <p v-else-if="renewalNotice" class="route-status">{{ renewalNotice }}</p>
+      <p v-else-if="!canModify && result.status !== 'SAVED'" class="route-status">유효한 코스 저장 증명이 없어 저장·숙소 변경을 사용할 수 없어요. 일정 조회는 유지됩니다.</p>
       <div class="course-result-grid">
         <main>
           <section v-for="day in result.days" :key="day.day_no" class="course-day">
@@ -332,7 +447,7 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
                   <span>↓</span> 이동 약 {{ formatDuration(inboundRoute(day.day_no, item.id)?.duration_seconds) }} ·
                   {{ formatDistance(inboundRoute(day.day_no, item.id)?.distance_meters) }}
                 </div>
-                <CourseItemCard :item="item" :transport="result.transport" @alternative="openAlternatives" @reschedule="openReschedule" />
+                <CourseItemCard :item="item" :transport="result.transport" :readonly="!canSwap" @alternative="openAlternatives" @reschedule="openReschedule" />
               </template>
               <div v-if="result.accommodation" class="travel-line"><span>↓</span> 숙소 복귀 · {{ result.accommodation.place_name }}<template v-if="day.accommodation_return_travel_minutes"> · {{ transportLabel[result.transport] }} {{ day.accommodation_return_travel_minutes }}분 · {{ formatDistance(day.accommodation_return_distance_m) }}</template></div>
             </div>
@@ -356,8 +471,9 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
               <dt>숙소</dt><dd>{{ result.accommodation?.place_name ?? '미정' }}</dd>
             </dl>
           </section>
+          <button v-if="canModify" class="btn" :disabled="accommodationLoading" @click="chooseAccommodation">{{ result.accommodation ? '숙소 변경' : '숙소 찾아보기' }}</button>
           <AccommodationRecommendations
-            v-if="!result.accommodation"
+            v-if="canModify && (!result.accommodation || accommodationPickerOpen)"
             :items="recommendedAccommodations"
             :loading="accommodationLoading"
             :error="accommodationError"
@@ -367,8 +483,8 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
       </div>
 
       <div class="result-actions">
-        <button class="btn" @click="editing = true">조건 수정</button>
-        <button class="btn primary" :disabled="loading" @click="generate(condition, true)">다른 코스 만들기</button>
+        <button class="btn" @click="editConditions">조건 수정</button>
+        <button class="btn primary" :disabled="loading" @click="editConditions">다른 코스 만들기</button>
       </div>
     </section>
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import FixedSchedulePicker from './FixedSchedulePicker.vue'
 import AccommodationSearch from './AccommodationSearch.vue'
 import KakaoPlaceSearch from './KakaoPlaceSearch.vue'
@@ -7,10 +7,11 @@ import { findPreferenceConflict } from '../../services/placePreferenceService'
 import type { AccommodationInput, CourseCondition, CourseStyle, KakaoPlaceSearchResult, PlacePreference, PreferenceType, RegionRef, Transport } from '../../assets/types/course'
 
 const props = defineProps<{ initial: CourseCondition; loading: boolean }>()
-const emit = defineEmits<{ submit: [condition: CourseCondition] }>()
+const emit = defineEmits<{ submit: [condition: CourseCondition]; draft: [condition: CourseCondition] }>()
 
 const cloneCondition = (value: CourseCondition) => JSON.parse(JSON.stringify(value)) as CourseCondition
 const form = reactive<CourseCondition>(cloneCondition(props.initial))
+watch(form, () => emit('draft', cloneCondition(form)), { deep: true })
 const preferenceKey = (item: PlacePreference) => item.source_place_id ? `KAKAO:${item.source_place_id}` : `DB:${item.place_id ?? item.place_name}`
 const fixedSchedules = reactive(new Set(form.course_place_preferences.filter(item => item.fixed_date || item.fixed_time).map(preferenceKey)))
 

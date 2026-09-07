@@ -2,7 +2,7 @@
 import type { CourseItem, Transport } from '../../assets/types/course'
 import { levelLabel as level } from '../../data/data'
 
-const props = defineProps<{ item: CourseItem; transport: Transport }>()
+const props = defineProps<{ item: CourseItem; transport: Transport; readonly?: boolean }>()
 defineEmits<{ alternative: [CourseItem]; reschedule: [CourseItem] }>()
 
 const accuracy = { VERIFIED: '검증가', ESTIMATED: '추정', UNKNOWN: '가격 정보 없음' }
@@ -51,8 +51,8 @@ const costLabel = (cost: CourseItem['costs'][number]) => {
       <p v-if="item.weather_warning" class="fixed-warning">{{ item.weather_warning }}</p>
       <p v-if="item.operating_hours_warning" class="fixed-warning">선택한 방문 시간이 일반 운영시간과 다를 수 있어요.</p>
       <p v-if="item.item_source === 'USER_FIXED' && item.congestion_level === 'CROWDED'" class="fixed-warning">사용자 지정 일정이에요. 해당 시간대는 혼잡할 것으로 예상돼요.</p>
-      <button v-if="item.item_source !== 'USER_FIXED'" class="btn small alternative-button" @click="$emit('alternative', item)">{{ item.congestion_level === 'CROWDED' ? '한산한 대안 보기' : '다른 장소 보기' }}</button>
-      <button v-if="item.congestion_level === 'CROWDED'" class="btn small alternative-button reschedule-button" @click="$emit('reschedule', item)"><span class="reschedule-label-desktop">이 장소를 더 한산한 시간으로 옮기기</span><span class="reschedule-label-mobile">한산한 시간 찾기</span></button>
+      <button v-if="!readonly && item.item_source !== 'USER_FIXED'" class="btn small alternative-button" @click="$emit('alternative', item)">{{ item.congestion_level === 'CROWDED' ? '한산한 대안 보기' : '다른 장소 보기' }}</button>
+      <button v-if="!readonly && item.congestion_level === 'CROWDED'" class="btn small alternative-button reschedule-button" @click="$emit('reschedule', item)"><span class="reschedule-label-desktop">이 장소를 더 한산한 시간으로 옮기기</span><span class="reschedule-label-mobile">한산한 시간 찾기</span></button>
     </div>
   </article>
 </template>
