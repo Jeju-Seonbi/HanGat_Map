@@ -1,0 +1,27 @@
+# prod,batch 순서로 활성화한다. DB 스키마·마스터 초기화는 API 배포가 먼저 완료해야 한다.
+spring:
+  main:
+    web-application-type: none
+  flyway:
+    enabled: false
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  datasource:
+    hikari:
+      maximum-pool-size: 3
+      minimum-idle: 0
+
+hangat:
+  scheduling:
+    enabled: false
+
+weather:
+  ingest:
+    on-startup: false
+congestion:
+  ingest:
+    on-startup: false
+sample-courses:
+  generate-on-startup: false

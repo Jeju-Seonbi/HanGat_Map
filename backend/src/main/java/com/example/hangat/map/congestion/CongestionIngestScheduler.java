@@ -38,6 +38,9 @@ import java.util.Optional;
  * 구조는 {@code WeatherIngestScheduler}와 같다 - 둘을 나란히 읽으면 된다.
  */
 @Component
+@org.springframework.context.annotation.Profile("!batch")
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+        name = "hangat.scheduling.enabled", havingValue = "true", matchIfMissing = true)
 public class CongestionIngestScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(CongestionIngestScheduler.class);

@@ -78,6 +78,10 @@ public class WeatherIngestService {
     public record WeatherIngestResult(int regions, int shortRows, int midRows, int inserted, int updated,
                                       int shortFailures, boolean midFailed,
                                       String shortIssuedAtKst, String midIssuedAtKst) {
+        /** 빈 API 응답은 예외를 내지 않으므로 전 권역의 D+0~3 행 수까지 확인한다. */
+        public boolean hasCompleteShortTermCoverage() {
+            return regions > 0 && shortFailures == 0 && shortRows == regions * SHORT_TERM_DAYS;
+        }
     }
 
     public WeatherIngestResult ingest() {

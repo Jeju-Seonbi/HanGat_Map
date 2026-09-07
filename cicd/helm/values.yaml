@@ -17,6 +17,11 @@ backend:
   replicaCount: 1
   revisionHistoryLimit: 3
 
+  # CronJob 전환 전에는 기존 API 내부 예약 실행을 유지한다.
+  # 전환 시 false로 배포하고 구 Pod 종료를 확인한 뒤 배치를 수동 검증한다.
+  scheduling:
+    enabled: true
+
   image:
     repository: lumisia/hangat-backend
     tag: latest
@@ -151,6 +156,33 @@ backend:
 
   tmpSizeLimit: 256Mi
 
+
+# ────────────────────────── 단발성 백엔드 배치 ──────────────────────────
+
+batch:
+  # 첫 배포에서는 생성하지 않는다. true + suspend:true로 생성 후 수동 검증한다.
+  enabled: false
+  suspend: true
+  timeZone: Asia/Seoul
+  startingDeadlineSeconds: 1800
+  activeDeadlineSeconds: 3600
+  backoffLimit: 2
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1024Mi
+  jobs:
+    congestion:
+      schedule: "0 3 * * *"
+    weather:
+      schedule: "30 3,6 * * *"
+    sample-courses:
+      schedule: "0 4 * * *"
 
 # ────────────────────────── 프론트엔드 ──────────────────────────
 

@@ -4,6 +4,7 @@ import io.github.cdimascio.dotenv.Dotenv;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
+import org.springframework.core.env.Profiles;
 import org.springframework.scheduling.annotation.EnableAsync;
 
 @ConfigurationPropertiesScan
@@ -13,7 +14,12 @@ public class HangatApplication {
 
     public static void main(String[] args) {
         loadDotenv();
-        SpringApplication.run(HangatApplication.class, args);
+        var context = SpringApplication.run(HangatApplication.class, args);
+        // ApplicationRunner 실패는 main 밖으로 전파되어 비정상 종료한다.
+        // 정상 배치도 DB 풀·비동기 스레드를 정리한 뒤 JVM을 종료해야 Job이 완료된다.
+        if (context.getEnvironment().acceptsProfiles(Profiles.of("batch"))) {
+            System.exit(SpringApplication.exit(context));
+        }
     }
 
     /**
