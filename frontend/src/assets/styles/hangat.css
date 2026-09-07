@@ -44,9 +44,16 @@
 .pn{border-radius:50%;border:2px solid #fff;box-sizing:border-box;
   transition:transform .15s;cursor:pointer}
 .pn:hover{transform:scale(1.18)}
-.pn.calm{background:#00b894;box-shadow:0 0 0 4px rgba(0,184,148,.28),0 2px 6px rgba(0,0,0,.26)}
-.pn.mid{background:#ff9500;box-shadow:0 0 0 4px rgba(255,149,0,.28),0 2px 6px rgba(0,0,0,.26)}
-.pn.busy{background:#f4364c;box-shadow:0 0 0 5px rgba(244,54,76,.3),0 2px 7px rgba(0,0,0,.28)}
+/* 혼잡 단계 색의 단일 출처 - 핀·범례 점·상세 배지·주간 카드 막대가 전부 이 값을 쓴다.
+   글자용 토큰(--mid 등)은 흰 배경 대비를 위해 어둡게 만든 값이라 면(배경)에 쓰면 색이 달라 보인다 */
+.stage{--pin-calm:#00b894;--pin-mid:#ff9500;--pin-busy:#f4364c}
+.pn.calm{background:var(--pin-calm);box-shadow:0 0 0 4px rgba(0,184,148,.28),0 2px 6px rgba(0,0,0,.26)}
+.pn.mid{background:var(--pin-mid);box-shadow:0 0 0 4px rgba(255,149,0,.28),0 2px 6px rgba(0,0,0,.26)}
+.pn.busy{background:var(--pin-busy);box-shadow:0 0 0 5px rgba(244,54,76,.3),0 2px 7px rgba(0,0,0,.28)}
+.tier-bg.calm{background:var(--pin-calm)}
+.tier-bg.mid{background:var(--pin-mid)}
+.tier-bg.busy{background:var(--pin-busy)}
+.tier-bg.none{background:var(--none)}
 .pn.pick{box-shadow:0 0 0 7px rgba(0,184,163,.36),0 3px 11px rgba(0,0,0,.32)}
 .pn.dim{opacity:.42;box-shadow:none}
 .lb-t{background:var(--surf);border-radius:var(--rp);padding:3px 10px;font-size:11.5px;
