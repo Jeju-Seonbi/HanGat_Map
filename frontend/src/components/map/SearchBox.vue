@@ -151,7 +151,7 @@ defineExpose({ close })
           <path d="M15.4 15.4L21 21" /></svg>
       </div>
       <b>'{{ q.trim() }}'에 맞는 곳이 없어요</b>
-      <p>장소 이름, 종류, 메뉴로 찾을 수 있어요<br>켜진 업종 칩과 권역 안에서만 찾아요</p>
+      <p>장소 이름, 종류, 메뉴로 찾을 수 있어요</p>
       <div class="sb-eg">
         <button v-for="t in EXAMPLES" :key="t" @click="useExample(t)">{{ t }}</button>
       </div>
