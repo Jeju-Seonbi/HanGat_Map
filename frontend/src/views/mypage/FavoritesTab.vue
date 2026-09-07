@@ -160,7 +160,8 @@ const feeLabel = item => item.feeText ?? (item.free ? '무료' : '정보 없음'
           <li v-for="p in data.items" :key="p.placeId">
             <article class="card hoverable" :class="{ sel: p.placeId === selectedId }">
               <button class="hit" :aria-label="`${p.name} 상세 보기`" @click="select(p.placeId)">
-                <PlaceThumb :category="p.category" :name="p.name" size="100%" radius="12px" class="th" />
+                <!-- 대표사진 = 장소 상세에 뜨는 첫 사진(백엔드 imageUrl). 없거나 깨지면 색 썸네일 -->
+                <PlaceThumb :category="p.category" :name="p.name" :src="p.imageUrl" size="100%" radius="12px" class="th" />
                 <div class="cbody">
                   <div class="cname">{{ p.name }}</div>
                   <p class="note addr">{{ p.category }} · {{ p.addr }}</p>
