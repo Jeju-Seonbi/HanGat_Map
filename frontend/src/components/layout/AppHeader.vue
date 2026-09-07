@@ -16,6 +16,8 @@ import { listAlerts } from '../../api/mypage.js'
 import { LEFT_TABS, NAV_TABS, RIGHT_TABS, isTabActive } from '../../config/navTabs.js'
 import ThemeToggle from './ThemeToggle.vue'
 import NotificationBell from './NotificationBell.vue'
+import ProfileAvatar from '../common/ProfileAvatar.vue'
+import { publicProfileImageUrl } from '../../utils/profileImage.js'
 
 defineProps({ compact: { type: Boolean, default: false } })
 
@@ -44,6 +46,14 @@ watch(() => [auth.user?.userId, route.fullPath, ui.alertsVersion], loadUnread, {
 watch(() => route.fullPath, () => { mobileMenuOpen.value = false })
 
 const activeOf = computed(() => tab => isTabActive(tab, route.path))
+// 내 정보는 이전 프론트 호환용 /me 주소이므로 로그인한 사용자의 공개 경로로 변환한다.
+const profileImagePath = computed(() => {
+  const id = String(auth.user?.userId ?? '')
+  const path = auth.user?.profileImageUrl
+  if (!/^[1-9][0-9]*$/.test(id) || typeof path !== 'string') return null
+  const publicPath = path.replace(/^\/users\/me\/profile-image\//, `/users/${id}/profile-image/`)
+  return publicPath.startsWith(`/users/${id}/profile-image/`) && publicProfileImageUrl(publicPath) ? publicPath : null
+})
 
 function openMobilePreview () {
   const href = router.resolve(route.fullPath).href
@@ -117,7 +127,7 @@ async function onLogout () {
       <div class="account-actions">
         <template v-if="auth.isLoggedIn">
           <RouterLink to="/mypage/profile" class="who">
-            <span class="av">{{ auth.initial }}</span>
+            <ProfileAvatar :src="profileImagePath" :nickname="auth.displayName || auth.initial" />
             <b>{{ auth.displayName }}</b>
           </RouterLink>
           <button class="ghost" @click="onLogout">로그아웃</button>
@@ -256,12 +266,6 @@ async function onLogout () {
 }
 .who:hover { background: var(--line); }
 .who b { font-weight: 700; }
-.av {
-  width: 22px; height: 22px; border-radius: 50%;
-  background: var(--ac-bg); color: var(--ac-dk);
-  font-size: 10.5px; font-weight: 800;
-  display: flex; align-items: center; justify-content: center;
-}
 .ghost.lg { background: var(--ac-bg); color: var(--ac-dk); font-weight: 700; }
 .ghost.lg:hover { filter: brightness(.96); background: var(--ac-bg); }
 

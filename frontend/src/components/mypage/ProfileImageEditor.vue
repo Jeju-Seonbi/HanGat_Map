@@ -5,6 +5,7 @@ import { useAuthStore } from '../../stores/auth.js'
 import { readProfileImage } from '../../api/userAuth.js'
 import { useApiError } from '../../composables/useApiError.js'
 import BaseModal from '../common/BaseModal.vue'
+import ProfilePhotoCropper from './ProfilePhotoCropper.vue'
 
 const auth = useAuthStore()
 const toMessage = useApiError()
@@ -13,6 +14,8 @@ const changeButton = ref(null)
 const currentUrl = ref('')
 const previewUrl = ref('')
 const selected = ref(null)
+const cropper = ref(null)
+const cropReady = ref(false)
 const saving = ref(false)
 const loading = ref(false)
 const error = ref('')
@@ -26,6 +29,7 @@ function clearSelection () {
   revoke(previewUrl.value)
   previewUrl.value = ''
   selected.value = null
+  cropReady.value = false
 }
 function close () {
   if (saving.value) return
@@ -37,7 +41,8 @@ function close () {
 // 이 대화상자 안에서 Tab이 순환하도록 한다. 저장 중에는 바깥 버튼으로 포커스가 빠지지 않는다.
 function trapFocus (event) {
   if (event.key !== 'Tab') return
-  const buttons = [...event.currentTarget.querySelectorAll('button:not(:disabled)')]
+  const buttons = [...event.currentTarget.querySelectorAll('button:not(:disabled), input:not(:disabled), [tabindex="0"]')]
+  if (!buttons.length) return
   const index = buttons.indexOf(document.activeElement)
   event.preventDefault()
   const next = index < 0 ? (event.shiftKey ? buttons.length - 1 : 0)
@@ -89,11 +94,16 @@ function choose (event) {
 }
 
 async function save () {
-  if (!selected.value || saving.value) return
+  if (!selected.value || saving.value || !cropReady.value) return
+  const original = selected.value
+  const userId = auth.user?.userId
   saving.value = true
   error.value = ''
   try {
-    await auth.updateProfileImage(selected.value)
+    const cropped = await cropper.value.exportFile()
+    // 비동기 이미지 변환 중 로그아웃·사진 교체가 일어나면 다른 계정으로 보내지 않는다.
+    if (disposed || original !== selected.value || userId !== auth.user?.userId) return
+    await auth.updateProfileImage(cropped)
     if (disposed) return
     clearSelection()
     notice.value = '프로필 사진을 변경했어요.'
@@ -132,13 +142,14 @@ onBeforeUnmount(() => {
       <div v-if="selected" @keydown="trapFocus">
         <BaseModal title="프로필 사진 변경" labelled-by="profile-photo-title" @close="close">
           <div class="photo-preview">
-            <img :src="previewUrl" alt="선택한 프로필 사진 미리보기" @error="error = '사진을 읽지 못했어요. 다른 파일을 선택해 주세요.'; clearSelection()" />
-            <p class="photo-note">사진은 원형으로 표시돼요. JPG, PNG, WebP · 최대 5MB</p>
+            <ProfilePhotoCropper :key="previewUrl" ref="cropper" :src="previewUrl" :disabled="saving"
+              @ready="cropReady = $event" @error="error = $event" />
+            <p class="photo-note">원 안에 보이는 영역을 저장해요. JPG, PNG, WebP · 최대 5MB</p>
             <p class="photo-note">등록한 프로필 사진은 리뷰에서 다른 사람에게도 보여요.</p>
             <p v-if="error" class="photo-error" role="alert">{{ error }}</p>
             <div class="photo-actions">
               <button type="button" class="btn2" :disabled="saving" @click="close">취소</button>
-              <button type="button" class="btn2 primary" :disabled="saving" @click="save">{{ saving ? '저장 중…' : '사진 저장' }}</button>
+              <button type="button" class="btn2 primary" :disabled="saving || !cropReady" @click="save">{{ saving ? '저장 중…' : '사진 저장' }}</button>
             </div>
           </div>
         </BaseModal>
@@ -158,7 +169,6 @@ onBeforeUnmount(() => {
 .photo-note { margin: 0; color: var(--tx2); font-size: 12px; line-height: 1.6; text-align: center; }
 .photo-error { color: var(--danger, #b42318); font-size: 13px; line-height: 1.6; text-align: center; }
 .photo-preview { display: flex; flex-direction: column; align-items: center; gap: 20px; padding-top: 20px; }
-.photo-preview img { width: min(240px, 65vw); aspect-ratio: 1; border-radius: 50%; object-fit: cover; background: var(--surf); }
 .photo-actions { display: flex; justify-content: flex-end; gap: 12px; width: 100%; }
 @media (max-width: 900px) {
   .profile-photo { width: 140px; }
