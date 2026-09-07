@@ -1,10 +1,10 @@
 import { reactive, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { crowd, tier } from '@/utils/crowd'
-import { at, iso, ago, D0 } from '@/utils/date'
+import { iso, D0 } from '@/utils/date'
 import MapPlaceService, { LAZY_LAYERS } from '@/services/map/MapPlaceService'
 import CrowdService, { attachSeries } from '@/services/map/CrowdService'
-import WeatherService from '@/services/map/WeatherService'
+import WeatherService from '@/services/map/MapWeatherService'
 
 /* 지도 페이지 전역 상태.
    Pinia와 같은 모양(state + action)으로 두어 나중에 옮기기 쉽게 했다.
@@ -32,8 +32,10 @@ export const state = reactive({
      reactive 라서 loadPlaces() 가 채우면 화면이 알아서 다시 그려진다 */
   layers: { spot: [], food: [], dine: [], cafe: [], cvs: [], stay: [], mart: [] },
   loading: true,
-  /** false = 백엔드가 죽어 하드코딩 폴백으로 그리는 중 (화면에 표시할 근거) */
+  /** false = 장소 레이어를 하나도 못 받았다(백엔드 다운) - 화면이 '새로고침' 안내를 띄운다 */
   live: false,
+  /** 이번 진입에서 못 받아온 레이어 키 - 칩을 다시 켜면 그 레이어만 재시도한다 */
+  loadFailed: [],
   /** 예보 일수. 화면은 30일 캘린더인데 실측은 21~22일이라 남는 날은 '정보 없음' */
   forecastDays: 0,
 
@@ -46,7 +48,6 @@ export const state = reactive({
   F: { reg: '서부', bud: 150000, cat: '' },   // cat='' = 모든 종류
   L: { crowd: 1, spot: 1, food: 1, dine: 0, cafe: 0, cvs: 0, stay: 0, mart: 0, rain: 1 },
   favs: readLS('hangat_favs', []),
-  courses: readLS('hangat_courses', []),
   toast: '',
 })
 
@@ -73,19 +74,26 @@ export const CATEGORIES = computed(() => {
 })
 
 /**
- * 업종 칩 토글. 대용량 레이어(카페·편의점·마트 5,419곳)는 첫 진입에 싣지 않고
- * 처음 켜는 순간 받아온다 - 한 번 받으면 메모리에 남아 재요청이 없다.
+ * 업종 칩 토글. 비어 있는 레이어는 켜는 순간 받아온다 - 대용량(카페·편의점·마트 5,419곳)은
+ * 첫 진입에 싣지 않아서, 첫 진입 때 실패한 기본 레이어는 재시도가 되도록.
+ * 한 번 받으면 메모리에 남아 재요청이 없다. 실패하면 칩을 되돌린다 - 켜진 칩에 핀이 없는
+ * 상태 불일치를 남기지 않는다.
  */
 const layerLoading = new Set()
 export async function toggleLayer (key) {
   state.L[key] ^= 1
-  if (!state.L[key] || !state.live || !LAZY_LAYERS.includes(key)) return
+  if (!state.L[key]) return
   if (state.layers[key].length || layerLoading.has(key)) return
   layerLoading.add(key)
   const rows = await MapPlaceService.getLayer(key)
   layerLoading.delete(key)
-  if (rows) state.layers[key] = rows
-  else toast('데이터를 불러오지 못했어요 — 칩을 껐다 다시 켜 주세요')
+  if (rows) {
+    state.layers[key] = rows
+    state.loadFailed = state.loadFailed.filter(k => k !== key)
+  } else {
+    state.L[key] = 0
+    toast('데이터를 불러오지 못했어요 — 칩을 다시 켜면 재시도해요')
+  }
 }
 
 /**
@@ -96,20 +104,27 @@ export async function toggleLayer (key) {
 export async function findPlaceById (id) {
   for (const [k, rows] of Object.entries(state.layers)) {
     const p = rows.find(x => x.id === id)
-    if (p) { state.L[k] = 1; return p }
+    if (p) { state.L[k] = 1; return { place: p, error: false } }
   }
-  if (!state.live) return null
-  for (const k of LAZY_LAYERS) {
+  // 장소를 하나도 못 받은 상태(백엔드 다운)면 더 두드리지 않는다 -
+  // 레이어 7개를 5초씩 순서대로 재시도하면 안내가 40초 뒤에 뜬다(실측)
+  if (!state.live) return { place: null, error: true }
+  // 못 불러온 레이어(첫 진입 실패분 + 지연 레이어)를 하나씩 받아 보며 찾는다.
+  // 어느 하나라도 못 받았으면 error - "없는 장소"가 아니라 "못 불러온 것"으로 안내해야 한다
+  let error = false
+  const candidates = [...new Set([...state.loadFailed, ...LAZY_LAYERS])]
+  for (const k of candidates) {
     if (state.layers[k].length || layerLoading.has(k)) continue
     layerLoading.add(k)
     const rows = await MapPlaceService.getLayer(k)
     layerLoading.delete(k)
-    if (!rows) continue
+    if (!rows) { error = true; continue }
     state.layers[k] = rows
+    state.loadFailed = state.loadFailed.filter(x => x !== k)
     const p = rows.find(x => x.id === id)
-    if (p) { state.L[k] = 1; return p }
+    if (p) { state.L[k] = 1; return { place: p, error: false } }
   }
-  return null
+  return { place: null, error }
 }
 
 /**
@@ -118,10 +133,16 @@ export async function findPlaceById (id) {
  */
 export async function loadPlaces () {
   state.loading = true
-  const { live, layers } = await MapPlaceService.getAll()
+  const { live, layers, failed } = await MapPlaceService.getAll()
   state.layers = layers
   state.live = live
+  state.loadFailed = failed
   state.loading = false
+  // 전부 실패는 화면 배너(MapView)가 맡고, 일부 실패만 여기서 알린다
+  if (live && failed.length) {
+    const names = failed.map(k => LAYERS.find(l => l.k === k)?.t ?? k).join('·')
+    toast(`${names} 데이터를 불러오지 못했어요 — 칩을 다시 켜면 재시도해요`)
+  }
 
   const [forecast] = await Promise.all([CrowdService.getForecast(), WeatherService.load()])
   state.forecastDays = forecast.days
@@ -149,7 +170,6 @@ export function toast(msg) {
 }
 
 const currentUser = () => useAuthStore().user
-const currentUserName = user => user?.nickname || user?.name || '한갓이'
 
 /** MAP_009 찜 — 회원 전용 */
 export function toggleFav(name) {
@@ -161,29 +181,5 @@ export function toggleFav(name) {
   return true
 }
 export const isFav = name => state.favs.includes(name)
-
-/* ── 코스 저장 (MY_001) ── */
-/** 같은 조건·같은 경유지면 같은 코스로 보고 중복 저장을 막는다 */
-export const courseKey = c =>
-  `${state.F.reg}|${iso(at(state.di))}|${c.stops.map(s => (s.o ? s.o.n : s.f.n)).join('|')}`
-
-export const isCourseSaved = () =>
-  !!state.course && state.courses.some(c => c.key === courseKey(state.course))
-
-export function saveCourse(title) {
-  if (!currentUser()) { toast('코스 저장은 로그인이 필요해요'); return false }
-  const c = state.course
-  if (!c) return false
-  const key = courseKey(c)
-  if (state.courses.some(x => x.key === key)) { toast('이미 저장한 코스예요'); return false }
-  state.courses.unshift({
-    key, title, region: state.F.reg, startDate: iso(at(state.di)), days: c.days,
-    budget: c.bud, spent: c.spent, avg: c.avg, move: c.move,
-    stops: c.stops.map(s => (s.o ? s.o.n : s.f.n)), savedAt: iso(new Date()),
-  })
-  if (!writeLS('hangat_courses', state.courses)) toast('저장 공간이 가득 찼어요 (데모 한계)')
-  else toast(`'${title}' 저장했어요 · 마이페이지에서 볼 수 있어요`)
-  return true
-}
 
 export { D0 }

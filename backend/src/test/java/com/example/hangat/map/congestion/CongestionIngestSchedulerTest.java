@@ -1,6 +1,6 @@
-package com.example.hangat.map.service;
+package com.example.hangat.map.congestion;
 
-import com.example.hangat.map.service.CongestionIngestService.CongestionIngestResult;
+import com.example.hangat.map.congestion.CongestionIngestService.CongestionIngestResult;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.scheduling.support.CronExpression;

@@ -1,21 +1,13 @@
 <script setup>
 /* MAP_006 코스 표시 — 생성은 AI 코스 페이지 담당, 지도는 결과 표시와 일차 전환만 맡는다 */
-import { ref, computed, watch } from 'vue'
-import { state, isCourseSaved, saveCourse, toast } from '@/stores/mapStore'
-import { useAuthStore } from '@/stores/auth'
-import { swapStop } from '@/utils/course'
+import { computed } from 'vue'
+import { state } from '@/stores/mapStore'
 import { at, fmt } from '@/utils/date'
 import { tier } from '@/utils/crowd'
 import { won } from '@/utils/geo'
 import { wxOf, wxIcon } from '@/utils/weather'
 
 const emit = defineEmits(['close', 'open-place'])
-const auth = useAuthStore()
-
-const naming = ref(false)
-const draftTitle = ref('')
-const nameInput = ref(null)
-
 const course = computed(() => state.course)
 const byDay = computed(() => {
   const g = {}
@@ -37,29 +29,9 @@ const moveText = computed(() => {
 })
 const spentPct = computed(() => Math.min(100, course.value.spent / course.value.bud * 100))
 const rest = computed(() => course.value.bud - course.value.spent)
-const saved = computed(() => isCourseSaved())
 
 const dayWeather = d => wxOf(state.di + +d - 1)
 
-function swap(time, day) {
-  if (!swapStop(state.course, time, day, state.di)) return
-  state.course = { ...state.course }
-}
-
-function startSave() {
-  if (!auth.isLoggedIn) { toast('코스 저장은 로그인이 필요해요'); return }
-  draftTitle.value = `${state.F.reg} ${course.value.days - 1}박${course.value.days}일`
-  naming.value = true
-  requestAnimationFrame(() => nameInput.value?.select())
-}
-function confirmSave() {
-  const t = draftTitle.value.trim()
-  if (!t) { toast('코스 이름을 입력해 주세요'); return }
-  saveCourse(t)
-  naming.value = false
-}
-
-watch(() => state.course, () => { naming.value = false })
 </script>
 
 <template>
@@ -116,7 +88,6 @@ watch(() => state.course, () => { naming.value = false })
               <div class="hd">
                 <span class="rpin" :class="s.o ? tier(s.c) : 'food'"></span>
                 <span class="nm">{{ s.o ? s.o.n : s.f.n }}</span>
-                <button class="sw" @click.stop="swap(s.t, s.d)">다른 곳</button>
               </div>
               <div class="why">{{ s.o ? s.why : `${s.f.m} · ${s.why}` }}</div>
               <div v-if="s.cost" class="pr">{{ s.o ? '입장료' : '2인' }} {{ won(s.cost) }}원</div>
@@ -146,16 +117,6 @@ watch(() => state.course, () => { naming.value = false })
         </div>
       </template>
 
-      <!-- MY_001: 코스 저장 (회원 전용). 이미 저장된 코스(saved)에는 저장 버튼이 무의미하다 -->
-      <div v-if="course.source !== 'saved'">
-        <div v-if="naming" class="savebox">
-          <input ref="nameInput" v-model="draftTitle" maxlength="60" placeholder="코스 이름"
-            @keydown.enter="confirmSave" @keydown.esc="naming = false">
-          <button @click="confirmSave">저장</button>
-        </div>
-        <button v-else-if="saved" class="save done">✓ 마이페이지에 저장됨</button>
-        <button v-else class="save" @click="startSave">이 코스 저장하기</button>
-      </div>
     </div>
   </div>
 </template>

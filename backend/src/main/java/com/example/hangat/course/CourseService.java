@@ -26,7 +26,8 @@ import java.util.List;
 import java.util.Locale;
 
 @Service
-@RequiredArgsConstructor
+@lombok.extern.slf4j.Slf4j
+@RequiredArgsConstructor(onConstructor_ = @org.springframework.beans.factory.annotation.Autowired)
 public class CourseService {
 
     private final TourApiService tourApiService;
@@ -37,6 +38,15 @@ public class CourseService {
     private final CoursePersistenceService coursePersistenceService;
     private final CourseBudgetService courseBudgetService;
     private final CourseResponseAssembler courseResponseAssembler;
+    private final java.util.Optional<CourseDbCandidateService> dbCandidateService;
+
+    public CourseService(TourApiService tourApiService, CongestionApiService congestionApiService,
+            CourseCandidateShortlistService courseCandidateShortlistService, CourseAiPreparationService courseAiPreparationService,
+            CourseAiGenerationService courseAiGenerationService, CoursePersistenceService coursePersistenceService,
+            CourseBudgetService courseBudgetService, CourseResponseAssembler courseResponseAssembler) {
+        this(tourApiService, congestionApiService, courseCandidateShortlistService, courseAiPreparationService,
+                courseAiGenerationService, coursePersistenceService, courseBudgetService, courseResponseAssembler, java.util.Optional.empty());
+    }
 
     public CourseResponseDto createCourse(CourseRequestDto request) {
         PreparedCourse prepared = prepareCourse(request);
@@ -99,26 +109,44 @@ public class CourseService {
 
         validatePlacePreferences(coursePlacePreferences, startDate, endDate);
 
-        List<TourPlaceDto> tourPlaces = tourApiService.getTourPlaces();
+        List<CourseCandidateDto> stored = dbCandidateService.map(service -> service.find(request)).orElseGet(List::of);
+        int target = CourseCandidateShortlistService.targetSize(request);
+        log.info("AI_CANDIDATES db={} target={} ktoFallback={}", stored.size(), target, stored.size() < target);
+        if (stored.size() >= target) {
+            return prepareCandidates(request, stored);
+        }
+        List<TourPlaceDto> tourPlaces;
+        try {
+            tourPlaces = tourApiService.getTourPlaces();
+        } catch (KtoApiException exception) {
+            // Validator requires every requested day to be non-empty; never fabricate a missing candidate.
+            long minimum = java.time.temporal.ChronoUnit.DAYS.between(startDate, endDate) + 1;
+            if (exception.isTemporary() && stored.size() >= minimum) return prepareCandidates(request, stored);
+            throw exception;
+        }
 
-        if (tourPlaces.isEmpty()) {
+        if (tourPlaces.isEmpty() && stored.isEmpty()) {
+            if (dbCandidateService.isPresent()) throw new KtoApiException(true);
             throw new IllegalArgumentException("조회된 관광지가 없습니다.");
         }
 
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
-        List<CourseCandidateDto> courseCandidates = new ArrayList<>();
+        List<CourseCandidateDto> courseCandidates = new ArrayList<>(stored);
 
         List<CourseCandidateShortlistService.ShortlistedPlace> shortlistedPlaces =
                 courseCandidateShortlistService.select(request, tourPlaces);
 
-        if (shortlistedPlaces.isEmpty() && (coursePlacePreferences == null
+        if (shortlistedPlaces.isEmpty() && stored.isEmpty() && (coursePlacePreferences == null
                 || coursePlacePreferences.stream().noneMatch(p -> p != null
                 && p.getPreferenceType() == PreferenceType.WANT))) {
-            throw new IllegalArgumentException("선택한 권역에서 일정을 구성할 수 있는 장소가 없습니다.");
+            throw new KtoApiException(true);
         }
 
         for (CourseCandidateShortlistService.ShortlistedPlace shortlisted : shortlistedPlaces) {
             TourPlaceDto place = shortlisted.place();
+            if (stored.stream().anyMatch(c -> c.getStoredCandidate().identity().sourceCode().equals("KTO")
+                    && c.getStoredCandidate().identity().sourcePlaceId().equals(place.getContentId()))) continue;
+            if (!stored.isEmpty() && courseCandidates.size() >= target && shortlisted.preferenceType() != PreferenceType.WANT) continue;
             PreferenceType preferenceType = shortlisted.preferenceType();
             List<String> confirmedStyleHints = shortlisted.confirmedStyleHints();
             String signguCd;
@@ -172,6 +200,13 @@ public class CourseService {
             ));
         }
 
+        if (dbCandidateService.isPresent() && courseCandidates.size() < java.time.temporal.ChronoUnit.DAYS.between(startDate, endDate) + 1) {
+            throw new KtoApiException(true);
+        }
+        return prepareCandidates(request, courseCandidates);
+    }
+
+    private PreparedCourse prepareCandidates(CourseRequestDto request, List<CourseCandidateDto> courseCandidates) {
         CourseAiPreparationService.PreparedGeneration generation =
                 courseAiPreparationService.prepareGeneration(request, courseCandidates);
         return new PreparedCourse(

@@ -11,7 +11,7 @@ import com.example.hangat.course.ai.CourseAiInputDto.TourCategoryDto;
 import com.example.hangat.course.ai.CourseAiInputDto.TravelFactDto;
 import com.example.hangat.course.ai.CourseAiInputDto.TripConditionDto;
 import com.example.hangat.course.ai.CourseAiInputDto.UserPreferencesDto;
-import com.example.hangat.course.model.CongestionLevel;
+import com.example.hangat.map.model.enums.CongestionLevel;
 import com.example.hangat.course.model.GenerationReason;
 import com.example.hangat.course.model.PreferenceType;
 import com.example.hangat.course.model.Transport;

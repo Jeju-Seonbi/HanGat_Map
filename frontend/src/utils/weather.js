@@ -1,5 +1,5 @@
 import { at, iso } from './date'
-import WeatherService from '../services/map/WeatherService'
+import WeatherService from '../services/map/MapWeatherService'
 
 /* MAP-05: 기상청 실데이터(7일). 로드는 loadPlaces()가 한다 - 범위 밖·실패면 null */
 export function wxOf(i) {

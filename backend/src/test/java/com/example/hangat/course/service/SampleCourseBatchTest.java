@@ -356,7 +356,7 @@ class SampleCourseBatchTest {
                 .andExpect(jsonPath("$.result[0].title").value("남부 여유 2박 3일"))
                 .andExpect(jsonPath("$.result[0].duration_text").value("2박 3일"))
                 .andExpect(jsonPath("$.result[0].congestion_level").value("QUIET"))
-                .andExpect(jsonPath("$.result[0].congestion_label").value("여유"))
+                .andExpect(jsonPath("$.result[0].congestion_label").value("한산"))
                 .andExpect(jsonPath("$.result[0].people").value(2))
                 .andExpect(jsonPath("$.result[0].place_count").value(9))
                 .andExpect(jsonPath("$.result[0].estimated_cost_min").isEmpty())

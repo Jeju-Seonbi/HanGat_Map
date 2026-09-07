@@ -39,7 +39,7 @@ interface AiCourseItem {
   inbound_travel_minutes: number | null
 }
 
-/** 지도 코스 형식 - utils/course.js 샘플 생성기의 출력과 같은 모양 */
+/** 지도 코스 형식 - CoursePanel·MapCanvas 가 그리는 모양 (예전 샘플 생성기 utils/course.js 의 출력 형식을 계승) */
 export interface MapCourse {
   /** 'ai'·'saved' = 여행일 고정 코스. 날짜 슬라이더가 혼잡을 재계산하지 않는다 */
   source: 'ai' | 'saved'

@@ -1,6 +1,6 @@
-package com.example.hangat.map.service;
+package com.example.hangat.map.congestion;
 
-import com.example.hangat.map.service.CongestionIngestService.CongestionIngestResult;
+import com.example.hangat.map.congestion.CongestionIngestService.CongestionIngestResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;

@@ -22,6 +22,12 @@ import java.util.Map;
 /** 공통 예외 → BaseResponse 변환 (Nexus 컨벤션) */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    @ExceptionHandler(com.example.hangat.course.KtoApiException.class)
+    public ResponseEntity<BaseResponse<Object>> handleKto(com.example.hangat.course.KtoApiException e) {
+        return ResponseEntity.status(e.isTemporary() ? HttpStatus.SERVICE_UNAVAILABLE : HttpStatus.BAD_GATEWAY)
+                .body(new BaseResponse<>(false, BaseResponseStatus.EXTERNAL_API_ERROR.getCode(),
+                        com.example.hangat.course.KtoApiException.USER_MESSAGE, null));
+    }
 
     /** @Valid 검증 실패 → 필드별 메시지를 result에 담아 400 */
     @ExceptionHandler(MethodArgumentNotValidException.class)

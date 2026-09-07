@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 
 import { MAP_LABEL_MAX_LEVEL, POI_MARKER_CLASS, shouldShowMapLabels } from './mapPresentation'
 
-const mapCss = readFileSync(new URL('../../assets/hangat.css', import.meta.url), 'utf8')
+const mapCss = readFileSync(new URL('../../assets/styles/hangat.css', import.meta.url), 'utf8')
 const sharedCss = readFileSync(new URL('../../assets/styles.css', import.meta.url), 'utf8')
 const filterPanelSource = readFileSync(new URL('./FilterPanel.vue', import.meta.url), 'utf8')
 const kakaoMapSource = readFileSync(new URL('./KakaoMap.vue', import.meta.url), 'utf8')

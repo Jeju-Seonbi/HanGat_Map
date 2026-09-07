@@ -9,7 +9,6 @@ import CoursePanel from '@/components/map/CoursePanel.vue'
 import PhotoLightbox from '@/components/map/PhotoLightbox.vue'
 import { state, toast, loadPlaces, findPlaceById } from '@/stores/mapStore'
 
-import { refreshCourse, courseFromNames } from '@/utils/course'
 import { at, iso, D0, FORECAST_DAYS } from '@/utils/date'
 import { useRouter, useRoute } from 'vue-router'
 import { popAiCourse, toMapCourse, toMapCourseFromDetail } from '@/services/map/CourseBridge'
@@ -90,16 +89,6 @@ async function loadSavedCourse(id) {
   return true
 }
 
-/* COM_002: 날짜는 순번이 아니라 실제 날짜로 저장한다 —
-   기준일(오늘)이 매일 바뀌므로 순번은 링크마다 뜻이 달라진다 */
-function syncURL() {
-  if (!state.course) return
-  history.replaceState(null, '', '?' + new URLSearchParams({
-    d: iso(at(state.di)), r: state.F.reg, b: state.course.bud,
-    s: state.course.stops.map(x => (x.o ? x.o.n : x.f.n)).join('|'),
-  }))
-}
-
 function loadFromURL() {
   const p = new URLSearchParams(location.search)
   const dp = p.get('d')
@@ -111,46 +100,52 @@ function loadFromURL() {
   const r = p.get('r')
   if (r && ['전체', '동부', '서부', '남부', '북부'].includes(r)) state.F.reg = r
   if (p.get('b')) state.F.bud = +p.get('b') || state.F.bud
-  const names = (p.get('s') || '').split('|').filter(Boolean)
-  if (!names.length) return
-  const c = courseFromNames(names, { region: state.F.reg, budget: state.F.bud, dayIndex: state.di })
-  if (c) { state.course = c; state.courseDay = 'all' }
 }
-
-/* 날짜가 바뀌면 코스의 혼잡도도 다시 계산한다 */
-watch(() => state.di, () => {
-  // AI·저장 코스의 혼잡은 여행일 기준 값이다 - 슬라이더로 재계산하면 거짓이 된다
-  if (state.course?.source) return
-  if (state.course) {
-    refreshCourse(state.course, { region: state.F.reg, dayIndex: state.di })
-    state.course = { ...state.course }
-  }
-})
 
 /** ?place=(공유 링크·마이페이지) 와 ?placeId=(장소 상세 페이지 링크) 둘 다 받는다 */
 async function openPlaceFromURL() {
   const raw = route.query.place ?? route.query.placeId
   if (!/^\d+$/.test(raw ?? '')) return
-  const p = await findPlaceById(+raw)
-  if (p) openPlace(p)
+  const { place, error } = await findPlaceById(+raw)
+  if (place) openPlace(place)
+  else if (error) toast('장소 정보를 불러오지 못했어요 — 새로고침해 주세요')
   else toast('공유받은 장소를 찾지 못했어요')
 }
 
 onMounted(async () => {
   // 장소·예보를 먼저 받아야 URL의 ?place= 로 들어온 장소를 찾을 수 있다
   await loadPlaces()
+  // 링크 복원은 단계마다 따로 감싼다 - 코스가 깨져도 장소 딥링크까지 조용히 죽지 않게
   let courseDrawn = false
-  if (route.query.course === 'ai') courseDrawn = loadAiCourse()
-  if (!courseDrawn && /^\d+$/.test(route.query.course ?? '')) courseDrawn = await loadSavedCourse(route.query.course)
+  try {
+    if (route.query.course === 'ai') courseDrawn = loadAiCourse()
+    if (!courseDrawn && /^\d+$/.test(route.query.course ?? '')) courseDrawn = await loadSavedCourse(route.query.course)
+  } catch (e) {
+    console.error('코스 링크 복원 실패', e)
+    toast('링크의 코스를 그리지 못했어요')
+  }
   if (!courseDrawn) loadFromURL()
   // 코스와 장소가 함께 온 링크도 있다(코스를 보다 장소를 열고 공유) - 코스를 그린 뒤 장소를 연다
-  await openPlaceFromURL()
+  try {
+    await openPlaceFromURL()
+  } catch (e) {
+    console.error('장소 링크 복원 실패', e)
+    toast('공유받은 장소를 여는 중 문제가 생겼어요')
+  }
 })
+
+const reload = () => location.reload()
 </script>
 
 <template>
   <div class="stage" :class="{ both: openCount === 2, 'sheet-open': openCount > 0 }">
     <MapCanvas @select="openPlace" @blank-click="closeDetail" />
+
+    <!-- 장소를 하나도 못 받은 상태(백엔드 다운). 가짜 데이터로 채우지 않고 사실대로 알린다 -->
+    <div v-if="!state.loading && !state.live" class="map-offline" role="alert">
+      장소 데이터를 불러오지 못했어요
+      <button type="button" @click="reload">새로고침</button>
+    </div>
 
     <FilterPanel :mobile-suppressed="openCount > 0"
       @open-place="openPlace" @toggle-course="toggleCourse" />

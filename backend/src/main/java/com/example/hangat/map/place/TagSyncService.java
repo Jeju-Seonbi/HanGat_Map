@@ -1,4 +1,4 @@
-package com.example.hangat.map.service;
+package com.example.hangat.map.place;
 
 import com.example.hangat.map.client.PublicApiClient;
 import com.example.hangat.map.model.dto.LclsSystmItem;
