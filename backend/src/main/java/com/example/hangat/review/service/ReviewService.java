@@ -59,7 +59,7 @@ public class ReviewService {
         Page<Review> reviews = reviewRepository.findByPlaceIdAndStatusOrderByCreatedAtDesc(
                 placeId, ReviewStatus.ACTIVE, PageRequest.of(page, size));
 
-        // 페이지(기본 6건)의 사진을 쿼리 한 번으로 - 후기마다 조회하면 N+1
+        // 페이지(기본 10건, 최대 20건)의 사진을 쿼리 한 번으로 - 후기마다 조회하면 N+1
         List<Long> ids = reviews.getContent().stream().map(Review::getId).toList();
         Map<Long, List<ReviewImage>> imagesByReview = ids.isEmpty() ? Map.of()
                 : imageRepository.findByReviewIdInOrderBySortOrder(ids).stream()
