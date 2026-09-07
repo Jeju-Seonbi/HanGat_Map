@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -70,6 +71,21 @@ public interface CongestionForecastRepository extends JpaRepository<CongestionFo
             order by f.place.id, f.forecastAt
             """)
     List<Object[]> findVersionRows(@Param("baseAt") LocalDateTime baseAt);
+
+    /**
+     * 여러 장소의 특정 날짜 집중률 - 찜 목록(favorite)의 '오늘 혼잡'. (placeId, rate).
+     * baseAt 을 함께 고정해야 발표 버전이 섞이지 않는다(클래스 주석). 그 날짜 예보가 없는 장소는 행이 없다.
+     */
+    @Query("""
+            select f.place.id, f.rate
+            from CongestionForecast f
+            where f.baseAt = :baseAt
+              and f.forecastAt = :forecastAt
+              and f.place.id in :placeIds
+            """)
+    List<Object[]> findRatesOn(@Param("baseAt") LocalDateTime baseAt,
+                               @Param("forecastAt") LocalDateTime forecastAt,
+                               @Param("placeIds") Collection<Long> placeIds);
 
     /**
      * 같은 발표 버전만 지운다. 재적재용이다.

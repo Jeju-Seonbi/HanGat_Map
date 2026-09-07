@@ -206,7 +206,7 @@ async function shareNative() {
           <div class="sub">{{ s.c }} · {{ s.r }}</div>
         </div>
         <!-- MAP_009 찜 -->
-        <button class="fav" :class="{ on: isFav(s.n) }" aria-label="찜하기" @click="toggleFav(s.n)">♥</button>
+        <button class="fav" :class="{ on: isFav(s) }" :aria-pressed="isFav(s)" aria-label="찜하기" @click="toggleFav(s)">♥</button>
         <div class="share-wrap">
           <button class="share" :aria-expanded="shareOpen" @click="toggleShare">공유하기</button>
           <div v-if="shareOpen" class="share-sheet">

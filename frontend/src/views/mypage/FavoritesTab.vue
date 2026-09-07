@@ -15,11 +15,11 @@ import SortSeg from '../../components/mypage/SortSeg.vue'
 import PlaceThumb from '../../components/mypage/PlaceThumb.vue'
 import StarRating from '../../components/mypage/StarRating.vue'
 import MapRenderer from '../../components/map/MapRenderer.vue'
-import { listFavorites, removeFavorite, FAVORITE_SORTS } from '../../api/mypage.js'
+/* 2026-09-07 백엔드 찜 API 연결(지도 담당 이후경) - 목업(api/mypage.js) 대신 api/favorites.js 를 읽는다. 항목 모양은 같다 */
+import { listFavorites, removeFavorite, FAVORITE_SORTS } from '../../api/favorites.js'
 import { operationStatus } from '../../data/places.js'
 import { useUiStore } from '../../stores/ui.js'
 import { useApiError } from '../../composables/useApiError.js'
-import { won } from '../../utils/format.js'
 import { toKakaoFavoritePlaces } from './favoriteMapModel'
 
 const ui = useUiStore()
@@ -78,7 +78,12 @@ async function unfavorite (item) {
   }
 }
 
-const status = item => operationStatus(item)
+/* 실데이터 운영시간은 자유 텍스트다 - "09:00~18:00" 꼴(hours)만 운영 중/종료를 판정하고 나머지는 원문을 그대로 보여준다 */
+const status = item => item.hours
+  ? operationStatus(item)
+  : { code: item.hoursText ? 'TEXT' : 'UNKNOWN', label: item.hoursText ?? '운영시간 정보 없음' }
+/* 입장료는 원문+무료 여부로 온다 - 모르면 '무료'가 아니라 '정보 없음' */
+const feeLabel = item => item.feeText ?? (item.free ? '무료' : '정보 없음')
 </script>
 
 <template>
@@ -127,12 +132,12 @@ const status = item => operationStatus(item)
             </div>
             <div class="dbadges">
               <CrowdBadge :value="selected.crowd" show-value />
-              <WeatherBadge :kind="selected.weather.kind" :t="selected.weather.t" />
+              <WeatherBadge v-if="selected.weather" :kind="selected.weather.kind" :t="selected.weather.t" />
             </div>
             <dl class="dmeta">
               <div><dt>주소</dt><dd>{{ selected.addr }}</dd></div>
               <div><dt>운영</dt><dd>{{ status(selected).label }}</dd></div>
-              <div><dt>입장료</dt><dd>{{ selected.fee ? `${won(selected.fee)}원` : '무료' }}</dd></div>
+              <div><dt>입장료</dt><dd>{{ feeLabel(selected) }}</dd></div>
               <div><dt>편의</dt>
                 <dd>
                   <span class="am" :class="{ no: !selected.park }">주차</span>
@@ -155,7 +160,8 @@ const status = item => operationStatus(item)
           <li v-for="p in data.items" :key="p.placeId">
             <article class="card hoverable" :class="{ sel: p.placeId === selectedId }">
               <button class="hit" :aria-label="`${p.name} 상세 보기`" @click="select(p.placeId)">
-                <PlaceThumb :category="p.category" :name="p.name" size="100%" radius="12px" class="th" />
+                <!-- 대표사진 = 장소 상세에 뜨는 첫 사진(백엔드 imageUrl). 없거나 깨지면 색 썸네일 -->
+                <PlaceThumb :category="p.category" :name="p.name" :src="p.imageUrl" size="100%" radius="12px" class="th" />
                 <div class="cbody">
                   <div class="cname">{{ p.name }}</div>
                   <p class="note addr">{{ p.category }} · {{ p.addr }}</p>
@@ -170,7 +176,7 @@ const status = item => operationStatus(item)
                   </div>
                   <div class="cbadges">
                     <CrowdBadge :value="p.crowd" />
-                    <WeatherBadge :kind="p.weather.kind" :t="p.weather.t" :size="15" />
+                    <WeatherBadge v-if="p.weather" :kind="p.weather.kind" :t="p.weather.t" :size="15" />
                   </div>
                 </div>
               </button>
