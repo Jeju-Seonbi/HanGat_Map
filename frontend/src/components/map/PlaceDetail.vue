@@ -250,7 +250,7 @@ async function shareNative() {
           &nbsp;관광공사 혼잡 예측 대상이 아니라 이 장소는 예보가 없어요.
         </template>
         <template v-else>
-          <span class="bdg" :style="{ background: `var(--${t})`, color: '#fff' }">{{ tierKo(c) }}</span>
+          <span class="bdg tier-bg" :class="t" style="color:#fff">{{ tierKo(c) }}</span>
           &nbsp;{{ fmtK(at(state.di)) }} · 이곳의 30일 예보 중에선
           <template v-if="rankText"><b>{{ rankText }}</b>이에요.</template>
           <template v-else>중간쯤이에요.</template>
@@ -278,7 +278,7 @@ async function shareNative() {
             </template>
           </div>
           <!-- 혼잡 바는 핀과 같은 면색(-st) - 글자용 진한 톤을 면에 쓰면 핀과 색이 어긋난다 -->
-          <div class="wc" :style="{ background: `var(--${w.t}-st, var(--${w.t}))` }" :title="w.ko"></div>
+          <div class="wc tier-bg" :class="w.t" :title="w.ko"></div>
         </div>
       </div>
       <div v-if="weatherGap && wxUntil" class="wx-note">날씨는 {{ wxUntil }}까지 제공돼요 · 혼잡은 30일 표시</div>
