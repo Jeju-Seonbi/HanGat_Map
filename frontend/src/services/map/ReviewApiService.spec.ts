@@ -18,7 +18,7 @@ const REAL_PAGE = {
     id: 1, userId: 1, nickname: '여행자', profileImageUrl: '/users/1/profile-image/12345678-1234-1234-1234-123456789abc.png', rating: 5, congestionReport: 'QUIET',
     content: 'good place', imageUrls: [], createdAt: '2026-08-31T01:37:06.580069'
   }],
-  number: 0, size: 6, totalPages: 1, totalElements: 1
+  number: 0, size: 10, totalPages: 1, totalElements: 1
 }
 
 function mockFetch (handler: (url: string, init?: RequestInit) => unknown) {
@@ -42,7 +42,7 @@ describe('후기 목록', () => {
     expect(page.content[0].profileImageUrl).toBe('/users/1/profile-image/12345678-1234-1234-1234-123456789abc.png')
     expect(page.totalElements).toBe(1)
     const call = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]
-    expect(call[0]).toContain('/places/24/reviews?page=0&size=6')
+    expect(call[0]).toContain('/places/24/reviews?page=0&size=10')
   })
 })
 
