@@ -148,7 +148,8 @@ public class SecurityConfig {
                 ).permitAll()
                 .requestMatchers(
                         HttpMethod.POST,
-                        "/courses/*/accommodations/search"
+                        "/courses/*/accommodations/search",
+                        "/courses/*/claim/renew"
                 ).permitAll()
                 // READY 숙소 변경은 서비스가 course-scoped claim proof를 검증한다.
                 // SAVED 코스는 같은 공개 경로에서도 로그인 owner만 통과한다.
