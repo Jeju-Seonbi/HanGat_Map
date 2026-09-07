@@ -156,6 +156,16 @@ pipeline {
                           --values cicd/helm/values-oci-k3s.yaml \
                           --values "$HELM_VALUES_PRIVATE" \
                           > /dev/null
+
+                        # 비활성 기간에도 CronJob 템플릿의 문법 오류를 검사한다.
+                        helm template "$HELM_RELEASE" cicd/helm \
+                          --namespace "$K8S_NAMESPACE" \
+                          --values cicd/helm/values.yaml \
+                          --values cicd/helm/values-oci-k3s.yaml \
+                          --values "$HELM_VALUES_PRIVATE" \
+                          --set batch.enabled=true \
+                          --set batch.suspend=true \
+                          > /dev/null
                     '''
                 }
             }
