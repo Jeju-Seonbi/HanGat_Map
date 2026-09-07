@@ -57,6 +57,9 @@ public interface CongestionForecastRepository extends JpaRepository<CongestionFo
     /** 같은 버전을 다시 적재하려는지 판정한다 - 배치를 하루에 두 번 돌렸을 때. */
     boolean existsByBaseAt(LocalDateTime baseAt);
 
+    /** 단발성 코스 배치가 필요한 날짜의 당일 적재 여부를 확인한다. */
+    boolean existsByBaseAtAndForecastAt(LocalDateTime baseAt, LocalDateTime forecastAt);
+
     /**
      * 화면용 전체 조회 - 한 발표 버전의 (place_id, forecast_at, rate) 전부.
      *

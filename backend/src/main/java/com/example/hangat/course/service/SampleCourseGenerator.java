@@ -103,6 +103,11 @@ public class SampleCourseGenerator {
     /** 한 번의 배치 결과 - 로그·수동 실행 응답용. */
     public record RunSummary(LocalDate startDate, List<String> readyRegions, List<String> failedRegions,
                              String skippedReason) {
+        /** 후보 권역의 중간 실패가 있어도 대체 권역으로 목표 수를 채웠으면 성공이다. */
+        public boolean isComplete() {
+            return skippedReason == null && readyRegions.size() >= REGIONS_TO_PICK;
+        }
+
         static RunSummary skipped(LocalDate date, String reason) {
             return new RunSummary(date, List.of(), List.of(), reason);
         }
