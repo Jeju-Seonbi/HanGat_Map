@@ -378,7 +378,7 @@ public class CourseAiInputAssembler {
                 fact.precipitationProbability(),
                 fact.precipitationTypeCode(),
                 fact.skyConditionCode(),
-                fact.windSpeed());
+                fact.windSpeed(), fact.dailyEvidence());
     }
 
     private CourseWeatherDto toLegacyWeatherFact(WeatherFact fact) {

@@ -269,8 +269,13 @@ public record CourseAiInputDto(
             Integer precipitationProbability,
             String precipitationTypeCode,
             String skyConditionCode,
-            BigDecimal windSpeed
+            BigDecimal windSpeed,
+            com.example.hangat.course.facts.DailyWeatherEvidence dailyEvidence
     ) {
+        public WeatherAiFactDto(LocalDate date, LocalTime time, BigDecimal temperature, Integer probability,
+                String precipitation, String sky, BigDecimal wind) {
+            this(date, time, temperature, probability, precipitation, sky, wind, null);
+        }
     }
 
     @JsonInclude(JsonInclude.Include.ALWAYS)

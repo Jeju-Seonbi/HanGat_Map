@@ -129,7 +129,7 @@ export function resultFromDetail(detail: CourseDetail, proof?: RestoreState): Co
       item_source: item.item_source, inbound_distance_m: item.inbound_distance_m, inbound_travel_minutes: item.inbound_travel_minutes,
       congestion_rate: item.congestion_rate, congestion_level: item.congestion_level,
       recommendation_reason: item.recommendation_reason, recommendation_reason_code: item.recommendation_reason_code,
-      replaced_from_place_id: item.replaced_from_place_id, costs: [],
+      replaced_from_place_id: item.replaced_from_place_id, weather: item.weather, costs: [],
     })) })),
   }
 }
