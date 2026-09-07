@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -139,6 +140,19 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
               and pt.sourceType = com.example.hangat.map.model.enums.TagSourceType.API
             """)
     List<Object[]> findApiTagOf(@Param("placeId") Long placeId);
+
+    /**
+     * 여러 장소의 세부분류를 한 번에 - 찜 목록(favorite)이 장소마다 {@link #findApiTagOf}를 부르면 N+1이라 묶어 읽는다.
+     * (placeId, tagName). 장소당 한 건이 전제지만 둘이어도 호출부가 첫 건을 쓴다.
+     */
+    @Query("""
+            select pt.place.id, t.name
+            from PlaceTag pt
+              join pt.tag t
+            where pt.place.id in :placeIds
+              and pt.sourceType = com.example.hangat.map.model.enums.TagSourceType.API
+            """)
+    List<Object[]> findApiTagNamesOf(@Param("placeIds") Collection<Long> placeIds);
 
     /**
      * 상세(detailIntro2)를 아직 안 받은 장소. 쿼터가 하루 1,000콜이라 나눠 도는데,
