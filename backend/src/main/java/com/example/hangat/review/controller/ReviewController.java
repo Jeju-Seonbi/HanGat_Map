@@ -10,8 +10,11 @@ import com.example.hangat.review.service.ReviewPhotoService;
 import com.example.hangat.review.service.ReviewService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -30,20 +33,31 @@ import java.util.List;
 @Tag(name = "후기", description = "장소 방문 후기")
 @RestController
 @RequiredArgsConstructor
+@Validated
 public class ReviewController {
+
+    /** 한 요청에 내어 주는 후기 상한. 화면은 10개씩 받으므로 정상 사용엔 영향이 없고, size=100000 같은 남용만 막는다. */
+    static final int MAX_PAGE_SIZE = 20;
+    /** size 를 안 보냈을 때. 지도 화면의 "더 보기" 단위(frontend ReviewApiService.PAGE_SIZE)와 같게 둔다. */
+    static final String DEFAULT_PAGE_SIZE = "10";
 
     private final ReviewService reviewService;
     private final ReviewPhotoService photoService;
 
     // ────────────────────────── 공개 후기 목록 ──────────────────────────
 
-    /** 장소별 공개 후기를 페이지 단위로 반환한다. */
-    @Operation(summary = "장소별 후기 목록", description = "삭제된 후기는 빠지고 최신순. 없는 장소면 PLACE_NOT_FOUND(3201).")
+    /**
+     * 장소별 공개 후기를 페이지 단위로 반환한다.
+     * page·size 범위 검증은 {@code @Validated}가 컨트롤러 진입 전에 하고, 위반은 GlobalExceptionHandler가 400 봉투로 바꾼다 -
+     * 검증이 없으면 size=0·page=-1 이 PageRequest 예외로 봉투 밖 500 이 됐다.
+     */
+    @Operation(summary = "장소별 후기 목록",
+            description = "삭제된 후기는 빠지고 최신순. 없는 장소면 PLACE_NOT_FOUND(3201). page는 0 이상, size는 1~20(기본 10, 넘으면 3000/400).")
     @GetMapping("/places/{placeId}/reviews")
     public BaseResponse<PageResponse<ReviewResponse>> getReviews(
             @PathVariable("placeId") Long placeId,
-            @RequestParam(name = "page", defaultValue = "0") int page,
-            @RequestParam(name = "size", defaultValue = "6") int size) {
+            @RequestParam(name = "page", defaultValue = "0") @Min(0) int page,
+            @RequestParam(name = "size", defaultValue = DEFAULT_PAGE_SIZE) @Min(1) @Max(MAX_PAGE_SIZE) int size) {
         return BaseResponse.success(reviewService.getReviews(placeId, page, size));
     }
 

@@ -16,8 +16,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.util.matcher.RegexRequestMatcher;
@@ -36,6 +35,7 @@ import java.util.List;
  */
 @EnableWebSecurity
 @Configuration
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class SecurityConfig {
 
     private final List<String> allowedOrigins;
@@ -148,7 +148,8 @@ public class SecurityConfig {
                 ).permitAll()
                 .requestMatchers(
                         HttpMethod.POST,
-                        "/courses/*/accommodations/search"
+                        "/courses/*/accommodations/search",
+                        "/courses/*/claim/renew"
                 ).permitAll()
                 // READY 숙소 변경은 서비스가 course-scoped claim proof를 검증한다.
                 // SAVED 코스는 같은 공개 경로에서도 로그인 owner만 통과한다.
@@ -221,8 +222,4 @@ public class SecurityConfig {
         return source;
     }
 
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
 }

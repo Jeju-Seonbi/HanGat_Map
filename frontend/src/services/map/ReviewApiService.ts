@@ -18,6 +18,9 @@ const apiRequest = rawApiRequest as (
   opts?: { method?: string, body?: unknown, auth?: boolean, retryAuth?: boolean }
 ) => Promise<never>
 
+/** 후기 목록 한 번에 받는 개수 - "더 보기" 단위. 백엔드 상한 20 안이어야 한다(넘으면 400). 2026-09-07 6 → 10 */
+export const PAGE_SIZE = 10
+
 /** 후기 한 건 - 백엔드 ReviewResponse 와 동일 모양 */
 export interface ReviewItem {
   id: number
@@ -60,7 +63,7 @@ export const absUrl = (u: string): string =>
 export const ReviewApiService = {
   /** 장소별 후기 목록 - 비로그인 허용, 6개씩 */
   getReviews (placeId: number, page = 0): Promise<ReviewPage> {
-    return apiGet<ReviewPage>(`/places/${placeId}/reviews?page=${page}&size=6`)
+    return apiGet<ReviewPage>(`/places/${placeId}/reviews?page=${page}&size=${PAGE_SIZE}`)
   },
 
   /** 작성 - 회원 전용. 별점 또는 혼잡 제보 중 1개 필수(서버 검증) */

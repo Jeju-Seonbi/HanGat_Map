@@ -122,7 +122,7 @@ function jumpToBest() {
 /** 한산한 날 찾기 — 앞으로 2주 안에서 */
 function findCalmDay() {
   if (c.value == null) {
-    hint.value = '<span style="color:var(--tx3)">혼잡 예보가 제공되지 않는 장소예요.</span>'
+    hint.value = '<span style="color:var(--tx3)">관광공사 혼잡 예측 대상이 아니라 예보가 없는 장소예요.</span>'
     return
   }
   const b = bestDay(s.value, state.di, 14)
@@ -206,7 +206,7 @@ async function shareNative() {
           <div class="sub">{{ s.c }} · {{ s.r }}</div>
         </div>
         <!-- MAP_009 찜 -->
-        <button class="fav" :class="{ on: isFav(s.n) }" aria-label="찜하기" @click="toggleFav(s.n)">♥</button>
+        <button class="fav" :class="{ on: isFav(s) }" :aria-pressed="isFav(s)" aria-label="찜하기" @click="toggleFav(s)">♥</button>
         <div class="share-wrap">
           <button class="share" :aria-expanded="shareOpen" @click="toggleShare">공유하기</button>
           <div v-if="shareOpen" class="share-sheet">
@@ -246,11 +246,11 @@ async function shareNative() {
       <div class="lead">
         <!-- MAP_004 예외: 예보 미제공 — 없는 데이터는 추측하지 않는다 -->
         <template v-if="c == null">
-          <span class="bdg" style="background:var(--none);color:#fff">정보 없음</span>
-          &nbsp;이 장소는 혼잡 예보가 제공되지 않아요.
+          <span class="bdg" style="background:var(--none);color:#fff">예보 없음</span>
+          &nbsp;관광공사 혼잡 예측 대상이 아니라 이 장소는 예보가 없어요.
         </template>
         <template v-else>
-          <span class="bdg" :style="{ background: `var(--${t})`, color: '#fff' }">{{ tierKo(c) }}</span>
+          <span class="bdg tier-bg" :class="t" style="color:#fff">{{ tierKo(c) }}</span>
           &nbsp;{{ fmtK(at(state.di)) }} · 이곳의 30일 예보 중에선
           <template v-if="rankText"><b>{{ rankText }}</b>이에요.</template>
           <template v-else>중간쯤이에요.</template>
@@ -278,7 +278,7 @@ async function shareNative() {
             </template>
           </div>
           <!-- 혼잡 바는 핀과 같은 면색(-st) - 글자용 진한 톤을 면에 쓰면 핀과 색이 어긋난다 -->
-          <div class="wc" :style="{ background: `var(--${w.t}-st, var(--${w.t}))` }" :title="w.ko"></div>
+          <div class="wc tier-bg" :class="w.t" :title="w.ko"></div>
         </div>
       </div>
       <div v-if="weatherGap && wxUntil" class="wx-note">날씨는 {{ wxUntil }}까지 제공돼요 · 혼잡은 30일 표시</div>

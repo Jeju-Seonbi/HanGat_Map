@@ -278,6 +278,24 @@ class PlaceRepositoryTest {
                 .contains("동부국수", "서부국수").doesNotContain("국수오름");
     }
 
+    @Test
+    void 검색은_이스케이프된_퍼센트와_밑줄을_글자로_취급한다() {
+        // 서비스(PlaceService.escapeLike)가 '!' 로 이스케이프해 넘긴다는 전제 - 쿼리의 escape '!' 가 그걸 받는다
+        placeWithCoords("50%할인마트", food, null);
+        placeWithCoords("50점만점식당", food, null);   // 이스케이프 없으면 '50%' 에 매칭돼 같이 나온다
+        placeWithCoords("a_b국수", food, null);
+        placeWithCoords("aXb국수", food, null);       // 이스케이프 없으면 'a_b' 의 _ 가 X 에 매칭된다
+        em.flush();
+        em.clear();
+
+        assertThat(names(placeRepository.searchList("50!%", null, PageRequest.of(0, 20))))
+                .containsExactly("50%할인마트");
+        assertThat(names(placeRepository.searchList("a!_b", null, PageRequest.of(0, 20))))
+                .containsExactly("a_b국수");
+        // 이스케이프한 전체 와일드카드("%%" → "!%!%")는 실제로 '%%' 가 들어간 이름에만 맞는다 - 전부 매칭이 아니다
+        assertThat(placeRepository.searchList("!%!%", null, PageRequest.of(0, 20))).isEmpty();
+    }
+
     private Place placeWithCoords(String name, PlaceCategory category, String overview) {
         Place place = Place.builder()
                 .region(west).primaryCategory(category)

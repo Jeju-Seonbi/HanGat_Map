@@ -8,7 +8,6 @@ import PlaceCard from '../../components/place/PlaceCard.vue'
 import MapRenderer from '../../components/map/MapRenderer.vue'
 
 const route = useRoute(),
-  liked = ref(false),
   added = ref(false),
   mapSection = ref<HTMLElement>(),
   { places } = usePlaces()
@@ -82,14 +81,6 @@ const bestDay = computed(() =>
             @click="added = !added"
           >
             {{ added ? '코스에 담았어요' : '코스에 담기' }}
-          </button>
-          <button
-            type="button"
-            :class="['btn place-secondary', { active: liked }]"
-            :aria-pressed="liked"
-            @click="liked = !liked"
-          >
-            {{ liked ? '찜했어요' : '찜하기' }}
           </button>
           <button type="button" class="btn place-secondary" @click="scrollToMap">
             지도 보기

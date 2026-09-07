@@ -85,4 +85,13 @@ class SecuritySmokeTests {
                         .content("{\"claim_token\":\"proof\",\"title\":\"제주 여행\"}"))
                 .andExpect(status().isUnauthorized());
     }
+
+    @Test
+    void 코스_갱신은_회원인증_대신_코스증명을_요구한다() throws Exception {
+        mockMvc.perform(post("/courses/1/claim/renew")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"claim_token\":\"invalid-proof\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code").value(3303))
+                .andExpect(header().string("Cache-Control", org.hamcrest.Matchers.containsString("no-store")));
+    }
 }

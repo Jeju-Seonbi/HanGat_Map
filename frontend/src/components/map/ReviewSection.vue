@@ -166,7 +166,7 @@ async function removeReview (r) {
         <div v-for="c in ['calm', 'mid', 'busy']" :key="c" class="rv-b">
           <span :style="{ color: `var(--${c})` }">{{ CROWD_KO[c] }}</span>
           <span class="bg">
-            <i :style="{ width: Math.round(counts[c] / total * 100) + '%', background: `var(--${c})` }"></i>
+            <i class="tier-bg" :class="c" :style="{ width: Math.round(counts[c] / total * 100) + '%' }"></i>
           </span>
           <b>{{ counts[c] }}</b>
         </div>

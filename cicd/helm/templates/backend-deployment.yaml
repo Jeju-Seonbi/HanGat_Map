@@ -48,6 +48,10 @@ spec:
           image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
           imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
 
+          # CLI 인자를 사용해 private env보다 명시적인 배포 전환 설정을 우선한다.
+          args:
+            - {{ printf "--hangat.scheduling.enabled=%t" .Values.backend.scheduling.enabled | quote }}
+
           securityContext:
             {{- toYaml .Values.backend.containerSecurityContext | nindent 12 }}
 
