@@ -13,6 +13,7 @@ import { useAuthStore } from '@/stores/auth'
 import { at, iso, D0, FORECAST_DAYS } from '@/utils/date'
 import { useRouter, useRoute } from 'vue-router'
 import { popAiCourse, toMapCourse, toMapCourseFromDetail } from '@/services/map/CourseBridge'
+import { hasCoords } from '@/services/map/MapPlaceService'
 import CourseService from '@/services/CourseService'
 
 const router = useRouter()
@@ -33,8 +34,9 @@ const openCount = computed(() => (state.sel ? 1 : 0) + (state.course ? 1 : 0))
 function openPlace(nameOrSpot) {
   const s = typeof nameOrSpot === 'string' ? state.layers.spot.find(x => x.n === nameOrSpot) : nameOrSpot
   if (!s) return
-  if (!s) return
-  mapBridge.panTo(s.y, s.x)
+  // 좌표 없는 장소(원천 결측)는 상세만 연다 - (위도, 0)으로 이동하면 지도가 대서양으로 날아간다
+  if (hasCoords(s)) mapBridge.panTo(s.y, s.x)
+  else toast('이 장소는 좌표 정보가 없어 지도에 표시할 수 없어요')
   state.sel = s
 }
 const closeDetail = () => { state.sel = null }
