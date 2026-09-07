@@ -5,6 +5,7 @@ import com.example.hangat.course.model.CourseRequestDto;
 import com.example.hangat.course.model.CourseResponseDto;
 import com.example.hangat.course.model.CourseClaimRequest;
 import com.example.hangat.course.model.CourseClaimResponse;
+import com.example.hangat.course.model.CourseClaimRenewal;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
@@ -20,6 +21,17 @@ public class CourseController {
     private final CourseService courseService;
     private final CourseClaimService courseClaimService;
     private final CourseClaimTokenService courseClaimTokenService;
+
+    @PostMapping("/courses/{courseId}/claim/renew")
+    public BaseResponse<CourseClaimRenewal.Response> renewClaim(
+            @PathVariable Long courseId,
+            @Valid @RequestBody CourseClaimRenewal.Request request,
+            jakarta.servlet.http.HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store");
+        response.setHeader("Pragma", "no-cache");
+        var proof = courseClaimService.renew(courseId, request.claimToken());
+        return BaseResponse.success(new CourseClaimRenewal.Response(proof.token(), proof.expiresAt()));
+    }
 
     @PostMapping("/courses")
     public BaseResponse<CourseResponseDto> createCourse(

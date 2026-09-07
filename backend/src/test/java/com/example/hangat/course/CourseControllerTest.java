@@ -33,6 +33,24 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class CourseControllerTest {
 
+    @Test
+    void renewalReturnsOnlyProofAndExpiryWithNoStoreAndRequiresBody() throws Exception {
+        var service = mock(CourseService.class);
+        var claims = mock(CourseClaimService.class);
+        when(claims.renew(11L, "proof")).thenReturn(new CourseClaimTokenService.ClaimProof(
+                "renewed-proof", java.time.Instant.parse("2026-09-07T05:50:00Z")));
+        var mvc = MockMvcBuilders.standaloneSetup(new CourseController(service, claims, mock(CourseClaimTokenService.class)))
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper)).build();
+        mvc.perform(post("/courses/11/claim/renew").contentType(MediaType.APPLICATION_JSON).content("{\"claim_token\":\"proof\"}"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.result.claim_token").value("renewed-proof"))
+                .andExpect(jsonPath("$.result.claim_expires_at").value("2026-09-07T05:50:00Z"));
+        mvc.perform(post("/courses/11/claim/renew").contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest());
+        org.mockito.Mockito.verifyNoInteractions(service);
+    }
+
     private final ObjectMapper objectMapper = new ObjectMapper()
             .registerModule(new JavaTimeModule())
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
