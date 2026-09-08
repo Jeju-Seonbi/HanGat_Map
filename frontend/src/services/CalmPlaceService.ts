@@ -4,8 +4,8 @@
  * 1순위: 백엔드 GET /main/calm-places (관광공사 집중률 실측 시드 기반)
  * 폴백: 백엔드가 죽어 있으면 기존 목업(data/data)으로 화면 유지 + live 플래그로 라벨 전환.
  *
- * 카드는 장소 상세로 이어진다. 실데이터는 지도 패널(/map?place=id)이 유일한 실 상세라 그쪽으로,
- * 목업 폴백은 목업 id를 쓰는 /places/:id로 보낸다 - 두 id 체계가 섞이면 엉뚱한 장소가 열린다.
+ * 실데이터 카드는 장소 상세 페이지(/places/<placeId>)로 이어진다.
+ * 목업 폴백(백엔드 미가동)은 그 페이지가 읽을 백엔드 id가 없으므로 링크를 걸지 않는다.
  */
 import { apiGet } from './apiClient'
 import { levelLabel, places } from '../data/data'
@@ -14,8 +14,8 @@ export type CongestionLevelName = 'QUIET' | 'NORMAL' | 'CROWDED'
 
 export interface CalmPlaceCard {
   key: string
-  /** 카드를 눌렀을 때 갈 곳 (실데이터: 지도 패널 / 목업: 목업 상세 페이지) */
-  to: string
+  /** 카드를 눌렀을 때 갈 곳. 목업 폴백은 열 상세가 없어 null */
+  to: string | null
   name: string
   region: string
   level: CongestionLevelName
@@ -51,7 +51,7 @@ export const CalmPlaceService = {
         live: true,
         cards: rows.map(row => ({
           key: `live-${row.placeId}`,
-          to: `/map?place=${row.placeId}`,
+          to: `/places/${row.placeId}`,
           name: row.name,
           region: row.regionLabel,
           level: row.level,
@@ -74,7 +74,7 @@ function sampleCards (limit: number): CalmPlaceCard[] {
     .slice(0, limit)
     .map(p => ({
       key: p.id,
-      to: `/places/${p.id}`,
+      to: null,
       name: p.name,
       region: p.region,
       level: p.level as CongestionLevelName,

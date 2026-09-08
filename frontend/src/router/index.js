@@ -30,8 +30,12 @@ export const routes = [
   /* ── 지도 — 전용 레이아웃 (문서 스크롤 없음) ── */
   { path: '/map', name: 'map', component: () => import('../views/map/MapView.vue'), meta: { layout: 'map', title: '지도' } },
 
-  /* ── 관광지 상세 ── */
-  { path: '/places/:placeId', name: 'place-detail', component: () => import('../views/place/PlaceDetailView.vue'), meta: { skin: 'toss', styleScope: 'content', title: '관광지' } },
+  /* ── 관광지 상세 ──
+     백엔드 placeId(숫자)만 받는다. 옛 목업 id('bijarim' 등)는 이제 열 장소가 없어 지도로 보낸다 -
+     예전 목업 페이지는 숫자 id가 들어오면 매칭에 실패해 항상 첫 목업 장소를 보여줬다. */
+  { path: '/places/:placeId', name: 'place-detail', component: () => import('../views/place/PlaceDetailView.vue'),
+    beforeEnter: to => (/^\d+$/.test(String(to.params.placeId)) ? true : { path: '/map', query: to.query, hash: to.hash }),
+    meta: { skin: 'toss', styleScope: 'content', title: '관광지' } },
 
   /* ── 저장 코스 · 코스 상세 ──
      목록은 내 데이터라 로그인이 필요하고, 상세는 공유 링크로도 열려야 해서 공개다 */
