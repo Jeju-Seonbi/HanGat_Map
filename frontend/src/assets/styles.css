@@ -50,7 +50,7 @@
    테두리를 잃고 라운드가 바뀐다. 담당 화면에만 걸리도록 스코프했다.
 
    html.skin-toss 는 App.vue 가 route.meta.skin 을 보고 <html> 에 붙인다.
-   붙는 화면: 메인(/) · 관광지 상세(/places/:placeId) · 저장한 코스(/courses)
+   붙는 화면: 메인(/) · 저장한 코스(/courses)
    이 블록만 지우면 세 화면도 원본 디자인으로 돌아간다. */
 
 html.skin-toss body{-webkit-font-smoothing:antialiased}

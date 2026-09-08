@@ -118,7 +118,7 @@ const fromLive = (course: CourseDetail): CourseView => {
         timeLabel: item.startTime?.slice(0, 5) ?? `${item.position}번째`,
         metaLabel: [move, swapped ?? item.reason].filter(Boolean).join(' · '),
         level: item.congestionLevel,
-        detailPath: null,
+        detailPath: item.placeId != null ? `/map?place=${item.placeId}` : null,
         liveItem: item,
         dayNo: day.dayNo,
         visitDate: day.visitDate,

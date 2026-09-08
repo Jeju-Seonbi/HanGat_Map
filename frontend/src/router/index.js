@@ -33,7 +33,9 @@ export const routes = [
   /* ── 관광지 상세 ──
      실 상세는 지도 패널(/map?place=<placeId>)뿐이다. 목업 전용 페이지가 백엔드 id를 받으면
      엉뚱한 장소를 진짜처럼 보여줘서 걷어냈다. 숫자가 아닌 옛 목업 id는 지도만 연다. */
-  { path: '/places/:placeId', name: 'place-detail', redirect: to => (/^\d+$/.test(String(to.params.placeId)) ? { path: '/map', query: { place: String(to.params.placeId) } } : { path: '/map' }) },
+  { path: '/places/:placeId', name: 'place-detail', redirect: to => (/^\d+$/.test(String(to.params.placeId))
+    ? { path: '/map', query: { ...to.query, place: String(to.params.placeId) }, hash: to.hash }
+    : { path: '/map', query: to.query, hash: to.hash }) },
 
   /* ── 저장 코스 · 코스 상세 ──
      목록은 내 데이터라 로그인이 필요하고, 상세는 공유 링크로도 열려야 해서 공개다 */
