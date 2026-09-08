@@ -5,7 +5,6 @@ import { sampleCourses } from '../../data/courses'
 import { resolveCourseDetail } from './courseDetailModel'
 
 const courseDetailSource = readFileSync(new URL('./CourseDetailView.vue', import.meta.url), 'utf8')
-const placeDetailCss = readFileSync(new URL('../../assets/place-detail.css', import.meta.url), 'utf8')
 
 describe('course and place detail navigation', () => {
   it('resolves every stop for the selected course id and rejects unknown ids', () => {
@@ -18,18 +17,12 @@ describe('course and place detail navigation', () => {
     expect(resolveCourseDetail('no-such-course', sampleCourses, places)).toBeNull()
   })
 
-  it('provides a place detail link for every saved-course stop', () => {
-    // 실데이터 연동으로 링크 경로가 뷰모델(stop.detailPath)로 옮겨졌다.
-    // 목업 코스는 여전히 /places/:id 를 채우고, 실데이터 일정은 장소 상세가 목업 id
-    // 라우팅이라 null 을 넣어 링크를 걸지 않는다 - 두 규칙을 함께 못 박는다.
+  it('links a stop only when there is a real place detail to open', () => {
+    // 목업 전용 장소 페이지(/places/:id)를 걷어냈다. 지금 열 수 있는 상세는 지도 패널뿐이고
+    // 목업 정류지는 백엔드 id가 없어 그마저도 못 연다 - 그래서 양쪽 다 detailPath가 null이다.
     expect(courseDetailSource).toContain(':to="stop.detailPath"')
     expect(courseDetailSource).toContain('v-if="stop.detailPath"')
-    expect(courseDetailSource).toContain('detailPath: `/places/${place.id}`')
+    expect(courseDetailSource).not.toContain('/places/')
     expect(courseDetailSource).toContain('class="place-detail-link"')
-  })
-
-  it('keeps secondary place actions readable on light and dark token surfaces', () => {
-    expect(placeDetailCss).toMatch(/\.place-page \.btn\.place-secondary\s*\{[^}]*background:var\(--muted\)[^}]*color:var\(--text\)/s)
-    expect(placeDetailCss).toMatch(/\.place-page \.btn\.place-secondary\s*\{[^}]*border:/s)
   })
 })

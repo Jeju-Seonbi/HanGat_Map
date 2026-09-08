@@ -23,14 +23,14 @@ describe('메인 한산 장소 카드 (MAIN_001, 담당 정동현)', () => {
     expect(cards[0].to).toBe('/map?place=1613')
   })
 
-  it('백엔드가 죽으면 목업 폴백이고, 목업 카드는 목업 id를 쓰는 상세로 보낸다', async () => {
+  it('백엔드가 죽으면 목업 폴백이고, 목업 카드는 링크를 걸지 않는다 - 열 상세가 없다', async () => {
     vi.mocked(apiGet).mockRejectedValue(new Error('HTTP 500'))
 
     const { live, cards } = await CalmPlaceService.getCalmPlaces(3)
 
     expect(live).toBe(false)
     expect(cards).toHaveLength(3)
-    cards.forEach(card => expect(card.to).toMatch(/^\/places\/[^/]+$/))
+    cards.forEach(card => expect(card.to).toBeNull())
   })
 
   it('카드마다 자기 placeId로 링크를 만든다 - 지도가 찾을 수 있는 숫자 id여야 한다', async () => {

@@ -232,7 +232,9 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateArrows))
             :key="p.key"
             class="poster-item"
           >
+            <!-- 목업 폴백 카드는 열 상세가 없어 링크를 걸지 않는다 (백엔드 미가동 표시와 함께) -->
             <RouterLink
+              v-if="p.to"
               class="poster-frame"
               :to="p.to"
             >
@@ -242,6 +244,16 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateArrows))
               />
               <span class="poster-rank">{{ i + 1 }}</span>
             </RouterLink>
+            <div
+              v-else
+              class="poster-frame"
+            >
+              <PlaceImage
+                :src="p.imageUrl ?? '/images/placeholder.svg'"
+                :alt="`${p.name} 사진`"
+              />
+              <span class="poster-rank">{{ i + 1 }}</span>
+            </div>
             <div class="poster-info">
               <h3>{{ p.name }}</h3>
               <p class="poster-stats">
@@ -249,6 +261,7 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateArrows))
               </p>
               <small class="poster-reason">{{ p.reason }}</small>
               <RouterLink
+                v-if="p.to"
                 class="poster-cta"
                 :to="p.to"
               >

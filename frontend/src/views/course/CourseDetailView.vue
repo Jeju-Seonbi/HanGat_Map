@@ -175,7 +175,7 @@ const fromMock = (course: NonNullable<typeof mock.value>): CourseView => {
         timeLabel: place.time,
         metaLabel: `${place.stay} · ${place.cost}`,
         level: place.level,
-        detailPath: `/places/${place.id}`,
+        detailPath: null, // 목업 장소는 백엔드 id가 없어 지도 패널로도 열 수 없다
         liveItem: null,
         dayNo: null,
         visitDate: null,
