@@ -13,7 +13,7 @@ describe('route view organization', () => {
       './course/SavedCoursesView.vue',
       './home/HomeView.vue',
       './map/MapView.vue',
-      './place/PlaceDetailView.vue',
+      // place/PlaceDetailView.vue 는 목업 전용이라 제거됐다 - 장소 상세는 지도 패널(/map?place=)이다
       './share/ShareCourseView.vue',
       './system/NotFoundView.vue',
       './system/OutOfScopeView.vue',
