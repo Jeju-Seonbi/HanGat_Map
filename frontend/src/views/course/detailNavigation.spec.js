@@ -18,12 +18,12 @@ describe('course and place detail navigation', () => {
   })
 
   it('links a stop only when there is a real place detail to open', () => {
-    // 목업 전용 장소 페이지(/places/:id)를 걷어냈다. 실데이터 정류지는 백엔드 placeId가 있어
-    // 지도 패널로 열고, 목업 정류지는 그 id가 없어 링크를 걸지 않는다.
+    // 장소 상세 페이지는 백엔드 placeId로만 연다. 실데이터 정류지는 그 id가 있어 링크를 걸고,
+    // 목업 정류지는 목업 문자열 id뿐이라 걸지 않는다.
     expect(courseDetailSource).toContain(':to="stop.detailPath"')
     expect(courseDetailSource).toContain('v-if="stop.detailPath"')
-    expect(courseDetailSource).toContain('detailPath: item.placeId != null ? `/map?place=${item.placeId}` : null')
-    expect(courseDetailSource).not.toMatch(/detailPath:\s*`\/places\//)
+    expect(courseDetailSource).toContain('detailPath: item.placeId != null ? `/places/${item.placeId}` : null')
+    expect(courseDetailSource).toContain('detailPath: null')
     expect(courseDetailSource).toContain('class="place-detail-link"')
   })
 })

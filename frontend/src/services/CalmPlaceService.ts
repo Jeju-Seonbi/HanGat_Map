@@ -4,8 +4,8 @@
  * 1순위: 백엔드 GET /main/calm-places (관광공사 집중률 실측 시드 기반)
  * 폴백: 백엔드가 죽어 있으면 기존 목업(data/data)으로 화면 유지 + live 플래그로 라벨 전환.
  *
- * 실데이터 카드는 지도 패널(/map?place=id)로 이어진다 - 유일한 실 장소 상세다.
- * 목업 폴백(백엔드 미가동)은 백엔드 id가 없어 열 상세가 없으므로 링크를 걸지 않는다.
+ * 실데이터 카드는 장소 상세 페이지(/places/<placeId>)로 이어진다.
+ * 목업 폴백(백엔드 미가동)은 그 페이지가 읽을 백엔드 id가 없으므로 링크를 걸지 않는다.
  */
 import { apiGet } from './apiClient'
 import { levelLabel, places } from '../data/data'
@@ -51,7 +51,7 @@ export const CalmPlaceService = {
         live: true,
         cards: rows.map(row => ({
           key: `live-${row.placeId}`,
-          to: `/map?place=${row.placeId}`,
+          to: `/places/${row.placeId}`,
           name: row.name,
           region: row.regionLabel,
           level: row.level,
