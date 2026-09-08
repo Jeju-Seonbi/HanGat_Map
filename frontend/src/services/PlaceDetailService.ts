@@ -56,6 +56,15 @@ export interface PlaceForecast {
   rates: number[]
 }
 
+/** 백엔드 DailyWeather (domain/weather/model/DailyWeather.java) - 현재 북부 권역 격자 기준이다 */
+export interface DayWeather {
+  date: string
+  minTemp: number | null
+  maxTemp: number | null
+  sky: string | null
+  rainProb: number | null
+}
+
 interface BackendForecast {
   from: string
   days: number
@@ -83,6 +92,18 @@ export const PlaceDetailService = {
       return rates?.length ? { from: res.from, rates } : null
     } catch {
       return null
+    }
+  },
+
+  /**
+   * 기상청 예보 7일. 백엔드가 아직 북부 권역 격자만 내려주므로 화면도 그렇게 표기한다 -
+   * 장소가 있는 권역의 날씨인 척하지 않는다.
+   */
+  async getWeather (): Promise<DayWeather[]> {
+    try {
+      return await apiGet<DayWeather[]>('/main/weather')
+    } catch {
+      return []
     }
   }
 }
