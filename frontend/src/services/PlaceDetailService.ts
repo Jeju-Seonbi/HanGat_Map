@@ -54,8 +54,8 @@ export interface PlaceDetail {
 export interface PlaceForecast {
   /** 예보 첫 날 (YYYY-MM-DD) */
   from: string
-  /** from 부터 하루씩. 예보가 없으면 빈 배열 */
-  rates: number[]
+  /** from 부터 하루씩. 백엔드가 값 없는 날짜를 null로 남기므로 그대로 받는다 - 0으로 바꾸지 않는다 */
+  rates: Array<number | null>
 }
 
 /** 백엔드 DailyWeather (domain/weather/model/DailyWeather.java) - 현재 북부 권역 격자 기준이다 */
@@ -70,7 +70,7 @@ export interface DayWeather {
 interface BackendForecast {
   from: string
   days: number
-  values: Record<string, number[]>
+  values: Record<string, Array<number | null>>
 }
 
 export const PlaceDetailService = {

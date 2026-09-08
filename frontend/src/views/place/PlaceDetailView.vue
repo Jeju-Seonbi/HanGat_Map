@@ -18,7 +18,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PlaceDetailService, { type DayWeather, type PlaceDetail, type PlaceForecast } from '../../services/PlaceDetailService'
 import ReviewApiService, { type ReviewItem, absUrl } from '../../services/map/ReviewApiService'
-import { getBackendUserId } from '../../api/backendClient.js'
+import { useAuthStore } from '../../stores/auth.js'
 import PlaceImage from '../../components/common/PlaceImage.vue'
 import CongestionBadge from '../../components/common/CongestionBadge.vue'
 import { congestionLabel, levelOf } from '../../utils/congestion'
@@ -37,28 +37,30 @@ const reviews = ref<ReviewItem[]>([])
 const reviewTotal = ref(0)
 const reviewNotice = ref('')
 const draftStars = ref(0)
+const draftReport = ref<'' | 'QUIET' | 'NORMAL' | 'CROWDED'>('')
 const draftText = ref('')
 const submitting = ref(false)
 
+const auth = useAuthStore()
 const today = todayKst()
-const loggedIn = computed(() => getBackendUserId() != null)
 
 /** 예보 30일. 발표 기준일이 오늘보다 앞설 수 있어 날짜는 from 기준으로 만든다 */
 const series = computed(() => {
   const rows = forecast.value
   if (!rows) return []
+  // 백엔드는 날짜 슬롯을 만들고 값이 있는 날만 채운다 - 빈 칸을 0으로 바꾸면 '정보 없음'이 '한산'이 된다
   return rows.rates.map((rate, index) => {
     const date = addCalendarDays(rows.from, index)
-    return { date, rate, level: levelOf(rate), label: fmt(date) }
+    return { date, rate: rate ?? null, level: levelOf(rate), label: fmt(date) }
   })
 })
 
-const todayCell = computed(() => series.value.find(day => day.date === today) ?? null)
+const todayCell = computed(() => series.value.find(day => day.date === today && day.rate != null) ?? null)
 
 /** 예보 창 안에서 가장 한산한 날. 창 밖과 비교하지 않는다 */
 const calmestDay = computed(() => {
-  const rows = series.value.filter(day => day.date >= today)
-  return rows.length > 1 ? rows.reduce((best, day) => (day.rate < best.rate ? day : best)) : null
+  const rows = series.value.filter(day => day.date >= today && day.rate != null)
+  return rows.length > 1 ? rows.reduce((best, day) => (day.rate! < best.rate! ? day : best)) : null
 })
 
 /**
@@ -88,14 +90,20 @@ const reasonChips = computed(() => {
   if (row.goodPrice) chips.push({ text: '착한가격업소 검증가', kind: 'good' })
   if (row.hiddenGem) chips.push({ text: '덜 알려진 숨은 명소' })
   const rate = todayCell.value?.rate
-  chips.push(rate == null
-    ? { text: '집중률 예보 대상 아님' }
-    : { text: `오늘 집중률 ${Math.round(rate)} · ${congestionLabel(rate)}` })
+  if (rate != null) chips.push({ text: `오늘 집중률 ${Math.round(rate)} · ${congestionLabel(rate)}` })
+  else chips.push({ text: series.value.length ? '오늘은 예보 창 밖' : '집중률 예보 대상 아님' })
   if (row.regionName) chips.push({ text: `${row.regionName} 권역` })
   return chips
 })
 
 const weatherToday = computed(() => weather.value[0] ?? null)
+
+/** 방문한 날 실제로 어땠는지 - 등급 라벨은 팀 표준(data/data.ts) 하나만 쓴다 */
+const reportOptions = [
+  { value: 'QUIET' as const, label: levelLabel.QUIET },
+  { value: 'NORMAL' as const, label: levelLabel.NORMAL },
+  { value: 'CROWDED' as const, label: levelLabel.CROWDED },
+]
 
 function skyIcon (day: DayWeather): string {
   const sky = day.sky ?? ''
@@ -110,7 +118,7 @@ const dowOf = (iso: string) => fmt(iso).slice(fmt(iso).indexOf('(') + 1, -1)
 
 async function loadReviews (id: number) {
   try {
-    const page = await ReviewApiService.list(id, 0)
+    const page = await ReviewApiService.getReviews(id, 0)
     reviews.value = page.content.slice(0, 5)
     reviewTotal.value = page.totalElements
   } catch {
@@ -148,12 +156,13 @@ async function load () {
 }
 
 async function submitReview () {
-  if (!loggedIn.value) {
+  if (!auth.isLoggedIn) {
     reviewNotice.value = '후기를 쓰려면 로그인이 필요해요.'
     return
   }
-  if (!draftStars.value && !draftText.value.trim()) {
-    reviewNotice.value = '별점이나 내용 중 하나는 남겨 주세요.'
+  // 백엔드 계약(ReviewService): 별점 또는 혼잡 제보 중 하나는 있어야 한다. 한줄평만으로는 안 된다
+  if (!draftStars.value && !draftReport.value) {
+    reviewNotice.value = '별점이나 혼잡 제보 중 하나는 남겨 주세요.'
     return
   }
   const id = placeId.value
@@ -162,9 +171,11 @@ async function submitReview () {
   try {
     await ReviewApiService.create(id, {
       rating: draftStars.value || null,
+      congestionReport: draftReport.value || null,
       content: draftText.value.trim() || null,
     })
     draftStars.value = 0
+    draftReport.value = ''
     draftText.value = ''
     await loadReviews(id)
     reviewNotice.value = '후기를 남겼어요.'
@@ -274,7 +285,7 @@ watch(placeId, load)
             <span
               v-else
               class="chip"
-            >오늘 예보 없음</span>
+            >{{ series.length ? '오늘은 예보 창 밖' : '오늘 예보 없음' }}</span>
             <span
               v-if="place.goodPrice"
               class="chip good"
@@ -347,9 +358,9 @@ watch(placeId, load)
               v-for="day in series"
               :key="day.date"
               class="bar"
-              :class="day.level.toLowerCase()"
-              :style="{ height: `${Math.max(4, day.rate)}%` }"
-              :title="`${day.label} · 집중률 ${Math.round(day.rate)}`"
+              :class="day.level ? day.level.toLowerCase() : 'none'"
+              :style="{ height: `${day.rate == null ? 4 : Math.max(4, day.rate)}%` }"
+              :title="day.rate == null ? `${day.label} · 예보 없음` : `${day.label} · 집중률 ${Math.round(day.rate)}`"
             />
           </div>
           <div class="bar-axis muted">
@@ -364,7 +375,7 @@ watch(placeId, load)
             앞으로는 {{ calmestDay.date === today ? '오늘' : calmestDay.label }}이 가장 한산해요.
           </p>
           <p class="muted source-note">
-            향후 30일 · 날짜 단위(시간대 아님) · 한국관광공사 집중률 예보
+            {{ series[0].label }}부터 {{ series.length }}일 · 날짜 단위(시간대 아님) · 한국관광공사 집중률 예보
           </p>
         </div>
         <div
@@ -493,6 +504,19 @@ watch(placeId, load)
               </button>
               <small class="muted">{{ draftStars ? `${draftStars}점` : '별점 선택' }}</small>
             </div>
+            <div class="report-picker">
+              <small class="muted">그날 붐빔</small>
+              <button
+                v-for="option in reportOptions"
+                :key="option.value"
+                type="button"
+                class="report-btn"
+                :class="{ on: draftReport === option.value }"
+                @click="draftReport = draftReport === option.value ? '' : option.value"
+              >
+                {{ option.label }}
+              </button>
+            </div>
             <textarea
               v-model="draftText"
               rows="3"
@@ -565,6 +589,9 @@ watch(placeId, load)
 .star-picker{display:flex;align-items:center;gap:4px}
 .star-btn{background:none;border:0;font-size:20px;color:var(--border);padding:0 1px}
 .star-btn.on{color:#f0a92b}
+.report-picker{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.report-btn{padding:4px 12px;border:1px solid var(--border);border-radius:999px;background:transparent;font-size:12px;color:var(--sub)}
+.report-btn.on{border-color:var(--primary);color:var(--primary);font-weight:700}
 .review-form textarea{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:12px;resize:none;background:transparent}
 .form-foot{display:flex;align-items:center;justify-content:flex-end;gap:10px}
 @media (max-width:900px){
