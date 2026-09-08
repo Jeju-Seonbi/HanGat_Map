@@ -43,6 +43,8 @@ export interface PlaceDetail {
   goodPriceBaseDate: string | null
   hiddenGem: boolean
   hiddenGemScore: number | null
+  /** 대표 사진(KTO firstimage). 상세 사진 배치를 안 돌린 장소도 값이 있다 */
+  imageUrl: string | null
   images: PlaceImage[]
   ratingAvg: number | null
   reviewCount: number

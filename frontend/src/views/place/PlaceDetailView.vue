@@ -61,7 +61,16 @@ const calmestDay = computed(() => {
   return rows.length > 1 ? rows.reduce((best, day) => (day.rate < best.rate ? day : best)) : null
 })
 
-const cover = computed(() => place.value?.images?.[0] ?? null)
+/**
+ * 대표 사진은 두 갈래다. place_images(사진 적재 배치)가 있으면 그걸 쓰고,
+ * 아직 안 돌린 장소는 목록·카드와 같은 firstimage(imageUrl)를 쓴다.
+ */
+const cover = computed(() => {
+  const row = place.value
+  if (!row) return null
+  if (row.images?.length) return row.images[0]
+  return row.imageUrl ? { url: row.imageUrl, thumbnailUrl: null, caption: null, attribution: null } : null
+})
 const thumbs = computed(() => place.value?.images?.slice(1, 3) ?? [])
 const address = computed(() => place.value?.roadAddress ?? place.value?.lotAddress ?? null)
 const feeText = computed(() => {
