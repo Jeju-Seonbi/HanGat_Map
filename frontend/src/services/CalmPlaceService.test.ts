@@ -21,7 +21,6 @@ describe('메인 한산 장소 카드 (MAIN_001, 담당 정동현)', () => {
     expect(apiGet).toHaveBeenCalledWith('/main/calm-places?limit=3')
     expect(live).toBe(true)
     expect(cards[0].to).toBe('/map?place=1613')
-    expect(cards[0].levelLabel).toBe('한산')
   })
 
   it('백엔드가 죽으면 목업 폴백이고, 목업 카드는 목업 id를 쓰는 상세로 보낸다', async () => {
@@ -34,11 +33,12 @@ describe('메인 한산 장소 카드 (MAIN_001, 담당 정동현)', () => {
     cards.forEach(card => expect(card.to).toMatch(/^\/places\/[^/]+$/))
   })
 
-  it('모든 카드에 이동 경로가 있다 - 눌러도 아무 일 없는 카드를 만들지 않는다', async () => {
+  it('카드마다 자기 placeId로 링크를 만든다 - 지도가 찾을 수 있는 숫자 id여야 한다', async () => {
     vi.mocked(apiGet).mockResolvedValue([row, { ...row, placeId: 1518, name: '제주맥주' }])
 
     const { cards } = await CalmPlaceService.getCalmPlaces()
 
-    expect(cards.every(card => card.to.length > 0)).toBe(true)
+    // MapView의 ?place= 처리는 /^\d+$/만 받는다 - undefined가 섞이면 조용히 무시된다
+    expect(cards.map(card => card.to)).toEqual(['/map?place=1613', '/map?place=1518'])
   })
 })

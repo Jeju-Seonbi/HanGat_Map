@@ -4,6 +4,7 @@
 // 정직성 원칙: 혼잡은 '날짜 단위 예보'로만 표현한다 (시간대별 혼잡 표현 금지 - 데이터 없음)
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useTravelStore } from '../../app/stores/travel'
+import { todayKst } from '../../utils/format.js'
 import type { DailyWeather } from '../../services/WeatherService'
 import { WeatherService } from '../../services/WeatherService'
 import CalmPlaceService, { type CalmPlaceCard } from '../../services/CalmPlaceService'
@@ -16,14 +17,13 @@ const weeklyWeather = ref<DailyWeather[]>([])
 // true = 기상청 실데이터, false = 백엔드 미가동 시 시연용 샘플 폴백
 const weatherLive = ref(false)
 
-const todayLabel = new Date().toLocaleDateString('ko-KR', {
-  month: 'long',
-  day: 'numeric',
-})
 const fmtDate = (iso: string) => {
   const [, m, d] = iso.split('-')
   return `${Number(m)}월 ${Number(d)}일`
 }
+// 백엔드 calm-places의 기본 기준일(DateTimes.todayKst)과 같은 한국 날짜여야 한다
+// - 브라우저 시계가 UTC면 로컬 날짜는 하루 전을 가리킨다
+const todayLabel = ref(fmtDate(todayKst()))
 
 // MAIN_002: 코스 추천 3종 - 새벽 배치가 만든 실데이터(백엔드 미가동 시 목업 폴백)
 const courseCards = ref<CourseCard[]>([])
@@ -51,6 +51,9 @@ const slideBy = (dir: 1 | -1) => {
 }
 
 onMounted(async () => {
+  // 자정을 넘겨 다시 들어온 탭이 지나간 일정·날짜를 그대로 보여주지 않게 다시 맞춘다
+  store.refreshDefaultDates()
+  todayLabel.value = fmtDate(todayKst())
   window.addEventListener('resize', updateArrows)
   await nextTick()
   updateArrows()
