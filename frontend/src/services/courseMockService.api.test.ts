@@ -417,7 +417,7 @@ describe('alternative places and swap (backend, 담당 정동현)', () => {
   })
   const alternative: AlternativePlace = {
     place_id: 601, place_name: '두산봉', category_name: '관광지', distance_m: 4200, congestion_rate: 21, congestion_level: 'QUIET',
-    recommendation_reason: '이 날짜 혼잡 예보가 여유예요', replacement_reason: '성산일출봉보다 집중률이 61 낮고 4.2km 거리예요', radius_km: 10,
+    recommendation_reason: '이 날짜 혼잡 예보가 한산이에요', replacement_reason: '성산일출봉보다 집중률이 61 낮고 4.2km 거리예요', radius_km: 10,
   }
 
   it('asks the backend with the visit date and the other course places excluded, then drops AVOID places only', async () => {
@@ -447,12 +447,12 @@ describe('alternative places and swap (backend, 담당 정동현)', () => {
       course_id: 101,
       average_congestion_rate: 39.5,
       congestion_level: 'QUIET',
-      congestion_label: '여유',
+      congestion_label: '한산',
       message: '두산봉으로 바꿨어요',
       updated_items: [
         {
           item_id: 1, day_no: 1, position: 1, visit_date: '2026-08-28', place_id: 601, place_name: '두산봉', category_name: '관광지', image_url: 'https://img/601.jpg',
-          congestion_rate: 21, congestion_level: 'QUIET', congestion_label: '여유', recommendation_reason: '성산일출봉보다 집중률이 61 낮고 4.2km 거리예요',
+          congestion_rate: 21, congestion_level: 'QUIET', congestion_label: '한산', recommendation_reason: '성산일출봉보다 집중률이 61 낮고 4.2km 거리예요',
           replaced_from_place_id: 501, replaced_from_place_name: '성산일출봉', inbound_distance_m: null, inbound_travel_minutes: null,
         },
         {

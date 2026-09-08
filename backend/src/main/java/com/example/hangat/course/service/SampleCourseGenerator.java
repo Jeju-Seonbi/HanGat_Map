@@ -380,7 +380,7 @@ public class SampleCourseGenerator {
         if (place.isGoodPrice()) return "착한가격업소 검증가";
         if (place.isHiddenGem()) return "덜 알려진 숨은 명소";
         if (CongestionLevel.from(forecast.getRate()) == CongestionLevel.QUIET) {
-            return "이 날짜 혼잡 예보가 여유예요";
+            return "이 날짜 혼잡 예보가 한산이에요";
         }
         return "인기 명소보다 한산한 편이에요";
     }

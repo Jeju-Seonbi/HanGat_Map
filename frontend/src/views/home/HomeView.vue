@@ -154,7 +154,7 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateArrows))
           <span class="eyebrow">READY-MADE COURSE</span>
           <h2>한적한 곳으로 이어 만든 추천 코스</h2>
           <p class="muted">
-            {{ coursesLive ? '새벽 배치가 그날 여유로운 권역으로 미리 만든 코스' : '시연용 데이터 · 백엔드 연결 대기' }} · 카드를 누르면 코스 상세로 이동해요
+            {{ coursesLive ? '새벽 배치가 그날 한산한 권역으로 미리 만든 코스' : '시연용 데이터 · 백엔드 연결 대기' }} · 카드를 누르면 코스 상세로 이동해요
           </p>
         </div>
       </div>

@@ -80,7 +80,7 @@ function sampleCards (limit: number): CalmPlaceCard[] {
       level: p.level as CongestionLevelName,
       levelLabel: levelLabel[p.level],
       imageUrl: p.imageUrl ?? p.image ?? null,
-      reason: p.level === 'QUIET' ? '이 날짜 혼잡 예보가 여유예요' : '인기 명소보다 한산한 편이에요'
+      reason: p.level === 'QUIET' ? '이 날짜 혼잡 예보가 한산이에요' : '인기 명소보다 한산한 편이에요'
     }))
 }
 
