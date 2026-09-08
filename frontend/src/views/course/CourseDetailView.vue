@@ -6,6 +6,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import CongestionBadge from '../../components/common/CongestionBadge.vue'
 import MapRenderer from '../../components/map/MapRenderer.vue'
+import PlaceImage from '../../components/common/PlaceImage.vue'
 import AlternativePlaceModal from '../../components/course/AlternativePlaceModal.vue'
 import { ApiError } from '../../api/errors.js'
 import { sampleCourses } from '../../data/courses'
@@ -362,11 +363,11 @@ async function applySwap (alternative: AlternativePlace) {
               :key="stop.key"
             >
               <span>{{ stop.timeLabel }}</span>
-              <img
-                v-if="stop.image"
-                :src="stop.image"
+              <!-- 사진이 없어도 자리를 비우지 않는다 - 3열 그리드가 밀려 이름이 세로로 접힌다 -->
+              <PlaceImage
+                :src="stop.image ?? '/images/placeholder.svg'"
                 :alt="stop.name"
-              >
+              />
               <div class="course-stop-content">
                 <div class="course-stop-head">
                   <h3>{{ stop.name }}</h3>
@@ -469,6 +470,7 @@ async function applySwap (alternative: AlternativePlace) {
 .course-day-section+.course-day-section{padding-top:6px;border-top:1px solid var(--border)}
 .course-day-head{margin-bottom:2px}
 .course-day-head h2{margin:0}
+.simple-timeline :deep(.place-image){width:110px;height:100px;object-fit:cover;border-radius:12px;background:var(--muted)}
 .course-stop-content{min-width:0}
 .course-stop-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .course-stop-head h3{min-width:0}
