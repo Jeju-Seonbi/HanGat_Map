@@ -171,3 +171,6 @@ hangat:
 
   notifications:
     enabled: ${HANGAT_NOTIFICATIONS_ENABLED:false}
+
+  trip-alerts:
+    enabled: ${HANGAT_TRIP_ALERTS_ENABLED:false}
