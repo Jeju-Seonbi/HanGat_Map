@@ -264,6 +264,23 @@ public class Course {
         this.averageCongestionRate = averageCongestionRate;
     }
 
+    /**
+     * 회원의 비동기 생성 결과를 본인 소유로 지정한다.
+     * 저장(SAVED)이나 여행 확정은 하지 않는다.
+     */
+    public void assignGenerationOwner(User owner) {
+        if (owner == null
+                || this.user != null
+                || this.status != CourseStatus.READY
+                || this.courseType != CourseType.USER) {
+            throw new IllegalStateException(
+                    "생성 결과의 소유자를 지정할 수 없습니다."
+            );
+        }
+
+        this.user = owner;
+    }
+
     @PrePersist
     void onCreate() {
         LocalDateTime now = LocalDateTime.now();

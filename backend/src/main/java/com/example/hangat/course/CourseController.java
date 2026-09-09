@@ -26,10 +26,14 @@ public class CourseController {
     public BaseResponse<CourseClaimRenewal.Response> renewClaim(
             @PathVariable Long courseId,
             @Valid @RequestBody CourseClaimRenewal.Request request,
+            Authentication authentication,
             jakarta.servlet.http.HttpServletResponse response) {
         response.setHeader("Cache-Control", "no-store");
         response.setHeader("Pragma", "no-cache");
-        var proof = courseClaimService.renew(courseId, request.claimToken());
+        Long userId = isAuthenticatedUser(authentication) ? (Long) authentication.getPrincipal() : null;
+        var proof = userId == null
+                ? courseClaimService.renew(courseId, request.claimToken())
+                : courseClaimService.renew(courseId, request.claimToken(), userId);
         return BaseResponse.success(new CourseClaimRenewal.Response(proof.token(), proof.expiresAt()));
     }
 
