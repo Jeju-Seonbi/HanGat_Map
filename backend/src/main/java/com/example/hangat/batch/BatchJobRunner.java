@@ -1,8 +1,10 @@
 package com.example.hangat.batch;
 
 import com.example.hangat.course.service.SampleCourseGenerator;
+import com.example.hangat.domain.weather.TripWeatherIngestService;
 import com.example.hangat.domain.weather.WeatherIngestService;
 import com.example.hangat.map.congestion.CongestionIngestService;
+import com.example.hangat.notification.service.trip.TripNotificationJobService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
@@ -26,15 +28,20 @@ public class BatchJobRunner implements ApplicationRunner {
     private final WeatherIngestService weather;
     private final SampleCourseGenerator courses;
     private final BatchPrerequisiteChecker prerequisites;
+    private final TripWeatherIngestService tripWeather;
+    private final TripNotificationJobService tripNotifications;
 
     public BatchJobRunner(@Value("${hangat.batch.job:}") String job,
                           CongestionIngestService congestion, WeatherIngestService weather,
-                          SampleCourseGenerator courses, BatchPrerequisiteChecker prerequisites) {
+                          SampleCourseGenerator courses, BatchPrerequisiteChecker prerequisites,
+                          TripWeatherIngestService tripWeather, TripNotificationJobService tripNotifications) {
         this.job = job;
         this.congestion = congestion;
         this.weather = weather;
         this.courses = courses;
         this.prerequisites = prerequisites;
+        this.tripWeather = tripWeather;
+        this.tripNotifications = tripNotifications;
     }
 
     /** 기존 스케줄러의 예외 흡수·재시도는 사용하지 않는다. 재시도 횟수는 Job이 관리한다. */
@@ -47,14 +54,44 @@ public class BatchJobRunner implements ApplicationRunner {
                 if (result.saved() == 0) {
                     throw new IllegalStateException("혼잡도 적재 실패: 저장된 예보가 없습니다.");
                 }
+                tripNotifications.run("congestion");
+
                 log.info("혼잡도 배치 결과 {}", result);
             }
+            // ────────────────────────── 기존 일별 날씨 적재 ──────────────────────────
             case "weather" -> {
                 var result = weather.ingest();
-                if (!result.hasCompleteShortTermCoverage() || result.midRows() == 0 || result.midFailed()) {
-                    throw new IllegalStateException("날씨 적재 불완전: " + result);
+
+                // 새로 적재된 중기예보 등의 변화도 비교한다.
+                // 비교는 DB 조회이며, 기상청을 추가로 호출하지 않는다.
+                tripNotifications.run("weather");
+
+                if (!result.hasCompleteShortTermCoverage()
+                        || result.midRows() == 0
+                        || result.midFailed()) {
+                    throw new IllegalStateException(
+                            "일별 날씨 적재 불완전: " + result
+                    );
                 }
-                log.info("날씨 배치 결과 {}", result);
+
+                log.info("일별 날씨 배치 결과 {}", result);
+            }
+
+            // ────────────────────────── 알림용 최신 시간별 예보 ──────────────────────────
+            case "trip-weather" -> {
+                int failedRegions = tripWeather.ingest();
+
+                // 성공적으로 저장된 권역의 최신 예보를 비교한다.
+                // 실패한 권역의 누락 값을 맑음으로 간주하지 않는다.
+                tripNotifications.run("weather");
+
+                if (failedRegions > 0) {
+                    throw new IllegalStateException(
+                            "알림용 날씨 적재 불완전: 실패 권역=" + failedRegions
+                    );
+                }
+
+                log.info("알림용 날씨 수집·비교 완료");
             }
             case "sample-courses" -> {
                 var startDate = LocalDate.now(ZoneId.of("Asia/Seoul")).plusDays(1);
@@ -65,8 +102,12 @@ public class BatchJobRunner implements ApplicationRunner {
                 }
                 log.info("샘플 코스 배치 결과 {}", result);
             }
+            case "trip-reminders" -> tripNotifications.run("reminders");
+
             default -> throw new IllegalArgumentException(
-                    "hangat.batch.job은 congestion, weather, sample-courses 중 하나여야 합니다.");
+                    "hangat.batch.job은 congestion, weather, trip-weather, "
+                            + "sample-courses, trip-reminders 중 하나여야 합니다."
+            );
         }
         log.info("배치 완료 job={}", job);
     }

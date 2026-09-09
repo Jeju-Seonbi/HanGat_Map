@@ -21,6 +21,9 @@ import java.util.Optional;
  */
 public interface CourseRepository extends JpaRepository<Course, Long> {
 
+    /** 여행 확정 조회용. 로그인한 소유자의 저장 상태까지 함께 검사한다. */
+    Optional<Course> findByIdAndUserIdAndStatus(Long id, Long userId, CourseStatus status);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select course from Course course where course.id = :courseId")
     Optional<Course> findByIdForClaim(@Param("courseId") Long courseId);

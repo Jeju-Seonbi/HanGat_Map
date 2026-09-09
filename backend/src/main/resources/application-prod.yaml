@@ -160,3 +160,20 @@ kakao-mobility:
   retry-backoff: 200ms
   cache-ttl: 10m
   cache-max-size: 128
+
+# 알람 + AI 코스 생성 비동기 처리
+hangat:
+  async:
+    enabled: ${HANGAT_ASYNC_ENABLED:false}
+    parallelism: ${HANGAT_ASYNC_PARALLELISM:2}
+    max-pending: ${HANGAT_ASYNC_MAX_PENDING:50}
+    max-active-per-user: ${HANGAT_ASYNC_MAX_ACTIVE_PER_USER:2}
+
+  notifications:
+    enabled: ${HANGAT_NOTIFICATIONS_ENABLED:false}
+
+  trip-alerts:
+    enabled: ${HANGAT_TRIP_ALERTS_ENABLED:false}
+
+  trip-notifications:
+    enabled: ${HANGAT_TRIP_NOTIFICATIONS_ENABLED:false}

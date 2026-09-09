@@ -115,8 +115,11 @@ public class SecurityConfig {
                 session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 
         http.authorizeHttpRequests(auth -> auth
-                // 예외 처리중 /error가 다시 인증에 막히는 것을 방지
-                .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
+                // 예외 처리중 /error가 다시 인증에 막히는 것을 방지 + ASYNC도 포함.
+                .dispatcherTypeMatchers(
+                        DispatcherType.ERROR,
+                        DispatcherType.ASYNC
+                ).permitAll()
 
                 // 운영 및 API 문서
                 .requestMatchers(

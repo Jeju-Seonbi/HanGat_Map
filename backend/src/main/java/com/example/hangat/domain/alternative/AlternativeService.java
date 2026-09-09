@@ -113,11 +113,11 @@ public class AlternativeService {
                 replacementReason(base, baseRate, rate, distanceKm));
     }
 
-    /** 이 장소가 어떤 곳인지 - MainService와 같은 우선순위 (검증가 > 숨은 명소 > 예보 여유) */
+    /** 이 장소가 어떤 곳인지 - MainService와 같은 우선순위 (검증가 > 숨은 명소 > 예보 한산) */
     private String recommendationReason(Place place, CongestionLevel level) {
         if (place.isGoodPrice()) return "착한가격업소 검증가";
         if (place.isHiddenGem()) return "덜 알려진 숨은 명소";
-        if (level == CongestionLevel.QUIET) return "이 날짜 혼잡 예보가 여유예요";
+        if (level == CongestionLevel.QUIET) return "이 날짜 혼잡 예보가 한산이에요";
         return "인기 명소보다 한산한 편이에요";
     }
 

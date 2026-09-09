@@ -103,7 +103,6 @@ pipeline {
                     }
 
                     trap cleanup EXIT
-
                     docker rm -f "$TEST_CONTAINER" >/dev/null 2>&1 || true
 
                     docker create \
@@ -113,16 +112,9 @@ pipeline {
                       --env npm_config_cache=/tmp/npm-cache \
                       --workdir /workspace \
                       node:22-alpine \
-                      sh -c "
-                        npm ci &&
-                        npm run type-check &&
-                        npm test
-                      "
+                      sh -c "npm ci && npm run type-check && npm test"
 
-                    docker cp \
-                      "$WORKSPACE/frontend/." \
-                      "$TEST_CONTAINER:/workspace"
-
+                    docker cp "$WORKSPACE/frontend/." "$TEST_CONTAINER:/workspace"
                     docker start --attach "$TEST_CONTAINER"
                 '''
             }
@@ -202,6 +194,10 @@ pipeline {
 
                         docker build \
                           --build-arg VITE_API_BASE_URL="$FRONTEND_API_BASE_URL" \
+                          --build-arg VITE_NOTIFICATIONS_ENABLED=true \
+                          --build-arg VITE_ASYNC_COURSES_ENABLED=true \
+                          --build-arg VITE_TRIP_ALERTS_ENABLED=true \
+                          --build-arg VITE_TRIP_NOTIFICATIONS_ENABLED=true \
                           --secret id=kakao_map_key,env=KAKAO_MAP_KEY \
                           --file cicd/frontend.Dockerfile \
                           --tag "$FRONTEND_IMAGE:$IMAGE_TAG" \

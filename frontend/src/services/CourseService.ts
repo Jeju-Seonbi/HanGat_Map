@@ -109,6 +109,7 @@ export interface CourseDetailDay {
 
 export interface CourseDetail {
   id: string
+  status?: string
   title: string | null
   conditionLabel: string
   durationText: string
@@ -130,6 +131,7 @@ export interface CourseDetail {
 
 interface BackendCourseDetail {
   id: number
+  status?: string
   title: string | null
   start_date: string
   end_date: string
@@ -208,8 +210,8 @@ const toCard = (row: BackendCourseCard): CourseCard => ({
   conditionLabel: conditionLabelOf(row.region_name, row.duration_text, row.people),
   stops: row.highlight_names.join(' → '),
   highlight: row.region_name
-    ? `${row.region_name} 권역에서 그날 예보가 여유로운 곳들로 이었어요`
-    : '그날 예보가 여유로운 곳들로 이었어요',
+    ? `${row.region_name} 권역에서 그날 예보가 한산한 곳들로 이었어요`
+    : '그날 예보가 한산한 곳들로 이었어요',
   budgetLabel: budgetLabelOf(row.estimated_cost_min, row.estimated_cost_max),
   level: row.congestion_level,
   imageUrl: row.image_url,
@@ -323,6 +325,7 @@ export const CourseService = {
         budgetLabel: budgetLabelOf(row.estimated_cost_min, row.estimated_cost_max),
         swappable: row.swappable,
         manageable: row.manageable,
+        status: row.status,
         accommodation: row.accommodation,
         days: row.days.map(day => ({
           dayNo: day.day_no,

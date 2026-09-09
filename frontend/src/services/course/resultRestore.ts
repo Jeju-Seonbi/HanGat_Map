@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { apiRequest } from '../../api/backendClient.js'
+import { ASYNC_COURSES_ENABLED } from '../../api/notifications.js'
 import { ApiError } from '../../api/errors.js'
 import type { CourseCondition, CourseResult, CourseItem } from '../../assets/types/course'
 
@@ -70,7 +71,7 @@ export function clearCourseProof(course: Proof) { delete course.claim_token; del
 
 /** One renewal per restored course per view, never a timer or member-auth refresh. */
 export function useClaimRenewal(send = (id: number, token: string) => apiRequest(`/courses/${id}/claim/renew`, {
-  method: 'POST', auth: false, body: { claim_token: token },
+  method: 'POST', auth: false, ...(ASYNC_COURSES_ENABLED ? { optionalAuth: true } : {}), body: { claim_token: token },
 }) as Promise<Proof>) {
   const notice = ref('')
   const renewing = ref(false)
@@ -129,7 +130,7 @@ export function resultFromDetail(detail: CourseDetail, proof?: RestoreState): Co
       item_source: item.item_source, inbound_distance_m: item.inbound_distance_m, inbound_travel_minutes: item.inbound_travel_minutes,
       congestion_rate: item.congestion_rate, congestion_level: item.congestion_level,
       recommendation_reason: item.recommendation_reason, recommendation_reason_code: item.recommendation_reason_code,
-      replaced_from_place_id: item.replaced_from_place_id, costs: [],
+      replaced_from_place_id: item.replaced_from_place_id, weather: item.weather, costs: [],
     })) })),
   }
 }

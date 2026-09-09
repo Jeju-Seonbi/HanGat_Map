@@ -24,13 +24,24 @@ public class CourseClaimService {
 
     @Transactional
     public CourseClaimTokenService.ClaimProof renew(Long courseId, String token) {
+        return renew(courseId, token, null);
+    }
+
+    @Transactional
+    public CourseClaimTokenService.ClaimProof renew(Long courseId, String token, Long userId) {
         // Validate possession first; a numeric id alone must not mint a proof.
         tokenService.validate(token, courseId);
+
         Course course = courseRepository.findByIdForClaim(courseId)
-                .orElseThrow(() -> new BaseException(BaseResponseStatus.COURSE_NOT_FOUND));
-        if (course.getUser() != null || course.getStatus() != CourseStatus.READY || course.getCourseType() == CourseType.SAMPLE) {
+                .orElseThrow(() ->
+                        new BaseException(BaseResponseStatus.COURSE_NOT_FOUND));
+
+        if (course.getStatus() != CourseStatus.READY
+                || course.getCourseType() == CourseType.SAMPLE
+                || (course.getUser() != null && !course.getUser().getId().equals(userId))) {
             throw new BaseException(BaseResponseStatus.COURSE_NOT_CLAIMABLE);
         }
+
         return tokenService.renew(token, courseId);
     }
 
@@ -41,7 +52,13 @@ public class CourseClaimService {
         Course course = courseRepository.findByIdForClaim(courseId)
                 .orElseThrow(() -> new BaseException(BaseResponseStatus.COURSE_NOT_FOUND));
 
-        if (course.getUser() != null || course.getStatus() != CourseStatus.READY) {
+        if (course.getStatus() != CourseStatus.READY
+                || course.getCourseType() == CourseType.SAMPLE) {
+            throw new BaseException(BaseResponseStatus.COURSE_NOT_CLAIMABLE);
+        }
+
+        if (course.getUser() != null
+                && !course.getUser().getId().equals(userId)) {
             throw new BaseException(BaseResponseStatus.COURSE_NOT_CLAIMABLE);
         }
 

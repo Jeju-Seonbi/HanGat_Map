@@ -53,12 +53,7 @@
                 <span>⏱ {{ p.stay }}</span><span>₩ {{ p.cost }}</span><span>🅿 주차</span><span>🚻 화장실</span>
               </div><div class="reason">
                 ✨ 추천 이유 · 오전 동선과 날씨가 좋고 이동 거리가 짧아요.
-              </div><RouterLink
-                class="text-link"
-                :to="`/places/${p.id}`"
-              >
-                장소 상세 보기 →
-              </RouterLink>
+              </div>
             </div>
           </article>
         </div>

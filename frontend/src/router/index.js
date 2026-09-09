@@ -24,14 +24,19 @@ export const routes = [
   /* ── 메인 · 코스 만들기 ── */
   { path: '/', name: 'home', component: () => import('../views/home/HomeView.vue'), meta: { skin: 'toss', styleScope: 'content', title: '메인' } },
   { path: '/ai-course', name: 'ai-course', component: () => import('../views/ai-course/AiCourseView.vue'), meta: { styleScope: 'content', title: 'AI 코스' } },
+  { path: '/ai-course/jobs/:jobId', name: 'course-generation-job', component: () => import('../views/ai-course/GenerationJobView.vue'), meta: { requiresAuth: true, styleScope: 'content', title: '코스 생성 상태' } },
   { path: '/travel/search', name: 'travel-search', component: () => import('../views/ai-course/TravelSearchView.vue'), meta: { requiresAuth: true, styleScope: 'content', title: '여행 조건' } },
   { path: '/recommendation', name: 'recommendation', component: () => import('../views/ai-course/RecommendationView.vue'), meta: { requiresAuth: true, styleScope: 'content', title: '추천 코스' } },
 
   /* ── 지도 — 전용 레이아웃 (문서 스크롤 없음) ── */
   { path: '/map', name: 'map', component: () => import('../views/map/MapView.vue'), meta: { layout: 'map', title: '지도' } },
 
-  /* ── 관광지 상세 ── */
-  { path: '/places/:placeId', name: 'place-detail', component: () => import('../views/place/PlaceDetailView.vue'), meta: { skin: 'toss', styleScope: 'content', title: '관광지' } },
+  /* ── 관광지 상세 ──
+     백엔드 placeId(숫자)만 받는다. 옛 목업 id('bijarim' 등)는 이제 열 장소가 없어 지도로 보낸다 -
+     예전 목업 페이지는 숫자 id가 들어오면 매칭에 실패해 항상 첫 목업 장소를 보여줬다. */
+  { path: '/places/:placeId', name: 'place-detail', component: () => import('../views/place/PlaceDetailView.vue'),
+    beforeEnter: to => (/^\d+$/.test(String(to.params.placeId)) ? true : { path: '/map', query: to.query, hash: to.hash }),
+    meta: { skin: 'toss', styleScope: 'content', title: '관광지' } },
 
   /* ── 저장 코스 · 코스 상세 ──
      목록은 내 데이터라 로그인이 필요하고, 상세는 공유 링크로도 열려야 해서 공개다 */
@@ -56,7 +61,7 @@ export const routes = [
       { path: '', redirect: '/mypage/reviews' },
       { path: 'reviews', name: 'my-reviews', component: () => import('../views/mypage/ReviewsTab.vue'), meta: { requiresAuth: true, title: '작성한 리뷰' } },
       { path: 'favorites', name: 'my-favorites', component: () => import('../views/mypage/FavoritesTab.vue'), meta: { requiresAuth: true, title: '찜한 장소' } },
-      { path: 'alerts', name: 'my-alerts', component: () => import('../views/mypage/AlertsTab.vue'), meta: { requiresAuth: true, title: '예보 변경 알림' } },
+      { path: 'alerts', name: 'my-alerts', component: () => import('../views/mypage/AlertsTab.vue'), meta: { requiresAuth: true, title: '알림 내역' } },
       { path: 'profile', name: 'my-profile', component: () => import('../views/mypage/ProfileTab.vue'), meta: { requiresAuth: true, title: '설정' } }
     ]
   },

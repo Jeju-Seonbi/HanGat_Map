@@ -12,7 +12,7 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth.js'
 import { useUiStore } from '../../stores/ui.js'
-import { listAlerts } from '../../api/mypage.js'
+import { useNotificationStore } from '../../stores/notifications.js'
 import { LEFT_TABS, NAV_TABS, RIGHT_TABS, isTabActive } from '../../config/navTabs.js'
 import ThemeToggle from './ThemeToggle.vue'
 import NotificationBell from './NotificationBell.vue'
@@ -26,23 +26,10 @@ const ui = useUiStore()
 const route = useRoute()
 const router = useRouter()
 
-const unread = ref(0)
+const notifications = useNotificationStore()
+const unread = computed(() => notifications.unread)
 const mobileMenuOpen = ref(false)
 
-async function loadUnread () {
-  if (!auth.isLoggedIn) {
-    unread.value = 0
-    return
-  }
-  try {
-    const res = await listAlerts({ onlyUnread: true })
-    unread.value = res.unread
-  } catch {
-    unread.value = 0
-  }
-}
-
-watch(() => [auth.user?.userId, route.fullPath, ui.alertsVersion], loadUnread, { immediate: true })
 watch(() => route.fullPath, () => { mobileMenuOpen.value = false })
 
 const activeOf = computed(() => tab => isTabActive(tab, route.path))

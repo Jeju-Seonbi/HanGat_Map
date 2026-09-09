@@ -6,6 +6,7 @@ import com.example.hangat.common.util.EmailNormalizer;
 import com.example.hangat.config.security.jwt.JwtProvider;
 import com.example.hangat.config.security.password.PasswordHasher;
 import com.example.hangat.config.security.token.TokenHasher;
+import com.example.hangat.notification.service.inbox.NotificationService;
 import com.example.hangat.user.model.User;
 import com.example.hangat.user.model.auth.RefreshRevokeReason;
 import com.example.hangat.user.model.auth.RefreshToken;
@@ -38,6 +39,7 @@ public class AuthService {
     private final RefreshTokenRepository refreshRepository;
     private final PasswordHasher passwordHasher;
     private final JwtProvider jwtProvider;
+    private final NotificationService notifications;
 
     // ────────────────────────── 로그인 ──────────────────────────
     @Transactional
@@ -86,6 +88,16 @@ public class AuthService {
                         UserDto.UserResponse.form(user),
                         accessToken(user)
                 );
+
+        notifications.enqueue(
+                user.getId(),
+                "SECURITY_LOGIN",
+                "계정에 로그인했어요",
+                "본인이 로그인한 것이 아니라면 비밀번호를 변경해 주세요.",
+                "SECURITY",
+                null,
+                "LOGIN:" + java.util.UUID.randomUUID()
+        );
 
         return new AuthInternalDto.LoginResult(body, rawRefresh);
     }

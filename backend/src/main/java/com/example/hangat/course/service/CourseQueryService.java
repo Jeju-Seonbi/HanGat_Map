@@ -47,13 +47,16 @@ public class CourseQueryService {
     private final CourseRepository courseRepository;
     private final CourseItemRepository itemRepository;
     private final CongestionService congestionService;
+    private final com.example.hangat.course.DbCourseWeatherFactsProvider weatherProvider;
 
     public CourseQueryService(CourseRepository courseRepository,
                               CourseItemRepository itemRepository,
-                              CongestionService congestionService) {
+                              CongestionService congestionService,
+                              com.example.hangat.course.DbCourseWeatherFactsProvider weatherProvider) {
         this.courseRepository = courseRepository;
         this.itemRepository = itemRepository;
         this.congestionService = congestionService;
+        this.weatherProvider = weatherProvider;
     }
 
     /**
@@ -91,7 +94,14 @@ public class CourseQueryService {
         List<CourseItem> items = itemRepository.findItemsWithPlace(courseId);
 
         Map<LocalDate, Map<Long, Double>> ratesByDate = new HashMap<>();
-        List<CourseDetailResponse.DayDto> days = groupByDay(items, ratesByDate);
+        var weather = com.example.hangat.course.weather.CourseWeatherFacts.empty();
+        try {
+            weather = weatherProvider.loadDates(course.getStartDate(), course.getEndDate(), items.stream()
+                    .map(i -> i.getPlace().getRegion().getCode()).collect(Collectors.toSet()));
+        } catch (org.springframework.dao.DataAccessException | org.springframework.transaction.TransactionException unavailable) {
+            // Optional current forecast: preserve the authoritative itinerary on storage failure.
+        }
+        List<CourseDetailResponse.DayDto> days = groupByDay(items, ratesByDate, weather);
 
         // 헤더 배지는 아래 일정들과 같은 기준(지금 예보)이어야 한다 - 저장된 캐시를 그대로 쓰면
         // "헤더는 혼잡인데 모든 일정은 여유"인 화면이 나온다
@@ -175,7 +185,8 @@ public class CourseQueryService {
 
     /** 일차별로 묶는다 - 화면이 "1일차/2일차" 섹션으로 그린다. items는 이미 (일차, 순서) 정렬. */
     private List<CourseDetailResponse.DayDto> groupByDay(
-            List<CourseItem> items, Map<LocalDate, Map<Long, Double>> ratesByDate) {
+            List<CourseItem> items, Map<LocalDate, Map<Long, Double>> ratesByDate,
+            com.example.hangat.course.weather.CourseWeatherFacts weather) {
         List<CourseDetailResponse.DayDto> days = new ArrayList<>();
         int currentDay = -1;
         List<CourseDetailResponse.ItemDto> bucket = null;
@@ -190,7 +201,7 @@ public class CourseQueryService {
                 bucketDate = item.getVisitDate();
                 bucket = new ArrayList<>();
             }
-            bucket.add(toItem(item, ratesByDate));
+            bucket.add(toItem(item, ratesByDate, weather));
         }
         if (bucket != null) {
             days.add(new CourseDetailResponse.DayDto(currentDay, bucketDate, bucket));
@@ -199,7 +210,8 @@ public class CourseQueryService {
     }
 
     private CourseDetailResponse.ItemDto toItem(CourseItem item,
-                                                Map<LocalDate, Map<Long, Double>> ratesByDate) {
+                                                Map<LocalDate, Map<Long, Double>> ratesByDate,
+                                                com.example.hangat.course.weather.CourseWeatherFacts weather) {
         Place place = item.getPlace();
         Double rate = ratesByDate
                 .computeIfAbsent(item.getVisitDate(), congestionService::ratesFor)
@@ -236,6 +248,10 @@ public class CourseQueryService {
                 item.getRecommendationReasonCode(),
                 item.getRecommendationReason(),
                 item.getReplacedFromPlace() == null ? null : item.getReplacedFromPlace().getId(),
-                item.getReplacedFromPlace() == null ? null : item.getReplacedFromPlace().getName());
+                item.getReplacedFromPlace() == null ? null : item.getReplacedFromPlace().getName(),
+                weather.weatherFactSets().stream().flatMap(s -> s.facts().stream())
+                        .filter(f -> item.getVisitDate().equals(f.forecastDate()) && f.dailyEvidence() != null
+                                && place.getRegion().getCode().equals(f.dailyEvidence().regionCode()))
+                        .map(com.example.hangat.course.model.CourseResponseDto.WeatherFactDto::from).toList());
     }
 }

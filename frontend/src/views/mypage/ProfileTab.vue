@@ -8,6 +8,7 @@ import BaseModal from '../../components/common/BaseModal.vue'
 import FieldText from '../../components/auth/FieldText.vue'
 import FieldPassword from '../../components/auth/FieldPassword.vue'
 import ThemeToggle from '../../components/layout/ThemeToggle.vue'
+import NotificationPreferences from '../../components/mypage/NotificationPreferences.vue'
 import { useAuthStore } from '../../stores/auth.js'
 import { useUiStore } from '../../stores/ui.js'
 import { useApiError } from '../../composables/useApiError.js'
@@ -273,6 +274,8 @@ async function onLogout () {
         </div>
       </div>
     </section>
+
+    <NotificationPreferences />
 
     <!-- 보안 -->
     <section class="blk">

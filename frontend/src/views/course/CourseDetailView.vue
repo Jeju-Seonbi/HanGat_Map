@@ -5,7 +5,9 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import CongestionBadge from '../../components/common/CongestionBadge.vue'
+import TripConfirmation from '../../components/course/TripConfirmation.vue'
 import MapRenderer from '../../components/map/MapRenderer.vue'
+import PlaceImage from '../../components/common/PlaceImage.vue'
 import AlternativePlaceModal from '../../components/course/AlternativePlaceModal.vue'
 import { ApiError } from '../../api/errors.js'
 import { sampleCourses } from '../../data/courses'
@@ -118,7 +120,7 @@ const fromLive = (course: CourseDetail): CourseView => {
         timeLabel: item.startTime?.slice(0, 5) ?? `${item.position}번째`,
         metaLabel: [move, swapped ?? item.reason].filter(Boolean).join(' · '),
         level: item.congestionLevel,
-        detailPath: null,
+        detailPath: item.placeId != null ? `/places/${item.placeId}` : null,
         liveItem: item,
         dayNo: day.dayNo,
         visitDate: day.visitDate,
@@ -175,7 +177,7 @@ const fromMock = (course: NonNullable<typeof mock.value>): CourseView => {
         timeLabel: place.time,
         metaLabel: `${place.stay} · ${place.cost}`,
         level: place.level,
-        detailPath: `/places/${place.id}`,
+        detailPath: null, // 목업 장소는 백엔드 id가 없어 지도 패널로도 열 수 없다
         liveItem: null,
         dayNo: null,
         visitDate: null,
@@ -323,6 +325,7 @@ async function applySwap (alternative: AlternativePlace) {
         </button>
       </div>
     </div>
+    <TripConfirmation v-if="live?.manageable && live.status === 'SAVED'" :course-id="courseId" />
     <div class="metrics panel">
       <div>
         <small>예상 비용</small><b>{{ view.budgetLabel }}</b>
@@ -362,11 +365,11 @@ async function applySwap (alternative: AlternativePlace) {
               :key="stop.key"
             >
               <span>{{ stop.timeLabel }}</span>
-              <img
-                v-if="stop.image"
-                :src="stop.image"
+              <!-- 사진이 없어도 자리를 비우지 않는다 - 3열 그리드가 밀려 이름이 세로로 접힌다 -->
+              <PlaceImage
+                :src="stop.image ?? '/images/placeholder.svg'"
                 :alt="stop.name"
-              >
+              />
               <div class="course-stop-content">
                 <div class="course-stop-head">
                   <h3>{{ stop.name }}</h3>
@@ -469,6 +472,7 @@ async function applySwap (alternative: AlternativePlace) {
 .course-day-section+.course-day-section{padding-top:6px;border-top:1px solid var(--border)}
 .course-day-head{margin-bottom:2px}
 .course-day-head h2{margin:0}
+.simple-timeline :deep(.place-image){width:110px;height:100px;object-fit:cover;border-radius:12px;background:var(--muted)}
 .course-stop-content{min-width:0}
 .course-stop-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .course-stop-head h3{min-width:0}
