@@ -66,6 +66,14 @@ backend:
 
     MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED: "true"
     MANAGEMENT_ENDPOINT_HEALTH_GROUP_READINESS_INCLUDE: "readinessState,db"
+    HANGAT_ASYNC_ENABLED: "true"
+    HANGAT_ASYNC_PARALLELISM: "2"
+    HANGAT_ASYNC_MAX_PENDING: "50"
+    HANGAT_ASYNC_MAX_ACTIVE_PER_USER: "2"
+
+    HANGAT_NOTIFICATIONS_ENABLED: "true"
+    HANGAT_TRIP_ALERTS_ENABLED: "true"
+    HANGAT_TRIP_NOTIFICATIONS_ENABLED: "true"
 
   # 실제 값은 Jenkins의 hangat-values-private 파일이 덮어쓴다.
   secretEnv:
@@ -185,9 +193,11 @@ batch:
     congestion:
       schedule: "0 3 * * *"
     weather:
-      schedule: "30 3,6 * * *"
+      schedule: "30 0,3,6,9,12,15,18,21 * * *"
     sample-courses:
       schedule: "0 4 * * *"
+    trip-reminders:
+      schedule: "10 * * * *"
 
 # ────────────────────────── 프론트엔드 ──────────────────────────
 

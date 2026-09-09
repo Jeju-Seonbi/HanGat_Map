@@ -11,6 +11,8 @@ import com.example.hangat.course.model.enums.CourseStatus;
 import com.example.hangat.course.model.enums.CourseType;
 import com.example.hangat.course.repository.CourseRepository;
 import com.example.hangat.map.model.entity.PlaceSourceMapping;
+import com.example.hangat.map.model.entity.Place;
+import com.example.hangat.map.model.entity.Region;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -69,32 +71,72 @@ public class CourseAccommodationService {
         return AccommodationDto.from(mapping);
     }
 
+    /** AI 계산 후 실제 선택된 장소 주변의 숙소인지 확인한다. 외부 호출은 저장 트랜잭션 밖에서 한다. */
+    public KakaoAccommodationProvider.VerifiedAccommodation verifyGeneratedAccommodation(
+            AccommodationDto accommodation, CourseService.ComputedCourse computed) {
+        if (accommodation == null) return null;
+        var candidates = computed.facts().candidates().stream().collect(java.util.stream.Collectors.toMap(
+                candidate -> candidate.identity().candidateId(), candidate -> candidate));
+        // 기존 숙소 추천과 동일하게 일정 순서의 권역별 첫 장소를 기준점으로 사용한다.
+        List<Place> anchors = computed.result().days().stream()
+                .flatMap(day -> day.items().stream())
+                .map(item -> candidates.get(item.candidateId()))
+                .map(candidate -> Place.builder()
+                        .region(Region.builder().code(candidate.regionCode()).build())
+                        .latitude(candidate.place().latitude()).longitude(candidate.place().longitude()).build())
+                .toList();
+        return kakaoAccommodationProvider.verify(anchors,
+                accommodation.getSourceCode(), accommodation.getSourcePlaceId());
+    }
+
+    /** 검증된 숙소 매핑도 코스·작업·알림과 같은 트랜잭션에서 저장한다. */
+    @Transactional
+    public void attachGeneratedAccommodation(Course course,
+            KakaoAccommodationProvider.VerifiedAccommodation verified) {
+        if (verified != null) course.changeAccommodation(placeResolver.resolveVerifiedAccommodation(verified));
+    }
+
     private List<com.example.hangat.map.model.entity.Place> coursePlaces(Long courseId) {
         return itemRepository.findItemsWithPlace(courseId).stream()
                 .map(item -> item.getPlace())
                 .toList();
     }
 
-    private void authorize(Course course, String claimToken, Long authUserId) {
+    private void authorize(
+            Course course,
+            String claimToken,
+            Long authUserId
+    ) {
         if (course.getStatus() == CourseStatus.DELETED) {
             throw new BaseException(BaseResponseStatus.COURSE_NOT_FOUND);
         }
+
         if (course.getCourseType() == CourseType.SAMPLE) {
             throw new BaseException(BaseResponseStatus.COURSE_FORBIDDEN);
         }
-        if (course.getStatus() == CourseStatus.READY && course.getUser() == null) {
-            claimTokenService.validate(claimToken, course.getId());
-            return;
+
+        if (course.getStatus() != CourseStatus.READY
+                && course.getStatus() != CourseStatus.SAVED) {
+            throw new BaseException(BaseResponseStatus.COURSE_NOT_FOUND);
         }
-        if (course.getStatus() == CourseStatus.SAVED && course.getUser() != null) {
+
+        if (course.getUser() != null) {
             if (authUserId == null) {
                 throw new BaseException(BaseResponseStatus.LOGIN_REQUIRED);
             }
+
             if (!course.getUser().getId().equals(authUserId)) {
                 throw new BaseException(BaseResponseStatus.COURSE_FORBIDDEN);
             }
+
             return;
         }
-        throw new BaseException(BaseResponseStatus.COURSE_NOT_FOUND);
+
+        if (course.getStatus() == CourseStatus.READY) {
+            claimTokenService.validate(claimToken, course.getId());
+            return;
+        }
+
+        throw new BaseException(BaseResponseStatus.COURSE_FORBIDDEN);
     }
 }

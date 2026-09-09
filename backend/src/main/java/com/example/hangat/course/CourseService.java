@@ -48,20 +48,76 @@ public class CourseService {
                 courseAiGenerationService, coursePersistenceService, courseBudgetService, courseResponseAssembler, java.util.Optional.empty());
     }
 
+    /**
+     * 비회원의 기존 동기 생성 경로.
+     */
     public CourseResponseDto createCourse(CourseRequestDto request) {
+        return persistComputedCourse(request, computeCourse(request));
+    }
+    /**
+     * 외부 조회 / AI 호출 / 방문 순서 최적화.
+     * 이 단계 전체를 DB 트랜잭션으로 감싸지 않는다.
+     */
+    public ComputedCourse computeCourse(CourseRequestDto request) {
+        checkCancelled();
         PreparedCourse prepared = prepareCourse(request);
-        CourseAiResultDto result = courseAiGenerationService.generate(prepared.input());
-        result = CourseVisitOrderOptimizer.optimize(request, prepared.facts(), result);
-        CoursePersistenceResult persistence = coursePersistenceService.persist(
+
+        checkCancelled();
+
+        CourseAiResultDto result =
+                courseAiGenerationService.generate(prepared.input());
+
+        result = CourseVisitOrderOptimizer.optimize(
                 request,
                 prepared.facts(),
+                result
+        );
+
+        checkCancelled();
+
+        return new ComputedCourse(
+                prepared.facts(),
                 result,
-                prepared.metadata());
-        CourseBudgetCalculation budget = courseBudgetService.calculateAndCache(
-                persistence.course().getId());
+                prepared.metadata()
+        );
+    }
+
+    /**
+     * 생성 결과 저장과 응답 구성.
+     *
+     * 비동기 작업에서는 호출자가 연 트랜잭션 안에서 실행해
+     * 코스 저장 / 작업 성공 / 알림 기록이 함께 확정되게 한다.
+     */
+    public CourseResponseDto persistComputedCourse(
+            CourseRequestDto request,
+            ComputedCourse computed
+    ) {
+        CoursePersistenceResult persistence = coursePersistenceService.persist(
+                request,
+                computed.facts(),
+                computed.result(),
+                computed.metadata()
+        );
+
+        CourseBudgetCalculation budget =
+                courseBudgetService.calculateAndCache(
+                        persistence.course().getId()
+                );
+
         return courseResponseAssembler.assemble(
-                prepared.facts(), result, persistence,
-                request.getAccommodation(), budget);
+                computed.facts(),
+                computed.result(),
+                persistence,
+                request.getAccommodation(),
+                budget
+        );
+    }
+
+    public record ComputedCourse(
+            CourseGenerationFacts facts,
+            CourseAiResultDto result,
+            CourseGenerationMetadata metadata
+    ) {
     }
 
     CourseAiInputDto prepareAiInput(CourseRequestDto request) {
@@ -143,6 +199,7 @@ public class CourseService {
         }
 
         for (CourseCandidateShortlistService.ShortlistedPlace shortlisted : shortlistedPlaces) {
+            checkCancelled();
             TourPlaceDto place = shortlisted.place();
             if (stored.stream().anyMatch(c -> c.getStoredCandidate().identity().sourceCode().equals("KTO")
                     && c.getStoredCandidate().identity().sourcePlaceId().equals(place.getContentId()))) continue;
@@ -207,6 +264,7 @@ public class CourseService {
     }
 
     private PreparedCourse prepareCandidates(CourseRequestDto request, List<CourseCandidateDto> courseCandidates) {
+        checkCancelled();
         CourseAiPreparationService.PreparedGeneration generation =
                 courseAiPreparationService.prepareGeneration(request, courseCandidates);
         return new PreparedCourse(
@@ -220,6 +278,10 @@ public class CourseService {
             CourseGenerationFacts facts,
             CourseGenerationMetadata metadata
     ) {
+    }
+
+    private static void checkCancelled() {
+        if (Thread.currentThread().isInterrupted()) throw new java.util.concurrent.CancellationException("코스 생성 작업이 중단됐습니다.");
     }
 
     private void validatePlacePreferences(

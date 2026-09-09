@@ -279,7 +279,7 @@ watch(placeId, load)
 
           <div class="chip-row">
             <CongestionBadge
-              v-if="todayCell"
+              v-if="todayCell?.level"
               :level="todayCell.level"
             />
             <span
@@ -349,7 +349,7 @@ watch(placeId, load)
           <div class="card-head">
             <h2>날짜별 혼잡 예보</h2>
             <CongestionBadge
-              v-if="todayCell"
+              v-if="todayCell?.level"
               :level="todayCell.level"
             />
           </div>

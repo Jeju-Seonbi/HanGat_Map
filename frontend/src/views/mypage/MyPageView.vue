@@ -10,11 +10,12 @@
  *
  * 리뷰 개수는 실제 서버에서 읽는다. 저장 코스·알림은 기존 API 전환 범위에 포함하지 않는다.
  */
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '../../stores/auth.js'
 import { useUiStore } from '../../stores/ui.js'
-import { listAlerts, listSavedCourses } from '../../api/mypage.js'
+import { listSavedCourses } from '../../api/mypage.js'
+import { useNotificationStore } from '../../stores/notifications.js'
 import { listMyReviews } from '../../api/myActivity.js'
 import { getBackendSessionVersion } from '../../api/backendClient.js'
 import AppIcon from '../../components/common/AppIcon.vue'
@@ -24,19 +25,12 @@ const auth = useAuthStore()
 const ui = useUiStore()
 const route = useRoute()
 
-const unread = ref(0)
+const notifications = useNotificationStore()
+const unread = computed(() => notifications.unread)
 const courseCount = ref(null)
 const reviewCount = ref(null)
 let statsVersion = 0
 onBeforeUnmount(() => { statsVersion += 1 })
-
-async function loadUnread () {
-  try {
-    unread.value = (await listAlerts({ onlyUnread: true })).unread
-  } catch {
-    unread.value = 0
-  }
-}
 
 async function loadStats () {
   const version = ++statsVersion
@@ -51,8 +45,8 @@ async function loadStats () {
   reviewCount.value = r.status === 'fulfilled' ? r.value.totalElements : null
 }
 
-onMounted(() => { loadUnread(); loadStats() })
-watch(() => [route.fullPath, ui.alertsVersion], () => { loadUnread(); loadStats() })
+onMounted(loadStats)
+watch(() => [route.fullPath, ui.alertsVersion], loadStats)
 watch(() => auth.user?.userId, () => {
   statsVersion += 1
   reviewCount.value = null

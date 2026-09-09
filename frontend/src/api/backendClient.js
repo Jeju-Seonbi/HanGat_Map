@@ -57,13 +57,15 @@ async function readBaseResponse (response) {
   return body.result
 }
 
-async function rawRequest (path, { method = 'GET', body, token, responseType = 'json' } = {}) {
+async function rawRequest (path, { method = 'GET', body, token, responseType = 'json', timeoutMs = 0 } = {}) {
   const headers = { Accept: 'application/json' }
   const multipart = typeof FormData !== 'undefined' && body instanceof FormData
   // multipart 경계(boundary)는 브라우저가 생성하므로 Content-Type을 직접 지정하지 않는다.
   if (body !== undefined && !multipart) headers['Content-Type'] = 'application/json'
   if (responseType === 'blob') headers.Accept = 'image/jpeg,image/png,image/webp'
   if (token) headers.Authorization = `Bearer ${token}`
+  const controller = timeoutMs > 0 ? new AbortController() : null
+  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null
 
   let response
   try {
@@ -71,20 +73,27 @@ async function rawRequest (path, { method = 'GET', body, token, responseType = '
       method,
       headers,
       credentials: 'include',
+      ...(controller ? { signal: controller.signal } : {}),
       ...(body !== undefined ? { body: multipart ? body : JSON.stringify(body) } : {})
     })
   } catch (error) {
+    if (timer) clearTimeout(timer)
+    if (controller?.signal.aborted) throw new ApiError(0, 'REQUEST_TIMEOUT', '응답 확인 시간이 초과됐어요. 다시 확인해 주세요.', error)
     throw new ApiError(0, 'NETWORK_ERROR', '서버에 연결할 수 없습니다.', error)
   }
 
-  if (response.ok && responseType === 'blob') {
-    const type = response.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase()
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(type)) {
-      throw new ApiError(502, 'INVALID_IMAGE_RESPONSE', '사진 응답 형식을 확인해주세요.')
+  try {
+    if (response.ok && responseType === 'blob') {
+      const type = response.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase()
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(type)) {
+        throw new ApiError(502, 'INVALID_IMAGE_RESPONSE', '사진 응답 형식을 확인해주세요.')
+      }
+      return await response.blob()
     }
-    return response.blob()
+    return await readBaseResponse(response)
+  } finally {
+    if (timer) clearTimeout(timer)
   }
-  return readBaseResponse(response)
 }
 
 function isJwtError (error) {
@@ -166,16 +175,20 @@ export function reissueAccessToken () {
  * 인증 API는 만료 시 한 번만 재발급하고 원 요청도 한 번만 다시 보낸다.
  *
  * @param {string} path
- * @param {{ method?: string, body?: unknown, auth?: boolean, retryAuth?: boolean, responseType?: 'json'|'blob', sessionBound?: boolean }} [options]
+ * @param {{ method?: string, body?: unknown, auth?: boolean, optionalAuth?: boolean, retryAuth?: boolean, responseType?: 'json'|'blob', sessionBound?: boolean, timeoutMs?: number }} [options]
  */
 export async function apiRequest (path, {
   method = 'GET',
   body,
   auth = false,
+  optionalAuth = false,
   retryAuth = true,
   responseType = 'json',
-  sessionBound = false
+  sessionBound = false,
+  timeoutMs = 0
 } = {}) {
+  // 회원이 생성한 READY 코스도 본인 확인이 필요하다. 비회원의 기존 공개 흐름은 유지한다.
+  if (optionalAuth && authenticatedUserId != null) { auth = true; sessionBound = true }
   const requestedEpoch = sessionEpoch
   const requestedUserId = authenticatedUserId
   const checkSession = () => {
@@ -197,7 +210,7 @@ export async function apiRequest (path, {
         throw new ApiError(401, 'SESSION_CHANGED', '로그인 계정이 변경됐어요. 새로고침 후 다시 시도해 주세요.')
       }
     }
-    const result = await rawRequest(path, { method, body, token, responseType })
+    const result = await rawRequest(path, { method, body, token, responseType, timeoutMs })
     checkSession()
     return result
   }
