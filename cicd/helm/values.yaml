@@ -73,6 +73,7 @@ backend:
 
     HANGAT_NOTIFICATIONS_ENABLED: "true"
     HANGAT_TRIP_ALERTS_ENABLED: "true"
+    HANGAT_TRIP_NOTIFICATIONS_ENABLED: "false"
 
   # 실제 값은 Jenkins의 hangat-values-private 파일이 덮어쓴다.
   secretEnv:
@@ -192,9 +193,11 @@ batch:
     congestion:
       schedule: "0 3 * * *"
     weather:
-      schedule: "30 3,6 * * *"
+      schedule: "30 0,3,6,9,12,15,18,21 * * *"
     sample-courses:
       schedule: "0 4 * * *"
+    trip-reminders:
+      schedule: "10 * * * *"
 
 # ────────────────────────── 프론트엔드 ──────────────────────────
 

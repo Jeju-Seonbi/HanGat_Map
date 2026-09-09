@@ -3,7 +3,7 @@
 {{- fail "CronJob 활성화 전 backend.scheduling.enabled=false로 API 예약 작업을 중단하세요." }}
 {{- end }}
 {{- range $name, $job := .Values.batch.jobs }}
-{{- if not (has $name (list "congestion" "weather" "sample-courses")) }}
+{{- if not (has $name (list "congestion" "weather" "sample-courses" "trip-reminders")) }}
 {{- fail (printf "지원하지 않는 batch.jobs 작업입니다: %s" $name) }}
 {{- end }}
 ---
