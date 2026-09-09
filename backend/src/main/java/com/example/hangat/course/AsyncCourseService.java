@@ -2,6 +2,7 @@ package com.example.hangat.course;
 
 import com.example.hangat.course.model.CourseRequestDto;
 import com.example.hangat.course.model.entity.Course;
+import com.example.hangat.course.repository.AsyncCourseJobRepository;
 import com.example.hangat.notification.service.NotificationService;
 import com.example.hangat.user.model.User;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -14,7 +15,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -43,7 +43,7 @@ import java.util.concurrent.*;
 )
 public class AsyncCourseService {
 
-    private final JdbcTemplate jdbc;
+    private final AsyncCourseJobRepository jobs;
     private final ObjectMapper mapper;
     private final CourseService courses;
     private final CourseAccommodationService accommodations;
@@ -75,7 +75,7 @@ public class AsyncCourseService {
     }
 
     public AsyncCourseService(
-            JdbcTemplate jdbc,
+            AsyncCourseJobRepository jobs,
             ObjectMapper mapper,
             CourseService courses,
             CourseAccommodationService accommodations,
@@ -84,7 +84,7 @@ public class AsyncCourseService {
             EntityManager entityManager,
             PlatformTransactionManager manager
     ) {
-        this.jdbc = jdbc;
+        this.jobs = jobs;
         this.mapper = mapper;
         this.courses = courses;
         this.accommodations = accommodations;
@@ -140,17 +140,11 @@ public class AsyncCourseService {
         String hash = sha256(json);
 
         return transaction.execute(status -> {
-            lockQueue();
+            jobs.lockQueue();
 
             requireActiveUser(userId);
 
-            List<Map<String, Object>> existing = jdbc.queryForList("""
-                    SELECT *
-                    FROM course_generation_jobs
-                    WHERE user_id = ? AND request_key = ?
-                    """,
-                    userId, requestKey
-            );
+            List<Map<String, Object>> existing = jobs.findByUserAndRequestKey(userId, requestKey);
 
             if (!existing.isEmpty()) {
                 Map<String, Object> row = existing.get(0);
@@ -165,14 +159,7 @@ public class AsyncCourseService {
                 return jobDto(row);
             }
 
-            Long ownActive = jdbc.queryForObject("""
-                    SELECT COUNT(*)
-                    FROM course_generation_jobs
-                    WHERE user_id = ?
-                      AND status IN ('QUEUED', 'RUNNING')
-                    """,
-                    Long.class, userId
-            );
+            Long ownActive = jobs.countActiveByUser(userId);
 
             if (ownActive != null && ownActive >= maxActivePerUser) {
                 throw problem(
@@ -181,13 +168,7 @@ public class AsyncCourseService {
                 );
             }
 
-            Long pending = jdbc.queryForObject("""
-                    SELECT COUNT(*)
-                    FROM course_generation_jobs
-                    WHERE status IN ('QUEUED', 'RUNNING')
-                    """,
-                    Long.class
-            );
+            Long pending = jobs.countActive();
 
             if (pending != null && pending >= maxPending) {
                 throw problem(
@@ -198,16 +179,7 @@ public class AsyncCourseService {
 
             String id = UUID.randomUUID().toString();
 
-            jdbc.update("""
-                    INSERT INTO course_generation_jobs (
-                        id, user_id, request_key, request_hash,
-                        request_json, status, start_date, end_date,
-                        created_at
-                    )
-                    VALUES (
-                        ?, ?, ?, ?, ?, 'QUEUED', ?, ?, UTC_TIMESTAMP(6)
-                    )
-                    """,
+            jobs.insertQueued(
                     id, userId, requestKey, hash, json,
                     request.getStartDate(), request.getEndDate()
             );
@@ -235,18 +207,7 @@ public class AsyncCourseService {
             } catch (RejectedExecutionException rejected) {
                 active.remove(ticket.id(), ticket);
 
-                jdbc.update("""
-                        UPDATE course_generation_jobs
-                        SET status = 'QUEUED',
-                            lease_token = NULL,
-                            lease_until = NULL,
-                            execution_deadline = NULL
-                        WHERE id = ?
-                          AND status = 'RUNNING'
-                          AND lease_token = ?
-                        """,
-                        ticket.id(), ticket.leaseToken()
-                );
+                jobs.requeueIfOwned(ticket.id(), ticket.leaseToken());
 
                 return;
             }
@@ -255,28 +216,15 @@ public class AsyncCourseService {
 
     private Ticket claim() {
         return transaction.execute(status -> {
-            lockQueue();
+            jobs.lockQueue();
 
-            Long running = jdbc.queryForObject("""
-                    SELECT COUNT(*)
-                    FROM course_generation_jobs
-                    WHERE status = 'RUNNING'
-                    """,
-                    Long.class
-            );
+            Long running = jobs.countRunning();
 
             if (running != null && running >= parallelism) {
                 return null;
             }
 
-            List<Map<String, Object>> rows = jdbc.queryForList("""
-                    SELECT *
-                    FROM course_generation_jobs
-                    WHERE status = 'QUEUED'
-                    ORDER BY created_at, id
-                    LIMIT 1
-                    FOR UPDATE
-                    """);
+            List<Map<String, Object>> rows = jobs.lockOldestQueued();
 
             if (rows.isEmpty()) {
                 return null;
@@ -287,21 +235,7 @@ public class AsyncCourseService {
             Long userId = ((Number) row.get("user_id")).longValue();
             String leaseToken = UUID.randomUUID().toString();
 
-            jdbc.update("""
-                    UPDATE course_generation_jobs
-                    SET status = 'RUNNING',
-                        lease_token = ?,
-                        lease_until = DATE_ADD(
-                            UTC_TIMESTAMP(6), INTERVAL 45 SECOND
-                        ),
-                        execution_deadline = DATE_ADD(
-                            UTC_TIMESTAMP(6), INTERVAL 20 MINUTE
-                        ),
-                        started_at = UTC_TIMESTAMP(6)
-                    WHERE id = ?
-                    """,
-                    leaseToken, id
-            );
+            jobs.markRunning(id, leaseToken);
 
             return new Ticket(
                     id,
@@ -350,7 +284,7 @@ public class AsyncCourseService {
             KakaoAccommodationProvider.VerifiedAccommodation accommodation
     ) {
         transaction.executeWithoutResult(status -> {
-            Map<String, Object> row = lockJob(ticket.id());
+            Map<String, Object> row = jobs.lockJob(ticket.id());
 
             if (!ownsLease(row, ticket.leaseToken())) {
                 return;
@@ -375,22 +309,10 @@ public class AsyncCourseService {
 
             entityManager.flush();
 
-            int updated = jdbc.update("""
-                    UPDATE course_generation_jobs
-                    SET status = 'SUCCEEDED',
-                        course_id = ?,
-                        completed_at = UTC_TIMESTAMP(6),
-                        lease_token = NULL,
-                        lease_until = NULL
-                    WHERE id = ?
-                      AND status = 'RUNNING'
-                      AND lease_token = ?
-                      AND lease_until > UTC_TIMESTAMP(6)
-                      AND execution_deadline > UTC_TIMESTAMP(6)
-                    """,
-                    response.id(),
+            int updated = jobs.markSucceededIfLeaseValid(
                     ticket.id(),
-                    ticket.leaseToken()
+                    ticket.leaseToken(),
+                    response.id()
             );
 
             if (updated != 1) {
@@ -415,20 +337,7 @@ public class AsyncCourseService {
     @Scheduled(fixedDelay = 5000, scheduler = "alarmScheduler")
     public void heartbeat() {
         for (Ticket ticket : active.values()) {
-            int updated = jdbc.update("""
-                    UPDATE course_generation_jobs
-                    SET lease_until = LEAST(
-                        DATE_ADD(UTC_TIMESTAMP(6), INTERVAL 45 SECOND),
-                        execution_deadline
-                    )
-                    WHERE id = ?
-                      AND status = 'RUNNING'
-                      AND lease_token = ?
-                      AND lease_until > UTC_TIMESTAMP(6)
-                      AND execution_deadline > UTC_TIMESTAMP(6)
-                    """,
-                    ticket.id(), ticket.leaseToken()
-            );
+            int updated = jobs.extendLeaseIfValid(ticket.id(), ticket.leaseToken());
             // 만료된 실행은 중단을 요청한다. 실제 종료 전에는 슬롯을 빼지 않아 동시 실행 상한을 지킨다.
             if (updated == 0) {
                 // finally의 제거와 원자적으로 처리하여 풀에서 재사용된 다음 작업을 중단하지 않는다.
@@ -441,16 +350,7 @@ public class AsyncCourseService {
     }
 
     private void recoverExpired() {
-        List<Map<String, Object>> rows = jdbc.queryForList("""
-                SELECT id, lease_token
-                FROM course_generation_jobs
-                WHERE status = 'RUNNING'
-                  AND (
-                      lease_until <= UTC_TIMESTAMP(6)
-                      OR execution_deadline <= UTC_TIMESTAMP(6)
-                  )
-                LIMIT 50
-                """);
+        List<Map<String, Object>> rows = jobs.findExpiredRunning();
 
         for (Map<String, Object> row : rows) {
             fail(
@@ -463,7 +363,7 @@ public class AsyncCourseService {
 
     private void fail(String id, String leaseToken, String errorCode) {
         transaction.executeWithoutResult(status -> {
-            Map<String, Object> row = lockJob(id);
+            Map<String, Object> row = jobs.lockJob(id);
 
             if (!"RUNNING".equals(row.get("status"))
                     || !Objects.equals(
@@ -476,27 +376,11 @@ public class AsyncCourseService {
             // 만료 후보를 읽은 뒤 heartbeat가 갱신됐을 수 있으므로 행 잠금 후 다시 검사한다.
             if ("WORKER_INTERRUPTED".equals(errorCode) && ownsLease(row, leaseToken)) return;
 
-            jdbc.update("""
-                    UPDATE course_generation_jobs
-                    SET status = 'FAILED',
-                        error_code = ?,
-                        completed_at = UTC_TIMESTAMP(6),
-                        lease_token = NULL,
-                        lease_until = NULL
-                    WHERE id = ?
-                    """,
-                    errorCode, id
-            );
+            jobs.markFailed(id, errorCode);
 
             Long userId = ((Number) row.get("user_id")).longValue();
 
-            Long activeUser = jdbc.queryForObject("""
-                    SELECT COUNT(*)
-                    FROM users
-                    WHERE id = ? AND status = 'ACTIVE'
-                    """,
-                    Long.class, userId
-            );
+            Long activeUser = jobs.countActiveUser(userId);
 
             if (activeUser == null || activeUser == 0) {
                 return;
@@ -521,15 +405,7 @@ public class AsyncCourseService {
     }
 
     public Map<String, Object> recent(Long userId) {
-        List<Map<String, Object>> rows = jdbc.queryForList("""
-                SELECT *
-                FROM course_generation_jobs
-                WHERE user_id = ?
-                ORDER BY created_at DESC, id DESC
-                LIMIT 20
-                """,
-                userId
-        );
+        List<Map<String, Object>> rows = jobs.findRecentByUser(userId);
 
         return Map.of(
                 "items",
@@ -555,16 +431,7 @@ public class AsyncCourseService {
             Long courseId =
                     ((Number) job.get("course_id")).longValue();
 
-            List<Map<String, Object>> courses = jdbc.queryForList("""
-                    SELECT id, user_id, status
-                    FROM courses
-                    WHERE id = ?
-                      AND user_id = ?
-                      AND status IN ('READY', 'SAVED')
-                    FOR UPDATE
-                    """,
-                    courseId, userId
-            );
+            List<Map<String, Object>> courses = jobs.lockOwnedResultCourse(courseId, userId);
 
             if (courses.isEmpty()) {
                 throw problem(
@@ -593,32 +460,6 @@ public class AsyncCourseService {
 
     // ────────────────────────── 내부 검증 / 변환 ──────────────────────────
 
-    private void lockQueue() {
-        jdbc.queryForObject("""
-                SELECT id
-                FROM ai_queue_control
-                WHERE id = 'COURSE_GENERATION'
-                FOR UPDATE
-                """,
-                String.class
-        );
-    }
-
-    private Map<String, Object> lockJob(String id) {
-        return jdbc.queryForMap("""
-                SELECT *,
-                       (
-                           lease_until > UTC_TIMESTAMP(6)
-                           AND execution_deadline > UTC_TIMESTAMP(6)
-                       ) AS lease_valid
-                FROM course_generation_jobs
-                WHERE id = ?
-                FOR UPDATE
-                """,
-                id
-        );
-    }
-
     private boolean ownsLease(
             Map<String, Object> row,
             String leaseToken
@@ -635,13 +476,7 @@ public class AsyncCourseService {
     }
 
     private Map<String, Object> findOwned(String id, Long userId) {
-        List<Map<String, Object>> rows = jdbc.queryForList("""
-                SELECT *
-                FROM course_generation_jobs
-                WHERE id = ? AND user_id = ?
-                """,
-                id, userId
-        );
+        List<Map<String, Object>> rows = jobs.findOwned(id, userId);
 
         if (rows.isEmpty()) {
             throw problem(
@@ -665,13 +500,7 @@ public class AsyncCourseService {
     }
 
     private void requireActiveUser(Long userId) {
-        Long count = jdbc.queryForObject("""
-                SELECT COUNT(*)
-                FROM users
-                WHERE id = ? AND status = 'ACTIVE'
-                """,
-                Long.class, userId
-        );
+        Long count = jobs.countActiveUser(userId);
 
         if (count == null || count == 0) {
             throw problem(
