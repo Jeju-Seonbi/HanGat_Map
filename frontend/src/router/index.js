@@ -24,6 +24,7 @@ export const routes = [
   /* ── 메인 · 코스 만들기 ── */
   { path: '/', name: 'home', component: () => import('../views/home/HomeView.vue'), meta: { skin: 'toss', styleScope: 'content', title: '메인' } },
   { path: '/ai-course', name: 'ai-course', component: () => import('../views/ai-course/AiCourseView.vue'), meta: { styleScope: 'content', title: 'AI 코스' } },
+  { path: '/ai-course/jobs/:jobId', name: 'course-generation-job', component: () => import('../views/ai-course/GenerationJobView.vue'), meta: { requiresAuth: true, styleScope: 'content', title: '코스 생성 상태' } },
   { path: '/travel/search', name: 'travel-search', component: () => import('../views/ai-course/TravelSearchView.vue'), meta: { requiresAuth: true, styleScope: 'content', title: '여행 조건' } },
   { path: '/recommendation', name: 'recommendation', component: () => import('../views/ai-course/RecommendationView.vue'), meta: { requiresAuth: true, styleScope: 'content', title: '추천 코스' } },
 
@@ -60,7 +61,7 @@ export const routes = [
       { path: '', redirect: '/mypage/reviews' },
       { path: 'reviews', name: 'my-reviews', component: () => import('../views/mypage/ReviewsTab.vue'), meta: { requiresAuth: true, title: '작성한 리뷰' } },
       { path: 'favorites', name: 'my-favorites', component: () => import('../views/mypage/FavoritesTab.vue'), meta: { requiresAuth: true, title: '찜한 장소' } },
-      { path: 'alerts', name: 'my-alerts', component: () => import('../views/mypage/AlertsTab.vue'), meta: { requiresAuth: true, title: '예보 변경 알림' } },
+      { path: 'alerts', name: 'my-alerts', component: () => import('../views/mypage/AlertsTab.vue'), meta: { requiresAuth: true, title: '알림 내역' } },
       { path: 'profile', name: 'my-profile', component: () => import('../views/mypage/ProfileTab.vue'), meta: { requiresAuth: true, title: '설정' } }
     ]
   },

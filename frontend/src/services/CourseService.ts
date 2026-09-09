@@ -109,6 +109,7 @@ export interface CourseDetailDay {
 
 export interface CourseDetail {
   id: string
+  status?: string
   title: string | null
   conditionLabel: string
   durationText: string
@@ -130,6 +131,7 @@ export interface CourseDetail {
 
 interface BackendCourseDetail {
   id: number
+  status?: string
   title: string | null
   start_date: string
   end_date: string
@@ -323,6 +325,7 @@ export const CourseService = {
         budgetLabel: budgetLabelOf(row.estimated_cost_min, row.estimated_cost_max),
         swappable: row.swappable,
         manageable: row.manageable,
+        status: row.status,
         accommodation: row.accommodation,
         days: row.days.map(day => ({
           dayNo: day.day_no,

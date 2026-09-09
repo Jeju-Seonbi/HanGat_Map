@@ -18,6 +18,7 @@ import type { AccommodationInput,
 import { getMockWeather, weatherRecommendationAdjustment, weatherWarning } from './weatherMockService'
 import { savedCourseMockService } from './savedCourseMockService'
 import { apiRequest } from '../api/backendClient.js'
+import { ASYNC_COURSES_ENABLED } from '../api/notifications.js'
 import { addCalendarDays as dateAt, calendarDayOffset as dayOffset } from '../utils/format.js'
 import { ApiError } from '../api/errors.js'
 
@@ -654,6 +655,7 @@ async function updateAccommodation(
   return await apiRequest(`/courses/${course.id}/accommodation`, {
     method: 'PATCH',
     auth: !course.claim_token,
+    ...(ASYNC_COURSES_ENABLED ? { optionalAuth: true } : {}),
     body: {
       accommodation,
       ...(course.claim_token ? { claim_token: course.claim_token } : {}),
@@ -667,6 +669,7 @@ async function getRecommendedAccommodations(
   const items = await apiRequest(`/courses/${course.id}/accommodations/search`, {
     method: 'POST',
     auth: !course.claim_token,
+    ...(ASYNC_COURSES_ENABLED ? { optionalAuth: true } : {}),
     body: course.claim_token ? { claim_token: course.claim_token } : {},
   }) as AccommodationInput[]
   return items.map(item => ({
@@ -679,6 +682,7 @@ async function getCarRoute(course: CourseResult): Promise<CarRouteResult> {
   return await apiRequest(`/courses/${course.id}/routes/car`, {
     method: 'GET',
     auth: !course.claim_token && course.status === 'SAVED',
+    ...(ASYNC_COURSES_ENABLED ? { optionalAuth: true } : {}),
   }) as CarRouteResult
 }
 
@@ -748,6 +752,7 @@ export const courseMockService = {
       body: { place_id: alternative.place_id },
       // 저장 코스는 본인만(JWT). 임시(READY) 코스는 생성이 비로그인이라 공개 경로
       auth: course.status === 'SAVED',
+      ...(ASYNC_COURSES_ENABLED ? { optionalAuth: true } : {}),
     }) as CourseSwapResponse
 
     const copy = JSON.parse(JSON.stringify(course)) as CourseResult

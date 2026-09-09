@@ -5,6 +5,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import CongestionBadge from '../../components/common/CongestionBadge.vue'
+import TripConfirmation from '../../components/course/TripConfirmation.vue'
 import MapRenderer from '../../components/map/MapRenderer.vue'
 import PlaceImage from '../../components/common/PlaceImage.vue'
 import AlternativePlaceModal from '../../components/course/AlternativePlaceModal.vue'
@@ -324,6 +325,7 @@ async function applySwap (alternative: AlternativePlace) {
         </button>
       </div>
     </div>
+    <TripConfirmation v-if="live?.manageable && live.status === 'SAVED'" :course-id="courseId" />
     <div class="metrics panel">
       <div>
         <small>예상 비용</small><b>{{ view.budgetLabel }}</b>

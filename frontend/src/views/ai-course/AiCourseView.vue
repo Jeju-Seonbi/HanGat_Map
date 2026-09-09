@@ -11,7 +11,10 @@ import BudgetGauge from '../../components/course/BudgetGauge.vue'
 import AlternativePlaceModal from '../../components/course/AlternativePlaceModal.vue'
 import CongestionRescheduleModal from '../../components/course/CongestionRescheduleModal.vue'
 import AccommodationRecommendations from '../../components/course/AccommodationRecommendations.vue'
-import { courseGenerationErrorMessage, courseMockService } from '../../services/courseMockService'
+import { courseGenerationErrorMessage, courseMockService, toCourseRequestPayload } from '../../services/courseMockService'
+import { ASYNC_COURSES_ENABLED } from '../../api/notifications.js'
+import { getGenerationResult, submitGenerationJob } from '../../api/courseGeneration.js'
+import GenerationJobs from '../../components/course/GenerationJobs.vue'
 import { storePendingCourseClaim, takePendingCourseClaim } from '../../services/pendingCourseClaim'
 import { routeSummary, accessNotices } from '../../services/course/courseSummary'
 import { ApiError } from '../../api/errors.js'
@@ -34,6 +37,7 @@ const condition = reactive<CourseCondition>({
 const result = ref<CourseResult>()
 const loading = ref(false)
 const error = ref('')
+const jobResultError = ref('')
 const editing = ref(true)
 const selected = ref<CourseItem>()
 const alternatives = ref<AlternativePlace[]>([])
@@ -88,10 +92,11 @@ function editConditions() {
   restoration.cancel(); renewal.cancel(); viewEpoch++; routeEpoch++
   if (result.value) clearCourseProof(result.value)
   restoringState.value = null; editing.value = true; loading.value = false; routeLoading.value = false
+  jobResultError.value = ''
   selected.value = undefined; rescheduleSelected.value = undefined; saveOpen.value = false
   accommodationPickerOpen.value = false
   rememberEditing(condition)
-  if (route.query.course != null) void router.replace({ path: route.path, query: { ...route.query, course: undefined } })
+  if (route.query.course != null || route.query.job != null) void router.replace({ path: route.path, query: { ...route.query, course: undefined, job: undefined } })
 }
 watch(condition, () => { if (editing.value && !restoring.value) rememberEditing(condition) }, { deep: true })
 async function restoreResult() {
@@ -187,6 +192,11 @@ async function generate(next: CourseCondition, regenerate = false) {
   loading.value = true
   error.value = ''
   try {
+    if (ASYNC_COURSES_ENABLED && auth.isAuthenticated && !regenerate) {
+      const job = await submitGenerationJob(toCourseRequestPayload(condition))
+      if (ticket === viewEpoch) await router.push({ name: 'course-generation-job', params: { jobId: job.jobId } })
+      return
+    }
     const generated = regenerate
       ? await courseMockService.regenerateCourse(condition)
       : await courseMockService.generateCourse(condition)
@@ -355,8 +365,49 @@ async function save() {
   }
 }
 
+async function restoreJobResult () {
+  const id = route.query.job
+  if (typeof id !== 'string' || !ASYNC_COURSES_ENABLED) return false
+  if (!auth.isAuthenticated) {
+    await router.replace({ name: 'login', query: { redirect: route.fullPath } })
+    return true
+  }
+  const ticket = ++viewEpoch
+  restoration.cancel(); renewal.cancel(); loading.value = true; jobResultError.value = ''
+  try {
+    if (!/^[a-f\d]{8}(-[a-f\d]{4}){3}-[a-f\d]{12}$/i.test(id)) throw new Error('INVALID_JOB')
+    const response = await getGenerationResult(id)
+    if (ticket !== viewEpoch) return true
+    // 알림은 며칠 뒤에도 열 수 있다. 생성 당시 JSON 대신 현재 저장/교체된 일정으로 복원한다.
+    const current = await restoration.restore({ mode: 'result', courseId: response.course.id,
+      condition: response.request, claim_token: response.course.claim_token,
+      claim_expires_at: response.course.claim_expires_at }, true)
+    if (ticket !== viewEpoch) return true
+    if (!current) throw new Error('RESULT_UNAVAILABLE')
+    if (current.status === 'READY') {
+      current.claim_token = response.course.claim_token
+      current.claim_expires_at = response.course.claim_expires_at
+    }
+    result.value = current
+    Object.assign(condition, response.request, { accommodation: current.accommodation ?? undefined })
+    editing.value = false; error.value = ''; rememberCurrent(); void loadCarRoute()
+  } catch {
+    if (ticket === viewEpoch) { jobResultError.value = '생성 결과를 불러오지 못했어요. 다시 조회하거나 작업 상태를 확인해 주세요.' }
+  } finally { if (ticket === viewEpoch) loading.value = false }
+  return true
+}
+watch(() => route.query.job, (id, previous) => {
+  viewEpoch++; routeEpoch++; jobResultError.value = ''
+  if (id) void restoreJobResult()
+  else if (previous) { loading.value = false; editing.value = true; result.value = undefined }
+})
+watch(() => (auth.user as { userId: number } | null)?.userId, () => {
+  viewEpoch++; routeEpoch++; restoration.cancel(); renewal.cancel()
+  if (route.query.job) { result.value = undefined; editing.value = true; loading.value = false; void restoreJobResult() }
+})
 onMounted(async () => {
   clock = setInterval(() => { now.value = Date.now() }, 1000)
+  if (await restoreJobResult()) return
   const pending = auth.isAuthenticated ? takePendingCourseClaim() : null
   if (!pending) { await restoreResult(); return }
 
@@ -392,7 +443,12 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
       </div>
     </header>
 
-    <section v-if="restoring || restoreError" class="course-shell generation-state" aria-live="polite">
+    <section v-if="jobResultError" class="course-shell generation-state" role="alert">
+      <h2>{{ jobResultError }}</h2>
+      <button class="btn" @click="restoreJobResult">결과 다시 불러오기</button>
+      <RouterLink class="btn" :to="{ name: 'course-generation-job', params: { jobId: String(route.query.job) } }">작업 상태 확인</RouterLink>
+    </section>
+    <section v-else-if="restoring || restoreError" class="course-shell generation-state" aria-live="polite">
       <h2>{{ restoring ? '저장된 코스를 다시 불러오고 있어요.' : restoreError }}</h2>
       <button v-if="!restoring && !terminal" class="btn" @click="restoreResult">다시 불러오기</button>
       <button class="btn" @click="editConditions">새 코스 만들기</button>
@@ -405,6 +461,7 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
     </section>
 
     <section v-else-if="editing" class="course-shell">
+      <GenerationJobs />
       <CourseConditionForm :initial="condition" :loading="loading" @submit="generate" @draft="draft => Object.assign(condition, draft, { accommodation: draft.accommodation })" />
       <p v-if="error" class="course-error">{{ error }} <button class="text-link" @click="generate(condition)">다시 시도</button></p>
     </section>
