@@ -6,7 +6,6 @@ import { useNotificationStore } from '../../stores/notifications.js'
 import { NOTIFICATIONS_ENABLED, notificationDestination } from '../../api/notifications.js'
 import { fmtRelative } from '../../utils/format.js'
 import GenerationJobs from '../../components/course/GenerationJobs.vue'
-import NotificationPreferences from '../../components/mypage/NotificationPreferences.vue'
 const notifications = useNotificationStore()
 const router = useRouter()
 const actionError = ref('')
@@ -34,7 +33,7 @@ async function readAll () {
       <button v-if="notifications.unread" type="button" class="btn" :disabled="busy" @click="readAll">모두 읽음</button>
     </header>
     <GenerationJobs />
-    <NotificationPreferences />
+    <RouterLink :to="{ name: 'my-profile' }" class="settings-link">알림 수신 설정</RouterLink>
     <p v-if="!NOTIFICATIONS_ENABLED">알림 서비스 준비 중이에요.</p>
     <template v-else>
       <p class="delivery-note">{{ notifications.connected ? '실시간 알림 연결됨' : '실시간 연결 대기 중 · 새로고침으로 확인할 수 있어요' }}<br>브라우저를 닫으면 실시간 수신은 중단돼요. 알림은 내역에 보관됩니다.</p>
@@ -59,6 +58,7 @@ async function readAll () {
 </template>
 <style scoped>
 .notification-inbox { color: var(--tx); }
+.settings-link { display: inline-block; margin-top: 16px; color: var(--ac); font-size: 13px; text-decoration: underline; }
 header, .heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 h2 { font-size: 22px; margin: 0 0 8px; }
 header p, .delivery-note, time { color: var(--tx3); font-size: 13px; line-height: 1.7; }
