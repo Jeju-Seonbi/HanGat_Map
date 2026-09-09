@@ -35,6 +35,7 @@ public class TripNotificationService {
 
     private final TripNotificationRepository settings;
     private final TripNotificationLockRepository locks;
+    private final TripNotificationCheckpointService checkpoints;
     private final CourseRepository courses;
 
     // 클래스명과 별개인 기존 운영 설정 키를 유지한다.
@@ -97,7 +98,16 @@ public class TripNotificationService {
             return previous;
         }
 
-        row.confirm(course.courseId(), course.courseTitle(), course.startDate(), course.endDate(), nowUtc());
+        row.confirm(
+                course.courseId(),
+                course.courseTitle(),
+                course.startDate(),
+                course.endDate(),
+                nowUtc()
+        );
+
+        checkpoints.reset(row, LocalDateTime.now(KST));
+
         return toState(row).trip();
     }
 
@@ -143,14 +153,35 @@ public class TripNotificationService {
         }
 
         LocalDate date = today();
-        boolean duringTrip = !date.isBefore(trip.startDate()) && !date.isAfter(trip.endDate());
+
+        boolean duringTrip =
+                !date.isBefore(trip.startDate())
+                        && !date.isAfter(trip.endDate());
+
+        boolean beforeTripEnds =
+                !date.isAfter(trip.endDate());
+
         return switch (type) {
-            case "WEATHER_WARNING" -> preferences.weatherWarning() && duringTrip;
-            case "FORECAST_CHANGE" -> preferences.forecastChange() && duringTrip;
-            case "CONGESTION_WORSENED" -> preferences.congestion() && duringTrip;
-            case "TRIP_SUMMARY" -> preferences.tripSummary()
-                    && !date.isBefore(trip.startDate().minusDays(1)) && !date.isAfter(trip.endDate());
-            case "REVIEW_REQUEST" -> preferences.reviewRequest() && date.equals(trip.endDate().plusDays(1));
+            // 이번에는 공식 기상특보 생성 작업을 구현하지 않는다.
+            case "WEATHER_WARNING" ->
+                    preferences.weatherWarning() && duringTrip;
+
+            // 출발 전도 허용한다.
+            case "FORECAST_CHANGE" ->
+                    preferences.forecastChange() && beforeTripEnds;
+
+            case "CONGESTION_WORSENED" ->
+                    preferences.congestion() && beforeTripEnds;
+
+            case "TRIP_SUMMARY" ->
+                    preferences.tripSummary()
+                            && !date.isBefore(trip.startDate().minusDays(1))
+                            && !date.isAfter(trip.endDate());
+
+            case "REVIEW_REQUEST" ->
+                    preferences.reviewRequest()
+                            && date.equals(trip.endDate().plusDays(1));
+
             default -> false;
         };
     }
