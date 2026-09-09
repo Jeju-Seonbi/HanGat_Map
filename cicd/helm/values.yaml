@@ -20,7 +20,7 @@ backend:
   # CronJob 전환 전에는 기존 API 내부 예약 실행을 유지한다.
   # 전환 시 false로 배포하고 구 Pod 종료를 확인한 뒤 배치를 수동 검증한다.
   scheduling:
-    enabled: true
+    enabled: false
 
   image:
     repository: lumisia/hangat-backend
@@ -164,24 +164,23 @@ backend:
 
   tmpSizeLimit: 256Mi
 
-
 # ────────────────────────── 단발성 백엔드 배치 ──────────────────────────
 
 batch:
-  # 전환 2단계: CronJob 을 만들되 실행은 하지 않는다(suspend).
-  # 다음 단계는 kubectl create job --from=cronjob/... 으로 세 작업을 수동 검증하는 것이고,
-  # 그 뒤에야 backend.scheduling.enabled=false 와 suspend=false 를 같은 배포에서 함께 뒤집는다.
-  # 따로 뒤집으면 backend-cronjob.yaml 의 fail 가드가 배포를 거부한다(이중 실행 방지).
-  # ⚠️ 선행 조건: cicd/bootstrap/jenkins-rbac.yaml 이 적용돼 있어야 한다.
-  #    Jenkins 에 batch/cronjobs 권한이 없으면 helm upgrade --atomic 이 403 으로 전체 롤백한다.
   enabled: true
-  suspend: true
+
+  # 첫 배포에서는 정지 상태로 유지한다.
+  # 기존 API Pod 종료 → 수동 검증 완료 후 false로 변경한다.
+  suspend: false
+
   timeZone: Asia/Seoul
   startingDeadlineSeconds: 1800
   activeDeadlineSeconds: 3600
   backoffLimit: 2
+
   successfulJobsHistoryLimit: 1
   failedJobsHistoryLimit: 3
+
   resources:
     requests:
       cpu: 100m
@@ -189,13 +188,22 @@ batch:
     limits:
       cpu: "1"
       memory: 1024Mi
+
   jobs:
     congestion:
       schedule: "0 3 * * *"
+
+    # 기존 일별 날씨: 하루 2회 유지
     weather:
-      schedule: "30 0,3,6,9,12,15,18,21 * * *"
+      schedule: "30 3,6 * * *"
+
+    # 알림용 최신 시간별 예보: 하루 8회
+    trip-weather:
+      schedule: "40 0,3,6,9,12,15,18,21 * * *"
+
     sample-courses:
       schedule: "0 4 * * *"
+
     trip-reminders:
       schedule: "10 * * * *"
 
