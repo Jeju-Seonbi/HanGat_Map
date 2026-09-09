@@ -3,7 +3,7 @@ package com.example.hangat.course;
 import com.example.hangat.course.model.CourseRequestDto;
 import com.example.hangat.course.model.entity.Course;
 import com.example.hangat.course.repository.AsyncCourseJobRepository;
-import com.example.hangat.notification.service.NotificationService;
+import com.example.hangat.notification.service.inbox.NotificationService;
 import com.example.hangat.user.model.User;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;

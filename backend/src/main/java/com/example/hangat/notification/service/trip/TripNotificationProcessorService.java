@@ -1,9 +1,12 @@
-package com.example.hangat.notification.service;
+package com.example.hangat.notification.service.trip;
+
+import com.example.hangat.notification.service.support.TripNotificationJsonService;
+import com.example.hangat.notification.service.inbox.NotificationService;
 
 import com.example.hangat.course.repository.CourseItemRepository;
 import com.example.hangat.notification.model.TripNotificationSample;
 import com.example.hangat.notification.model.entity.TripNotificationSettings;
-import com.example.hangat.notification.repository.TripNotificationLockRepository;
+import com.example.hangat.notification.repository.trip.TripNotificationLockRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

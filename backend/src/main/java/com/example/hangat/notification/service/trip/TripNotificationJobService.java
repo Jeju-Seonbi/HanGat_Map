@@ -1,6 +1,6 @@
-package com.example.hangat.notification.service;
+package com.example.hangat.notification.service.trip;
 
-import com.example.hangat.notification.repository.TripNotificationRepository;
+import com.example.hangat.notification.repository.trip.TripNotificationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

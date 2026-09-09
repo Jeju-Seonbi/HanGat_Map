@@ -1,4 +1,6 @@
-package com.example.hangat.notification.service;
+package com.example.hangat.notification.service.trip;
+
+import com.example.hangat.notification.service.support.TripNotificationJsonService;
 
 import com.example.hangat.course.repository.CourseItemRepository;
 import com.example.hangat.domain.weather.model.enums.PrecipitationType;
@@ -7,7 +9,7 @@ import com.example.hangat.domain.weather.repository.WeatherForecastRepository;
 import com.example.hangat.map.repository.CongestionForecastRepository;
 import com.example.hangat.notification.model.TripNotificationSample;
 import com.example.hangat.notification.model.entity.TripWeatherSnapshot;
-import com.example.hangat.notification.repository.TripWeatherSnapshotRepository;
+import com.example.hangat.notification.repository.weather.TripWeatherSnapshotRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

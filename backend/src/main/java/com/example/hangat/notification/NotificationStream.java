@@ -1,7 +1,7 @@
 package com.example.hangat.notification;
 
-import com.example.hangat.notification.repository.NotificationOutboxRepository;
-import com.example.hangat.notification.repository.NotificationOutboxRepository.OutboxEntry;
+import com.example.hangat.notification.repository.inbox.NotificationOutboxRepository;
+import com.example.hangat.notification.repository.inbox.NotificationOutboxRepository.OutboxEntry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;

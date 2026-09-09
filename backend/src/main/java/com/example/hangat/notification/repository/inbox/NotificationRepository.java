@@ -1,4 +1,4 @@
-package com.example.hangat.notification.repository;
+package com.example.hangat.notification.repository.inbox;
 
 import com.example.hangat.notification.model.entity.NotificationEntity;
 import org.springframework.data.domain.Pageable;

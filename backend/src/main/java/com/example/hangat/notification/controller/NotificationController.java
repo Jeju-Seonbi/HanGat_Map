@@ -3,7 +3,7 @@ package com.example.hangat.notification.controller;
 import com.example.hangat.common.model.BaseResponse;
 import com.example.hangat.notification.NotificationStream;
 import com.example.hangat.notification.model.Notification;
-import com.example.hangat.notification.service.NotificationService;
+import com.example.hangat.notification.service.inbox.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;

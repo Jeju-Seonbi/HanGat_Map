@@ -1,4 +1,4 @@
-package com.example.hangat.notification.repository;
+package com.example.hangat.notification.repository.trip;
 
 import com.example.hangat.course.model.entity.Course;
 import com.example.hangat.course.model.enums.CourseStatus;

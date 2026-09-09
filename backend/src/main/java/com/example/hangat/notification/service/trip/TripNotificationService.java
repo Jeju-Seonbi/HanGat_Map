@@ -1,4 +1,4 @@
-package com.example.hangat.notification.service;
+package com.example.hangat.notification.service.trip;
 
 import com.example.hangat.course.model.enums.CourseStatus;
 import com.example.hangat.course.repository.CourseRepository;
@@ -7,8 +7,8 @@ import com.example.hangat.notification.model.TripNotificationModels.Preferences;
 import com.example.hangat.notification.model.TripNotificationModels.State;
 import com.example.hangat.notification.model.TripNotificationModels.Trip;
 import com.example.hangat.notification.model.entity.TripNotificationSettings;
-import com.example.hangat.notification.repository.TripNotificationLockRepository;
-import com.example.hangat.notification.repository.TripNotificationRepository;
+import com.example.hangat.notification.repository.trip.TripNotificationLockRepository;
+import com.example.hangat.notification.repository.trip.TripNotificationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;

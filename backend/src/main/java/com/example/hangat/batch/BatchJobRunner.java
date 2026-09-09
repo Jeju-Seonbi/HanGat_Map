@@ -4,7 +4,7 @@ import com.example.hangat.course.service.SampleCourseGenerator;
 import com.example.hangat.domain.weather.TripWeatherIngestService;
 import com.example.hangat.domain.weather.WeatherIngestService;
 import com.example.hangat.map.congestion.CongestionIngestService;
-import com.example.hangat.notification.service.TripNotificationJobService;
+import com.example.hangat.notification.service.trip.TripNotificationJobService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;

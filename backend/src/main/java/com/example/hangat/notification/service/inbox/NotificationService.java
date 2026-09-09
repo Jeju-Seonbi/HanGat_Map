@@ -1,10 +1,12 @@
-package com.example.hangat.notification.service;
+package com.example.hangat.notification.service.inbox;
+
+import com.example.hangat.notification.service.trip.TripNotificationService;
 
 import com.example.hangat.notification.model.Notification.NotificationDto;
 import com.example.hangat.notification.model.Notification.NotificationPage;
-import com.example.hangat.notification.repository.NotificationCommandRepository;
-import com.example.hangat.notification.repository.NotificationRepository;
-import com.example.hangat.notification.repository.NotificationRepository.NotificationView;
+import com.example.hangat.notification.repository.inbox.NotificationCommandRepository;
+import com.example.hangat.notification.repository.inbox.NotificationRepository;
+import com.example.hangat.notification.repository.inbox.NotificationRepository.NotificationView;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;

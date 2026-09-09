@@ -1,4 +1,4 @@
-package com.example.hangat.notification.repository;
+package com.example.hangat.notification.repository.inbox;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;

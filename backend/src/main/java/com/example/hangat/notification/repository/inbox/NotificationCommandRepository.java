@@ -1,4 +1,4 @@
-package com.example.hangat.notification.repository;
+package com.example.hangat.notification.repository.inbox;
 
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;

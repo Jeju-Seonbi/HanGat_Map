@@ -6,7 +6,7 @@ import com.example.hangat.common.util.EmailNormalizer;
 import com.example.hangat.config.security.jwt.JwtProvider;
 import com.example.hangat.config.security.password.PasswordHasher;
 import com.example.hangat.config.security.token.TokenHasher;
-import com.example.hangat.notification.service.NotificationService;
+import com.example.hangat.notification.service.inbox.NotificationService;
 import com.example.hangat.user.model.User;
 import com.example.hangat.user.model.auth.RefreshRevokeReason;
 import com.example.hangat.user.model.auth.RefreshToken;

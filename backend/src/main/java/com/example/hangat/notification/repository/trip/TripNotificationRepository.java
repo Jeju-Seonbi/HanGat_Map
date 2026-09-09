@@ -1,4 +1,4 @@
-package com.example.hangat.notification.repository;
+package com.example.hangat.notification.repository.trip;
 
 import com.example.hangat.notification.model.entity.TripNotificationSettings;
 import org.springframework.data.domain.Pageable;

@@ -1,4 +1,4 @@
-package com.example.hangat.notification.repository;
+package com.example.hangat.notification.repository.weather;
 
 import com.example.hangat.map.model.entity.Region;
 import com.example.hangat.notification.model.entity.TripWeatherSnapshot;

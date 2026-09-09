@@ -1,4 +1,4 @@
-package com.example.hangat.notification.service;
+package com.example.hangat.notification.service.support;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;

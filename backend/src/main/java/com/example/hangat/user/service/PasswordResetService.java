@@ -4,7 +4,7 @@ import com.example.hangat.common.exception.BaseException;
 import com.example.hangat.common.model.BaseResponseStatus;
 import com.example.hangat.config.security.password.PasswordHasher;
 import com.example.hangat.config.security.token.TokenHasher;
-import com.example.hangat.notification.service.NotificationService;
+import com.example.hangat.notification.service.inbox.NotificationService;
 import com.example.hangat.user.model.auth.PasswordResetRequest;
 import com.example.hangat.user.model.auth.RefreshRevokeReason;
 import com.example.hangat.user.model.User;

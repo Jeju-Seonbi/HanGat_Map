@@ -4,7 +4,7 @@ import com.example.hangat.common.model.BaseResponse;
 import com.example.hangat.notification.model.TripNotificationModels;
 import com.example.hangat.notification.model.TripNotificationModels.Preferences;
 import com.example.hangat.notification.model.TripNotificationModels.Trip;
-import com.example.hangat.notification.service.TripNotificationService;
+import com.example.hangat.notification.service.trip.TripNotificationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;

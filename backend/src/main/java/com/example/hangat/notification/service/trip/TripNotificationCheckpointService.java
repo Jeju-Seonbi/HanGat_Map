@@ -1,8 +1,10 @@
-package com.example.hangat.notification.service;
+package com.example.hangat.notification.service.trip;
+
+import com.example.hangat.notification.service.support.TripNotificationJsonService;
 
 import com.example.hangat.notification.model.entity.TripNotificationCheckpoint;
 import com.example.hangat.notification.model.entity.TripNotificationSettings;
-import com.example.hangat.notification.repository.TripNotificationCheckpointRepository;
+import com.example.hangat.notification.repository.trip.TripNotificationCheckpointRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
