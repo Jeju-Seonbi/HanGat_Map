@@ -1,10 +1,11 @@
 package com.example.hangat.notification;
 
+import com.example.hangat.notification.repository.NotificationOutboxRepository;
+import com.example.hangat.notification.repository.NotificationOutboxRepository.OutboxEntry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
@@ -36,7 +37,7 @@ public class NotificationStream {
 
     private static final int MAX_CONNECTIONS_PER_USER = 6;
 
-    private final JdbcTemplate jdbc;
+    private final NotificationOutboxRepository outbox;
 
     private final Map<Long, Set<SseEmitter>> connections =
             new ConcurrentHashMap<>();
@@ -77,29 +78,14 @@ public class NotificationStream {
 
     @Scheduled(fixedDelay = 2000, scheduler = "alarmScheduler")
     public void dispatchOutbox() {
-        List<Map<String, Object>> rows = jdbc.queryForList("""
-                SELECT notification_id, user_id
-                FROM notification_outbox
-                ORDER BY notification_id
-                LIMIT 100
-                """);
+        List<OutboxEntry> rows = outbox.findPending(100);
 
-        for (Map<String, Object> row : rows) {
-            long notificationId =
-                    ((Number) row.get("notification_id")).longValue();
-            long userId =
-                    ((Number) row.get("user_id")).longValue();
-
-            invalidate(userId);
+        for (OutboxEntry row : rows) {
+            invalidate(row.userId());
 
             // 오프라인 사용자도 알림 본문은 DB에 남아 있다.
             // 신호를 보낸 후 프로세스가 종료되면 다음 실행에서 중복 전송될 수 있다.
-            jdbc.update("""
-                    DELETE FROM notification_outbox
-                    WHERE notification_id = ?
-                    """,
-                    notificationId
-            );
+            outbox.deleteByNotificationId(row.notificationId());
         }
     }
 
