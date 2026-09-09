@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useAuthStore } from '../../stores/auth.js'
-import { TRIP_ALERTS_ENABLED } from '../../api/notifications.js'
+import { TRIP_ALERTS_ENABLED, TRIP_NOTIFICATIONS_ENABLED } from '../../api/notifications.js'
 import { getConfirmedTrip, confirmTrip, cancelConfirmedTrip } from '../../api/tripAlerts.js'
 const props = defineProps({ courseId: { type: [String, Number], required: true } })
 const auth = useAuthStore()
@@ -54,6 +54,8 @@ onBeforeUnmount(() => { epoch++ })
   <section v-if="TRIP_ALERTS_ENABLED && auth.isLoggedIn" class="trip-confirmation" aria-label="여행 확정과 알림">
     <h2>{{ mine ? '확정한 여행이에요' : '실제로 떠날 여행인가요?' }}</h2>
     <p>여행을 확정하면 이 코스를 여행 알림 대상으로 설정해요. 수신 설정에서 켠 항목만 해당 기능이 제공될 때 안내해요. 숙소나 교통편 예약은 아니에요.</p>
+    <p v-if="TRIP_NOTIFICATIONS_ENABLED">출발 전부터 여행 종료일까지, 확인 가능한 일정의 날씨 예보 변경과 혼잡 악화를 안내해요. 예보가 없는 날짜는 비교하지 않아요.</p>
+    <p v-else>출발 전 예보 변경·혼잡 악화·일정 알림은 준비 중이에요. 지금은 여행 확정과 수신 설정을 저장할 수 있어요.</p>
     <p v-if="mine && confirmation.startDate && confirmation.endDate">확정 일정: {{ confirmation.startDate }} ~ {{ confirmation.endDate }}</p>
     <p v-if="mine && confirmation.scheduleChanged" role="alert">코스 일정이 변경되어 여행 알림이 중단됐어요. 여행 확정을 취소한 뒤 다시 확정해 주세요.</p>
     <p v-if="hasActive && !mine">현재 확정한 여행: {{ confirmation.courseTitle }}</p>

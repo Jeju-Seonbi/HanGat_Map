@@ -3,7 +3,7 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNotificationStore } from '../../stores/notifications.js'
-import { NOTIFICATIONS_ENABLED, notificationDestination } from '../../api/notifications.js'
+import { NOTIFICATIONS_ENABLED, notificationDestination, notificationTypeLabel, notificationActionLabel } from '../../api/notifications.js'
 import { fmtRelative } from '../../utils/format.js'
 import GenerationJobs from '../../components/course/GenerationJobs.vue'
 const notifications = useNotificationStore()
@@ -44,11 +44,11 @@ async function readAll () {
       <ol class="inbox-list">
         <li v-for="item in notifications.items" :key="item.id" :class="{ unread: !item.readAt }">
           <button type="button" @click="open(item)">
+            <span class="kind">{{ notificationTypeLabel(item.type) }}</span>
             <span class="heading"><strong>{{ item.title }}</strong><span v-if="!item.readAt" class="unread-label">안 읽음</span></span>
             <span class="message">{{ item.message }}</span>
             <time :datetime="item.createdAt">{{ fmtRelative(item.createdAt) }}</time>
-            <span v-if="item.targetType === 'COURSE_GENERATION'" class="action">코스 생성 결과 확인</span>
-            <span v-else-if="item.targetType === 'COURSE'" class="action">해당 코스 보기</span>
+            <span v-if="notificationActionLabel(item)" class="action">{{ notificationActionLabel(item) }}</span>
           </button>
         </li>
       </ol>
@@ -68,6 +68,7 @@ li { border-bottom: 1px solid var(--line); }
 li.unread { background: var(--ac-bg); }
 li > button { width: 100%; padding: 20px 14px; text-align: left; color: inherit; }
 .heading { align-items: baseline; }
+.kind { display: block; margin-bottom: 6px; font-size: 12px; color: var(--ac); }
 .message { display: block; margin: 8px 0; white-space: pre-line; overflow-wrap: anywhere; line-height: 1.65; }
 .unread-label, .action { color: var(--ac); font-size: 12px; white-space: nowrap; }
 .action { display: block; margin-top: 12px; font-weight: 700; }

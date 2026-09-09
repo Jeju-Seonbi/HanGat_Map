@@ -1,7 +1,7 @@
 <script setup>
 import { onBeforeUnmount, ref, watch } from 'vue'
 import { useAuthStore } from '../../stores/auth.js'
-import { TRIP_ALERTS_ENABLED } from '../../api/notifications.js'
+import { TRIP_ALERTS_ENABLED, TRIP_NOTIFICATIONS_ENABLED, isNotificationPreferenceAvailable } from '../../api/notifications.js'
 import { getNotificationPreferences, saveNotificationPreferences } from '../../api/tripAlerts.js'
 const auth = useAuthStore()
 const settings = ref(null)
@@ -12,11 +12,11 @@ const ready = ref(false)
 let epoch = 0
 const fields = [
   ['aiCourse', 'AI 코스 생성 결과', '코스 생성이 완료되거나 실패했을 때'],
-  ['weatherWarning', '공식 기상특보', '확정 여행 지역에 기상특보가 발표됐을 때'],
-  ['forecastChange', '날씨 예보 변경', '확정한 일정의 날씨 예보가 달라졌을 때'],
-  ['congestion', '혼잡 예보 악화', '확정한 일정의 장소가 더 혼잡해질 것으로 예상될 때'],
-  ['tripSummary', '여행 일정 요약', '확정 여행의 출발 전날과 여행 당일'],
-  ['reviewRequest', '여행 후 리뷰 요청', '확정한 여행이 끝난 뒤']
+  ['weatherWarning', '공식 기상특보', '기상청 공식 특보 연동을 준비하고 있어요.'],
+  ['forecastChange', '날씨 예보 변경', '출발 전부터 여행 종료일까지, 확인 가능한 일정의 비·눈 예보가 달라질 때'],
+  ['congestion', '혼잡 예보 악화', '출발 전부터 여행 종료일까지, 방문 예정 장소가 이 관광지 기준으로 혼잡해질 때'],
+  ['tripSummary', '여행 일정 요약', '출발 전날 저녁과 여행 기간 매일 아침에 일정 확인'],
+  ['reviewRequest', '여행 후 리뷰 요청', '여행 종료 다음 날, 방문 장소의 리뷰 작성 안내']
 ]
 async function load () {
   const ticket = ++epoch
@@ -31,7 +31,7 @@ async function load () {
   finally { if (ticket === epoch) busy.value = false }
 }
 async function toggle (key, label) {
-  if (busy.value || !ready.value || !settings.value || !auth.isLoggedIn) return
+  if (!isNotificationPreferenceAvailable(key) || busy.value || !ready.value || !settings.value || !auth.isLoggedIn) return
   const ticket = ++epoch
   const previous = settings.value
   const next = { ...previous, [key]: !previous[key] }
@@ -65,10 +65,12 @@ onBeforeUnmount(() => { epoch++ })
     <p v-if="!TRIP_ALERTS_ENABLED" class="note">알림 수신 설정을 준비 중이에요.</p>
     <template v-else>
       <p class="note">스위치를 바꾸면 바로 저장돼요. 끈 항목은 이후 새 알림을 받지 않으며, 이미 받은 알림은 유지돼요.</p>
+      <p v-if="!TRIP_NOTIFICATIONS_ENABLED" class="note">여행 예보·일정 알림은 준비 중이에요. 여행 확정과 기존 수신 설정은 유지됩니다.</p>
       <div v-if="settings" class="preference-list">
         <div v-for="[key, label, description] in fields" :key="key" class="preference-row">
           <div><h3 :id="`notification-${key}`">{{ label }}</h3><p :id="`notification-${key}-description`" class="note">{{ description }}</p></div>
-          <button type="button" role="switch" class="preference-switch" :class="{ enabled: settings[key] }"
+          <span v-if="!isNotificationPreferenceAvailable(key)" class="pending-label">준비 중</span>
+          <button v-else type="button" role="switch" class="preference-switch" :class="{ enabled: settings[key] }"
             :aria-checked="settings[key]" :aria-labelledby="`notification-${key}`"
             :aria-describedby="`notification-${key}-description`" :disabled="busy || !ready"
             @click="toggle(key, label)"><span aria-hidden="true" class="switch-track"><span /></span><span aria-hidden="true">{{ settings[key] ? '켜짐' : '꺼짐' }}</span></button>
@@ -78,7 +80,7 @@ onBeforeUnmount(() => { epoch++ })
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <button v-if="!ready && !busy" type="button" class="retry" @click="load">다시 불러오기</button>
       <p v-if="notice" class="notice" role="status">{{ notice }}</p>
-      <p class="note policy">여행 관련 알림은 여행을 확정하고 해당 알림 기능이 제공되는 경우에 받을 수 있어요. 여행 확정 취소 시 이후 여행 관련 알림은 중단돼요.<br>로그인·비밀번호 변경과 중요 공지는 항상 알림함에 보관해요. 브라우저를 닫으면 실시간 수신은 중단돼요.</p>
+      <p class="note policy">여행 알림은 확정한 코스에만 적용돼요. 예보가 없는 날짜는 비교하지 않으며, 같은 상태가 유지되면 반복해서 알리지 않아요. 여행 확정 취소 시 이후 여행 알림은 중단돼요.<br>로그인·비밀번호 변경과 중요 공지는 항상 알림함에 보관해요. 브라우저를 닫으면 실시간 수신은 중단돼요.</p>
     </template>
   </section>
 </template>
@@ -90,6 +92,7 @@ h3 { margin: 0; font-size: 14px; font-weight: 600; color: var(--tx); }
 .preference-list { margin-top: 14px; }
 .preference-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 14px; border-bottom: 1px solid var(--line); }
 .preference-row:last-child { border-bottom: 0; }
+.pending-label { flex: 0 0 auto; font-size: 12px; color: var(--tx3); }
 .preference-switch { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; min-height: 44px; padding: 0 2px; color: var(--tx3); font-size: 12px; }
 .switch-track { display: inline-flex; align-items: center; width: 42px; height: 24px; box-sizing: border-box; border-radius: 20px; padding: 3px; background: var(--tx3); }
 .switch-track > span { width: 18px; height: 18px; border-radius: 50%; background: var(--surf); }

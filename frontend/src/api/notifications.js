@@ -4,6 +4,30 @@ import { apiRequest, BACKEND_BASE_URL, getBackendAccessToken, getBackendSessionV
 export const NOTIFICATIONS_ENABLED = import.meta.env.VITE_NOTIFICATIONS_ENABLED === 'true'
 export const ASYNC_COURSES_ENABLED = import.meta.env.VITE_ASYNC_COURSES_ENABLED === 'true'
 export const TRIP_ALERTS_ENABLED = import.meta.env.VITE_TRIP_ALERTS_ENABLED === 'true'
+// 여행 확정 API와 별개: 실제 비교·일정 배치 배포를 확인한 뒤 켠다.
+export const TRIP_NOTIFICATIONS_ENABLED = import.meta.env.VITE_TRIP_NOTIFICATIONS_ENABLED === 'true'
+export function isNotificationPreferenceAvailable (key) {
+  if (key === 'aiCourse') return true
+  return TRIP_NOTIFICATIONS_ENABLED && ['forecastChange', 'congestion', 'tripSummary', 'reviewRequest'].includes(key)
+}
+
+export function notificationTypeLabel (type) {
+  const labels = {
+    AI_COURSE_COMPLETED: 'AI 코스 완성', AI_COURSE_FAILED: 'AI 코스 생성 실패',
+    FORECAST_CHANGE: '날씨 예보 변경', CONGESTION_WORSENED: '혼잡 예보 악화',
+    TRIP_SUMMARY: '여행 일정', REVIEW_REQUEST: '여행 후 리뷰', WEATHER_WARNING: '공식 기상특보',
+    SECURITY_LOGIN: '로그인 안내', SECURITY_PASSWORD_CHANGED: '비밀번호 변경', NOTICE: '중요 공지'
+  }
+  return Object.hasOwn(labels, type) ? labels[type] : '알림'
+}
+
+export function notificationActionLabel (item) {
+  if (item.targetType === 'COURSE_GENERATION') return '코스 생성 결과 확인'
+  if (item.targetType === 'COURSE') return item.type === 'REVIEW_REQUEST' ? '방문 장소 확인하고 리뷰 남기기' : '해당 코스 보기'
+  if (item.targetType === 'PLACE') return '해당 장소 보기'
+  if (item.targetType === 'SECURITY') return '계정 설정 확인'
+  return ''
+}
 const authenticated = { auth: true, sessionBound: true, timeoutMs: 15000 }
 
 export const listNotifications = (cursor = null) => apiRequest(`/users/me/notifications?size=30${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`, authenticated)
