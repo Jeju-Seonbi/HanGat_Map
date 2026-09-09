@@ -73,7 +73,7 @@ backend:
 
     HANGAT_NOTIFICATIONS_ENABLED: "true"
     HANGAT_TRIP_ALERTS_ENABLED: "true"
-    HANGAT_TRIP_NOTIFICATIONS_ENABLED: "false"
+    HANGAT_TRIP_NOTIFICATIONS_ENABLED: "true"
 
   # 실제 값은 Jenkins의 hangat-values-private 파일이 덮어쓴다.
   secretEnv:
