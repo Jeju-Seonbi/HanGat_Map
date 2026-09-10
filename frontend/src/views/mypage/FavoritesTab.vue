@@ -192,7 +192,7 @@ const feeLabel = item => item.feeText ?? (item.free ? '무료' : '정보 없음'
         <ul v-else class="rows">
           <li v-for="p in data.items" :key="p.placeId">
             <button class="row" :class="{ sel: p.placeId === selectedId }" @click="select(p.placeId)">
-              <span class="rpin" :class="p.crowdTier" aria-hidden="true" />
+              <span v-if="p.crowdTier" class="rpin" :class="p.crowdTier" aria-hidden="true" />
               <span class="rinfo">
                 <span class="rn">{{ p.name }}</span>
                 <span class="rs">{{ p.category }} · {{ p.addr }}</span>
