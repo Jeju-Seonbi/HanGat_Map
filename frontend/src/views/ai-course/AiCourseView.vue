@@ -386,7 +386,7 @@ async function restoreJobResult () {
     return true
   }
   const ticket = ++viewEpoch
-  restoration.cancel(); renewal.cancel(); loading.value = true; jobResultError.value = ''
+  transit.cancel(); restoration.cancel(); renewal.cancel(); loading.value = true; jobResultError.value = ''
   try {
     if (!/^[a-f\d]{8}(-[a-f\d]{4}){3}-[a-f\d]{12}$/i.test(id)) throw new Error('INVALID_JOB')
     const response = await getGenerationResult(id)
@@ -410,12 +410,12 @@ async function restoreJobResult () {
   return true
 }
 watch(() => route.query.job, (id, previous) => {
-  viewEpoch++; routeEpoch++; jobResultError.value = ''
+  transit.cancel(); viewEpoch++; routeEpoch++; jobResultError.value = ''
   if (id) void restoreJobResult()
   else if (previous) { loading.value = false; editing.value = true; result.value = undefined }
 })
 watch(() => (auth.user as { userId: number } | null)?.userId, () => {
-  viewEpoch++; routeEpoch++; restoration.cancel(); renewal.cancel()
+  transit.cancel(); viewEpoch++; routeEpoch++; restoration.cancel(); renewal.cancel()
   if (route.query.job) { result.value = undefined; editing.value = true; loading.value = false; void restoreJobResult() }
 })
 onMounted(async () => {

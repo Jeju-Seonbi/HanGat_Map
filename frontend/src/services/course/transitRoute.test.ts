@@ -1,9 +1,20 @@
 import { describe,it,expect,vi } from 'vitest'
+import { apiRequest } from '../../api/backendClient.js'
 import { useTransitRoute,transitTotal,transitSignature,minutes, type TransitRoute } from './transitRoute'
 import type { CourseResult } from '../../assets/types/course'
+vi.mock('../../api/backendClient.js',()=>({apiRequest:vi.fn()}))
+vi.mock('../../api/notifications.js',()=>({ASYNC_COURSES_ENABLED:true}))
 const course={id:15,status:'READY',transport:'PUBLIC_TRANSIT',start_date:'2026-09-08',end_date:'2026-09-08',days:[{day_no:1,visit_date:'2026-09-08',items:[{id:1,place_id:10,latitude:33.4,longitude:126.5,position:1,start_time:'10:00:00'}]}]} as CourseResult
 const response={course_id:15,queried_at:'2026-09-07T12:00:00Z',cached:false,provider_attempts:1,days:[{day_no:1,visit_date:'2026-09-08',distance_meters:5013,duration_seconds:2115,legs:[{from:{id:'1',name:'출발'},to:{id:'2',name:'도착'},status:'OK',distance_meters:5013,duration_seconds:2115,transfers:0,landing_url:null,steps:[{type:'WALKING',distance_meters:800,duration_seconds:600,stops:[],vehicles:[]}]}]}]} satisfies TransitRoute
 describe('course-only transit routes',()=>{
+ it('sends optional member authentication for an owned READY async result',async()=>{
+   vi.mocked(apiRequest).mockResolvedValueOnce(response)
+   const state=useTransitRoute()
+   await state.load(course)
+   expect(apiRequest).toHaveBeenCalledWith('/courses/15/routes/transit',{
+     method:'GET',auth:false,optionalAuth:true,
+   })
+ })
  it('uses provider totals, preserves real zero and incomplete totals',()=>{
    expect(transitTotal(response.days[0])).toBe('36분 · 5.0km')
    expect(minutes(0)).toBe('0분');expect(minutes(null)).toBe('정보 없음')

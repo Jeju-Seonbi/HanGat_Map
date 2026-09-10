@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { apiRequest } from '../../api/backendClient.js'
+import { ASYNC_COURSES_ENABLED } from '../../api/notifications.js'
 import type { CourseResult } from '../../assets/types/course'
 export interface TransitStep { type: string; distance_meters: number | null; duration_seconds: number | null; stops: string[]; vehicles: string[] }
 export interface TransitLeg { from: { id: string; name: string }; to: { id: string; name: string }; status: string;
@@ -37,6 +38,7 @@ export function transitSignature(c: CourseResult) {
 }
 export function useTransitRoute(fetcher = async (c: CourseResult): Promise<TransitRoute> => await apiRequest(`/courses/${c.id}/routes/transit`, {
   method: 'GET', auth: c.status === 'SAVED',
+  ...(ASYNC_COURSES_ENABLED ? { optionalAuth: true } : {}),
 }) as TransitRoute) {
   const data=ref<TransitRoute>(), loading=ref(false), error=ref('')
   let epoch=0

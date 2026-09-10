@@ -11,6 +11,16 @@ const leg:TransitLeg={from:{id:'1',name:'출발'},to:{id:'2',name:'도착'},stat
  {type:'BUS',distance_meters:17185,duration_seconds:2246,vehicles:['722-2'],stops:['고성리 성산농협','일출랜드입구']},
 ]}
 describe('transit cards',()=>{
+ it('keeps async job lifecycle and transit cancellation integrated',()=>{
+  const view=readFileSync(new URL('../../views/ai-course/AiCourseView.vue',import.meta.url),'utf8')
+  const restore=view.slice(view.indexOf('async function restoreJobResult'),view.indexOf('onMounted(async'))
+  expect(restore).toContain('getGenerationResult(id)')
+  expect(restore).toContain('restoration.restore')
+  expect(restore.indexOf('void loadCarRoute()')).toBeGreaterThan(restore.indexOf('result.value = current'))
+  expect(restore).toContain('transit.cancel()')
+  expect(restore).toContain('watch(() => route.query.job')
+  expect(restore).toContain('watch(() => (auth.user')
+ })
  it('reloads transit only after the accommodation PATCH has succeeded',()=>{
   const view=readFileSync(new URL('../../views/ai-course/AiCourseView.vue',import.meta.url),'utf8')
   const handler=view.slice(view.indexOf('async function selectRecommendedAccommodation'),view.indexOf('async function chooseAccommodation'))
