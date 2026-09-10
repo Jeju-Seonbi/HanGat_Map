@@ -203,6 +203,21 @@ public class Place {
         this.imageUrl = imageUrl;
     }
 
+    /**
+     * 출처 목록에서 두 번 연속 사라진 장소를 폐업으로 표시한다(PlacePresenceReconciler).
+     * 행을 지우지 않는다 - 찜·후기·코스가 참조하고, 원천 오탐이면 다음 적재에 되살린다.
+     */
+    public void markClosed() {
+        this.businessStatus = BusinessStatus.CLOSED;
+    }
+
+    /** 출처에 다시 나타난 장소를 되살린다. 영업 중인지는 모르므로 OPEN이 아니라 UNKNOWN이다. */
+    public void reopenIfClosed() {
+        if (this.businessStatus == BusinessStatus.CLOSED) {
+            this.businessStatus = BusinessStatus.UNKNOWN;
+        }
+    }
+
     /** 검증된 Kakao 숙박 사실로만 기존 Place의 외부 표시 사실을 갱신한다. */
     public void updateVerifiedAccommodation(
             Region region, PlaceCategory primaryCategory,
