@@ -227,6 +227,7 @@ public class CourseQueryService {
                 place.getName(),
                 place.getPrimaryCategory().getName(),
                 place.getRegion().getName(),
+                place.getBusinessStatus(),
                 place.getImageUrl(),
                 place.getLatitude() == null ? null : place.getLatitude().doubleValue(),
                 place.getLongitude() == null ? null : place.getLongitude().doubleValue(),
