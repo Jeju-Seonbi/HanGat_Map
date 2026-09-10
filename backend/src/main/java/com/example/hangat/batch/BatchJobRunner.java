@@ -4,6 +4,9 @@ import com.example.hangat.course.service.SampleCourseGenerator;
 import com.example.hangat.domain.weather.TripWeatherIngestService;
 import com.example.hangat.domain.weather.WeatherIngestService;
 import com.example.hangat.map.congestion.CongestionIngestService;
+import com.example.hangat.map.goodprice.GoodPriceIngestService;
+import com.example.hangat.map.place.PlaceIngestService;
+import com.example.hangat.map.store.StoreIngestService;
 import com.example.hangat.notification.service.trip.TripNotificationJobService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,11 +33,15 @@ public class BatchJobRunner implements ApplicationRunner {
     private final BatchPrerequisiteChecker prerequisites;
     private final TripWeatherIngestService tripWeather;
     private final TripNotificationJobService tripNotifications;
+    private final PlaceIngestService places;
+    private final StoreIngestService stores;
+    private final GoodPriceIngestService goodPrice;
 
     public BatchJobRunner(@Value("${hangat.batch.job:}") String job,
                           CongestionIngestService congestion, WeatherIngestService weather,
                           SampleCourseGenerator courses, BatchPrerequisiteChecker prerequisites,
-                          TripWeatherIngestService tripWeather, TripNotificationJobService tripNotifications) {
+                          TripWeatherIngestService tripWeather, TripNotificationJobService tripNotifications,
+                          PlaceIngestService places, StoreIngestService stores, GoodPriceIngestService goodPrice) {
         this.job = job;
         this.congestion = congestion;
         this.weather = weather;
@@ -42,6 +49,9 @@ public class BatchJobRunner implements ApplicationRunner {
         this.prerequisites = prerequisites;
         this.tripWeather = tripWeather;
         this.tripNotifications = tripNotifications;
+        this.places = places;
+        this.stores = stores;
+        this.goodPrice = goodPrice;
     }
 
     /** 기존 스케줄러의 예외 흡수·재시도는 사용하지 않는다. 재시도 횟수는 Job이 관리한다. */
@@ -103,10 +113,23 @@ public class BatchJobRunner implements ApplicationRunner {
                 log.info("샘플 코스 배치 결과 {}", result);
             }
             case "trip-reminders" -> tripNotifications.run("reminders");
+            // ────────────────────────── 장소 원천 재적재 + 출석 체크(폐업 판정) ──────────────────────────
+            case "places" -> {
+                // 순서 고정: KTO(관광지) → SBIZ(상가) → 착한가격(앞의 둘 위에 플래그만 얹는다)
+                var ktoResult = places.ingest();
+                var sbizResult = stores.ingest();
+                var goodPriceResult = goodPrice.ingest();
+                // 수신이 부족해 판정을 건너뛴 날은 실패로 남긴다 - 조용히 성공 처리되면 아무도 안 본다
+                if (ktoResult.presence().skipped() || sbizResult.presence().skipped() || goodPriceResult.clearSkipped()) {
+                    throw new IllegalStateException("장소 재적재 불완전(수신 부족으로 판정 보류): KTO=" + ktoResult
+                            + " SBIZ=" + sbizResult + " 착한가격=" + goodPriceResult);
+                }
+                log.info("장소 재적재 결과 KTO={} SBIZ={} 착한가격={}", ktoResult, sbizResult, goodPriceResult);
+            }
 
             default -> throw new IllegalArgumentException(
                     "hangat.batch.job은 congestion, weather, trip-weather, "
-                            + "sample-courses, trip-reminders 중 하나여야 합니다."
+                            + "sample-courses, trip-reminders, places 중 하나여야 합니다."
             );
         }
         log.info("배치 완료 job={}", job);
