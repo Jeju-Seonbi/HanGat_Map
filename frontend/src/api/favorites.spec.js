@@ -102,3 +102,11 @@ describe('toItem closed flag', () => {
     expect(toItem({ ...ROW, businessStatus: 'CLOSED' }, null).closed).toBe(true)
   })
 })
+
+describe('toItem crowd dot', () => {
+  it('keeps the gray dot for a tourist spot without forecast but drops it for a restaurant', () => {
+    expect(toItem({ ...ROW, crowdRate: null }, null).crowdTier).toBe('none')
+    expect(toItem({ ...ROW, crowdRate: null, categoryCode: 'FOOD' }, null).crowdTier).toBeNull()
+    expect(toItem({ ...ROW, crowdRate: 55, categoryCode: 'FOOD' }, null).crowdTier).toBe('mid')
+  })
+})
