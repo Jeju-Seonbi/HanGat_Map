@@ -108,3 +108,30 @@ describe('getAll 부분 실패 - 목업으로 바꿔치기하지 않는다', () 
     expect(Object.values(r.layers).every(l => l.length === 0)).toBe(true)
   })
 })
+
+/** 폐업 장소 - 목록엔 없지만 찜·공유 링크로 열리므로 id 단건 조회와 closed 플래그가 필요하다 */
+const CLOSED_ROW = {
+  id: 77, name: '문닫은집', regionCode: 'WEST', regionName: '서부', categoryCode: 'FOOD', categoryName: '음식점',
+  tagCode: null, tagName: '한식', roadAddress: '제주 제주시 애월읍', lotAddress: null, latitude: 33.4, longitude: 126.3,
+  phone: null, operatingHoursText: null, parkingAvailable: null, toiletAvailable: null,
+  businessStatus: 'CLOSED', goodPrice: false, hiddenGem: false
+}
+
+describe('폐업 장소', () => {
+  it('목록 변환은 CLOSED 를 closed 플래그로 옮기고 나머지는 false 다', async () => {
+    mockFetch([CLOSED_ROW, { ...CLOSED_ROW, id: 78, businessStatus: 'UNKNOWN' }])
+    const rows = await MapPlaceService.getLayer('dine')
+    expect(rows?.map(r => r.closed)).toEqual([true, false])
+  })
+
+  it('getById 는 상세 응답을 목록과 같은 모양으로 돌려준다', async () => {
+    mockFetch({ ...CLOSED_ROW, overview: '소개', images: [] })
+    const p = await MapPlaceService.getById(77)
+    expect(p).toMatchObject({ id: 77, n: '문닫은집', x: 126.3, y: 33.4, cat: 'FOOD', closed: true })
+  })
+
+  it('getById 는 실패하면 null - 호출부가 "찾지 못했어요" 로 안내한다', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('down')))
+    expect(await MapPlaceService.getById(1)).toBeNull()
+  })
+})

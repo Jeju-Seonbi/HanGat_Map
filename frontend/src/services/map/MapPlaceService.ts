@@ -46,6 +46,8 @@ export interface MapPlace {
   fee: number | null
   d: number | null
   in: number | null
+  /** 폐업(businessStatus CLOSED). 목록·검색엔 안 나오고 찜·공유 링크로 열릴 때만 true - 패널이 '폐업' 배지를 단다 */
+  closed: boolean
 }
 
 /** 백엔드 PlaceListResponse (map/model/dto/PlaceListResponse.java 와 동일 모양) */
@@ -201,6 +203,18 @@ export const MapPlaceService = {
     } catch {
       return null
     }
+  },
+
+  /**
+   * 목록에 없는 장소를 id 로 받는다 - 폐업(CLOSED) 장소는 목록·검색에서 빠지지만 찜·공유 링크로는 들어온다.
+   * 상세 응답은 목록 응답의 상위 집합이라 같은 변환을 쓴다. 없거나 실패하면 null.
+   */
+  async getById (id: number): Promise<MapPlace | null> {
+    try {
+      return toMapPlace(await apiGet<BackendPlace>(`/places/${id}`, 15000))
+    } catch {
+      return null
+    }
   }
 }
 
@@ -225,7 +239,8 @@ function toMapPlace (row: BackendPlace): MapPlace {
     b: null,
     fee: null,
     d: null,
-    in: null
+    in: null,
+    closed: row.businessStatus === 'CLOSED'
   }
 }
 

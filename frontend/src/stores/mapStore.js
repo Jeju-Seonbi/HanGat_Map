@@ -122,6 +122,9 @@ export async function findPlaceById (id) {
     const p = rows.find(x => x.id === id)
     if (p) { state.L[k] = 1; return { place: p, error: false } }
   }
+  // 어느 레이어에도 없는 장소 - 폐업(CLOSED)은 목록에서 빠지지만 찜·공유 링크로는 들어온다. 상세를 직접 받아 연다
+  const single = await MapPlaceService.getById(id)
+  if (single) return { place: single, error: false }
   return { place: null, error }
 }
 

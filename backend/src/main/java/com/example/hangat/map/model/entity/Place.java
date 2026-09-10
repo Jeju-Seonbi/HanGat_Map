@@ -44,6 +44,8 @@ import java.time.LocalDateTime;
 public class Place {
 
     private static final BigDecimal DEFAULT_RATING_AVG = new BigDecimal("0.00");
+    /** 착한가격 CSV가 채우는 overview 문단의 머리말. 이 머리말로 시작하는 문단만 착한가격 배치가 덮어쓰고 지운다. */
+    public static final String GOOD_PRICE_MENU_PREFIX = "대표메뉴:";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -203,6 +205,21 @@ public class Place {
         this.imageUrl = imageUrl;
     }
 
+    /**
+     * 출처 목록에서 두 번 연속 사라진 장소를 폐업으로 표시한다(PlacePresenceReconciler).
+     * 행을 지우지 않는다 - 찜·후기·코스가 참조하고, 원천 오탐이면 다음 적재에 되살린다.
+     */
+    public void markClosed() {
+        this.businessStatus = BusinessStatus.CLOSED;
+    }
+
+    /** 출처에 다시 나타난 장소를 되살린다. 영업 중인지는 모르므로 OPEN이 아니라 UNKNOWN이다. */
+    public void reopenIfClosed() {
+        if (this.businessStatus == BusinessStatus.CLOSED) {
+            this.businessStatus = BusinessStatus.UNKNOWN;
+        }
+    }
+
     /** 검증된 Kakao 숙박 사실로만 기존 Place의 외부 표시 사실을 갱신한다. */
     public void updateVerifiedAccommodation(
             Region region, PlaceCategory primaryCategory,
@@ -224,12 +241,26 @@ public class Place {
      * 상세 배치(detailIntro2)가 채우는 값들 - 목록 적재와 출처가 달라 따로 둔다.
      * 목록 배치가 이 값들을 null로 덮어쓰면 안 되므로 updateFromSource 와 섞지 않는다.
      */
-    /** 착한가격 지정 - 있는 정보만 채우고 기존 값(KTO)은 지우지 않는다 */
+    /**
+     * 착한가격 지정·갱신. 메뉴·가격 문단은 비어 있거나 우리가 넣은 것({@link #GOOD_PRICE_MENU_PREFIX})일 때만 쓴다 -
+     * KTO 소개글은 지우지 않는다. 전화도 없을 때만 채운다.
+     */
     public void markGoodPrice(java.time.LocalDate baseDate, String menuText, String phone) {
         this.isGoodPrice = true;
         this.goodPriceBaseDate = baseDate;
-        if (this.overview == null && menuText != null) this.overview = menuText;
+        if (menuText != null && (this.overview == null || isGoodPriceMenu(this.overview))) this.overview = menuText;
         if (this.phone == null && phone != null) this.phone = phone;
+    }
+
+    /** CSV에서 빠진 업소 - 지정 해제. 옛 가격 문단은 지우고, 폐업 판정은 하지 않는다(해제 ≠ 폐업). */
+    public void clearGoodPrice() {
+        this.isGoodPrice = false;
+        this.goodPriceBaseDate = null;
+        if (isGoodPriceMenu(this.overview)) this.overview = null;
+    }
+
+    private static boolean isGoodPriceMenu(String overview) {
+        return overview != null && overview.startsWith(GOOD_PRICE_MENU_PREFIX);
     }
 
     /** 음식점 메뉴 배치(detailIntro2)가 채운다 - 착한가격이 이미 넣은 overview는 지우지 않는다 */
