@@ -208,6 +208,7 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
 
     /**
      * 대안 스왑용 후보 조회 - 같은 카테고리 + 바운딩 박스 선필터 (정밀 거리는 GeoService가 2차 컷).
+     * 폐업(CLOSED)은 대안으로 권하지 않는다.
      * 팀 규칙상 네이티브 대신 JPQL. region은 응답 표시명에 바로 쓰므로 fetch join.
      */
     @Query("""
@@ -216,6 +217,7 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
             where p.primaryCategory.code = :categoryCode
               and p.latitude between :minLat and :maxLat
               and p.longitude between :minLng and :maxLng
+              and p.businessStatus <> com.example.hangat.map.model.enums.BusinessStatus.CLOSED
             """)
     List<Place> findCandidatesInBox(String categoryCode,
                                     BigDecimal minLat, BigDecimal maxLat,
