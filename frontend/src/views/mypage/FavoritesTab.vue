@@ -79,9 +79,12 @@ async function unfavorite (item) {
 }
 
 /* 실데이터 운영시간은 자유 텍스트다 - "09:00~18:00" 꼴(hours)만 운영 중/종료를 판정하고 나머지는 원문을 그대로 보여준다 */
-const status = item => item.hours
-  ? operationStatus(item)
-  : { code: item.hoursText ? 'TEXT' : 'UNKNOWN', label: item.hoursText ?? '운영시간 정보 없음' }
+/* 폐업이 운영시간보다 먼저다 - 원천 목록에서 두 번 연속 빠진 장소. 찜은 남기고 표시만 한다 */
+const status = item => item.closed
+  ? { code: 'CLOSED', label: '폐업' }
+  : item.hours
+    ? operationStatus(item)
+    : { code: item.hoursText ? 'TEXT' : 'UNKNOWN', label: item.hoursText ?? '운영시간 정보 없음' }
 /* 입장료는 원문+무료 여부로 온다 - 모르면 '무료'가 아니라 '정보 없음' */
 const feeLabel = item => item.feeText ?? (item.free ? '무료' : '정보 없음')
 </script>

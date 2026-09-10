@@ -72,6 +72,8 @@ export function toItem (r, weather = null) {
     rating: r.ratingAvg == null ? null : Number(r.ratingAvg),
     reviewCount: r.reviewCount ?? 0,
     businessStatus: r.businessStatus,
+    /** 폐업(CLOSED) - 목록·검색에선 빠지지만 찜은 남기고 '폐업'으로 표시한다 */
+    closed: r.businessStatus === 'CLOSED',
     imageUrl: r.imageUrl ?? null
   }
 }

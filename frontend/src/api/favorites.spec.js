@@ -95,3 +95,10 @@ describe('listFavorites / removeFavorite', () => {
     expect(apiRequest).toHaveBeenCalledWith('/favorites/5', { method: 'DELETE', auth: true })
   })
 })
+
+describe('toItem closed flag', () => {
+  it('marks CLOSED places so the tab can label them 폐업 instead of hiding them', () => {
+    expect(toItem(ROW, null).closed).toBe(false)
+    expect(toItem({ ...ROW, businessStatus: 'CLOSED' }, null).closed).toBe(true)
+  })
+})
