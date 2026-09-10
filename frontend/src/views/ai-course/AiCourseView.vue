@@ -2,6 +2,9 @@
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { congestionLabel } from '../../utils/congestion'
 import { dayWeatherLabels } from '../../services/course/dailyWeather'
+import { useTransitRoute } from '../../services/course/transitRoute'
+import TransitDayRoute from '../../components/course/TransitDayRoute.vue'
+import TransitLegCard from '../../components/course/TransitLegCard.vue'
 import { todayKst, addCalendarDays, formatCalendarDate } from '../../utils/format.js'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../app/stores/auth'
@@ -74,6 +77,8 @@ if (typeof route.query.course === 'string' && /^[1-9]\d{0,14}$/.test(route.query
 // The form clones its initial props: hydrate before its first render, not onMounted.
 if (restoringState.value) Object.assign(condition, restoringState.value.condition)
 const fetchRoute = singleFlight(courseMockService.getCarRoute)
+const transit = useTransitRoute()
+const { data: transitData, loading: transitLoading, error: transitError } = transit
 const now = ref(Date.now())
 let clock: ReturnType<typeof setInterval> | undefined
 let viewEpoch = 0
@@ -89,6 +94,7 @@ function rememberCurrent() {
   }
 }
 function editConditions() {
+  transit.cancel()
   restoration.cancel(); renewal.cancel(); viewEpoch++; routeEpoch++
   if (result.value) clearCourseProof(result.value)
   restoringState.value = null; editing.value = true; loading.value = false; routeLoading.value = false
@@ -126,7 +132,7 @@ async function restoreResult() {
     }
   }
 }
-onUnmounted(() => { restoration.cancel(); renewal.cancel(); viewEpoch++; routeEpoch++; if (clock) clearInterval(clock) })
+onUnmounted(() => { transit.cancel(); restoration.cancel(); renewal.cancel(); viewEpoch++; routeEpoch++; if (clock) clearInterval(clock) })
 watch(now, () => {
   if (result.value?.claim_token && !validProof(result.value, now.value)) { clearCourseProof(result.value); rememberCurrent() }
 })
@@ -142,6 +148,8 @@ async function viewOnMap() {
 }
 
 async function loadCarRoute() {
+  if (result.value?.transport === 'PUBLIC_TRANSIT') { await transit.load(result.value); return }
+  transit.cancel()
   if (!result.value || result.value.transport !== 'RENTAL_CAR') return
   const course = result.value
   const ticket = ++routeEpoch
@@ -155,6 +163,10 @@ async function loadCarRoute() {
   } finally {
     if (ticket === routeEpoch) routeLoading.value = false
   }
+}
+
+function transitLeg(dayNo: number, fromId: string) {
+  return transitData.value?.days.find(d => d.day_no === dayNo)?.legs.find(l => l.from.id === fromId)
 }
 
 const routeForDay = (dayNo: number): CarDayRoute | undefined =>
@@ -186,6 +198,7 @@ const estimatedCost = computed(() => {
 
 async function generate(next: CourseCondition, regenerate = false) {
   if (loading.value) return
+  transit.cancel()
   restoration.cancel(); renewal.cancel(); routeEpoch++
   const ticket = ++viewEpoch
   Object.assign(condition, JSON.parse(JSON.stringify(next)) as CourseCondition)
@@ -495,20 +508,23 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
           <section v-for="day in result.days" :key="day.day_no" class="course-day">
             <header><b>DAY {{ day.day_no }}</b><span>{{ formatDate(day.visit_date) }}</span></header>
             <p v-for="weather in dayWeatherLabels(day.items)" :key="weather" class="daily-weather">{{ weather }}</p>
+            <TransitDayRoute v-if="result.transport === 'PUBLIC_TRANSIT'" :day="transitData?.days.find(d => d.day_no === day.day_no)" :loading="transitLoading" :error="transitError" />
             <p v-if="result.transport === 'RENTAL_CAR'" class="route-summary">
               총 이동 {{ routeSummary([routeForDay(day.day_no) ?? {}], routeLoading) }}
             </p>
             <div class="day-timeline">
               <p v-for="notice in accessNotices(routeForDay(day.day_no) ? [routeForDay(day.day_no)!] : [])" :key="notice" class="route-status">{{ notice }}</p>
-              <div v-if="result.accommodation" class="travel-line"><span>↓</span> 숙소 출발 · {{ result.accommodation.place_name }}<template v-if="day.accommodation_departure_travel_minutes"> · {{ transportLabel[result.transport] }} {{ day.accommodation_departure_travel_minutes }}분 · {{ formatDistance(day.accommodation_departure_distance_m) }}</template></div>
-              <template v-for="item in day.items" :key="item.id">
+              <TransitLegCard v-if="result.transport === 'PUBLIC_TRANSIT' && result.accommodation && day.items.length" :leg="transitLeg(day.day_no, 'ACCOMMODATION')" :from="result.accommodation.place_name" :to="day.items[0]!.place_name" :loading="transitLoading" />
+              <div v-if="result.accommodation && result.transport !== 'PUBLIC_TRANSIT'" class="travel-line"><span>↓</span> 숙소 출발 · {{ result.accommodation.place_name }}<template v-if="day.accommodation_departure_travel_minutes"> · {{ transportLabel[result.transport] }} {{ day.accommodation_departure_travel_minutes }}분 · {{ formatDistance(day.accommodation_departure_distance_m) }}</template></div>
+              <template v-for="(item,itemIndex) in day.items" :key="item.id">
                 <div v-if="inboundRoute(day.day_no, item.id)" class="travel-line">
                   <span>↓</span> 이동 약 {{ formatDuration(inboundRoute(day.day_no, item.id)?.duration_seconds) }} ·
                   {{ formatDistance(inboundRoute(day.day_no, item.id)?.distance_meters) }}
                 </div>
                 <CourseItemCard :item="item" :transport="result.transport" :readonly="!canSwap" @alternative="openAlternatives" @reschedule="openReschedule" />
+                <TransitLegCard v-if="result.transport === 'PUBLIC_TRANSIT' && (day.items[itemIndex + 1] || result.accommodation)" :leg="transitLeg(day.day_no, `ITEM:${item.id}`)" :from="item.place_name" :to="day.items[itemIndex + 1]?.place_name ?? result.accommodation!.place_name" :loading="transitLoading" />
               </template>
-              <div v-if="result.accommodation" class="travel-line"><span>↓</span> 숙소 복귀 · {{ result.accommodation.place_name }}<template v-if="day.accommodation_return_travel_minutes"> · {{ transportLabel[result.transport] }} {{ day.accommodation_return_travel_minutes }}분 · {{ formatDistance(day.accommodation_return_distance_m) }}</template></div>
+              <div v-if="result.accommodation && result.transport !== 'PUBLIC_TRANSIT'" class="travel-line"><span>↓</span> 숙소 복귀 · {{ result.accommodation.place_name }}<template v-if="day.accommodation_return_travel_minutes"> · {{ transportLabel[result.transport] }} {{ day.accommodation_return_travel_minutes }}분 · {{ formatDistance(day.accommodation_return_distance_m) }}</template></div>
             </div>
           </section>
           <p v-if="routeLoading" class="route-status">자동차 이동 경로를 불러오는 중이에요.</p>
