@@ -244,8 +244,13 @@ async function shareNative() {
       </div>
 
       <div class="lead">
+        <!-- 폐업: 원천 목록에서 두 번 연속 빠진 장소(PlacePresenceReconciler). 핀은 없고 찜·코스·공유 링크로만 열린다 -->
+        <template v-if="s.closed">
+          <span class="bdg" style="background:var(--busy);color:#fff">폐업</span>
+          &nbsp;폐업했거나 관광 정보에서 삭제된 장소예요. 찜·코스에는 그대로 남아 있어요.
+        </template>
         <!-- MAP_004 예외: 예보 미제공 — 없는 데이터는 추측하지 않는다 -->
-        <template v-if="c == null">
+        <template v-else-if="c == null">
           <span class="bdg" style="background:var(--none);color:#fff">예보 없음</span>
           &nbsp;관광공사 혼잡 예측 대상이 아니라 이 장소는 예보가 없어요.
         </template>
@@ -257,11 +262,13 @@ async function shareNative() {
         </template>
       </div>
 
-      <div v-if="c != null" class="tipbox" @click="jumpToBest">
+      <div v-if="c != null && !s.closed" class="tipbox" @click="jumpToBest">
         <template v-if="!tipText">✓ 30일 중 <b>오늘이 가장 한산</b>해요.</template>
         <template v-else>🕐 <b>{{ fmtK(at(best.k)) }}</b>로 가면 <b>{{ tipText }}</b> 날이에요. 눌러서 옮겨보세요.</template>
       </div>
 
+      <!-- 폐업 장소는 날씨·혼잡 줄을 그리지 않는다 - 갈 수 없는 곳의 예보다 -->
+      <template v-if="!s.closed">
       <div class="spark" style="margin-bottom:6px"><div class="st"><i></i>날짜별 날씨와 혼잡</div></div>
       <div class="wxrow">
         <div v-for="w in week" :key="w.k" class="wxc" :class="{ on: w.k === state.di }"
@@ -282,6 +289,7 @@ async function shareNative() {
         </div>
       </div>
       <div v-if="weatherGap && wxUntil" class="wx-note">날씨는 {{ wxUntil }}까지 제공돼요 · 혼잡은 30일 표시</div>
+      </template>
 
       <!-- 없는 정보(null)는 배지를 그리지 않는다 - '주차 없음'과 '주차 정보 없음'은 다르다 -->
       <div v-if="hasAmen" class="amen">
