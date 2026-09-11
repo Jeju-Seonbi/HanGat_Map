@@ -186,8 +186,7 @@ export const MapPlaceService = {
    */
   async getDetail (id: number): Promise<PlaceDetail | null> {
     try {
-      // 15초: 핀 전량 재생성이 메인 스레드를 5초 넘게 잠그면 5초 기본값으론 응답이 Abort로 죽는다
-      const row = await apiGet<BackendPlaceDetail>(`/places/${id}`, 15000)
+      const row = await apiGet<BackendPlaceDetail>(`/places/${id}`)
       const images = (row.images ?? []).map(i => ({
         url: i.url,
         thumb: i.thumbnailUrl ?? i.url,
@@ -215,7 +214,7 @@ export const MapPlaceService = {
    */
   async getById (id: number): Promise<MapPlace | null> {
     try {
-      return toMapPlace(await apiGet<BackendPlace>(`/places/${id}`, 15000))
+      return toMapPlace(await apiGet<BackendPlace>(`/places/${id}`))
     } catch {
       return null
     }
