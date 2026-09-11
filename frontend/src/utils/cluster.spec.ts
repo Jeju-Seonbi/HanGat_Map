@@ -2,12 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { clusterByUnit, clusterModeFor, clusterPins, clusterSize, dominantTier, hideDimFor } from './cluster'
 
 describe('cluster - 축소 뷰 핀 묶기', () => {
-  it('방식은 레벨로 정한다: 10 이상 행정 단위, 8~9 픽셀 40px, 7 이하 안 묶음(전부 개별 핀)', () => {
+  it('방식은 레벨·레이어로: 10 이상 행정 단위, 관광지·착한가격·식당·숙소는 9까지 픽셀 40px·8부터 개별, 카페·편의점·마트는 8까지 픽셀', () => {
     expect(clusterModeFor(11)).toEqual({ unit: true, radius: 0 })
-    expect(clusterModeFor(10)).toEqual({ unit: true, radius: 0 })
+    expect(clusterModeFor(10, 'cafe')).toEqual({ unit: true, radius: 0 })
     expect(clusterModeFor(9)).toEqual({ unit: false, radius: 40 })
-    expect(clusterModeFor(8)).toEqual({ unit: false, radius: 40 })
-    expect(clusterModeFor(7)).toEqual({ unit: false, radius: 0 })
+    for (const g of ['spot', 'food', 'dine', 'stay']) expect(clusterModeFor(8, g)).toEqual({ unit: false, radius: 0 })
+    for (const g of ['cafe', 'cvs', 'mart']) expect(clusterModeFor(8, g)).toEqual({ unit: false, radius: 40 })
+    expect(clusterModeFor(7, 'cafe')).toEqual({ unit: false, radius: 0 })
     expect(clusterModeFor(4)).toEqual({ unit: false, radius: 0 })
   })
 
@@ -19,9 +20,9 @@ describe('cluster - 축소 뷰 핀 묶기', () => {
     expect(cl[0].members).toHaveLength(5)
   })
 
-  it('흐린 핀 숨김은 레벨 8 이상', () => {
-    expect(hideDimFor(8)).toBe(true)
-    expect(hideDimFor(7)).toBe(false)
+  it('흐린 핀 숨김은 관광지가 묶이는 레벨 9 이상', () => {
+    expect(hideDimFor(9)).toBe(true)
+    expect(hideDimFor(8)).toBe(false)
   })
 
   it('행정 단위 묶기: 단위 하나에 묶음 하나, 위치는 평균, 이름은 단위', () => {
