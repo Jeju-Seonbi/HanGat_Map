@@ -4,6 +4,7 @@ import com.example.hangat.course.service.SampleCourseGenerator;
 import com.example.hangat.domain.weather.TripWeatherIngestService;
 import com.example.hangat.domain.weather.WeatherIngestService;
 import com.example.hangat.map.congestion.CongestionIngestService;
+import com.example.hangat.map.hiddengem.HiddenGemScoringService;
 import com.example.hangat.map.goodprice.GoodPriceIngestService;
 import com.example.hangat.map.place.PlaceIngestService;
 import com.example.hangat.map.detail.OverviewIngestService;
@@ -38,13 +39,14 @@ public class BatchJobRunner implements ApplicationRunner {
     private final StoreIngestService stores;
     private final GoodPriceIngestService goodPrice;
     private final OverviewIngestService overviews;
+    private final HiddenGemScoringService hiddenGems;
 
     public BatchJobRunner(@Value("${hangat.batch.job:}") String job,
                           CongestionIngestService congestion, WeatherIngestService weather,
                           SampleCourseGenerator courses, BatchPrerequisiteChecker prerequisites,
                           TripWeatherIngestService tripWeather, TripNotificationJobService tripNotifications,
                           PlaceIngestService places, StoreIngestService stores, GoodPriceIngestService goodPrice,
-                          OverviewIngestService overviews) {
+                          OverviewIngestService overviews, HiddenGemScoringService hiddenGems) {
         this.job = job;
         this.congestion = congestion;
         this.weather = weather;
@@ -56,6 +58,7 @@ public class BatchJobRunner implements ApplicationRunner {
         this.stores = stores;
         this.goodPrice = goodPrice;
         this.overviews = overviews;
+        this.hiddenGems = hiddenGems;
     }
 
     /** 기존 스케줄러의 예외 흡수·재시도는 사용하지 않는다. 재시도 횟수는 Job이 관리한다. */
@@ -67,6 +70,14 @@ public class BatchJobRunner implements ApplicationRunner {
                 var result = congestion.ingest();
                 if (result.saved() == 0) {
                     throw new IllegalStateException("혼잡도 적재 실패: 저장된 예보가 없습니다.");
+                }
+                // 숨은 명소는 "집계 대상이 아닌 관광지"라 최신 발표분이 확정된 직후 판정한다.
+                // 알림 처리보다 먼저 - 둘은 독립이고, 알림이 회원 한 명 실패로 예외를 내도 판정이 밀리면 안 된다.
+                // 판정 실패는 혼잡 적재를 되돌릴 이유가 아니다 - 재시도하면 집중률 API를 다시 부른다. 로그로 남긴다.
+                try {
+                    log.info("숨은 명소 판정 결과 {}", hiddenGems.score());
+                } catch (RuntimeException e) {
+                    log.error("숨은 명소 판정 실패 - 어제 판정이 남아 있고 다음 배치가 다시 시도한다", e);
                 }
                 tripNotifications.run("congestion");
 
