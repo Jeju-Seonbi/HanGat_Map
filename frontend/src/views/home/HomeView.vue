@@ -392,6 +392,12 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateArrows))
   .hero-full {
     min-height: 520px;
   }
+  /* 제목 옆에 "전체 지도 보기" 링크가 끼면 제목이 두 줄로 접힌다 - 제목 아래로 */
+  .section-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
   .weather-grid {
     display: flex;
     gap: 10px;
