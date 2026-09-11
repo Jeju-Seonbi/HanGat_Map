@@ -37,8 +37,9 @@
    크기를 20px로 고정하는 이유: 카카오는 노드 크기로 앵커(중심)를 잡는데 핀을 재사용하며 점 지름을 9→15→20으로
    바꾸면 래퍼 크기가 달라져 다시 재기 전까지 핀이 몇 px 어긋난다. 래퍼는 고정, 안쪽 점만 커지고 작아진다(가운데 정렬) */
 .pw{position:relative;display:flex;align-items:center;justify-content:center;width:20px;height:20px}
-/* 핀 이름표는 상세 줌(level 7 이하)에서만 - 관광지·업종 공통. 축소 뷰의 라벨 밭 방지 */
-.pw .lb-t{position:absolute;bottom:calc(100% + 5px);left:50%;transform:translateX(-50%);
+/* 핀 이름표는 상세 줌(level 7 이하)에서만 - 관광지·업종 공통. 축소 뷰의 라벨 밭 방지.
+   위치는 핀 아래(2026-09-12 결정) - 아이콘이 들어간 핀 위에 이름표가 얹히면 핀이 가려 보인다 */
+.pw .lb-t{position:absolute;top:calc(100% + 5px);left:50%;transform:translateX(-50%);
   pointer-events:none;display:none}
 #map.labels-visible .pw .lb-t{display:block}
 /* 필터 밖 관광지(흐린 핀)는 줌과 무관하게 이름표 없음 - 핀을 재사용하므로 노드를 빼지 않고 클래스로 숨긴다 */
