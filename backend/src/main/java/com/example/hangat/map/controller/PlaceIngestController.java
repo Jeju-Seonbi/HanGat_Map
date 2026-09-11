@@ -3,6 +3,7 @@ package com.example.hangat.map.controller;
 import com.example.hangat.common.model.BaseResponse;
 import com.example.hangat.map.congestion.CongestionIngestService;
 import com.example.hangat.map.detail.MenuIngestService;
+import com.example.hangat.map.detail.OverviewIngestService;
 import com.example.hangat.map.detail.PlaceDetailIngestService;
 import com.example.hangat.map.image.PlaceImageIngestService;
 import com.example.hangat.map.place.PlaceIngestService;
@@ -38,6 +39,7 @@ public class PlaceIngestController {
     private final com.example.hangat.map.goodprice.GoodPriceIngestService goodPriceIngestService;
     private final com.example.hangat.map.store.StoreIngestService storeIngestService;
     private final MenuIngestService menuIngestService;
+    private final OverviewIngestService overviewIngestService;
 
     public PlaceIngestController(PlaceIngestService placeIngestService,
                                  CongestionIngestService congestionIngestService,
@@ -45,7 +47,8 @@ public class PlaceIngestController {
                                  PlaceImageIngestService placeImageIngestService,
                                  com.example.hangat.map.goodprice.GoodPriceIngestService goodPriceIngestService,
                                  com.example.hangat.map.store.StoreIngestService storeIngestService,
-                                 MenuIngestService menuIngestService) {
+                                 MenuIngestService menuIngestService,
+                                 OverviewIngestService overviewIngestService) {
         this.placeIngestService = placeIngestService;
         this.congestionIngestService = congestionIngestService;
         this.placeDetailIngestService = placeDetailIngestService;
@@ -53,6 +56,7 @@ public class PlaceIngestController {
         this.goodPriceIngestService = goodPriceIngestService;
         this.storeIngestService = storeIngestService;
         this.menuIngestService = menuIngestService;
+        this.overviewIngestService = overviewIngestService;
     }
 
     @Operation(summary = "카페·편의점·마트 적재 (MAP-04)",
@@ -97,6 +101,16 @@ public class PlaceIngestController {
             @RequestParam(name = "limit", required = false,
                     defaultValue = "" + MenuIngestService.DEFAULT_LIMIT) int limit) {
         return BaseResponse.success(menuIngestService.ingest(limit));
+    }
+
+    @Operation(summary = "관광지 소개글 적재 (MAP_008)",
+            description = "KTO detailCommon2의 overview를 관광지 overview에 채운다(원문 유지, 태그만 정리). "
+                    + "소개글 없는 관광지부터 limit만큼 처리하고 remaining이 0에 가까워질 때까지 다시 실행하면 이어진다. 관광지 812곳 = 812콜.")
+    @PostMapping("/overviews")
+    public BaseResponse<OverviewIngestService.OverviewIngestResult> ingestOverviews(
+            @RequestParam(name = "limit", required = false,
+                    defaultValue = "" + OverviewIngestService.DEFAULT_LIMIT) int limit) {
+        return BaseResponse.success(overviewIngestService.ingest(limit));
     }
 
     @Operation(summary = "KTO 관광정보 적재",

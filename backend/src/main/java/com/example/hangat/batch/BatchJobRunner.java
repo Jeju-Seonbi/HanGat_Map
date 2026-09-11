@@ -6,6 +6,7 @@ import com.example.hangat.domain.weather.WeatherIngestService;
 import com.example.hangat.map.congestion.CongestionIngestService;
 import com.example.hangat.map.goodprice.GoodPriceIngestService;
 import com.example.hangat.map.place.PlaceIngestService;
+import com.example.hangat.map.detail.OverviewIngestService;
 import com.example.hangat.map.store.StoreIngestService;
 import com.example.hangat.notification.service.trip.TripNotificationJobService;
 import lombok.extern.slf4j.Slf4j;
@@ -36,12 +37,14 @@ public class BatchJobRunner implements ApplicationRunner {
     private final PlaceIngestService places;
     private final StoreIngestService stores;
     private final GoodPriceIngestService goodPrice;
+    private final OverviewIngestService overviews;
 
     public BatchJobRunner(@Value("${hangat.batch.job:}") String job,
                           CongestionIngestService congestion, WeatherIngestService weather,
                           SampleCourseGenerator courses, BatchPrerequisiteChecker prerequisites,
                           TripWeatherIngestService tripWeather, TripNotificationJobService tripNotifications,
-                          PlaceIngestService places, StoreIngestService stores, GoodPriceIngestService goodPrice) {
+                          PlaceIngestService places, StoreIngestService stores, GoodPriceIngestService goodPrice,
+                          OverviewIngestService overviews) {
         this.job = job;
         this.congestion = congestion;
         this.weather = weather;
@@ -52,6 +55,7 @@ public class BatchJobRunner implements ApplicationRunner {
         this.places = places;
         this.stores = stores;
         this.goodPrice = goodPrice;
+        this.overviews = overviews;
     }
 
     /** 기존 스케줄러의 예외 흡수·재시도는 사용하지 않는다. 재시도 횟수는 Job이 관리한다. */
@@ -125,6 +129,10 @@ public class BatchJobRunner implements ApplicationRunner {
                             + " SBIZ=" + sbizResult + " 착한가격=" + goodPriceResult);
                 }
                 log.info("장소 재적재 결과 KTO={} SBIZ={} 착한가격={}", ktoResult, sbizResult, goodPriceResult);
+                // 새로 들어온 관광지의 소개글을 같은 새벽에 채운다(detailCommon2, 우리만 쓰는 오퍼레이션이라 1,000/일 여유).
+                // 첫 배포 땐 812곳이 첫날 다 채워지고, 이후엔 신규 몇 건뿐. 소개글이 없는 건 실패가 아니라 결과만 남긴다
+                var overviewResult = overviews.ingest(OverviewIngestService.DEFAULT_LIMIT);
+                log.info("관광지 소개글 적재 결과 {}", overviewResult);
             }
 
             default -> throw new IllegalArgumentException(

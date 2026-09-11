@@ -13,6 +13,7 @@ import { dist, won } from '@/utils/geo'
 import { copyText } from '@/utils/clipboard'
 import { shareToKakao, preloadKakao } from '@/composables/useKakaoShare'
 import { goodPriceSourceLine } from '@/utils/dataSources'
+import { introOf, needsMore } from '@/utils/intro'
 import MapPlaceService from '@/services/map/MapPlaceService'
 import ReviewApiService, { LEVEL_TO_KEY, absUrl } from '@/services/map/ReviewApiService'
 
@@ -103,6 +104,10 @@ const menuRows = computed(() => {
   })
 })
 
+/* 관광공사 소개글 (MAP_008) - 사진 아래 2줄로 접어 두고 더보기로 펼친다. 장소가 바뀌면 다시 접는다 */
+const intro = computed(() => introOf(detail.value?.overview))
+const introOpen = ref(false)
+
 /** 관광공사(KTO) 공식 사진 - 상세에 싣는 사진은 이것뿐이다 */
 const ktoImages = computed(() => detail.value?.images ?? [])
 /* 후기 요약은 상세 API(places.rating_avg 비정규화)가 준다 - localStorage 데모 아님 */
@@ -118,6 +123,7 @@ async function loadDetail() {
   view.value = 'info'
   hint.value = ''
   shareOpen.value = false
+  introOpen.value = false
   detail.value = null
   // 목업 모드는 id 가 없다
   if (s.value.id == null) return
@@ -259,6 +265,15 @@ async function shareNative() {
       </div>
       <div v-if="ktoImages.length && detail?.imageAttribution" class="pimg-src">
         {{ detail.imageAttribution }}
+      </div>
+
+      <!-- 관광공사 소개글 (MAP_008) - 메뉴 섹션과 같은 제목 줄, 출처는 제목 오른쪽(사진 출처와 두 줄 연달아 안 나오게).
+           기본 2줄로 접어 혼잡 정보가 아래로 밀리지 않게 하고 더보기로 펼친다 -->
+      <div v-if="intro" class="intro">
+        <div class="intro-h"><i></i>소개<span class="intro-src">ⓒ한국관광공사</span></div>
+        <p class="intro-t" :class="{ clamp: !introOpen }">{{ intro }}</p>
+        <button v-if="needsMore(intro)" type="button" class="intro-more" :aria-expanded="introOpen"
+          @click="introOpen = !introOpen">{{ introOpen ? '접기 ‹' : '더보기 ›' }}</button>
       </div>
 
       <div v-if="s.closed || crowdUi" class="lead">

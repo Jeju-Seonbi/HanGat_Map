@@ -263,6 +263,11 @@ public class Place {
         return overview != null && overview.startsWith(GOOD_PRICE_MENU_PREFIX);
     }
 
+    /** 관광공사 소개글(detailCommon2). 메뉴 문단 등 이미 있는 값은 덮지 않는다 - 가격표가 소개글로 바뀌면 안 된다 */
+    public void updateOverview(String text) {
+        if (this.overview == null && text != null) this.overview = text;
+    }
+
     /** 음식점 메뉴 배치(detailIntro2)가 채운다 - 착한가격이 이미 넣은 overview는 지우지 않는다 */
     public void updateMenuText(String menuText) {
         if (this.overview == null && menuText != null) this.overview = menuText;
