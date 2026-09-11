@@ -71,11 +71,17 @@ public class BatchJobRunner implements ApplicationRunner {
                 if (result.saved() == 0) {
                     throw new IllegalStateException("혼잡도 적재 실패: 저장된 예보가 없습니다.");
                 }
+                // 숨은 명소는 "집계 대상이 아닌 관광지"라 최신 발표분이 확정된 직후 판정한다.
+                // 알림 처리보다 먼저 - 둘은 독립이고, 알림이 회원 한 명 실패로 예외를 내도 판정이 밀리면 안 된다.
+                // 판정 실패는 혼잡 적재를 되돌릴 이유가 아니다 - 재시도하면 집중률 API를 다시 부른다. 로그로 남긴다.
+                try {
+                    log.info("숨은 명소 판정 결과 {}", hiddenGems.score());
+                } catch (RuntimeException e) {
+                    log.error("숨은 명소 판정 실패 - 어제 판정이 남아 있고 다음 배치가 다시 시도한다", e);
+                }
                 tripNotifications.run("congestion");
-                // 숨은 명소는 "집계 대상이 아닌 관광지"라 최신 발표분이 확정된 직후에 판정한다
-                var gemResult = hiddenGems.score();
 
-                log.info("혼잡도 배치 결과 {} / 숨은 명소 {}", result, gemResult);
+                log.info("혼잡도 배치 결과 {}", result);
             }
             // ────────────────────────── 기존 일별 날씨 적재 ──────────────────────────
             case "weather" -> {

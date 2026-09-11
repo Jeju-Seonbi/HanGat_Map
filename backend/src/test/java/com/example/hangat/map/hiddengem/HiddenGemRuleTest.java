@@ -86,6 +86,15 @@ class HiddenGemRuleTest {
     }
 
     @Test
+    void 착한가격_메뉴_문단은_소개글로_치지_않는다() {
+        // 착한가격 배치가 overview 에 "대표메뉴:..." 를 넣는다 - 메뉴판이 관광지 소개는 아니다
+        Place place = tourist("메뉴만").imageUrl("x").latitude(BigDecimal.ONE).longitude(BigDecimal.ONE)
+                .roadAddress("주소").overview(Place.GOOD_PRICE_MENU_PREFIX + " 갈치조림 12,000원").build();
+
+        assertThat(rule.evaluate(place, false).score()).isEqualByComparingTo("0.500");
+    }
+
+    @Test
     void 빈_문자열은_없는_정보로_센다() {
         // 공공 API는 "" 를 자주 준다 - 공백을 사진·주소로 치면 없는 품질을 지어낸다
         Place place = tourist("빈칸").imageUrl("  ").roadAddress("").operatingHoursText("").build();

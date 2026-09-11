@@ -17,13 +17,20 @@ import java.math.RoundingMode;
  *       음식점·숙소·쇼핑은 "명소"가 아니다.</li>
  *   <li><b>유명도 하위</b>: 한국관광공사가 집중률(방문자 집계)을 산출하는 관광지는 제주 448곳뿐이고, 이들이 곧 주요
  *       관광지다. 그 <b>집계 대상이 아닌</b> 등재 관광지를 "덜 알려진 곳"으로 본다. 집중률 값 자체는 장소별 최성수기
- *       대비 상대값이라 장소 간 유명도 비교에 쓰지 않는다(무명 오름 90이 성산일출봉 40보다 붐비는 게 아니다).</li>
+ *       대비 상대값이라 장소 간 유명도 비교에 쓰지 않는다(무명 오름 90이 성산일출봉 40보다 붐비는 게 아니다).
+ *       <br>한계: 우리 DB의 집계 대상 명단은 집중률 API 이름을 KTO 장소에 매칭한 결과라 448곳 중 매칭에 성공한
+ *       곳(실측 345곳, 약 77%)뿐이다. 매칭이 안 된 주요 관광지는 "집계 대상 아님"으로 보여 숨은 명소로 잘못 판정될 수
+ *       있다 - 판정 결과는 명단 크기({@code famousCount})와 함께 기록·검토한다.</li>
  *   <li><b>콘텐츠 품질</b>: 소개할 만한 정보가 갖춰졌는지를 0~1 점수로 센다. 사진 0.30 · 좌표 0.10 · 주소 0.10 ·
  *       운영시간 0.20 · 소개글 0.20 · 후기 1건 이상 0.10. {@value #THRESHOLD_TEXT} 이상이면 충족 - 사진·좌표·주소에
  *       운영시간이나 소개글 중 하나는 있어야 넘는다.</li>
  * </ul>
  *
- * <p>정직성: 폐업(CLOSED)은 제외한다. 점수는 판정과 무관하게 모든 후보에 기록해 화면·설명서에서 근거를 보일 수 있게 한다.
+ * <p>정직성: 폐업(CLOSED)은 제외한다. 점수는 판정과 무관하게 관광지 후보 전부에 기록해 화면·설명서에서 근거를 보일 수 있게 한다.
+ * 착한가격업소 배치가 소개글 자리에 넣는 메뉴 문단({@link Place#GOOD_PRICE_MENU_PREFIX})은 소개글로 치지 않는다.
+ *
+ * <p>정의상 숨은 명소는 집중률 예보가 없는 곳이다. 그래서 예보를 전제로 하는 추천(한산 장소 카드·대안·샘플 코스)에는
+ * 오르지 않고, 지도 레이어·장소 상세 배지·별도 큐레이션으로 보여 준다.
  */
 @Component
 public class HiddenGemRule {
@@ -79,7 +86,9 @@ public class HiddenGemRule {
         if (place.getLatitude() != null && place.getLongitude() != null) score = score.add(COORDS);
         if (present(place.getRoadAddress()) || present(place.getLotAddress())) score = score.add(ADDRESS);
         if (present(place.getOperatingHoursText())) score = score.add(HOURS);
-        if (present(place.getOverview())) score = score.add(OVERVIEW);
+        if (present(place.getOverview()) && !place.getOverview().startsWith(Place.GOOD_PRICE_MENU_PREFIX)) {
+            score = score.add(OVERVIEW);
+        }
         if (place.getReviewCount() > 0) score = score.add(REVIEWS);
         return score.setScale(3, RoundingMode.HALF_UP);
     }

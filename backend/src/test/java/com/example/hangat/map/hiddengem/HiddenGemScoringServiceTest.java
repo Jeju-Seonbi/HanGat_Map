@@ -74,12 +74,20 @@ class HiddenGemScoringServiceTest {
                 .fetchedAt(발표분).build());
     }
 
+    /** 집계 명단이 얇지 않게 - 기준(MIN_FAMOUS_COUNT) 이상의 예보 보유 장소를 채운다 */
+    private void enoughFamous() {
+        for (int i = 0; i < HiddenGemScoringService.MIN_FAMOUS_COUNT; i++) {
+            forecast(ktoPlace("유명관광지" + i, false));
+        }
+    }
+
     @Test
     void 집계_대상이_아닌_품질_충족_관광지만_숨은_명소가_된다() {
         Place 가문이오름 = ktoPlace("가문이오름", true);
         Place 성산일출봉 = ktoPlace("성산일출봉", true);
         Place 사진없는곳 = ktoPlace("사진없는곳", false);
         forecast(성산일출봉);
+        enoughFamous();
         em.flush();
 
         HiddenGemScoringService.HiddenGemScoringResult result = service.score();
@@ -87,9 +95,10 @@ class HiddenGemScoringServiceTest {
         em.clear();
 
         assertThat(result.skipped()).isFalse();
-        assertThat(result.evaluated()).isEqualTo(3);
+        assertThat(result.famousCount()).isEqualTo(HiddenGemScoringService.MIN_FAMOUS_COUNT + 1);
+        assertThat(result.evaluated()).isEqualTo(3 + HiddenGemScoringService.MIN_FAMOUS_COUNT);
         assertThat(result.hiddenGems()).isEqualTo(1);
-        assertThat(result.famous()).isEqualTo(1);
+        assertThat(result.famous()).isEqualTo(1 + HiddenGemScoringService.MIN_FAMOUS_COUNT);
         assertThat(result.baseAt()).isEqualTo(발표분);
 
         Place gem = em.find(Place.class, 가문이오름.getId());
@@ -122,18 +131,71 @@ class HiddenGemScoringServiceTest {
     }
 
     @Test
-    void 다시_돌리면_같은_결과를_덮어쓴다_멱등() {
+    void 다시_돌리면_같은_결과이고_바뀐_것이_없으면_쓰지_않는다_멱등() {
         Place place = ktoPlace("가문이오름", true);
-        forecast(ktoPlace("성산일출봉", true));
+        enoughFamous();
         em.flush();
 
+        HiddenGemScoringService.HiddenGemScoringResult first = service.score();
+        em.flush();
+        HiddenGemScoringService.HiddenGemScoringResult second = service.score();
+        em.flush();
+        em.clear();
+
+        assertThat(first.changed()).isGreaterThan(0);
+        assertThat(second.changed()).isZero();   // 매일 2천 행의 updated_at 을 흔들지 않는다
+        assertThat(second.hiddenGems()).isEqualTo(1);
+        assertThat(em.find(Place.class, place.getId()).isHiddenGem()).isTrue();
+    }
+
+    @Test
+    void 집계_대상에_새로_오르면_숨은_명소에서_빠진다() {
+        Place place = ktoPlace("뜬_오름", true);
+        enoughFamous();
+        em.flush();
         service.score();
+        em.flush();
+        assertThat(em.find(Place.class, place.getId()).isHiddenGem()).isTrue();
+
+        forecast(place);   // 다음 발표분부터 관광공사 집계 대상이 됐다
+        em.flush();
         service.score();
         em.flush();
         em.clear();
 
-        assertThat(em.find(Place.class, place.getId()).isHiddenGem()).isTrue();
-        assertThat(service.score().hiddenGems()).isEqualTo(1);
+        assertThat(em.find(Place.class, place.getId()).isHiddenGem()).isFalse();
+    }
+
+    @Test
+    void 집계_명단이_얇으면_부분_수신으로_보고_건너뛴다() {
+        Place place = ktoPlace("가문이오름", true);
+        forecast(ktoPlace("성산일출봉", true));   // 명단이 1곳뿐 - 집중률 API 부분 수신과 구분할 수 없다
+        em.flush();
+
+        HiddenGemScoringService.HiddenGemScoringResult result = service.score();
+        em.flush();
+        em.clear();
+
+        assertThat(result.skipped()).isTrue();
+        assertThat(result.famousCount()).isEqualTo(1);
+        assertThat(em.find(Place.class, place.getId()).isHiddenGem()).isFalse();
+    }
+
+    @Test
+    void 음식점에는_점수를_남기지_않는다() {
+        PlaceCategory food = em.persist(PlaceCategory.builder().code("FOOD").name("음식점").build());
+        Place restaurant = em.persist(Place.builder().region(east).primaryCategory(food).name("식당").normalizedName("식당")
+                .imageUrl("x").latitude(BigDecimal.ONE).longitude(BigDecimal.ONE).roadAddress("주소").overview("소개").build());
+        em.persist(PlaceSourceMapping.builder().place(restaurant).source(kto).sourcePlaceId("kto-food")
+                .lastSyncedAt(LocalDateTime.of(2026, 9, 10, 0, 0)).build());
+        enoughFamous();
+        em.flush();
+
+        service.score();
+        em.flush();
+        em.clear();
+
+        assertThat(em.find(Place.class, restaurant.getId()).getHiddenGemScore()).isNull();
     }
 
     @Test
@@ -142,12 +204,12 @@ class HiddenGemScoringServiceTest {
                 .imageUrl("x").latitude(BigDecimal.ONE).longitude(BigDecimal.ONE).roadAddress("주소").overview("소개").build());
         em.persist(PlaceSourceMapping.builder().place(place).source(kto).sourcePlaceId("kto-gone")
                 .lastSyncedAt(LocalDateTime.of(2026, 9, 10, 0, 0)).isActive(false).build());
-        forecast(ktoPlace("성산일출봉", true));
+        enoughFamous();
         em.flush();
 
         HiddenGemScoringService.HiddenGemScoringResult result = service.score();
 
-        assertThat(result.evaluated()).isEqualTo(1);   // 성산일출봉만
+        assertThat(result.evaluated()).isEqualTo(HiddenGemScoringService.MIN_FAMOUS_COUNT);   // 사라진 곳은 세지 않는다
         em.flush();
         em.clear();
         assertThat(em.find(Place.class, place.getId()).getHiddenGemAlgorithmVersion()).isNull();
