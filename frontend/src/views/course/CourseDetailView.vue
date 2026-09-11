@@ -332,9 +332,6 @@ async function applySwap (alternative: AlternativePlace) {
         >
           링크 공유
         </button>
-        <button class="btn primary">
-          저장됨 ✓
-        </button>
       </div>
     </div>
     <TripConfirmation v-if="live?.manageable && live.status === 'SAVED'" :course-id="courseId" />
@@ -405,8 +402,7 @@ async function applySwap (alternative: AlternativePlace) {
                   v-if="editing"
                   class="edit-actions"
                 >
-                  <button>시간 변경</button>
-                  <!-- 목업 코스는 서버 item id가 없어 교체 불가 -->
+                  <!-- 시간 변경은 백엔드 API가 없어 두지 않는다 - 눌러도 아무 일 없는 버튼을 만들지 않는다 -->
                   <button
                     :disabled="!stop.liveItem"
                     @click="openSwap(stop)"
