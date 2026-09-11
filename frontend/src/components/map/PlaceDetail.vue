@@ -12,6 +12,7 @@ import { wxOf, wxIcon } from '@/utils/weather'
 import { dist, won } from '@/utils/geo'
 import { copyText } from '@/utils/clipboard'
 import { shareToKakao, preloadKakao } from '@/composables/useKakaoShare'
+import { goodPriceSourceLine } from '@/utils/dataSources'
 import MapPlaceService from '@/services/map/MapPlaceService'
 import ReviewApiService, { LEVEL_TO_KEY, absUrl } from '@/services/map/ReviewApiService'
 
@@ -311,6 +312,8 @@ async function shareNative() {
         <div v-for="m in menuRows" :key="m.n" class="mn-r">
           <span class="mn-n">{{ m.n }}</span><span class="mn-p">{{ m.p }}</span>
         </div>
+        <!-- 가격은 행안부 CSV 기준일의 값이다 - 날짜 없이 보여주면 현재가처럼 읽힌다 (MAP_003) -->
+        <div v-if="s.good" class="mn-src">{{ goodPriceSourceLine(detail?.goodPriceBaseDate) }}</div>
       </div>
 
       <!-- 주소(복사) · 운영시간(있을 때만 — 상시 개방은 줄 자체를 표시하지 않음) · 전화 -->

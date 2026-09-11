@@ -9,6 +9,7 @@ import { crowd, tier } from '@/utils/crowd'
 import { cssVar } from '@/utils/geo'
 import { POI_MARKER_CLASS, shouldShowMapLabels } from './mapPresentation'
 import { JEJU_MAX_LEVEL, clampToJeju } from '@/utils/jejuBounds'
+import { goodPriceSourceLine } from '@/utils/dataSources'
 
 const emit = defineEmits(['select', 'blank-click'])
 
@@ -54,9 +55,11 @@ async function showGoodPriceTip(f) {
   tip = my
   const d = f.id != null ? await MapPlaceService.getDetail(f.id) : null
   if (tip !== my) return   // 기다리는 사이 닫혔거나 다른 핀으로 바뀜
-  render(d?.overview
+  const menu = d?.overview
     ? d.overview.replace(/^대표메뉴:\s*/, '').split(' · ').map(m => `<span>${m}</span>`).join('')
-    : '<span>메뉴 정보 없음</span>')
+    : '<span>메뉴 정보 없음</span>'
+  // 가격표 밑에 출처·기준일 - 상세 패널과 같은 문장 (MAP_003)
+  render(menu + (f.good ? `<i class="gp-src">${goodPriceSourceLine(d?.goodPriceBaseDate)}</i>` : ''))
 }
 
 function syncLabelVisibility() {

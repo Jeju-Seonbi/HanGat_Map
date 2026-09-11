@@ -72,6 +72,7 @@
   padding:9px 13px;box-shadow:0 3px 14px rgba(30,50,80,.26);white-space:nowrap}
 .gp-tip b{font-size:12.5px;color:var(--tx)}
 .gp-tip span{font-size:11.5px;font-weight:600;color:var(--tx2)}
+.gp-tip .gp-src{font-style:normal;font-size:10.5px;font-weight:600;color:var(--tx3);margin-top:2px}
 .gp-tip .gp-more{margin-top:5px;padding:5px 0 1px;border:0;border-top:1px solid rgba(0,0,0,.08);
   background:none;color:var(--ac);font-size:11.5px;font-weight:800;cursor:pointer}
 
@@ -83,6 +84,7 @@
 .mn-r{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:3px 0}
 .mn-n{color:var(--tx)}
 .mn-p{font-weight:800;color:var(--tx);white-space:nowrap}
+.mn-src{margin-top:6px;font-size:10.5px;color:var(--tx3);word-break:keep-all}
 
 /* 선택 장소 강조 핀 - 레이어가 꺼져 있어도 검색으로 연 곳은 보여준다 (MAP_002) */
 .pw .lb-t.sel-on{display:block}
