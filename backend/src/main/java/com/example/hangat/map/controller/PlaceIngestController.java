@@ -40,6 +40,7 @@ public class PlaceIngestController {
     private final com.example.hangat.map.store.StoreIngestService storeIngestService;
     private final MenuIngestService menuIngestService;
     private final OverviewIngestService overviewIngestService;
+    private final com.example.hangat.map.hiddengem.HiddenGemScoringService hiddenGemScoringService;
 
     public PlaceIngestController(PlaceIngestService placeIngestService,
                                  CongestionIngestService congestionIngestService,
@@ -48,7 +49,8 @@ public class PlaceIngestController {
                                  com.example.hangat.map.goodprice.GoodPriceIngestService goodPriceIngestService,
                                  com.example.hangat.map.store.StoreIngestService storeIngestService,
                                  MenuIngestService menuIngestService,
-                                 OverviewIngestService overviewIngestService) {
+                                 OverviewIngestService overviewIngestService,
+                                 com.example.hangat.map.hiddengem.HiddenGemScoringService hiddenGemScoringService) {
         this.placeIngestService = placeIngestService;
         this.congestionIngestService = congestionIngestService;
         this.placeDetailIngestService = placeDetailIngestService;
@@ -57,6 +59,7 @@ public class PlaceIngestController {
         this.storeIngestService = storeIngestService;
         this.menuIngestService = menuIngestService;
         this.overviewIngestService = overviewIngestService;
+        this.hiddenGemScoringService = hiddenGemScoringService;
     }
 
     @Operation(summary = "카페·편의점·마트 적재 (MAP-04)",
@@ -128,5 +131,14 @@ public class PlaceIngestController {
     @PostMapping("/congestion")
     public BaseResponse<CongestionIngestService.CongestionIngestResult> ingestCongestion() {
         return BaseResponse.success(congestionIngestService.ingest());
+    }
+
+    @Operation(summary = "숨은 명소 판정 (#숨은 명소)",
+            description = "KTO 등재 관광지 중 관광공사 집중률 집계 대상이 아니고 콘텐츠 품질 점수가 기준 이상인 곳을 "
+                    + "숨은 명소로 표시한다(HiddenGemRule). 최신 집중률 발표분이 없으면 아무것도 바꾸지 않고 skipped 로 답한다. "
+                    + "운영은 혼잡 배치 직후 자동으로 돈다.")
+    @PostMapping("/hidden-gems")
+    public BaseResponse<com.example.hangat.map.hiddengem.HiddenGemScoringService.HiddenGemScoringResult> scoreHiddenGems() {
+        return BaseResponse.success(hiddenGemScoringService.score());
     }
 }
