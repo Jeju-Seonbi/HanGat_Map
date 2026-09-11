@@ -598,4 +598,21 @@ watch(placeId, load)
   .place-grid{grid-template-columns:1fr}
   .photo-grid{height:220px}
 }
+@media (max-width:767px){
+  .place-card{padding:16px}
+  /* 제목 옆 버튼이 제목을 두 줄로 밀어낸다 - 제목 아래 한 줄 통째로 */
+  .place-title-row{flex-direction:column;align-items:stretch}
+  .place-title-row .btn{width:100%;text-align:center}
+  .card-head{flex-wrap:wrap}
+  /* 7일을 375px에 7열로 쑤셔 넣으면 기온이 읽히지 않는다 - 옆으로 넘기게 */
+  .weather-week{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch}
+  .weather-day{flex:0 0 68px;scroll-snap-align:start;font-size:12px}
+  .bars{height:110px;gap:2px}
+  /* 손가락 크기 - 제보 칩·별점이 24px 높이면 잘못 눌린다 */
+  .report-btn{padding:8px 14px;font-size:13px}
+  .star-btn{font-size:26px;padding:0 3px}
+  .review-form textarea{font-size:16px}
+  .form-foot{flex-wrap:wrap}
+  .form-foot .btn{flex:1 1 100%;text-align:center}
+}
 </style>
