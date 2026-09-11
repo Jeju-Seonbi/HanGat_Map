@@ -182,6 +182,16 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
             """)
     List<Place> findFoodWithoutMenu(Pageable pageable);
 
+    /** 소개글(overview)이 아직 없는 관광지부터. 폐업은 콜을 아낀다 */
+    @Query("""
+            select p from Place p
+            where p.primaryCategory.code = 'TOURIST'
+              and p.overview is null
+              and p.businessStatus <> com.example.hangat.map.model.enums.BusinessStatus.CLOSED
+            order by p.id
+            """)
+    List<Place> findTouristWithoutOverview(Pageable pageable);
+
     List<Place> findByNormalizedName(String normalizedName);
 
     /** 사진이 아직 없는 장소부터. KTO에 사진이 0장인 곳도 다시 잡힌다 - 상세 적재의 empty 와 같은 트레이드오프 */
