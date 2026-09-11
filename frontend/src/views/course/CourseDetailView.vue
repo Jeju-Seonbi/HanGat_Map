@@ -8,6 +8,7 @@ import TripConfirmation from '../../components/course/TripConfirmation.vue'
 import MapRenderer from '../../components/map/MapRenderer.vue'
 import PlaceImage from '../../components/common/PlaceImage.vue'
 import AlternativePlaceModal from '../../components/course/AlternativePlaceModal.vue'
+import ConfirmDeleteDialog from '../../components/mypage/ConfirmDeleteDialog.vue'
 import { ApiError } from '../../api/errors.js'
 import CourseService, { type CourseDetail, type CourseDetailItem } from '../../services/CourseService'
 import type { CongestionLevel, Place } from '../../assets/types'
@@ -28,6 +29,13 @@ const altNotice = ref('')
 const swapping = ref(false)
 const toast = ref('')
 let toastTimer: ReturnType<typeof setTimeout> | undefined
+
+// 저장 코스 관리(MY_001) - 본인 코스(manageable)만. 백엔드 PATCH/DELETE 는 있었고 화면 진입점만 없었다
+const renaming = ref(false)
+const draftTitle = ref('')
+const renameBusy = ref(false)
+const confirmingDelete = ref(false)
+const deleteBusy = ref(false)
 
 onMounted(async () => {
   live.value = await CourseService.getCourseDetail(courseId)
@@ -180,6 +188,43 @@ const showToast = (text: string) => {
   toastTimer = setTimeout(() => { toast.value = '' }, 2600)
 }
 
+function startRename () {
+  draftTitle.value = live.value?.title ?? ''
+  renaming.value = true
+}
+
+async function saveRename () {
+  const title = draftTitle.value.trim()
+  if (!live.value || renameBusy.value) return
+  if (!title) { showToast('코스 이름을 입력해 주세요.'); return }
+  if (title.length > 100) { showToast('코스 이름은 100자까지예요.'); return }
+  renameBusy.value = true
+  try {
+    live.value.title = await CourseService.renameCourse(courseId, title)
+    renaming.value = false
+    showToast('코스 이름을 바꿨어요.')
+  } catch (failure) {
+    showToast(failure instanceof ApiError ? `이름을 바꾸지 못했어요. ${failure.message}` : '이름을 바꾸지 못했어요.')
+  } finally {
+    renameBusy.value = false
+  }
+}
+
+async function deleteCourse () {
+  if (deleteBusy.value) return
+  deleteBusy.value = true
+  try {
+    await CourseService.deleteCourse(courseId)
+    // 지운 코스에 머물지 않는다 - 목록으로 돌아가면 서버가 다시 읽어 준다
+    await router.replace('/courses')
+  } catch (failure) {
+    confirmingDelete.value = false
+    showToast(failure instanceof ApiError ? `삭제하지 못했어요. ${failure.message}` : '코스를 삭제하지 못했어요.')
+  } finally {
+    deleteBusy.value = false
+  }
+}
+
 /** 코스 상세는 공개 경로라 주소만 복사하면 된다. 복사가 안 되면 안 됐다고 말한다 - 성공을 지어내지 않는다 */
 async function shareCourse () {
   const url = window.location.href
@@ -258,7 +303,36 @@ async function applySwap (alternative: AlternativePlace) {
     <div class="page-head">
       <div>
         <span class="eyebrow">SAVED COURSE · {{ view.dayCount }} DAYS</span>
-        <h1>{{ view.title }}</h1>
+        <form
+          v-if="renaming"
+          class="rename-form"
+          @submit.prevent="saveRename"
+        >
+          <input
+            v-model="draftTitle"
+            class="rename-input"
+            maxlength="100"
+            aria-label="코스 이름"
+          >
+          <button
+            class="btn primary"
+            type="submit"
+            :disabled="renameBusy"
+          >
+            {{ renameBusy ? '저장 중...' : '저장' }}
+          </button>
+          <button
+            class="btn ghost"
+            type="button"
+            :disabled="renameBusy"
+            @click="renaming = false"
+          >
+            취소
+          </button>
+        </form>
+        <h1 v-else>
+          {{ view.title }}
+        </h1>
         <p>{{ view.conditionLabel }}</p>
         <p class="muted course-highlight">
           {{ view.highlight }}
@@ -283,6 +357,22 @@ async function applySwap (alternative: AlternativePlace) {
         >
           링크 공유
         </button>
+        <!-- 본인 저장 코스만 - 샘플·임시 코스에는 관리 버튼을 두지 않는다 -->
+        <template v-if="live?.manageable">
+          <button
+            class="btn ghost"
+            :disabled="renaming"
+            @click="startRename"
+          >
+            이름 바꾸기
+          </button>
+          <button
+            class="btn ghost danger"
+            @click="confirmingDelete = true"
+          >
+            삭제
+          </button>
+        </template>
       </div>
     </div>
     <TripConfirmation v-if="live?.manageable && live.status === 'SAVED'" :course-id="courseId" />
@@ -414,6 +504,15 @@ async function applySwap (alternative: AlternativePlace) {
     @close="swapTarget = null"
     @select="applySwap"
   />
+  <ConfirmDeleteDialog
+    v-if="confirmingDelete && view"
+    title="코스 삭제"
+    :subject="view.title"
+    :detail="view.highlight"
+    :busy="deleteBusy"
+    @close="confirmingDelete = false"
+    @confirm="deleteCourse"
+  />
   <div
     v-if="toast"
     class="toast"
@@ -424,6 +523,9 @@ async function applySwap (alternative: AlternativePlace) {
 
 <style scoped>
 .course-highlight{margin-top:8px}
+.rename-form{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0 10px}
+.rename-input{flex:1 1 240px;min-width:0;padding:10px 14px;border:1px solid var(--border);border-radius:12px;font-size:1.2rem;font-weight:700;background:transparent;color:inherit}
+.btn.danger{color:#c43c3c;border-color:#e6b4b4}
 .course-days{display:grid;gap:32px}
 .course-day-section+.course-day-section{padding-top:6px;border-top:1px solid var(--border)}
 .course-day-head{margin-bottom:2px}
