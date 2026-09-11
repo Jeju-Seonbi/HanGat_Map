@@ -115,9 +115,13 @@ function keepAnchorOnScreen() {
   const W = el.value.clientWidth, H = el.value.clientHeight
   if (p.x > W * 0.25 && p.x < W * 0.75 && p.y > H * 0.25 && p.y < H * 0.75) return
   anchorLL = map.getCenter()
+  // setPosition 은 카카오가 레이어를 떼었다 붙이는데, 그 비용이 보이는 핀 수에 비례한다(실측 300~770개 보일 때 250~430ms 멈춤).
+  // 붙이는 동안 레이어를 display:none 으로 두면 자식을 그리지 않아 30ms 안(실측)이고, 같은 프레임 안에서 되돌리므로 깜빡임은 없다
+  layerNode.style.display = 'none'
   layerOv.setPosition(anchorLL)
   const a = proj.pointFromCoords(anchorLL)
   layerNode.style.transform = `translate(${originPt.x - a.x}px,${originPt.y - a.y}px)`
+  layerNode.style.display = ''
 }
 
 /* 줌이 바뀌면 핀을 다시 놓고(relayout) 묶음도 다시 계산한다(draw - 핀 서명은 같아 싸다) */
@@ -145,7 +149,7 @@ function clusterPass(lv) {
   if (!mode.unit && !mode.radius) return
   const byGroup = new Map()
   for (const e of pool.values()) {
-    if (!e.shown || e.pick) continue   // 선택·코스 핀은 묶지 않고 위에 남긴다
+    if (!e.wanted || e.pick) continue   // 선택·코스 핀은 묶지 않고 위에 남긴다. 화면 밖(컬링) 핀도 개수엔 들어간다
     if (!byGroup.has(e.group)) byGroup.set(e.group, [])
     byGroup.get(e.group).push(e)
   }
@@ -217,7 +221,7 @@ function ensurePin(key, group, p) {
   node.innerHTML = group === 'spot'
     ? '<div class="lb-t"></div><div class="pn"></div>'
     : `<div class="lb-t"></div><div class="poi-marker ${POI_MARKER_CLASS[group]}"></div>`
-  e = { node, lb: node.firstElementChild, dot: node.lastElementChild, data: p, sig: '', shown: true, group, pick: false, px: 0, py: 0 }
+  e = { node, lb: node.firstElementChild, dot: node.lastElementChild, data: p, sig: '', shown: true, wanted: true, group, pick: false, px: 0, py: 0 }
   if (group !== 'spot') node.style.zIndex = 60
   place(e)
   layerNode.appendChild(node)
@@ -230,6 +234,39 @@ function show(e, on) {
   if (e.shown === on) return
   e.shown = on
   e.node.classList.toggle('hid', !on)
+}
+
+/* ── 뷰포트 컬링 ──
+   화면 밖 핀은 숨긴다(display:none). 카카오가 레이어를 다시 붙이거나(앵커 재설정 setPosition, 선택 핀 setMap) 브라우저가 다시 칠할 때
+   비용이 "보이는 핀 수"에 비례한다 - 실측: 3,851개 보이면 재부착 232ms + 다시 칠하기 240~460ms(카페 켜고 핀 클릭·드래그마다 렉),
+   같은 3,851개를 숨기면 35ms, 300개 보이면 14ms. 여백은 화면의 1/4(사방) - 1km 뷰에서 여백을 화면 크기만큼 주면 섬 대부분이
+   들어와 2,896개가 남았다. 다시 계산은 이동이 끝났을 때(idle)만 - 이동 중에 0.2초마다 하면 새로 보이는 핀 수백 개를
+   그리는 비용이 애니메이션 동안 여러 번 든다(실측). 핀을 눌러 이동하는 거리는 반 화면 안이라 여백이 감당하고,
+   그보다 멀리 끌면 손을 뗄 때 채워진다. 묶음은 컬링과 무관하게 wanted 기준으로 세므로 개수는 그대로다 */
+let view = null   // 레이어 좌표계(originPt 기준 px)의 보이는 사각형, 여백 포함
+
+function updateView() {
+  if (!map || !proj || !originPt) { view = null; return }
+  const b = map.getBounds()
+  const sw = proj.pointFromCoords(b.getSouthWest()), ne = proj.pointFromCoords(b.getNorthEast())
+  const x1 = Math.min(sw.x, ne.x) - originPt.x, x2 = Math.max(sw.x, ne.x) - originPt.x
+  const y1 = Math.min(sw.y, ne.y) - originPt.y, y2 = Math.max(sw.y, ne.y) - originPt.y
+  // 여백 = 화면의 1/4(사방). 절반이면 북부 해안 1km 뷰에서 1,864개가 보여 idle 때 그리는 데 350ms, 1/4 이면 그 절반 아래
+  const mx = (x2 - x1) / 4, my = (y2 - y1) / 4
+  view = { x1: x1 - mx, x2: x2 + mx, y1: y1 - my, y2: y2 + my }
+}
+
+const inView = e => !view || (e.px >= view.x1 && e.px <= view.x2 && e.py >= view.y1 && e.py <= view.y2)
+
+/** 필터·레이어가 원하는(wanted) 핀 중 화면(여백 포함) 안의 것만 보인다 */
+function cullPass() {
+  updateView()
+  for (const e of pool.values()) show(e, e.wanted && inView(e))
+}
+
+/** 이동 중엔 앵커만 화면 안에 유지한다(컬링은 idle 에서) */
+function onCenterChanged() {
+  keepAnchorOnScreen()
 }
 
 /** 레이어 배열이 새로 왔을 때(재진입·칩 재요청) 목록에서 사라진 장소의 핀을 풀에서 뺀다 - 폐업 등.
@@ -293,7 +330,7 @@ function draw() {
       e.node.style.zIndex = spec.z
     }
     e.pick = pick
-    show(e, true)
+    e.wanted = true
   }
 
   // 업종 - 켜진 레이어의 권역 안 장소만. 끈 레이어는 숨길 뿐 풀에 남겨 다시 켤 때 즉시 보인다
@@ -307,13 +344,14 @@ function draw() {
       const e = ensurePin(key, g, f)
       e.data = f
       if (e.sig !== f.n) { e.sig = f.n; e.lb.textContent = f.n }
-      show(e, true)
+      e.wanted = true
     }
   }
 
-  // 이번 패스에 없는 핀(끈 레이어·권역 밖·축소 뷰의 흐린 핀)은 숨긴다
-  for (const [key, e] of pool) if (!seen.has(key)) show(e, false)
+  // 이번 패스에 없는 핀(끈 레이어·권역 밖·축소 뷰의 흐린 핀)은 원하지 않는 핀
+  for (const [key, e] of pool) if (!seen.has(key)) e.wanted = false
 
+  cullPass()
   clusterPass(lv)
   drawExtras(di, sel, course, courseDay, L)
 }
@@ -404,6 +442,12 @@ function keepInJeju() {
   if (lat !== c.getLat() || lng !== c.getLng()) map.setCenter(LL(lat, lng))
 }
 
+/** 이동이 끝나면 제주 안으로 되돌리고, 새 화면 기준으로 핀 컬링을 다시 한다 */
+function onIdle() {
+  keepInJeju()
+  cullPass()
+}
+
 onMounted(async () => {
   try {
     await loadKakaoMap()
@@ -417,8 +461,8 @@ onMounted(async () => {
   map.addControl(new kakao.maps.ZoomControl(), kakao.maps.ControlPosition.BOTTOMRIGHT)
   kakao.maps.event.addListener(map, 'click', () => { closeTip(); emit('blank-click') })
   kakao.maps.event.addListener(map, 'zoom_changed', onZoomChanged)
-  kakao.maps.event.addListener(map, 'center_changed', keepAnchorOnScreen)
-  kakao.maps.event.addListener(map, 'idle', keepInJeju)
+  kakao.maps.event.addListener(map, 'center_changed', onCenterChanged)
+  kakao.maps.event.addListener(map, 'idle', onIdle)
   addEventListener('resize', onResize)
 
   Object.assign(mapBridge, {
@@ -437,8 +481,8 @@ onBeforeUnmount(() => {
   removeEventListener('resize', onResize)
   if (map) {
     kakao.maps.event.removeListener(map, 'zoom_changed', onZoomChanged)
-    kakao.maps.event.removeListener(map, 'center_changed', keepAnchorOnScreen)
-    kakao.maps.event.removeListener(map, 'idle', keepInJeju)
+    kakao.maps.event.removeListener(map, 'center_changed', onCenterChanged)
+    kakao.maps.event.removeListener(map, 'idle', onIdle)
   }
   clearOverlays()
   mapBridge.ready = false
