@@ -7,7 +7,8 @@ import MapPlaceService, { hasCoords } from '@/services/map/MapPlaceService'
 
 import { crowd, tier } from '@/utils/crowd'
 import { cssVar } from '@/utils/geo'
-import { POI_MARKER_CLASS, shouldShowMapLabels } from './mapPresentation'
+import { POI_MARKER_CLASS, POI_GROUPS, spotPinSpec, spotIconGroup, shouldShowMapLabels } from './mapPresentation'
+import { clusterModeFor, hideDimFor, clusterByUnit, clusterPins, dominantTier, clusterSize } from '@/utils/cluster'
 import { JEJU_MAX_LEVEL, clampToJeju } from '@/utils/jejuBounds'
 import { goodPriceSourceLine } from '@/utils/dataSources'
 
@@ -17,17 +18,45 @@ const el = ref(null)
 const failed = ref('')
 const origin = location.origin
 let map = null
-/* 오버레이는 반응형일 필요가 없어 ref 바깥에 둔다 */
-const OV = { spot: [], food: [], dine: [], cafe: [], cvs: [], stay: [], mart: [], route: [], num: [], sel: [] }
+
+/* ── 핀 풀 + 자체 레이어 (성능: 오버레이 재사용) ──
+   관광지·업종 핀은 장소당 노드 하나를 한 번만 만들어 두고, 상태가 바뀌면 클래스·크기·표시 여부만 바꾼다.
+   예전엔 날짜·선택·필터가 바뀔 때마다 841~1,558개를 전부 지우고 새로 만들어 메인 스레드가 2~6초 멈췄다(9/7 실측).
+
+   핀마다 CustomOverlay 를 만들지 않고 CustomOverlay 하나(레이어) 안에 절대배치로 넣는 이유:
+   카카오 setMap 은 핀마다 노드 크기를 읽어 강제 레이아웃을 일으키는데, 그 비용이 이미 붙어 있는 핀 수에 비례한다
+   (실측: 붙은 핀 3,800개 상태에서 핀 하나 넣고 크기 읽기 15ms, 읽기 없이 넣기만 하면 0.05ms).
+   카페 3,039개를 핀마다 setMap 으로 넣으면 15초, 숨겼다 다시 setMap 해도 12초였다. 레이어 하나에 자식으로 넣으면
+   크기 읽기가 없어 수백 ms 안에 끝나고, 지도 이동 때 카카오가 옮기는 오버레이도 하나뿐이다.
+   핀 위치 = 앵커(제주 중심) 기준 픽셀 오프셋. 같은 레벨에선 이동해도 안 변하고, 줌이 바뀌면 전부 다시 계산한다.
+
+   키 = 그룹:장소id. 항목 = { node(.pw), lb(이름표), dot(점), data(현재 장소 객체), sig(마지막 적용 모습), shown, group } */
+const pool = new Map()
+/* anchorLL = 레이어 오버레이의 현재 위치, originPt = 핀 오프셋의 기준 픽셀(현재 레벨). 처음엔 둘이 같은 지점이다.
+   카카오는 위치(앵커)가 화면 밖으로 나간 CustomOverlay 를 DOM 에서 떼어 버린다(실측: 확대해서 앵커가 화면을 벗어나자 핀 전부 소실).
+   그래서 이동 중 앵커가 화면 가운데를 벗어나면 앵커만 현재 중심으로 옮기고, 핀은 그대로 둔 채 레이어를 반대로 밀어 상쇄한다 */
+let layerOv = null, layerNode = null, proj = null, anchorLL = null, originPt = null
+/* 선택 핀·코스 번호·경로선은 몇 개 안 돼(20개 남짓) 카카오 오버레이로 매번 다시 만든다. 대신 모습이 지난번과 같으면 건너뛴다 */
+const EX = { route: [], num: [], sel: [] }
+let exSig = ''
 
 /** 선택 핀의 업종색 - 지도 마커와 같은 팔레트 */
 const CAT_MARKER = { FOOD: 'mk-dine', CAFE: 'mk-cafe', CONVENIENCE: 'mk-cvs', LODGING: 'mk-stay', MART: 'mk-mart' }
 
 const LL = (lat, lng) => new kakao.maps.LatLng(lat, lng)
 
+function clearExtras() {
+  for (const k in EX) { EX[k].forEach(o => o.setMap(null)); EX[k].length = 0 }
+  exSig = ''
+}
+
+/** 전부 내린다 - 언마운트 때만. 상태 변경 때는 draw() 가 차분으로 적용한다 */
 function clearOverlays() {
   closeTip()
-  for (const k in OV) { OV[k].forEach(o => o.setMap(null)); OV[k].length = 0 }
+  clearExtras()
+  if (layerOv) { layerOv.setMap(null); layerOv = null; layerNode = null }
+  clusterNodes = []
+  pool.clear()
 }
 
 /* MAP_001 착한가격 클릭 툴팁 - 한 번에 하나만 띄운다 */
@@ -67,9 +96,192 @@ function syncLabelVisibility() {
   el.value.classList.toggle('labels-visible', shouldShowMapLabels(map.getLevel()))
 }
 
-const onZoomChanged = () => syncLabelVisibility()
+/** 줌이 바뀌면 픽셀 오프셋의 척도가 달라진다 - 앵커를 현재 중심으로 옮기고 풀 핀 전부 다시 놓는다(스타일 쓰기만이라 수십 ms) */
+function relayoutPins() {
+  if (!map || !layerOv) return
+  proj = map.getProjection()
+  anchorLL = map.getCenter()
+  originPt = proj.pointFromCoords(anchorLL)
+  layerOv.setPosition(anchorLL)
+  layerNode.style.transform = ''
+  pool.forEach(place)
+}
 
-/** 핀 하나 = CustomOverlay 하나 (라벨은 같은 오버레이 안에 겹쳐 넣는다) */
+/** 지도가 움직여 앵커가 화면 가운데 절반을 벗어나면 앵커를 중심으로 옮긴다. 핀 오프셋은 originPt 기준 그대로 두고
+    레이어를 (originPt - 새 앵커) 만큼 밀어 화면 위치를 유지한다 - 핀 수와 무관한 O(1) */
+function keepAnchorOnScreen() {
+  if (!map || !layerOv || !el.value) return
+  const p = proj.containerPointFromCoords(anchorLL)
+  const W = el.value.clientWidth, H = el.value.clientHeight
+  if (p.x > W * 0.25 && p.x < W * 0.75 && p.y > H * 0.25 && p.y < H * 0.75) return
+  anchorLL = map.getCenter()
+  // setPosition 은 카카오가 레이어를 떼었다 붙이는데, 그 비용이 보이는 핀 수에 비례한다(실측 300~770개 보일 때 250~430ms 멈춤).
+  // 붙이는 동안 레이어를 display:none 으로 두면 자식을 그리지 않아 30ms 안(실측)이고, 같은 프레임 안에서 되돌리므로 깜빡임은 없다
+  layerNode.style.display = 'none'
+  layerOv.setPosition(anchorLL)
+  const a = proj.pointFromCoords(anchorLL)
+  layerNode.style.transform = `translate(${originPt.x - a.x}px,${originPt.y - a.y}px)`
+  layerNode.style.display = ''
+}
+
+/* 줌이 바뀌면 핀을 다시 놓고(relayout) 묶음도 다시 계산한다(draw - 핀 서명은 같아 싸다) */
+const onZoomChanged = () => { syncLabelVisibility(); relayoutPins(); draw() }
+
+function place(e) {
+  const pt = proj.pointFromCoords(LL(e.data.y, e.data.x))
+  e.px = pt.x - originPt.x   // 묶음 계산도 이 값을 쓴다
+  e.py = pt.y - originPt.y
+  e.node.style.left = e.px + 'px'
+  e.node.style.top = e.py + 'px'
+}
+
+/* ── 묶음 핀 (축소 뷰) ──
+   레벨 10 이상은 행정 단위(읍면·시내·중문) 하나에 묶음 하나(이름표 = 단위), 8~9 는 픽셀 40px 로 이름 없이, 7 이하는 전부 개별 핀 (utils/cluster).
+   레이어별로 따로 묶고(관광지는 관광지끼리) 묶인 핀은 숨긴다. 매 draw 마다 다시 계산한다 -
+   묶음은 많아야 300개라 노드를 새로 만들어도 수 ms 이고, 날짜가 바뀌면 테두리 비율이 달라져 어차피 다시 그려야 한다 */
+let clusterNodes = []
+
+function clusterPass(lv) {
+  clusterNodes.forEach(n => n.remove())
+  clusterNodes = []
+  for (const e of pool.values()) e.node.classList.remove('cl-in')
+  const mode = clusterModeFor(lv)
+  if (!mode.unit && !mode.radius) return
+  const byGroup = new Map()
+  for (const e of pool.values()) {
+    if (!e.wanted || e.pick) continue   // 선택·코스 핀은 묶지 않고 위에 남긴다. 화면 밖(컬링) 핀도 개수엔 들어간다
+    if (!byGroup.has(e.group)) byGroup.set(e.group, [])
+    byGroup.get(e.group).push(e)
+  }
+  for (const [group, list] of byGroup) {
+    const clusters = mode.unit ? clusterByUnit(list, e => e.data.unit) : clusterPins(list, mode.radius)
+    // 혼자인 장소는 묶지 않고 핀 그대로 보여준다(2026-09-12 결정) - 근처에 아무도 없는 곳은 "1" 묶음보다 핀이 더 말이 된다
+    for (const c of clusters) {
+      if (c.members.length < 2) continue
+      c.members.forEach(e => e.node.classList.add('cl-in'))
+      clusterNodes.push(makeCluster(group, c, mode.unit ? c.name : null))
+    }
+  }
+}
+
+/** 묶음 노드: 색 원 + 흰 숫자(디자인 A안). 관광지는 대표 혼잡 색(선택한 날짜 기준, 예보 있는 곳만 세서 다수), 업종은 업종 색.
+    이름표는 행정 단위(섬 전체 뷰에서만). 클릭하면 그 자리로 2단계 확대 - 픽셀 묶음으로 바뀌어 안에 뭐가 어디 있는지 보인다 */
+function makeCluster(group, c, name) {
+  const n = c.members.length
+  const node = document.createElement('div')
+  let cls = group === 'spot' ? 'cl' : `cl poi ${POI_MARKER_CLASS[group]}`
+  if (group === 'spot') {
+    const cnt = { calm: 0, mid: 0, busy: 0, none: 0 }
+    for (const e of c.members) cnt[state.L.crowd ? tier(crowd(e.data, state.di)) : 'calm']++
+    cls += ' ' + dominantTier(cnt)
+  }
+  node.className = cls
+  const size = clusterSize(n)
+  node.style.cssText = `left:${c.x}px;top:${c.y}px;width:${size}px;height:${size}px`
+  node.innerHTML = `<b>${n}</b>` + (name ? `<div class="lb-t">${name}</div>` : '')
+  const lat = c.members.reduce((a, e) => a + e.data.y, 0) / n
+  const lng = c.members.reduce((a, e) => a + e.data.x, 0) / n
+  node.addEventListener('click', ev => {
+    ev.stopPropagation()
+    map.setLevel(Math.max(1, map.getLevel() - 2), { anchor: LL(lat, lng) })
+  })
+  layerNode.appendChild(node)
+  return node
+}
+
+/** 풀 핀이 들어갈 레이어(CustomOverlay 1개). 클릭은 레이어에서 한 번만 받아 핀 키로 찾는다 -
+    핀마다 리스너를 붙이지 않고, 재진입·재요청으로 장소 객체가 새것으로 바뀌어도 e.data 가 항상 현재 객체다 */
+function ensureLayer() {
+  if (layerOv) return
+  layerNode = document.createElement('div')
+  layerNode.className = 'pl-layer'
+  layerNode.addEventListener('click', ev => {
+    const pw = ev.target.closest('.pw')
+    const e = pw && pool.get(pw.dataset.k)
+    if (!e) return
+    ev.stopPropagation()
+    // 착한가격은 정의서(MAP_001)대로 툴팁, 나머지 업종은 관광지처럼 상세 패널
+    if (e.group === 'food') showGoodPriceTip(e.data)
+    else emit('select', e.data)
+  })
+  layerOv = new kakao.maps.CustomOverlay({
+    position: map.getCenter(), content: layerNode, xAnchor: 0, yAnchor: 0, zIndex: 50, clickable: true,
+  })
+  layerOv.setMap(map)
+  relayoutPins()
+}
+
+/** 풀에서 핀을 꺼내고, 없으면 만든다 */
+function ensurePin(key, group, p) {
+  let e = pool.get(key)
+  if (e) return e
+  const node = document.createElement('div')
+  node.className = 'pw pl'
+  node.dataset.k = key
+  node.innerHTML = group === 'spot'
+    ? '<div class="lb-t"></div><div class="pn"></div>'
+    : `<div class="lb-t"></div><div class="poi-marker ${POI_MARKER_CLASS[group]}"></div>`
+  e = { node, lb: node.firstElementChild, dot: node.lastElementChild, data: p, sig: '', shown: true, wanted: true, group, pick: false, px: 0, py: 0 }
+  if (group !== 'spot') node.style.zIndex = 60
+  place(e)
+  layerNode.appendChild(node)
+  pool.set(key, e)
+  return e
+}
+
+/** 숨김·표시는 클래스로만 - DOM 을 떼었다 붙이면 붙은 핀 수만큼 비용이 다시 든다 */
+function show(e, on) {
+  if (e.shown === on) return
+  e.shown = on
+  e.node.classList.toggle('hid', !on)
+}
+
+/* ── 뷰포트 컬링 ──
+   화면 밖 핀은 숨긴다(display:none). 카카오가 레이어를 다시 붙이거나(앵커 재설정 setPosition, 선택 핀 setMap) 브라우저가 다시 칠할 때
+   비용이 "보이는 핀 수"에 비례한다 - 실측: 3,851개 보이면 재부착 232ms + 다시 칠하기 240~460ms(카페 켜고 핀 클릭·드래그마다 렉),
+   같은 3,851개를 숨기면 35ms, 300개 보이면 14ms. 여백은 화면의 1/4(사방) - 1km 뷰에서 여백을 화면 크기만큼 주면 섬 대부분이
+   들어와 2,896개가 남았다. 다시 계산은 이동이 끝났을 때(idle)만 - 이동 중에 0.2초마다 하면 새로 보이는 핀 수백 개를
+   그리는 비용이 애니메이션 동안 여러 번 든다(실측). 핀을 눌러 이동하는 거리는 반 화면 안이라 여백이 감당하고,
+   그보다 멀리 끌면 손을 뗄 때 채워진다. 묶음은 컬링과 무관하게 wanted 기준으로 세므로 개수는 그대로다 */
+let view = null   // 레이어 좌표계(originPt 기준 px)의 보이는 사각형, 여백 포함
+
+function updateView() {
+  if (!map || !proj || !originPt) { view = null; return }
+  const b = map.getBounds()
+  const sw = proj.pointFromCoords(b.getSouthWest()), ne = proj.pointFromCoords(b.getNorthEast())
+  const x1 = Math.min(sw.x, ne.x) - originPt.x, x2 = Math.max(sw.x, ne.x) - originPt.x
+  const y1 = Math.min(sw.y, ne.y) - originPt.y, y2 = Math.max(sw.y, ne.y) - originPt.y
+  // 여백 = 화면의 1/4(사방). 절반이면 북부 해안 1km 뷰에서 1,864개가 보여 idle 때 그리는 데 350ms, 1/4 이면 그 절반 아래
+  const mx = (x2 - x1) / 4, my = (y2 - y1) / 4
+  view = { x1: x1 - mx, x2: x2 + mx, y1: y1 - my, y2: y2 + my }
+}
+
+const inView = e => !view || (e.px >= view.x1 && e.px <= view.x2 && e.py >= view.y1 && e.py <= view.y2)
+
+/** 필터·레이어가 원하는(wanted) 핀 중 화면(여백 포함) 안의 것만 보인다 */
+function cullPass() {
+  updateView()
+  for (const e of pool.values()) show(e, e.wanted && inView(e))
+}
+
+/** 이동 중엔 앵커만 화면 안에 유지한다(컬링은 idle 에서) */
+function onCenterChanged() {
+  keepAnchorOnScreen()
+}
+
+/** 레이어 배열이 새로 왔을 때(재진입·칩 재요청) 목록에서 사라진 장소의 핀을 풀에서 뺀다 - 폐업 등.
+    배열이 같은 객체면 아무것도 안 한다(매 draw 마다 2천 건을 대조하지 않게) */
+const lastLists = {}
+function prune(group, list) {
+  if (lastLists[group] === list) return
+  lastLists[group] = list
+  const ids = new Set(list.map(p => p.id ?? p.n))
+  for (const [key, e] of pool) {
+    if (e.group === group && !ids.has(e.data.id ?? e.data.n)) { e.node.remove(); pool.delete(key) }
+  }
+}
+
+/** 선택 핀·코스 번호용 - 카카오 오버레이로 매번 새로 만드는 쪽 */
 function addPin(group, lat, lng, html, onClick, z) {
   const node = document.createElement('div')
   node.className = 'pw'
@@ -79,49 +291,92 @@ function addPin(group, lat, lng, html, onClick, z) {
     yAnchor: 0.5, xAnchor: 0.5, zIndex: z || 0, clickable: !!onClick,
   })
   ov.setMap(map)
-  OV[group].push(ov)
+  EX[group].push(ov)
   if (onClick) node.addEventListener('click', e => { e.stopPropagation(); onClick() })
 }
 
+/** 지금 상태를 핀에 적용한다. 만드는 건 처음 보는 장소뿐이고, 나머지는 서명이 달라진 핀만 손댄다 */
 function draw() {
   if (!map) return
-  clearOverlays()
+  closeTip()
+  ensureLayer()
   const { di, sel, course, courseDay, L } = state
   const inCourse = n => course && course.stops.some(s => s.o && s.o.n === n)
+  const seen = new Set()
+  const lv = map.getLevel()
+  // 축소 뷰(레벨 8 이상)에선 필터 밖 흐린 핀을 아예 숨긴다 - 섬 전체 뷰의 회색 점 600개는 정보가 아니라 잡음.
+  // 묶음 개수에도 안 들어가 왼쪽 목록과 기준이 같다. 확대하면(레벨 7 이하) 다시 보인다
+  const hideDim = hideDimFor(lv)
 
-  // 좌표 없는 장소는 지도에 못 찍는다 - KTO 원본에 좌표 오류가 있어 null로 저장된 건이 있다
-  if (L.spot) state.layers.spot.filter(hasCoords).forEach(s => {
-    const c = crowd(s, di), on = inFilter(s), t = tier(c)
-    const pick = inCourse(s.n) || (sel && sel.n === s.n)
-    const sz = pick ? 20 : on ? 15 : 9
-    const cls = `pn ${L.crowd ? t : 'calm'}${pick ? ' pick' : ''}${on ? '' : ' dim'}`
-    addPin('spot', s.y, s.x,
-      `${on ? `<div class="lb-t">${s.n}</div>` : ''}
-       <div class="${cls}" style="width:${sz}px;height:${sz}px"></div>`,
-      () => emit('select', s), pick ? 400 : on ? 200 : 100)
-  })
-
-  const poi = (g, list) => {
-    if (!L[g]) return
-    // 착한가격은 정의서(MAP_001)대로 툴팁, 나머지 업종은 관광지처럼 상세 패널
-    list.filter(f => inRegion(f) && hasCoords(f)).forEach(f => addPin(g, f.y, f.x,
-      `<div class="lb-t">${f.n}</div><div class="poi-marker ${POI_MARKER_CLASS[g]}"></div>`,
-      g === 'food' ? () => showGoodPriceTip(f) : () => emit('select', f), 60))
+  // 관광지 - 날짜가 바뀌면 달라지는 건 색·크기뿐. 좌표 없는 장소는 못 찍는다(KTO 원본 좌표 오류로 null 인 건)
+  prune('spot', state.layers.spot)
+  if (L.spot) for (const s of state.layers.spot) {
+    if (!hasCoords(s)) continue
+    const on = inFilter(s)
+    if (!on && hideDim) continue
+    const key = 'spot:' + (s.id ?? s.n)
+    seen.add(key)
+    const e = ensurePin(key, 'spot', s)
+    e.data = s
+    const pick = !!(inCourse(s.n) || (sel && sel.n === s.n))
+    const spec = spotPinSpec(L.crowd ? tier(crowd(s, di)) : 'calm', pick, on, spotIconGroup(s.tc))
+    const sig = spec.sig + '|' + s.n
+    if (sig !== e.sig) {
+      e.sig = sig
+      e.dot.className = spec.cls
+      e.dot.style.width = e.dot.style.height = spec.size + 'px'
+      e.lb.textContent = s.n
+      e.lb.classList.toggle('off', !on)   // 이름표는 필터 안 장소만
+      e.node.style.zIndex = spec.z
+    }
+    e.pick = pick
+    e.wanted = true
   }
-  poi('food', state.layers.food)
-  poi('dine', state.layers.dine)
-  poi('cafe', state.layers.cafe)
-  poi('cvs', state.layers.cvs)
-  poi('stay', state.layers.stay)
-  poi('mart', state.layers.mart)
 
+  // 업종 - 켜진 레이어의 권역 안 장소만. 끈 레이어는 숨길 뿐 풀에 남겨 다시 켤 때 즉시 보인다
+  for (const g of POI_GROUPS) {
+    prune(g, state.layers[g])
+    if (!L[g]) continue
+    for (const f of state.layers[g]) {
+      if (!hasCoords(f) || !inRegion(f)) continue
+      const key = g + ':' + (f.id ?? f.n)
+      seen.add(key)
+      const e = ensurePin(key, g, f)
+      e.data = f
+      if (e.sig !== f.n) { e.sig = f.n; e.lb.textContent = f.n }
+      e.wanted = true
+    }
+  }
+
+  // 이번 패스에 없는 핀(끈 레이어·권역 밖·축소 뷰의 흐린 핀)은 원하지 않는 핀
+  for (const [key, e] of pool) if (!seen.has(key)) e.wanted = false
+
+  cullPass()
+  clusterPass(lv)
+  drawExtras(di, sel, course, courseDay, L)
+}
+
+/** 선택 핀 + 코스(경로선·번호 핀). 모습 서명이 지난번과 같으면 그대로 둔다 */
+function drawExtras(di, sel, course, courseDay, L) {
   // 검색 등으로 연 장소는 레이어가 꺼져 있어도 선택 핀을 띄운다 (MAP_002) -
   // 지도가 이동만 하고 아무것도 안 보이면 고장으로 느껴진다. 이름표는 줌 무관 항상 표시.
   // 코스 정류지는 제외 - 번호 핀이 이미 그 자리를 표시하고, 겹치면 이름표가 두 장 뜬다
-  if (sel && hasCoords(sel) && !(L.spot && state.layers.spot.includes(sel))
-      && !(course && course.stops.some(cs => cs.o === sel))) {
+  const selPin = !!(sel && hasCoords(sel) && !(L.spot && state.layers.spot.includes(sel))
+    && !(course && course.stops.some(cs => cs.o === sel)))
+  const selTier = sel?.cat === 'TOURIST' ? (L.crowd ? tier(crowd(sel, di)) : 'calm') : ''
+  const sig = [
+    selPin ? `${sel.id ?? sel.n}|${selTier}` : '',
+    course ? course.stops.map(s => (s.o ? `${s.o.id ?? s.o.n}@${s.d}` : '')).join(',') : '',
+    courseDay,
+    course && sel ? (sel.id ?? sel.n) : '',   // 번호 핀의 pick 강조
+  ].join('#')
+  if (sig === exSig) return
+  clearExtras()
+  exSig = sig
+
+  if (selPin) {
     const pin = sel.cat === 'TOURIST'
-      ? `<div class="pn ${L.crowd ? tier(crowd(sel, di)) : 'calm'} pick" style="width:20px;height:20px"></div>`
+      ? `<div class="pn ${selTier} ic-${spotIconGroup(sel.tc)} pick" style="width:20px;height:20px"></div>`
       : `<div class="poi-marker sel-pick ${sel.good ? 'mk-food' : (CAT_MARKER[sel.cat] ?? 'mk-dine')}"></div>`
     addPin('sel', sel.y, sel.x, `<div class="lb-t sel-on">${sel.n}</div>` + pin, () => emit('select', sel), 500)
   }
@@ -140,7 +395,7 @@ function draw() {
           strokeOpacity: on ? 0.9 : 0.25, strokeStyle: 'shortdash',
         })
         line.setMap(map)
-        OV.route.push(line)
+        EX.route.push(line)
       }
       // 코스 핀도 눌러서 이름·상세를 본다 - 코스가 화면의 주인공이라 이름표는 줌 무관 상시 표시
       if (on) g[d].forEach((stop, i) => addPin('num', stop.o.y, stop.o.x,
@@ -187,6 +442,12 @@ function keepInJeju() {
   if (lat !== c.getLat() || lng !== c.getLng()) map.setCenter(LL(lat, lng))
 }
 
+/** 이동이 끝나면 제주 안으로 되돌리고, 새 화면 기준으로 핀 컬링을 다시 한다 */
+function onIdle() {
+  keepInJeju()
+  cullPass()
+}
+
 onMounted(async () => {
   try {
     await loadKakaoMap()
@@ -200,7 +461,8 @@ onMounted(async () => {
   map.addControl(new kakao.maps.ZoomControl(), kakao.maps.ControlPosition.BOTTOMRIGHT)
   kakao.maps.event.addListener(map, 'click', () => { closeTip(); emit('blank-click') })
   kakao.maps.event.addListener(map, 'zoom_changed', onZoomChanged)
-  kakao.maps.event.addListener(map, 'idle', keepInJeju)
+  kakao.maps.event.addListener(map, 'center_changed', onCenterChanged)
+  kakao.maps.event.addListener(map, 'idle', onIdle)
   addEventListener('resize', onResize)
 
   Object.assign(mapBridge, {
@@ -219,22 +481,22 @@ onBeforeUnmount(() => {
   removeEventListener('resize', onResize)
   if (map) {
     kakao.maps.event.removeListener(map, 'zoom_changed', onZoomChanged)
-    kakao.maps.event.removeListener(map, 'idle', keepInJeju)
+    kakao.maps.event.removeListener(map, 'center_changed', onCenterChanged)
+    kakao.maps.event.removeListener(map, 'idle', onIdle)
   }
   clearOverlays()
   mapBridge.ready = false
 })
 
-/* 상태가 바뀌면 다시 그린다. 지도 자체는 새로 만들지 않는다 */
-/* state.layers 를 함께 본다 - 장소는 API로 비동기로 오므로 지도가 먼저 뜨고 데이터가 나중에 도착한다.
-   이걸 빼면 첫 렌더 때 빈 배열로 그린 뒤 다시 그리지 않아 지도에 핀이 하나도 안 찍힌다.
-   레이어별 길이만 보면 되므로(내용 비교는 2천 건이라 비싸다) deep 감시 대상에서 분리한다 */
+/* 상태가 바뀌면 다시 적용한다. 지도 자체는 새로 만들지 않는다 */
 watch(() => [state.di, state.sel, state.course, state.courseDay, state.F.reg, state.F.cat,
   ...Object.values(state.L)], draw, { deep: true })
-/* forecastDays 도 함께 본다 - 예보는 장소보다 늦게 도착해 series 를 뒤늦게 채운다.
-   배열 길이는 그대로라 이걸 빼면 핀이 첫 렌더 상태(전부 회색 '정보 없음')로 굳는다.
-   좌측 목록은 computed 라 알아서 갱신되므로 목록만 색이 맞고 지도는 회색인 상태가 되어 알아채기 어렵다 */
-watch(() => [Object.values(state.layers).map(list => list.length).join(','), state.forecastDays], draw)
+/* 레이어 배열 자체가 바뀔 때(진입·칩 재요청·재진입 재적재)도 본다 - 장소는 API로 비동기로 오므로 지도가 먼저 뜨고
+   데이터가 나중에 도착한다. 이걸 빼면 첫 렌더 때 빈 배열로 그린 뒤 다시 그리지 않아 지도에 핀이 하나도 안 찍힌다.
+   forecastVersion 도 함께 본다 - 예보는 장소보다 늦게 도착해 series 를 뒤늦게 채운다.
+   예전엔 forecastDays(일수)를 봤는데 재진입 땐 22→22 로 값이 같아 안 깨어났고, 그 사이 새로 받은 장소 객체로
+   그린 핀은 예보가 붙은 뒤에도 회색으로 굳었다(클릭해야 색이 돌아오던 버그) */
+watch(() => [state.layers, ...Object.values(state.layers), state.forecastVersion], draw)
 </script>
 
 <template>

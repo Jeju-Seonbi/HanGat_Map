@@ -48,6 +48,9 @@ export const state = reactive({
   loadFailed: [],
   /** 예보 일수. 화면은 30일 캘린더인데 실측은 21~22일이라 남는 날은 '정보 없음' */
   forecastDays: 0,
+  /** 예보를 장소에 붙일 때마다 1 증가 - 지도가 이걸 보고 핀 색을 다시 칠한다.
+      일수(forecastDays)로는 안 된다: 재진입 때 22→22 로 값이 같아 watch 가 안 깨어나 핀이 회색으로 굳는다 */
+  forecastVersion: 0,
 
   di: 0,                 // 선택한 날짜 (오늘로부터 며칠 뒤)
   sel: null,             // 상세를 연 장소
@@ -166,6 +169,7 @@ export async function loadPlaces () {
   const [forecast] = await Promise.all([CrowdService.getForecast(), WeatherService.load()])
   state.forecastDays = forecast.days
   attachSeries(state.layers.spot, forecast, iso(new Date()))
+  state.forecastVersion++
 }
 
 /** 지역·종류 필터를 함께 적용 */

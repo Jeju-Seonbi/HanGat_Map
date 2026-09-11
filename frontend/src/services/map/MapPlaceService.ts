@@ -12,6 +12,7 @@
  *   ⚠️ `x`가 경도, `y`가 위도다 - 뒤집으면 제주 전역 핀이 통째로 엉뚱한 곳에 찍힌다.
  */
 import { apiGet } from '../apiClient'
+import { inferUnits, placeUnit } from '../../utils/emd'
 
 /** 화면이 쓰는 장소 한 건. 기존 placesMap.js 한 줄과 같은 모양이다. */
 export interface MapPlace {
@@ -26,6 +27,10 @@ export interface MapPlace {
   r: string
   /** 세부분류 표시명 (오름/해수욕장/박물관…). 미분류면 '정보 없음' */
   c: string
+  /** 세부분류 코드 (관광공사 NA010100 등). 관광지 핀 아이콘 묶음을 앞자리로 정한다 - 없으면 null */
+  tc: string | null
+  /** 묶음 단위(읍·면 / 제주시내 / 서귀포시내 / 중문) - 주소에서 뽑고, 없으면 가장 가까운 장소의 단위(inferUnits). 섬 전체 뷰 묶음 핀용 */
+  unit: string | null
   /** 카테고리 코드 (TOURIST/FOOD/CAFE/…) - 검색 결과의 핀 색 구분용 */
   cat: string
   addr: string | null
@@ -151,7 +156,7 @@ export const MapPlaceService = {
     const layers = emptyLayers()
     const failed: LayerKey[] = []
     results.forEach((r, i) => {
-      if (r.status === 'fulfilled') layers[keys[i]] = r.value.map(toMapPlace)
+      if (r.status === 'fulfilled') layers[keys[i]] = withUnits(r.value.map(toMapPlace))
       else failed.push(keys[i])
     })
     return { live: failed.length < keys.length, layers, failed }
@@ -161,7 +166,7 @@ export const MapPlaceService = {
   async getLayer (key: LayerKey): Promise<MapPlace[] | null> {
     try {
       const rows = await apiGet<BackendPlace[]>(`/places?type=${key}`)
-      return rows.map(toMapPlace)
+      return withUnits(rows.map(toMapPlace))
     } catch {
       return null
     }
@@ -174,7 +179,7 @@ export const MapPlaceService = {
       if (opts?.region) params.set('region', opts.region)
       if (opts?.categories?.length) params.set('categories', opts.categories.join(','))
       const rows = await apiGet<BackendPlace[]>(`/places/search?${params}`)
-      return rows.map(toMapPlace)
+      return withUnits(rows.map(toMapPlace))
     } catch {
       return []
     }
@@ -186,8 +191,7 @@ export const MapPlaceService = {
    */
   async getDetail (id: number): Promise<PlaceDetail | null> {
     try {
-      // 15초: 핀 전량 재생성이 메인 스레드를 5초 넘게 잠그면 5초 기본값으론 응답이 Abort로 죽는다
-      const row = await apiGet<BackendPlaceDetail>(`/places/${id}`, 15000)
+      const row = await apiGet<BackendPlaceDetail>(`/places/${id}`)
       const images = (row.images ?? []).map(i => ({
         url: i.url,
         thumb: i.thumbnailUrl ?? i.url,
@@ -215,7 +219,7 @@ export const MapPlaceService = {
    */
   async getById (id: number): Promise<MapPlace | null> {
     try {
-      return toMapPlace(await apiGet<BackendPlace>(`/places/${id}`, 15000))
+      return toMapPlace(await apiGet<BackendPlace>(`/places/${id}`))
     } catch {
       return null
     }
@@ -223,6 +227,12 @@ export const MapPlaceService = {
 }
 
 /** 백엔드 응답 → 화면 형식. 좌표가 없는 장소는 지도에 못 그리므로 호출부에서 걸러진다. */
+/** 한 레이어를 통째로 받은 뒤 단위 없는 장소를 이웃 장소로 채운다 - 묶음 핀에서 빠지는 곳이 없게 */
+function withUnits (rows: MapPlace[]): MapPlace[] {
+  inferUnits(rows)
+  return rows
+}
+
 function toMapPlace (row: BackendPlace): MapPlace {
   return {
     id: row.id,
@@ -232,6 +242,8 @@ function toMapPlace (row: BackendPlace): MapPlace {
     r: row.regionName,
     // 세부분류가 없는 장소가 있다 - 빈 문자열로 두면 드롭다운에 빈 항목이 생긴다
     c: row.tagName ?? '정보 없음',
+    tc: row.tagCode ?? null,   // 관광공사 분류 코드 - 관광지 핀 아이콘 묶음(spotIconGroup)이 앞자리로 나눈다
+    unit: placeUnit(row.lotAddress, row.roadAddress),
     cat: row.categoryCode,
     addr: row.roadAddress ?? row.lotAddress,
     tel: row.phone,
