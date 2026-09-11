@@ -1,7 +1,6 @@
 <script setup lang="ts">
-// 코스 상세 (담당: 정동현)
-// 숫자 id는 백엔드 GET /courses/{id} 실데이터, 문자열 id('sample-aewol')는 기존 목업 -
-// 목업 코스 링크가 아직 살아 있어 전환기 동안 두 경로가 공존한다.
+// 코스 상세 (담당: 정동현) - 백엔드 GET /courses/{id} 실데이터만 그린다.
+// 예전에는 문자열 id('sample-aewol')로 목업 코스를 그렸는데, 없는 id에 가짜 코스가 떠서 걷어냈다.
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import CongestionBadge from '../../components/common/CongestionBadge.vue'
@@ -10,10 +9,6 @@ import MapRenderer from '../../components/map/MapRenderer.vue'
 import PlaceImage from '../../components/common/PlaceImage.vue'
 import AlternativePlaceModal from '../../components/course/AlternativePlaceModal.vue'
 import { ApiError } from '../../api/errors.js'
-import { sampleCourses } from '../../data/courses'
-import { levelLabel, places } from '../../data/data'
-import { levelOf } from '../../utils/congestion'
-import { resolveCourseDetail } from './courseDetailModel'
 import CourseService, { type CourseDetail, type CourseDetailItem } from '../../services/CourseService'
 import type { CongestionLevel, Place } from '../../assets/types'
 import type { AlternativePlace, CourseItem } from '../../assets/types/course'
@@ -44,15 +39,15 @@ interface Stop {
   name: string
   image: string | null
   timeLabel: string
-  /** 목업은 "2시간 · 12,000원", 실데이터는 "이동 12분 · 6.6km · 근거" */
+  /** "이동 12분 · 6.6km · 근거" */
   metaLabel: string
   level: CongestionLevel | null
-  /** 장소 상세가 아직 목업 id 라우팅이라, 실데이터 일정은 링크를 걸지 않는다 */
+  /** 장소 상세 페이지(/places/<placeId>) - 백엔드 id가 없으면 null */
   detailPath: string | null
-  /** 실데이터 일정만 - 장소 교체가 백엔드 item id·날짜를 알아야 한다. 목업은 교체 불가 */
-  liveItem: CourseDetailItem | null
-  dayNo: number | null
-  visitDate: string | null
+  /** 장소 교체가 백엔드 item id·날짜를 알아야 한다 */
+  liveItem: CourseDetailItem
+  dayNo: number
+  visitDate: string
 }
 
 interface CourseView {
@@ -151,53 +146,12 @@ const fromLive = (course: CourseDetail): CourseView => {
   }
 }
 
-const mock = computed(() => resolveCourseDetail(courseId, sampleCourses, places))
-
-const fromMock = (course: NonNullable<typeof mock.value>): CourseView => {
-  const stops = course.places
-  const avg = stops.length
-    ? Math.round(stops.reduce((sum, place) => sum + place.score, 0) / stops.length)
-    : 0
-  return {
-    title: course.title,
-    conditionLabel: course.conditionLabel,
-    highlight: course.highlight,
-    budgetLabel: course.budgetLabel.replace(/^검증가 식비 포함\s*/, ''),
-    averageText: `${avg} · ${levelLabel[levelOf(avg)]}`,
-    dayCount: course.days.length,
-    placeCount: stops.length,
-    days: course.days.map(day => ({
-      day: day.day,
-      label: day.label,
-      stops: day.places.map(place => ({
-        key: `mock-${day.day}-${place.id}`,
-        name: place.name,
-        image: place.image,
-        timeLabel: place.time,
-        metaLabel: `${place.stay} · ${place.cost}`,
-        level: place.level,
-        detailPath: null, // 목업 장소는 백엔드 id가 없어 지도 패널로도 열 수 없다
-        liveItem: null,
-        dayNo: null,
-        visitDate: null,
-      })),
-    })),
-    mapPlaces: stops,
-    forecastNote: null,
-    editable: true,
-  }
-}
-
-const view = computed<CourseView | null>(() => {
-  if (live.value) return fromLive(live.value)
-  if (mock.value) return fromMock(mock.value)
-  return null
-})
+const view = computed<CourseView | null>(() => (live.value ? fromLive(live.value) : null))
 
 /** 대안 모달은 AI 코스 화면의 CourseItem 모양을 받는다 - 상세 응답에서 그 모양으로 옮긴다(없는 값은 비운다) */
 const modalItem = computed<CourseItem | null>(() => {
   const stop = swapTarget.value
-  if (!stop?.liveItem || !live.value) return null
+  if (!stop || !live.value) return null
   const item = stop.liveItem
   return {
     id: item.id,
@@ -206,9 +160,9 @@ const modalItem = computed<CourseItem | null>(() => {
     place_name: item.placeName,
     category_name: item.categoryName,
     image_url: item.imageUrl ?? undefined,
-    day_no: stop.dayNo ?? 1,
+    day_no: stop.dayNo,
     position: item.position,
-    visit_date: stop.visitDate ?? live.value.startDate,
+    visit_date: stop.visitDate,
     start_time: item.startTime ?? undefined,
     item_source: item.replacedFromPlaceName ? 'REPLACEMENT' : 'AI_RECOMMENDED',
     inbound_distance_m: item.inboundDistanceM ?? undefined,
@@ -239,13 +193,13 @@ async function shareCourse () {
 }
 
 async function openSwap (stop: Stop) {
-  if (!stop.liveItem || !stop.visitDate || !live.value) return
+  if (!live.value) return
   swapTarget.value = stop
   alternatives.value = []
   altNotice.value = ''
   altLoading.value = true
   const exclude = live.value.days.flatMap(day => day.items)
-    .filter(item => item.id !== stop.liveItem?.id)
+    .filter(item => item.id !== stop.liveItem.id)
     .map(item => item.placeId)
   try {
     alternatives.value = await CourseService.getAlternatives(stop.liveItem.placeId, stop.visitDate, exclude)
@@ -317,16 +271,13 @@ async function applySwap (alternative: AlternativePlace) {
         </p>
       </div>
       <div class="actions">
-        <!-- 실데이터 코스만 - 목업 코스는 지도에 이어줄 id·좌표가 없다 -->
         <button
-          v-if="live"
           class="btn ghost"
           @click="router.push(`/map?course=${courseId}`)"
         >
           지도에서 보기
         </button>
         <button
-          v-if="live"
           class="btn ghost"
           @click="shareCourse"
         >
@@ -403,10 +354,7 @@ async function applySwap (alternative: AlternativePlace) {
                   class="edit-actions"
                 >
                   <!-- 시간 변경은 백엔드 API가 없어 두지 않는다 - 눌러도 아무 일 없는 버튼을 만들지 않는다 -->
-                  <button
-                    :disabled="!stop.liveItem"
-                    @click="openSwap(stop)"
-                  >
+                  <button @click="openSwap(stop)">
                     장소 교체
                   </button>
                 </div>
