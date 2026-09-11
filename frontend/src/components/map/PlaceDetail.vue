@@ -8,7 +8,7 @@ import { state, toggleFav, isFav, toast } from '@/stores/mapStore'
 
 import { crowd, tier, tierKo, rank30, bestDay, CROWD_KO } from '@/utils/crowd'
 import { at, fmtK } from '@/utils/date'
-import { wxOf, wxIcon } from '@/utils/weather'
+import { wxOf, wxIcon, wxIssuedAt } from '@/utils/weather'
 import { dist, won } from '@/utils/geo'
 import { copyText } from '@/utils/clipboard'
 import { shareToKakao, preloadKakao } from '@/composables/useKakaoShare'
@@ -54,7 +54,7 @@ const tipText = computed(() => {
 const week = computed(() => {
   const st = Math.max(0, Math.min(state.di - 1, 23))
   return Array.from({ length: 7 }, (_, j) => {
-    const k = st + j, d = at(k), w = wxOf(k), cc = crowd(s.value, k)
+    const k = st + j, d = at(k), w = wxOf(k, s.value.r), cc = crowd(s.value, k)
     return { k, d, w, cc, t: tier(cc), ko: tierKo(cc), label: `${d.getMonth() + 1}/${d.getDate()} ${'일월화수목금토'[d.getDay()]}` }
   })
 })
@@ -62,12 +62,23 @@ const week = computed(() => {
 /** 날씨가 제공되는 마지막 날짜 라벨. 창에 날씨 없는 카드가 있을 때 캡션으로 안내한다 */
 const wxUntil = computed(() => {
   let last = -1
-  for (let i = 0; i < 30; i++) if (wxOf(i)) last = i
+  for (let i = 0; i < 30; i++) if (wxOf(i, s.value.r)) last = i
   if (last < 0) return null
   const d = at(last)
   return `${d.getMonth() + 1}/${d.getDate()}`
 })
 const weatherGap = computed(() => week.value.some(w => !w.w))
+const hasWx = computed(() => week.value.some(w => w.w))
+
+/* 날씨는 이 장소 권역의 기상청 격자 값이다 - 어느 권역 기준이고 언제 발표된 예보인지 적는다 (MAP_006).
+   발표 시각은 선택한 날짜 예보의 것(단기 05시·중기 18시가 섞인다). 적재분에만 있어 라이브 폴백이면 권역만 적는다 */
+const wxSource = computed(() => {
+  const issued = wxIssuedAt(s.value.r, state.di)
+  if (!issued) return `출처: 기상청 · ${s.value.r} 기준`
+  const d = new Date(issued)
+  const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  return `출처: 기상청 · ${s.value.r} 기준 · ${d.getMonth() + 1}/${d.getDate()} ${hm} 발표`
+})
 
 /**
  * 입장료 배지. 모르면 배지를 안 그린다 -
@@ -295,6 +306,7 @@ async function shareNative() {
           <div v-if="crowdUi" class="wc tier-bg" :class="w.t" :title="w.ko"></div>
         </div>
       </div>
+      <div v-if="hasWx" class="wx-src">{{ wxSource }}</div>
       <div v-if="weatherGap && wxUntil" class="wx-note">날씨는 {{ wxUntil }}까지 제공돼요<template v-if="crowdUi"> · 혼잡은 30일 표시</template></div>
       </template>
 
