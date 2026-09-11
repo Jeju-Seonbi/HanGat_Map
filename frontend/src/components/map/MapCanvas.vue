@@ -362,8 +362,10 @@ watch(() => [state.di, state.sel, state.course, state.courseDay, state.F.reg, st
   ...Object.values(state.L)], draw, { deep: true })
 /* 레이어 배열 자체가 바뀔 때(진입·칩 재요청·재진입 재적재)도 본다 - 장소는 API로 비동기로 오므로 지도가 먼저 뜨고
    데이터가 나중에 도착한다. 이걸 빼면 첫 렌더 때 빈 배열로 그린 뒤 다시 그리지 않아 지도에 핀이 하나도 안 찍힌다.
-   forecastDays 도 함께 본다 - 예보는 장소보다 늦게 도착해 series 를 뒤늦게 채운다 */
-watch(() => [state.layers, ...Object.values(state.layers), state.forecastDays], draw)
+   forecastVersion 도 함께 본다 - 예보는 장소보다 늦게 도착해 series 를 뒤늦게 채운다.
+   예전엔 forecastDays(일수)를 봤는데 재진입 땐 22→22 로 값이 같아 안 깨어났고, 그 사이 새로 받은 장소 객체로
+   그린 핀은 예보가 붙은 뒤에도 회색으로 굳었다(클릭해야 색이 돌아오던 버그) */
+watch(() => [state.layers, ...Object.values(state.layers), state.forecastVersion], draw)
 </script>
 
 <template>
