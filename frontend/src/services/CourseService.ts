@@ -299,9 +299,23 @@ export const CourseService = {
     return { averageRate: body.average_congestion_rate, levelLabel: body.congestion_label, message: body.message }
   },
 
+  /** 저장 코스 이름 변경 - PATCH /courses/{id}. 본인 코스만(3307) 되고 100자 제한은 서버가 검사한다 */
+  async renameCourse (courseId: string, title: string): Promise<string> {
+    const row = await apiRequest(`/courses/${courseId}`, {
+      method: 'PATCH',
+      body: { title },
+      auth: true,
+    }) as { title: string | null }
+    return row.title ?? title
+  },
+
+  /** 저장 코스 삭제 - DELETE /courses/{id}. 서버는 논리 삭제라 되돌릴 여지를 남기고, 두 번 지워도 성공이다 */
+  async deleteCourse (courseId: string): Promise<void> {
+    await apiRequest(`/courses/${courseId}`, { method: 'DELETE', auth: true })
+  },
+
   /**
-   * 코스 상세. 숫자 id만 백엔드에 묻는다 - 목업 코스는 'sample-aewol' 같은 문자열 id라
-   * 전환기 동안 두 경로가 공존한다.
+   * 코스 상세. 숫자 id만 백엔드에 묻는다.
    *
    * 로그인돼 있으면 JWT를 붙인다 - 소유자가 있는 저장 코스는 본인 확인(3307)을 통과해야 열리고,
    * 그래야 swappable/manageable이 참이 되어 교체·이름 변경이 가능하다. 비로그인은 공개 경로.

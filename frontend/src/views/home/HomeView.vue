@@ -157,16 +157,18 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateArrows))
           <span class="eyebrow">READY-MADE COURSE</span>
           <h2>한적한 곳으로 이어 만든 추천 코스</h2>
           <p class="muted">
-            {{ coursesLive ? '새벽 배치가 그날 한산한 권역으로 미리 만든 코스' : '시연용 데이터 · 백엔드 연결 대기' }} · 카드를 누르면 코스 상세로 이동해요
+            {{ coursesLive ? '새벽 배치가 그날 한산한 권역으로 미리 만든 코스 · 카드를 누르면 코스 상세로 이동해요' : '시연용 데이터 · 백엔드 연결 대기' }}
           </p>
         </div>
       </div>
       <div class="cards">
-        <RouterLink
+        <!-- 목업 폴백(백엔드 미가동·배치 전)은 열 상세가 없어 링크를 걸지 않는다 - 눌러서 "찾을 수 없어요"가 뜨지 않게 -->
+        <component
+          :is="coursesLive ? 'RouterLink' : 'article'"
           v-for="course in courseCards"
           :key="course.id"
           class="home-course-card"
-          :to="`/courses/${course.id}`"
+          v-bind="coursesLive ? { to: `/courses/${course.id}` } : {}"
         >
           <div class="eyebrow">
             {{ course.conditionLabel }}
@@ -190,9 +192,12 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateArrows))
               :level="course.level"
             />
             <span v-else />
-            <span class="text-link">코스 상세 →</span>
+            <span
+              v-if="coursesLive"
+              class="text-link"
+            >코스 상세 →</span>
           </div>
-        </RouterLink>
+        </component>
       </div>
     </section>
     <!-- ④ MAIN_001: 장소 추천 캐러셀 -->
