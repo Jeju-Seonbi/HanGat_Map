@@ -58,6 +58,13 @@ describe('mapPresentation', () => {
     expect(mapCss).toContain('.pw.hid{display:none}')
   })
 
+  it('핀 아이콘: 관광지(.pn)와 업종 마커 전부 마스크 아이콘이 있고, 흐린 9px 핀엔 없다', () => {
+    expect(mapCss).toContain('.pn.dim::after{display:none}')
+    for (const cls of ['pn', ...Object.values(POI_MARKER_CLASS)]) {
+      expect(mapCss).toMatch(new RegExp(`\\.${cls}\\{--ico:url\\("data:image/svg\\+xml,`))
+    }
+  })
+
   it('축소 상태를 우회해 이름을 표시하는 hover 규칙이 없다', () => {
     expect(mapCss).not.toContain('.pw:hover .poi-label')
   })
