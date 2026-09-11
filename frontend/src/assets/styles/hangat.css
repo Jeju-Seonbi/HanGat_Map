@@ -375,6 +375,8 @@
 .rv-none{padding:16px 0;text-align:center;font-size:12px;color:var(--tx3);line-height:1.7}
 /* 혼잡 색 범례 — 코스 버튼 아래 */
 .cta-note{font-size:11px;line-height:1.45;color:var(--tx3);margin:6px 2px 0;flex-shrink:0;word-break:keep-all}
+/* 출처 줄 - 범례 아래 고정. 레이어가 늘면 두 줄까지 접힌다 */
+.cta-src{font-size:10.5px;line-height:1.4;color:var(--tx3);margin:5px 2px 0;flex-shrink:0;word-break:keep-all}
 .cta-leg{display:flex;gap:10px;align-items:center;flex-wrap:wrap;flex-shrink:0;
   margin-top:11px;padding-top:10px;border-top:1px solid var(--line);
   font-size:11px;font-weight:800}
