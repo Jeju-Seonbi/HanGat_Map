@@ -31,8 +31,10 @@ let map = null
 
    키 = 그룹:장소id. 항목 = { node(.pw), lb(이름표), dot(점), data(현재 장소 객체), sig(마지막 적용 모습), shown, group } */
 const pool = new Map()
-const ANCHOR = { lat: 33.383, lng: 126.55 }
-let layerOv = null, layerNode = null, proj = null, anchorPt = null
+/* anchorLL = 레이어 오버레이의 현재 위치, originPt = 핀 오프셋의 기준 픽셀(현재 레벨). 처음엔 둘이 같은 지점이다.
+   카카오는 위치(앵커)가 화면 밖으로 나간 CustomOverlay 를 DOM 에서 떼어 버린다(실측: 확대해서 앵커가 화면을 벗어나자 핀 전부 소실).
+   그래서 이동 중 앵커가 화면 가운데를 벗어나면 앵커만 현재 중심으로 옮기고, 핀은 그대로 둔 채 레이어를 반대로 밀어 상쇄한다 */
+let layerOv = null, layerNode = null, proj = null, anchorLL = null, originPt = null
 /* 선택 핀·코스 번호·경로선은 몇 개 안 돼(20개 남짓) 카카오 오버레이로 매번 다시 만든다. 대신 모습이 지난번과 같으면 건너뛴다 */
 const EX = { route: [], num: [], sel: [] }
 let exSig = ''
@@ -92,20 +94,36 @@ function syncLabelVisibility() {
   el.value.classList.toggle('labels-visible', shouldShowMapLabels(map.getLevel()))
 }
 
-/** 줌이 바뀌면 앵커 기준 픽셀 오프셋이 달라진다 - 풀 핀 전부 다시 놓는다(스타일 쓰기만이라 수십 ms) */
+/** 줌이 바뀌면 픽셀 오프셋의 척도가 달라진다 - 앵커를 현재 중심으로 옮기고 풀 핀 전부 다시 놓는다(스타일 쓰기만이라 수십 ms) */
 function relayoutPins() {
-  if (!map) return
+  if (!map || !layerOv) return
   proj = map.getProjection()
-  anchorPt = proj.pointFromCoords(LL(ANCHOR.lat, ANCHOR.lng))
+  anchorLL = map.getCenter()
+  originPt = proj.pointFromCoords(anchorLL)
+  layerOv.setPosition(anchorLL)
+  layerNode.style.transform = ''
   pool.forEach(place)
+}
+
+/** 지도가 움직여 앵커가 화면 가운데 절반을 벗어나면 앵커를 중심으로 옮긴다. 핀 오프셋은 originPt 기준 그대로 두고
+    레이어를 (originPt - 새 앵커) 만큼 밀어 화면 위치를 유지한다 - 핀 수와 무관한 O(1) */
+function keepAnchorOnScreen() {
+  if (!map || !layerOv || !el.value) return
+  const p = proj.containerPointFromCoords(anchorLL)
+  const W = el.value.clientWidth, H = el.value.clientHeight
+  if (p.x > W * 0.25 && p.x < W * 0.75 && p.y > H * 0.25 && p.y < H * 0.75) return
+  anchorLL = map.getCenter()
+  layerOv.setPosition(anchorLL)
+  const a = proj.pointFromCoords(anchorLL)
+  layerNode.style.transform = `translate(${originPt.x - a.x}px,${originPt.y - a.y}px)`
 }
 
 const onZoomChanged = () => { syncLabelVisibility(); relayoutPins() }
 
 function place(e) {
   const pt = proj.pointFromCoords(LL(e.data.y, e.data.x))
-  e.node.style.left = (pt.x - anchorPt.x) + 'px'
-  e.node.style.top = (pt.y - anchorPt.y) + 'px'
+  e.node.style.left = (pt.x - originPt.x) + 'px'
+  e.node.style.top = (pt.y - originPt.y) + 'px'
 }
 
 /** 풀 핀이 들어갈 레이어(CustomOverlay 1개). 클릭은 레이어에서 한 번만 받아 핀 키로 찾는다 -
@@ -124,7 +142,7 @@ function ensureLayer() {
     else emit('select', e.data)
   })
   layerOv = new kakao.maps.CustomOverlay({
-    position: LL(ANCHOR.lat, ANCHOR.lng), content: layerNode, xAnchor: 0, yAnchor: 0, zIndex: 50, clickable: true,
+    position: map.getCenter(), content: layerNode, xAnchor: 0, yAnchor: 0, zIndex: 50, clickable: true,
   })
   layerOv.setMap(map)
   relayoutPins()
@@ -332,6 +350,7 @@ onMounted(async () => {
   map.addControl(new kakao.maps.ZoomControl(), kakao.maps.ControlPosition.BOTTOMRIGHT)
   kakao.maps.event.addListener(map, 'click', () => { closeTip(); emit('blank-click') })
   kakao.maps.event.addListener(map, 'zoom_changed', onZoomChanged)
+  kakao.maps.event.addListener(map, 'center_changed', keepAnchorOnScreen)
   kakao.maps.event.addListener(map, 'idle', keepInJeju)
   addEventListener('resize', onResize)
 
@@ -351,6 +370,7 @@ onBeforeUnmount(() => {
   removeEventListener('resize', onResize)
   if (map) {
     kakao.maps.event.removeListener(map, 'zoom_changed', onZoomChanged)
+    kakao.maps.event.removeListener(map, 'center_changed', keepAnchorOnScreen)
     kakao.maps.event.removeListener(map, 'idle', keepInJeju)
   }
   clearOverlays()
