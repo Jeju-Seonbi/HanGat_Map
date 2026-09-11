@@ -63,6 +63,13 @@ describe('상세 조회 사진 매핑', () => {
     expect(d?.imageAttribution).toBeNull()
   })
 
+  it('착한가격 기준일은 그대로 넘기고, 없으면 null 이다', async () => {
+    mockFetch({ ...REAL_DETAIL, goodPriceBaseDate: '2026-06-30' })
+    expect((await MapPlaceService.getDetail(161))?.goodPriceBaseDate).toBe('2026-06-30')
+    mockFetch(REAL_DETAIL)
+    expect((await MapPlaceService.getDetail(9))?.goodPriceBaseDate).toBeNull()
+  })
+
   it('호출이 실패하면 null - 패널은 목록 데이터로 계속 그려진다', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('down')))
 

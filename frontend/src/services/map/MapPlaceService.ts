@@ -93,6 +93,8 @@ export interface PlaceDetail {
   imageAttribution: string | null
   /** 소개 원문. 착한가격업소는 "대표메뉴: ○○ 9,000원 · …" 형태 - 핀 툴팁이 쓴다 */
   overview: string | null
+  /** 착한가격 명단 기준일(행안부 CSV 발행일, ISO 날짜). 착한가격이 아니거나 모르면 null - 가격표 밑 출처 줄이 쓴다 */
+  goodPriceBaseDate: string | null
 }
 
 export interface PlaceImage {
@@ -110,6 +112,7 @@ interface BackendPlaceDetail {
   reviewCount: number
   images: BackendPlaceImage[]
   overview: string | null
+  goodPriceBaseDate?: string | null
 }
 
 interface BackendPlaceImage {
@@ -198,7 +201,8 @@ export const MapPlaceService = {
         reviewCount: row.reviewCount ?? 0,
         images,
         imageAttribution: row.images?.[0]?.attribution ?? null,
-        overview: row.overview ?? null
+        overview: row.overview ?? null,
+        goodPriceBaseDate: row.goodPriceBaseDate ?? null
       }
     } catch {
       return null
