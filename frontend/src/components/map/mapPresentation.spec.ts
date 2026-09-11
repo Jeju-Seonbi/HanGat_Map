@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 
-import { MAP_LABEL_MAX_LEVEL, POI_MARKER_CLASS, shouldShowMapLabels } from './mapPresentation'
+import { MAP_LABEL_MAX_LEVEL, POI_GROUPS, POI_MARKER_CLASS, shouldShowMapLabels, spotPinSpec } from './mapPresentation'
 
 const mapCss = readFileSync(new URL('../../assets/styles/hangat.css', import.meta.url), 'utf8')
 const sharedCss = readFileSync(new URL('../../assets/styles.css', import.meta.url), 'utf8')
@@ -31,6 +31,31 @@ describe('mapPresentation', () => {
       stay: 'mk-stay',
       mart: 'mk-mart',
     })
+  })
+
+  it('업종 레이어 키는 마커 클래스 표와 같은 순서다', () => {
+    expect(POI_GROUPS).toEqual(['food', 'dine', 'cafe', 'cvs', 'stay', 'mart'])
+  })
+
+  describe('spotPinSpec - 관광지 핀 모습(핀 재사용의 변경 감지 기준)', () => {
+    it('선택·코스 정류지는 20px 최상단, 필터 안은 15px, 필터 밖은 9px 흐림', () => {
+      expect(spotPinSpec('busy', true, true)).toMatchObject({ cls: 'pn busy pick', size: 20, z: 400 })
+      expect(spotPinSpec('calm', false, true)).toMatchObject({ cls: 'pn calm', size: 15, z: 200 })
+      expect(spotPinSpec('mid', false, false)).toMatchObject({ cls: 'pn mid dim', size: 9, z: 100 })
+    })
+
+    it('혼잡 단계만 달라져도 서명이 달라진다 - 날짜 이동 때 색이 갱신되는 근거', () => {
+      expect(spotPinSpec('calm', false, true).sig).not.toBe(spotPinSpec('busy', false, true).sig)
+      expect(spotPinSpec('calm', false, true).sig).toBe(spotPinSpec('calm', false, true).sig)
+    })
+  })
+
+  it('핀 래퍼는 크기가 고정이고 풀 핀은 레이어 안 절대배치, 숨김·이름표 숨김은 클래스로 - 핀 재사용 전제', () => {
+    expect(mapCss).toMatch(/\.pw\{[^}]*width:20px;height:20px/)
+    expect(mapCss).toContain('#map .pw .lb-t.off{display:none}')
+    expect(mapCss).toMatch(/\.pl-layer\{[^}]*width:0;height:0/)
+    expect(mapCss).toMatch(/\.pw\.pl\{position:absolute;margin:-10px 0 0 -10px/)
+    expect(mapCss).toContain('.pw.hid{display:none}')
   })
 
   it('축소 상태를 우회해 이름을 표시하는 hover 규칙이 없다', () => {

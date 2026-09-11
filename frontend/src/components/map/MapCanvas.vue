@@ -7,7 +7,7 @@ import MapPlaceService, { hasCoords } from '@/services/map/MapPlaceService'
 
 import { crowd, tier } from '@/utils/crowd'
 import { cssVar } from '@/utils/geo'
-import { POI_MARKER_CLASS, shouldShowMapLabels } from './mapPresentation'
+import { POI_MARKER_CLASS, POI_GROUPS, spotPinSpec, shouldShowMapLabels } from './mapPresentation'
 import { JEJU_MAX_LEVEL, clampToJeju } from '@/utils/jejuBounds'
 import { goodPriceSourceLine } from '@/utils/dataSources'
 
@@ -17,17 +17,42 @@ const el = ref(null)
 const failed = ref('')
 const origin = location.origin
 let map = null
-/* 오버레이는 반응형일 필요가 없어 ref 바깥에 둔다 */
-const OV = { spot: [], food: [], dine: [], cafe: [], cvs: [], stay: [], mart: [], route: [], num: [], sel: [] }
+
+/* ── 핀 풀 + 자체 레이어 (성능: 오버레이 재사용) ──
+   관광지·업종 핀은 장소당 노드 하나를 한 번만 만들어 두고, 상태가 바뀌면 클래스·크기·표시 여부만 바꾼다.
+   예전엔 날짜·선택·필터가 바뀔 때마다 841~1,558개를 전부 지우고 새로 만들어 메인 스레드가 2~6초 멈췄다(9/7 실측).
+
+   핀마다 CustomOverlay 를 만들지 않고 CustomOverlay 하나(레이어) 안에 절대배치로 넣는 이유:
+   카카오 setMap 은 핀마다 노드 크기를 읽어 강제 레이아웃을 일으키는데, 그 비용이 이미 붙어 있는 핀 수에 비례한다
+   (실측: 붙은 핀 3,800개 상태에서 핀 하나 넣고 크기 읽기 15ms, 읽기 없이 넣기만 하면 0.05ms).
+   카페 3,039개를 핀마다 setMap 으로 넣으면 15초, 숨겼다 다시 setMap 해도 12초였다. 레이어 하나에 자식으로 넣으면
+   크기 읽기가 없어 수백 ms 안에 끝나고, 지도 이동 때 카카오가 옮기는 오버레이도 하나뿐이다.
+   핀 위치 = 앵커(제주 중심) 기준 픽셀 오프셋. 같은 레벨에선 이동해도 안 변하고, 줌이 바뀌면 전부 다시 계산한다.
+
+   키 = 그룹:장소id. 항목 = { node(.pw), lb(이름표), dot(점), data(현재 장소 객체), sig(마지막 적용 모습), shown, group } */
+const pool = new Map()
+const ANCHOR = { lat: 33.383, lng: 126.55 }
+let layerOv = null, layerNode = null, proj = null, anchorPt = null
+/* 선택 핀·코스 번호·경로선은 몇 개 안 돼(20개 남짓) 카카오 오버레이로 매번 다시 만든다. 대신 모습이 지난번과 같으면 건너뛴다 */
+const EX = { route: [], num: [], sel: [] }
+let exSig = ''
 
 /** 선택 핀의 업종색 - 지도 마커와 같은 팔레트 */
 const CAT_MARKER = { FOOD: 'mk-dine', CAFE: 'mk-cafe', CONVENIENCE: 'mk-cvs', LODGING: 'mk-stay', MART: 'mk-mart' }
 
 const LL = (lat, lng) => new kakao.maps.LatLng(lat, lng)
 
+function clearExtras() {
+  for (const k in EX) { EX[k].forEach(o => o.setMap(null)); EX[k].length = 0 }
+  exSig = ''
+}
+
+/** 전부 내린다 - 언마운트 때만. 상태 변경 때는 draw() 가 차분으로 적용한다 */
 function clearOverlays() {
   closeTip()
-  for (const k in OV) { OV[k].forEach(o => o.setMap(null)); OV[k].length = 0 }
+  clearExtras()
+  if (layerOv) { layerOv.setMap(null); layerOv = null; layerNode = null }
+  pool.clear()
 }
 
 /* MAP_001 착한가격 클릭 툴팁 - 한 번에 하나만 띄운다 */
@@ -67,9 +92,82 @@ function syncLabelVisibility() {
   el.value.classList.toggle('labels-visible', shouldShowMapLabels(map.getLevel()))
 }
 
-const onZoomChanged = () => syncLabelVisibility()
+/** 줌이 바뀌면 앵커 기준 픽셀 오프셋이 달라진다 - 풀 핀 전부 다시 놓는다(스타일 쓰기만이라 수십 ms) */
+function relayoutPins() {
+  if (!map) return
+  proj = map.getProjection()
+  anchorPt = proj.pointFromCoords(LL(ANCHOR.lat, ANCHOR.lng))
+  pool.forEach(place)
+}
 
-/** 핀 하나 = CustomOverlay 하나 (라벨은 같은 오버레이 안에 겹쳐 넣는다) */
+const onZoomChanged = () => { syncLabelVisibility(); relayoutPins() }
+
+function place(e) {
+  const pt = proj.pointFromCoords(LL(e.data.y, e.data.x))
+  e.node.style.left = (pt.x - anchorPt.x) + 'px'
+  e.node.style.top = (pt.y - anchorPt.y) + 'px'
+}
+
+/** 풀 핀이 들어갈 레이어(CustomOverlay 1개). 클릭은 레이어에서 한 번만 받아 핀 키로 찾는다 -
+    핀마다 리스너를 붙이지 않고, 재진입·재요청으로 장소 객체가 새것으로 바뀌어도 e.data 가 항상 현재 객체다 */
+function ensureLayer() {
+  if (layerOv) return
+  layerNode = document.createElement('div')
+  layerNode.className = 'pl-layer'
+  layerNode.addEventListener('click', ev => {
+    const pw = ev.target.closest('.pw')
+    const e = pw && pool.get(pw.dataset.k)
+    if (!e) return
+    ev.stopPropagation()
+    // 착한가격은 정의서(MAP_001)대로 툴팁, 나머지 업종은 관광지처럼 상세 패널
+    if (e.group === 'food') showGoodPriceTip(e.data)
+    else emit('select', e.data)
+  })
+  layerOv = new kakao.maps.CustomOverlay({
+    position: LL(ANCHOR.lat, ANCHOR.lng), content: layerNode, xAnchor: 0, yAnchor: 0, zIndex: 50, clickable: true,
+  })
+  layerOv.setMap(map)
+  relayoutPins()
+}
+
+/** 풀에서 핀을 꺼내고, 없으면 만든다 */
+function ensurePin(key, group, p) {
+  let e = pool.get(key)
+  if (e) return e
+  const node = document.createElement('div')
+  node.className = 'pw pl'
+  node.dataset.k = key
+  node.innerHTML = group === 'spot'
+    ? '<div class="lb-t"></div><div class="pn"></div>'
+    : `<div class="lb-t"></div><div class="poi-marker ${POI_MARKER_CLASS[group]}"></div>`
+  e = { node, lb: node.firstElementChild, dot: node.lastElementChild, data: p, sig: '', shown: true, group }
+  if (group !== 'spot') node.style.zIndex = 60
+  place(e)
+  layerNode.appendChild(node)
+  pool.set(key, e)
+  return e
+}
+
+/** 숨김·표시는 클래스로만 - DOM 을 떼었다 붙이면 붙은 핀 수만큼 비용이 다시 든다 */
+function show(e, on) {
+  if (e.shown === on) return
+  e.shown = on
+  e.node.classList.toggle('hid', !on)
+}
+
+/** 레이어 배열이 새로 왔을 때(재진입·칩 재요청) 목록에서 사라진 장소의 핀을 풀에서 뺀다 - 폐업 등.
+    배열이 같은 객체면 아무것도 안 한다(매 draw 마다 2천 건을 대조하지 않게) */
+const lastLists = {}
+function prune(group, list) {
+  if (lastLists[group] === list) return
+  lastLists[group] = list
+  const ids = new Set(list.map(p => p.id ?? p.n))
+  for (const [key, e] of pool) {
+    if (e.group === group && !ids.has(e.data.id ?? e.data.n)) { e.node.remove(); pool.delete(key) }
+  }
+}
+
+/** 선택 핀·코스 번호용 - 카카오 오버레이로 매번 새로 만드는 쪽 */
 function addPin(group, lat, lng, html, onClick, z) {
   const node = document.createElement('div')
   node.className = 'pw'
@@ -79,49 +177,83 @@ function addPin(group, lat, lng, html, onClick, z) {
     yAnchor: 0.5, xAnchor: 0.5, zIndex: z || 0, clickable: !!onClick,
   })
   ov.setMap(map)
-  OV[group].push(ov)
+  EX[group].push(ov)
   if (onClick) node.addEventListener('click', e => { e.stopPropagation(); onClick() })
 }
 
+/** 지금 상태를 핀에 적용한다. 만드는 건 처음 보는 장소뿐이고, 나머지는 서명이 달라진 핀만 손댄다 */
 function draw() {
   if (!map) return
-  clearOverlays()
+  closeTip()
+  ensureLayer()
   const { di, sel, course, courseDay, L } = state
   const inCourse = n => course && course.stops.some(s => s.o && s.o.n === n)
+  const seen = new Set()
 
-  // 좌표 없는 장소는 지도에 못 찍는다 - KTO 원본에 좌표 오류가 있어 null로 저장된 건이 있다
-  if (L.spot) state.layers.spot.filter(hasCoords).forEach(s => {
-    const c = crowd(s, di), on = inFilter(s), t = tier(c)
-    const pick = inCourse(s.n) || (sel && sel.n === s.n)
-    const sz = pick ? 20 : on ? 15 : 9
-    const cls = `pn ${L.crowd ? t : 'calm'}${pick ? ' pick' : ''}${on ? '' : ' dim'}`
-    addPin('spot', s.y, s.x,
-      `${on ? `<div class="lb-t">${s.n}</div>` : ''}
-       <div class="${cls}" style="width:${sz}px;height:${sz}px"></div>`,
-      () => emit('select', s), pick ? 400 : on ? 200 : 100)
-  })
-
-  const poi = (g, list) => {
-    if (!L[g]) return
-    // 착한가격은 정의서(MAP_001)대로 툴팁, 나머지 업종은 관광지처럼 상세 패널
-    list.filter(f => inRegion(f) && hasCoords(f)).forEach(f => addPin(g, f.y, f.x,
-      `<div class="lb-t">${f.n}</div><div class="poi-marker ${POI_MARKER_CLASS[g]}"></div>`,
-      g === 'food' ? () => showGoodPriceTip(f) : () => emit('select', f), 60))
+  // 관광지 - 날짜가 바뀌면 달라지는 건 색·크기뿐. 좌표 없는 장소는 못 찍는다(KTO 원본 좌표 오류로 null 인 건)
+  prune('spot', state.layers.spot)
+  if (L.spot) for (const s of state.layers.spot) {
+    if (!hasCoords(s)) continue
+    const key = 'spot:' + (s.id ?? s.n)
+    seen.add(key)
+    const e = ensurePin(key, 'spot', s)
+    e.data = s
+    const on = inFilter(s)
+    const spec = spotPinSpec(L.crowd ? tier(crowd(s, di)) : 'calm', !!(inCourse(s.n) || (sel && sel.n === s.n)), on)
+    const sig = spec.sig + '|' + s.n
+    if (sig !== e.sig) {
+      e.sig = sig
+      e.dot.className = spec.cls
+      e.dot.style.width = e.dot.style.height = spec.size + 'px'
+      e.lb.textContent = s.n
+      e.lb.classList.toggle('off', !on)   // 이름표는 필터 안 장소만
+      e.node.style.zIndex = spec.z
+    }
+    show(e, true)
   }
-  poi('food', state.layers.food)
-  poi('dine', state.layers.dine)
-  poi('cafe', state.layers.cafe)
-  poi('cvs', state.layers.cvs)
-  poi('stay', state.layers.stay)
-  poi('mart', state.layers.mart)
 
+  // 업종 - 켜진 레이어의 권역 안 장소만. 끈 레이어는 숨길 뿐 풀에 남겨 다시 켤 때 즉시 보인다
+  for (const g of POI_GROUPS) {
+    prune(g, state.layers[g])
+    if (!L[g]) continue
+    for (const f of state.layers[g]) {
+      if (!hasCoords(f) || !inRegion(f)) continue
+      const key = g + ':' + (f.id ?? f.n)
+      seen.add(key)
+      const e = ensurePin(key, g, f)
+      e.data = f
+      if (e.sig !== f.n) { e.sig = f.n; e.lb.textContent = f.n }
+      show(e, true)
+    }
+  }
+
+  // 이번 패스에 없는 핀(끈 레이어·권역 밖)은 숨긴다
+  for (const [key, e] of pool) if (!seen.has(key)) show(e, false)
+
+  drawExtras(di, sel, course, courseDay, L)
+}
+
+/** 선택 핀 + 코스(경로선·번호 핀). 모습 서명이 지난번과 같으면 그대로 둔다 */
+function drawExtras(di, sel, course, courseDay, L) {
   // 검색 등으로 연 장소는 레이어가 꺼져 있어도 선택 핀을 띄운다 (MAP_002) -
   // 지도가 이동만 하고 아무것도 안 보이면 고장으로 느껴진다. 이름표는 줌 무관 항상 표시.
   // 코스 정류지는 제외 - 번호 핀이 이미 그 자리를 표시하고, 겹치면 이름표가 두 장 뜬다
-  if (sel && hasCoords(sel) && !(L.spot && state.layers.spot.includes(sel))
-      && !(course && course.stops.some(cs => cs.o === sel))) {
+  const selPin = !!(sel && hasCoords(sel) && !(L.spot && state.layers.spot.includes(sel))
+    && !(course && course.stops.some(cs => cs.o === sel)))
+  const selTier = sel?.cat === 'TOURIST' ? (L.crowd ? tier(crowd(sel, di)) : 'calm') : ''
+  const sig = [
+    selPin ? `${sel.id ?? sel.n}|${selTier}` : '',
+    course ? course.stops.map(s => (s.o ? `${s.o.id ?? s.o.n}@${s.d}` : '')).join(',') : '',
+    courseDay,
+    course && sel ? (sel.id ?? sel.n) : '',   // 번호 핀의 pick 강조
+  ].join('#')
+  if (sig === exSig) return
+  clearExtras()
+  exSig = sig
+
+  if (selPin) {
     const pin = sel.cat === 'TOURIST'
-      ? `<div class="pn ${L.crowd ? tier(crowd(sel, di)) : 'calm'} pick" style="width:20px;height:20px"></div>`
+      ? `<div class="pn ${selTier} pick" style="width:20px;height:20px"></div>`
       : `<div class="poi-marker sel-pick ${sel.good ? 'mk-food' : (CAT_MARKER[sel.cat] ?? 'mk-dine')}"></div>`
     addPin('sel', sel.y, sel.x, `<div class="lb-t sel-on">${sel.n}</div>` + pin, () => emit('select', sel), 500)
   }
@@ -140,7 +272,7 @@ function draw() {
           strokeOpacity: on ? 0.9 : 0.25, strokeStyle: 'shortdash',
         })
         line.setMap(map)
-        OV.route.push(line)
+        EX.route.push(line)
       }
       // 코스 핀도 눌러서 이름·상세를 본다 - 코스가 화면의 주인공이라 이름표는 줌 무관 상시 표시
       if (on) g[d].forEach((stop, i) => addPin('num', stop.o.y, stop.o.x,
@@ -225,16 +357,13 @@ onBeforeUnmount(() => {
   mapBridge.ready = false
 })
 
-/* 상태가 바뀌면 다시 그린다. 지도 자체는 새로 만들지 않는다 */
-/* state.layers 를 함께 본다 - 장소는 API로 비동기로 오므로 지도가 먼저 뜨고 데이터가 나중에 도착한다.
-   이걸 빼면 첫 렌더 때 빈 배열로 그린 뒤 다시 그리지 않아 지도에 핀이 하나도 안 찍힌다.
-   레이어별 길이만 보면 되므로(내용 비교는 2천 건이라 비싸다) deep 감시 대상에서 분리한다 */
+/* 상태가 바뀌면 다시 적용한다. 지도 자체는 새로 만들지 않는다 */
 watch(() => [state.di, state.sel, state.course, state.courseDay, state.F.reg, state.F.cat,
   ...Object.values(state.L)], draw, { deep: true })
-/* forecastDays 도 함께 본다 - 예보는 장소보다 늦게 도착해 series 를 뒤늦게 채운다.
-   배열 길이는 그대로라 이걸 빼면 핀이 첫 렌더 상태(전부 회색 '정보 없음')로 굳는다.
-   좌측 목록은 computed 라 알아서 갱신되므로 목록만 색이 맞고 지도는 회색인 상태가 되어 알아채기 어렵다 */
-watch(() => [Object.values(state.layers).map(list => list.length).join(','), state.forecastDays], draw)
+/* 레이어 배열 자체가 바뀔 때(진입·칩 재요청·재진입 재적재)도 본다 - 장소는 API로 비동기로 오므로 지도가 먼저 뜨고
+   데이터가 나중에 도착한다. 이걸 빼면 첫 렌더 때 빈 배열로 그린 뒤 다시 그리지 않아 지도에 핀이 하나도 안 찍힌다.
+   forecastDays 도 함께 본다 - 예보는 장소보다 늦게 도착해 series 를 뒤늦게 채운다 */
+watch(() => [state.layers, ...Object.values(state.layers), state.forecastDays], draw)
 </script>
 
 <template>
