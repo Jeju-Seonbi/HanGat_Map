@@ -8,16 +8,19 @@
 export interface ClusterItem { px: number; py: number }
 export interface Cluster<T extends ClusterItem> { x: number; y: number; members: T[]; name?: string }
 
-/** 레벨별 묶음 방식. unit=true 면 행정 단위 묶기, 아니면 radius(px) 픽셀 묶기(0 이면 안 묶음).
-    묶음은 2곳 이상일 때만 만들고 혼자인 장소는 핀 그대로 둔다(2026-09-12 결정).
-    7 이하는 아예 안 묶고 전부 개별 핀 - 겹치는 핀은 그 동네 뷰에선 같은 자리라는 뜻이라 그대로 둔다 */
-export function clusterModeFor (level: number): { unit: boolean; radius: number } {
+/** 레벨별·레이어별 묶음 방식. unit=true 면 행정 단위 묶기, 아니면 radius(px) 픽셀 묶기(0 이면 안 묶음).
+    관광지·착한가격·식당·숙소(각 200~970개)는 레벨 9(4km 뷰)까지만 묶고 8부터 전부 개별 핀 - 사용자가 "여기까지만 모아서" 결정(2026-09-12).
+    카페·편의점·마트(1,058~3,039개)는 8까지 묶는다. 묶음은 2곳 이상일 때만 만들고 혼자인 장소는 핀 그대로 둔다.
+    그 아래는 아예 안 묶고 전부 개별 핀 - 겹치는 핀은 그 동네 뷰에선 같은 자리라는 뜻이라 그대로 둔다 */
+const DENSE_GROUPS = new Set(['cafe', 'cvs', 'mart'])
+export function clusterModeFor (level: number, group: string = 'spot'): { unit: boolean; radius: number } {
   if (level >= 10) return { unit: true, radius: 0 }
-  return { unit: false, radius: level >= 8 ? 40 : 0 }
+  const minPixelLevel = DENSE_GROUPS.has(group) ? 8 : 9
+  return { unit: false, radius: level >= minPixelLevel ? 40 : 0 }
 }
 
-/** 축소 뷰(레벨 8 이상)에선 필터 밖 흐린 핀을 숨긴다 - 섬 전체 뷰의 회색 점 600개는 정보가 아니라 잡음 */
-export const hideDimFor = (level: number): boolean => level >= 8
+/** 관광지가 묶이는 축소 뷰(레벨 9 이상)에선 필터 밖 흐린 핀을 숨긴다 - 섬 전체 뷰의 회색 점 600개는 정보가 아니라 잡음 */
+export const hideDimFor = (level: number): boolean => level >= 9
 
 /** 행정 단위 하나 = 묶음 하나. 위치는 구성원 평균. 단위가 없는 항목(inferUnits 뒤엔 없어야 함)은 '기타'로 */
 export function clusterByUnit<T extends ClusterItem> (items: T[], unitOf: (it: T) => string | null | undefined): Cluster<T>[] {

@@ -136,7 +136,8 @@ function place(e) {
 }
 
 /* ── 묶음 핀 (축소 뷰) ──
-   레벨 10 이상은 행정 단위(읍면·시내·중문) 하나에 묶음 하나(이름표 = 단위), 8~9 는 픽셀 40px 로 이름 없이, 7 이하는 전부 개별 핀 (utils/cluster).
+   레벨 10 이상은 행정 단위(읍면·시내·중문) 하나에 묶음 하나(이름표 = 단위), 그 아래는 픽셀 40px 로 이름 없이 - 관광지·착한가격·식당·숙소는
+   9까지, 카페·편의점·마트는 8까지 - 그 다음부터 전부 개별 핀 (utils/cluster).
    레이어별로 따로 묶고(관광지는 관광지끼리) 묶인 핀은 숨긴다. 매 draw 마다 다시 계산한다 -
    묶음은 많아야 300개라 노드를 새로 만들어도 수 ms 이고, 날짜가 바뀌면 테두리 비율이 달라져 어차피 다시 그려야 한다 */
 let clusterNodes = []
@@ -145,8 +146,6 @@ function clusterPass(lv) {
   clusterNodes.forEach(n => n.remove())
   clusterNodes = []
   for (const e of pool.values()) e.node.classList.remove('cl-in')
-  const mode = clusterModeFor(lv)
-  if (!mode.unit && !mode.radius) return
   const byGroup = new Map()
   for (const e of pool.values()) {
     if (!e.wanted || e.pick) continue   // 선택·코스 핀은 묶지 않고 위에 남긴다. 화면 밖(컬링) 핀도 개수엔 들어간다
@@ -154,6 +153,8 @@ function clusterPass(lv) {
     byGroup.get(e.group).push(e)
   }
   for (const [group, list] of byGroup) {
+    const mode = clusterModeFor(lv, group)   // 관광지·착한가격·식당·숙소는 9까지, 카페·편의점·마트는 8까지 묶는다
+    if (!mode.unit && !mode.radius) continue
     const clusters = mode.unit ? clusterByUnit(list, e => e.data.unit) : clusterPins(list, mode.radius)
     // 혼자인 장소는 묶지 않고 핀 그대로 보여준다(2026-09-12 결정) - 근처에 아무도 없는 곳은 "1" 묶음보다 핀이 더 말이 된다
     for (const c of clusters) {
@@ -304,8 +305,8 @@ function draw() {
   const inCourse = n => course && course.stops.some(s => s.o && s.o.n === n)
   const seen = new Set()
   const lv = map.getLevel()
-  // 축소 뷰(레벨 8 이상)에선 필터 밖 흐린 핀을 아예 숨긴다 - 섬 전체 뷰의 회색 점 600개는 정보가 아니라 잡음.
-  // 묶음 개수에도 안 들어가 왼쪽 목록과 기준이 같다. 확대하면(레벨 7 이하) 다시 보인다
+  // 관광지가 묶이는 축소 뷰(레벨 9 이상)에선 필터 밖 흐린 핀을 아예 숨긴다 - 섬 전체 뷰의 회색 점 600개는 정보가 아니라 잡음.
+  // 묶음 개수에도 안 들어가 왼쪽 목록과 기준이 같다. 확대하면(레벨 8 이하) 다시 보인다
   const hideDim = hideDimFor(lv)
 
   // 관광지 - 날짜가 바뀌면 달라지는 건 색·크기뿐. 좌표 없는 장소는 못 찍는다(KTO 원본 좌표 오류로 null 인 건)
