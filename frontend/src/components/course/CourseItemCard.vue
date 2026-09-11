@@ -41,6 +41,7 @@ const costLabel = (cost: CourseItem['costs'][number]) => {
         <span v-else class="level unknown">혼잡 정보 없음</span>
       </div>
       <div class="badges">
+        <span v-if="item.place_business_status === 'CLOSED'" class="closed-badge">폐업</span>
         <span v-if="item.item_source === 'USER_FIXED'">사용자 지정</span>
         <span v-else-if="item.item_source === 'AI_RECOMMENDED'">AI 추천</span>
         <span v-else-if="item.item_source === 'REPLACEMENT'">대체 추천</span>
@@ -50,13 +51,15 @@ const costLabel = (cost: CourseItem['costs'][number]) => {
       <p class="item-reason">{{ item.recommendation_reason || '추천 이유를 준비 중이에요.' }}</p>
       <p v-if="item.weather_warning" class="fixed-warning">{{ item.weather_warning }}</p>
       <p v-if="item.operating_hours_warning" class="fixed-warning">선택한 방문 시간이 일반 운영시간과 다를 수 있어요.</p>
+      <p v-if="item.place_business_status === 'CLOSED'" class="fixed-warning">폐업했거나 관광 정보에서 삭제된 장소예요.</p>
       <p v-if="item.item_source === 'USER_FIXED' && item.congestion_level === 'CROWDED'" class="fixed-warning">사용자 지정 일정이에요. 해당 시간대는 혼잡할 것으로 예상돼요.</p>
-      <button v-if="!readonly && item.item_source !== 'USER_FIXED'" class="btn small alternative-button" @click="$emit('alternative', item)">{{ item.congestion_level === 'CROWDED' ? '한산한 대안 보기' : '다른 장소 보기' }}</button>
+      <button v-if="!readonly && item.item_source !== 'USER_FIXED'" class="btn small alternative-button" @click="$emit('alternative', item)">{{ item.place_business_status === 'CLOSED' ? '다른 장소로 바꾸기' : item.congestion_level === 'CROWDED' ? '한산한 대안 보기' : '다른 장소 보기' }}</button>
       <button v-if="!readonly && item.congestion_level === 'CROWDED'" class="btn small alternative-button reschedule-button" @click="$emit('reschedule', item)"><span class="reschedule-label-desktop">이 장소를 더 한산한 시간으로 옮기기</span><span class="reschedule-label-mobile">한산한 시간 찾기</span></button>
     </div>
   </article>
 </template>
 
 <style scoped>
+.badges .closed-badge{background:rgba(244,54,76,.12);color:var(--busy,#c0392b)}
 .alternative-button{margin-right:6px;white-space:nowrap}.item-weather{margin:7px 0 0;color:var(--course-text-2);font-size:.7rem;font-weight:700}.reschedule-label-mobile{display:none}@media(max-width:767px){.alternative-button{width:100%;max-width:100%;margin-right:0;white-space:nowrap}.reschedule-label-desktop{display:none}.reschedule-label-mobile{display:inline}}
 </style>

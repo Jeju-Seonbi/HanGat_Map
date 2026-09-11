@@ -67,6 +67,8 @@ export interface CourseBudgetSummary {
 }
 export interface CourseItem {
   id: number; course_id: number; place_id: number; place_name: string; category_name: string; image_url?: string
+  /** 폐업(CLOSED)이면 카드가 '폐업' 배지를 단다 - 저장된 코스에서 지우지는 않는다 */
+  place_business_status?: 'OPEN' | 'TEMP_CLOSED' | 'CLOSED' | 'UNKNOWN' | null
   candidate_id?: string; source_code?: PlaceSourceCode; source_place_id?: string
   address?: string; road_address?: string; latitude?: number; longitude?: number
   day_no: number; position: number; visit_date: string; start_time?: string; end_time?: string

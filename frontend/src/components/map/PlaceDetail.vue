@@ -29,6 +29,12 @@ const s = computed(() => props.place)
 const c = computed(() => crowd(s.value, state.di))
 const t = computed(() => tier(c.value))
 
+/* 혼잡 UI(리드·팁·주간 막대·한산한 날 찾기)는 예보가 있는 곳과 관광지에만 그린다.
+   식당·카페·숙소는 관광공사 예측 대상이 아니라 "예보 없음" 설명조차 잡음이다 - 날씨 줄만 남긴다.
+   관광지는 예보가 없어도 왜 없는지 말해야 하므로 리드를 유지한다 (MAP_004) */
+const hasForecast = computed(() => Array.isArray(s.value.series) && s.value.series.some(v => v != null))
+const crowdUi = computed(() => hasForecast.value || s.value.cat === 'TOURIST')
+
 /* 리드 문장은 그 장소의 30일 예보 안에서의 순위만 말한다 — 다른 장소와 비교하지 않는다 */
 const rankText = computed(() => {
   const r = rank30(s.value, state.di)
@@ -243,9 +249,14 @@ async function shareNative() {
         {{ detail.imageAttribution }}
       </div>
 
-      <div class="lead">
+      <div v-if="s.closed || crowdUi" class="lead">
+        <!-- 폐업: 원천 목록에서 두 번 연속 빠진 장소(PlacePresenceReconciler). 핀은 없고 찜·코스·공유 링크로만 열린다 -->
+        <template v-if="s.closed">
+          <span class="bdg" style="background:var(--busy);color:#fff">폐업</span>
+          &nbsp;폐업했거나 관광 정보에서 삭제된 장소예요. 찜·코스에는 그대로 남아 있어요.
+        </template>
         <!-- MAP_004 예외: 예보 미제공 — 없는 데이터는 추측하지 않는다 -->
-        <template v-if="c == null">
+        <template v-else-if="c == null">
           <span class="bdg" style="background:var(--none);color:#fff">예보 없음</span>
           &nbsp;관광공사 혼잡 예측 대상이 아니라 이 장소는 예보가 없어요.
         </template>
@@ -257,12 +268,14 @@ async function shareNative() {
         </template>
       </div>
 
-      <div v-if="c != null" class="tipbox" @click="jumpToBest">
+      <div v-if="c != null && !s.closed" class="tipbox" @click="jumpToBest">
         <template v-if="!tipText">✓ 30일 중 <b>오늘이 가장 한산</b>해요.</template>
         <template v-else>🕐 <b>{{ fmtK(at(best.k)) }}</b>로 가면 <b>{{ tipText }}</b> 날이에요. 눌러서 옮겨보세요.</template>
       </div>
 
-      <div class="spark" style="margin-bottom:6px"><div class="st"><i></i>날짜별 날씨와 혼잡</div></div>
+      <!-- 폐업 장소는 날씨·혼잡 줄을 그리지 않는다 - 갈 수 없는 곳의 예보다 -->
+      <template v-if="!s.closed">
+      <div class="spark" style="margin-bottom:6px"><div class="st"><i></i>{{ crowdUi ? '날짜별 날씨와 혼잡' : '날짜별 날씨' }}</div></div>
       <div class="wxrow">
         <div v-for="w in week" :key="w.k" class="wxc" :class="{ on: w.k === state.di }"
           @click="state.di = w.k">
@@ -278,10 +291,11 @@ async function shareNative() {
             </template>
           </div>
           <!-- 혼잡 바는 핀과 같은 면색(-st) - 글자용 진한 톤을 면에 쓰면 핀과 색이 어긋난다 -->
-          <div class="wc tier-bg" :class="w.t" :title="w.ko"></div>
+          <div v-if="crowdUi" class="wc tier-bg" :class="w.t" :title="w.ko"></div>
         </div>
       </div>
-      <div v-if="weatherGap && wxUntil" class="wx-note">날씨는 {{ wxUntil }}까지 제공돼요 · 혼잡은 30일 표시</div>
+      <div v-if="weatherGap && wxUntil" class="wx-note">날씨는 {{ wxUntil }}까지 제공돼요<template v-if="crowdUi"> · 혼잡은 30일 표시</template></div>
+      </template>
 
       <!-- 없는 정보(null)는 배지를 그리지 않는다 - '주차 없음'과 '주차 정보 없음'은 다르다 -->
       <div v-if="hasAmen" class="amen">
@@ -332,7 +346,7 @@ async function shareNative() {
       </div>
 
       <div class="acts">
-        <button class="p1" @click="findCalmDay">한산한 날 찾기</button>
+        <button v-if="crowdUi" class="p1" @click="findCalmDay">한산한 날 찾기</button>
         <button @click="findNearby">근처 대안 보기</button>
       </div>
       <div v-if="hint || nearby.length" class="hint" style="display:block">

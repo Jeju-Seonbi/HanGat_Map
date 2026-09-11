@@ -1,4 +1,4 @@
-import { reactive, computed } from 'vue'
+import { reactive, computed, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { crowd, tier } from '@/utils/crowd'
 import { iso, D0 } from '@/utils/date'
@@ -23,6 +23,19 @@ export const LAYERS = [
 ]
 export const FILTER_VISIBLE = 4
 
+/* 권역 기본값은 '전체'. 탭이 살아 있는 동안은 마지막 선택을 기억한다(sessionStorage) -
+   메인↔지도를 오가도 보던 권역이 유지되고, 탭을 닫으면 다시 '전체'로 시작한다.
+   공유 링크의 ?r= 은 MapView.loadFromURL 이 이 값 위에 덮어쓴다 (MAP_001, 2026-09-11 결정) */
+const REGION_KEY = 'hangat_map_region'
+export function savedRegion (storage = globalThis.sessionStorage) {
+  try {
+    const v = storage?.getItem(REGION_KEY)
+    return REGIONS.includes(v) ? v : '전체'
+  } catch {
+    return '전체'   // 저장소 접근 불가(프라이빗 모드 등) - 기본값으로
+  }
+}
+
 export const state = reactive({
   /* ── 서버에서 받아오는 장소 데이터 ──
      하드코딩 시절엔 import 하는 순간 값이 있었지만 이제 비동기라 처음엔 비어 있다.
@@ -42,11 +55,16 @@ export const state = reactive({
   course: null,
   courseDay: 'all',
   filterOffset: 0,       // 업종 필터 캐러셀 위치
-  F: { reg: '서부', bud: 150000, cat: '' },   // cat='' = 모든 종류
-  L: { crowd: 1, spot: 1, food: 1, dine: 0, cafe: 0, cvs: 0, stay: 0, mart: 0, rain: 1 },
+  F: { reg: savedRegion(), bud: 150000, cat: '' },   // reg 기본 '전체'(탭 안 마지막 선택 기억), cat='' = 모든 종류
+  // 기본은 관광지 핀만 - 착한가격(271)까지 켜면 전체 권역에서 분홍 마커가 혼잡 색을 가린다. 칩으로 켠다 (2026-09-11 결정)
+  L: { crowd: 1, spot: 1, food: 0, dine: 0, cafe: 0, cvs: 0, stay: 0, mart: 0, rain: 1 },
   /** 로그인한 회원이 찜한 장소 ID (MAP_009). 백엔드 /favorites 가 원본이고 이건 화면용 사본. 비로그인이면 빈 배열 */
   favIds: [],
   toast: '',
+})
+
+watch(() => state.F.reg, r => {
+  try { sessionStorage.setItem(REGION_KEY, r) } catch { /* 저장소 접근 불가 - 기억만 못 할 뿐 */ }
 })
 
 /* ── 파생값 ── */
@@ -122,6 +140,9 @@ export async function findPlaceById (id) {
     const p = rows.find(x => x.id === id)
     if (p) { state.L[k] = 1; return { place: p, error: false } }
   }
+  // 어느 레이어에도 없는 장소 - 폐업(CLOSED)은 목록에서 빠지지만 찜·공유 링크로는 들어온다. 상세를 직접 받아 연다
+  const single = await MapPlaceService.getById(id)
+  if (single) return { place: single, error: false }
   return { place: null, error }
 }
 

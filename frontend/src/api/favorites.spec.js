@@ -95,3 +95,18 @@ describe('listFavorites / removeFavorite', () => {
     expect(apiRequest).toHaveBeenCalledWith('/favorites/5', { method: 'DELETE', auth: true })
   })
 })
+
+describe('toItem closed flag', () => {
+  it('marks CLOSED places so the tab can label them 폐업 instead of hiding them', () => {
+    expect(toItem(ROW, null).closed).toBe(false)
+    expect(toItem({ ...ROW, businessStatus: 'CLOSED' }, null).closed).toBe(true)
+  })
+})
+
+describe('toItem crowd dot', () => {
+  it('keeps the gray dot for a tourist spot without forecast but drops it for a restaurant', () => {
+    expect(toItem({ ...ROW, crowdRate: null }, null).crowdTier).toBe('none')
+    expect(toItem({ ...ROW, crowdRate: null, categoryCode: 'FOOD' }, null).crowdTier).toBeNull()
+    expect(toItem({ ...ROW, crowdRate: 55, categoryCode: 'FOOD' }, null).crowdTier).toBe('mid')
+  })
+})

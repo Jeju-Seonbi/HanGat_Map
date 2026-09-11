@@ -4,6 +4,7 @@ import com.example.hangat.course.model.enums.CourseItemSource;
 import com.example.hangat.course.model.enums.CourseStatus;
 import com.example.hangat.course.model.enums.CourseType;
 import com.example.hangat.course.model.enums.Transport;
+import com.example.hangat.map.model.enums.BusinessStatus;
 import com.example.hangat.map.model.enums.CongestionLevel;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
@@ -75,6 +76,8 @@ public record CourseDetailResponse(
             String placeName,
             String categoryName,
             String regionName,
+            /** 폐업(CLOSED)이면 화면이 '폐업' 배지를 단다 - 저장된 코스에서 지우지는 않는다(PlacePresenceReconciler) */
+            BusinessStatus placeBusinessStatus,
             String imageUrl,
             Double latitude,
             Double longitude,
