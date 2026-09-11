@@ -11,6 +11,7 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.test.context.ActiveProfiles;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import static org.assertj.core.api.Assertions.*;
 
 @DataJpaTest
@@ -80,5 +81,23 @@ class CourseDbCandidateServiceTest {
         assertThat(first).hasSize(CourseCandidateShortlistService.targetSize(request("")));
         assertThat(first).extracting(c->c.getStoredCandidate()).containsExactlyElementsOf(second.stream().map(CourseCandidateDto::getStoredCandidate).toList());
         assertThat(first).allMatch(c->c.getStoredCandidate().identity().sourcePlaceId().compareTo("DB_LIMIT_0300")<0);
+    }
+    @Test void selectsLatestForecastPerPlaceAndTargetTimeInsteadOfGlobalBaseAt()throws Exception {
+        var first=place("DB_FORECAST_A","first","33.4",region);
+        var second=place("DB_FORECAST_B","second","33.5",region);
+        LocalDateTime target=LocalDateTime.of(2026,9,6,15,0);
+        em.persist(CongestionForecast.of(first.getPlace(),source,target,
+                LocalDateTime.of(2026,9,7,0,0),new BigDecimal("25.00")));
+        em.persist(CongestionForecast.of(second.getPlace(),source,target,
+                LocalDateTime.of(2026,9,6,0,0),new BigDecimal("55.00")));
+        em.flush();em.clear();
+
+        var result=new CourseDbCandidateService(em.getEntityManager(),mapper).find(request(""));
+
+        assertThat(result).hasSize(2);
+        assertThat(result).allSatisfy(candidate ->
+                assertThat(candidate.getStoredCandidate().congestionFacts()).hasSize(1));
+        assertThat(result).extracting(candidate -> candidate.getStoredCandidate().congestionFacts().get(0).rate())
+                .containsExactly(new BigDecimal("25.00"),new BigDecimal("55.00"));
     }
 }

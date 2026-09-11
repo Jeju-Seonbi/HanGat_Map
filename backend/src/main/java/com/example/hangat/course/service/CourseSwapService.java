@@ -45,17 +45,20 @@ public class CourseSwapService {
     private final PlaceRepository placeRepository;
     private final CongestionService congestionService;
     private final CourseTravelCalculator travelCalculator;
+    private final com.example.hangat.course.CourseRetentionPolicy retentionPolicy;
 
     public CourseSwapService(CourseRepository courseRepository,
                              CourseItemRepository itemRepository,
                              PlaceRepository placeRepository,
                              CongestionService congestionService,
-                             CourseTravelCalculator travelCalculator) {
+                             CourseTravelCalculator travelCalculator,
+                             com.example.hangat.course.CourseRetentionPolicy retentionPolicy) {
         this.courseRepository = courseRepository;
         this.itemRepository = itemRepository;
         this.placeRepository = placeRepository;
         this.congestionService = congestionService;
         this.travelCalculator = travelCalculator;
+        this.retentionPolicy = retentionPolicy;
     }
 
     /**
@@ -66,6 +69,7 @@ public class CourseSwapService {
     public CourseSwapResponse swap(Long courseId, Long itemId, Long newPlaceId, Long authUserId) {
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new BaseException(BaseResponseStatus.COURSE_NOT_FOUND, courseId));
+        retentionPolicy.requireAvailable(course);
         if (course.getStatus() == CourseStatus.DELETED) {
             throw new BaseException(BaseResponseStatus.COURSE_NOT_FOUND, courseId);
         }

@@ -102,7 +102,8 @@ public class CourseDbCandidateService {
             var start = request.getStartDate().atStartOfDay(DateTimes.KST).withZoneSameInstant(ZoneOffset.UTC).toLocalDateTime();
             var end = request.getEndDate().plusDays(1).atStartOfDay(DateTimes.KST).withZoneSameInstant(ZoneOffset.UTC).toLocalDateTime();
             for (CongestionForecast f : entityManager.createQuery("select f from CongestionForecast f join fetch f.source "
-                    + "where f.place.id in :ids and f.baseAt=(select max(v.baseAt) from CongestionForecast v) "
+                    + "where f.place.id in :ids and f.baseAt=(select max(v.baseAt) from CongestionForecast v "
+                    + "where v.place.id=f.place.id and v.forecastAt=f.forecastAt) "
                     + "and f.forecastAt>=:start and f.forecastAt<:end order by f.place.id,f.forecastAt", CongestionForecast.class)
                     .setParameter("ids", selectedIds).setParameter("start", start).setParameter("end", end).getResultList()) {
                 congestion.computeIfAbsent(f.getPlace().getId(), ignored -> new ArrayList<>()).add(new CongestionFact(f.getId(),

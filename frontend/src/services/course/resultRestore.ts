@@ -157,10 +157,13 @@ export function useResultRestore(load = fetchRestoredCourse) {
       if (ticket !== epoch) return undefined
       // BaseException may use HTTP 400 with the existing domain response code.
       const missing = failure instanceof ApiError && (failure.status === 404 || Number(failure.code) === 3301)
+      const expired = failure instanceof ApiError && (failure.status === 410 || Number(failure.code) === 3309)
       terminal.value = failure instanceof ApiError && ([401, 403, 404, 410].includes(failure.status)
-        || [3001, 3002, 3301, 3303, 3304, 3305, 3307].includes(Number(failure.code)))
+        || [3001, 3002, 3301, 3303, 3304, 3305, 3307, 3309].includes(Number(failure.code)))
       restoreError.value = terminal.value
-        ? (missing ? '삭제되었거나 찾을 수 없는 코스예요.' : '코스가 만료되었거나 조회 권한이 없어요.')
+        ? (missing ? '삭제되었거나 찾을 수 없는 코스예요.' : expired
+          ? '저장하지 않은 코스의 2시간 보관 기간이 만료되었어요.'
+          : '코스가 만료되었거나 조회 권한이 없어요.')
         : '코스를 불러오지 못했어요. 잠시 후 다시 불러와 주세요.'
       return undefined
     }).finally(() => { if (ticket === epoch) { restoring.value = false; pending = undefined } })

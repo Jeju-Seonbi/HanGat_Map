@@ -94,6 +94,35 @@ const itineraryContract = (course: CourseResult) => course.days.flatMap(day =>
 afterEach(() => vi.clearAllMocks())
 
 describe('courseMockService Backend generation', () => {
+  it('refuses save without proof and never reports an expired server claim as saved', async () => {
+    const mock = vi.mocked(apiRequest)
+    await expect(courseMockService.saveCourse(response, '제주')).rejects.toThrow('저장 권한')
+    expect(mock).not.toHaveBeenCalled()
+    const withProof = { ...response, claim_token: 'test-proof' }
+    mock.mockRejectedValueOnce(new ApiError(410, 3309, '만료'))
+    await expect(courseMockService.saveCourse(withProof, '제주')).rejects.toThrow('만료')
+    expect(withProof.status).toBe('READY')
+    mock.mockResolvedValueOnce({ id: response.id, status: 'READY' })
+    await expect(courseMockService.saveCourse(withProof, '제주')).rejects.toThrow('저장을 확인')
+  })
+
+  it('preserves provider-only WANT in both synchronous and asynchronous regeneration payloads', async () => {
+    const previous = structuredClone(response)
+    previous.days[0]!.items[0]!.source_code = 'KAKAO_LOCAL'
+    previous.days[0]!.items[0]!.source_place_id = 'real-place'
+    const wanted: CourseCondition = { ...condition, course_place_preferences: [{
+      source_code: 'KAKAO_LOCAL', source_place_id: 'real-place',
+      place_name: '필수 장소', preference_type: 'WANT',
+    }] }
+    expect(toCourseRequestPayload(wanted, true, previous).course_place_preferences)
+      .toEqual(wanted.course_place_preferences)
+    vi.mocked(apiRequest).mockResolvedValueOnce(previous)
+    await courseMockService.regenerateCourse(wanted, previous)
+    expect(vi.mocked(apiRequest).mock.calls[0]?.[1]?.body).toMatchObject({
+      course_place_preferences: wanted.course_place_preferences,
+    })
+    expect(wanted.course_place_preferences).toHaveLength(1)
+  })
   it('posts the unchanged CourseCondition and returns the Backend CourseResult without fabricating data', async () => {
     const requestMock = vi.mocked(apiRequest).mockResolvedValue(response)
 
@@ -362,11 +391,16 @@ describe('courseMockService Backend generation', () => {
     )
   })
 
-  it('keeps regeneration unavailable instead of sending an INITIAL request or returning mock data', async () => {
-    const requestMock = vi.mocked(apiRequest)
+  it('regenerates with the same conditions through the real course API without mock data', async () => {
+    const requestMock = vi.mocked(apiRequest).mockResolvedValue(response)
 
-    await expect(courseMockService.regenerateCourse(condition)).rejects.toThrow('재생성은 아직 지원되지 않습니다')
-    expect(requestMock).not.toHaveBeenCalled()
+    await expect(courseMockService.regenerateCourse(condition, response)).resolves.toMatchObject({ id: 101 })
+    expect(requestMock).toHaveBeenCalledOnce()
+    expect(requestMock.mock.calls[0]?.[0]).toBe('/courses')
+    expect(requestMock.mock.calls[0]?.[1]?.body).toMatchObject({ regenerate: true })
+    expect((requestMock.mock.calls[0]?.[1]?.body as CourseCondition).course_place_preferences)
+      .toEqual(expect.arrayContaining(response.days.flatMap(day => day.items).map(item =>
+        expect.objectContaining({ place_id: item.place_id, preference_type: 'AVOID' }))))
   })
 
   it('claims a generated guest course with authenticated API and removes the proof from the result', async () => {

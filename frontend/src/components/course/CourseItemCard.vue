@@ -2,8 +2,8 @@
 import type { CourseItem, Transport } from '../../assets/types/course'
 import { levelLabel as level } from '../../data/data'
 
-const props = defineProps<{ item: CourseItem; transport: Transport; readonly?: boolean }>()
-defineEmits<{ alternative: [CourseItem]; reschedule: [CourseItem] }>()
+const props = defineProps<{ item: CourseItem; transport: Transport; readonly?: boolean; showInboundEstimate?: boolean }>()
+defineEmits<{ alternative: [CourseItem] }>()
 
 const accuracy = { VERIFIED: '검증가', ESTIMATED: '추정', UNKNOWN: '가격 정보 없음' }
 const weather = {
@@ -28,8 +28,8 @@ const costLabel = (cost: CourseItem['costs'][number]) => {
   <div v-if="item.gap_before" class="travel-line">
     <span>↓</span> 자유시간 · {{ gapDuration(item.gap_before.minutes) }}
   </div>
-  <div v-if="item.inbound_travel_minutes" class="travel-line">
-    <span>↓</span> {{ travelMode[props.transport] }} {{ item.inbound_travel_minutes }}분 · {{ distance(item.inbound_distance_m) }}
+  <div v-if="props.showInboundEstimate !== false && item.inbound_travel_minutes" class="travel-line">
+    <span>↓</span> 추정 {{ travelMode[props.transport] }} {{ item.inbound_travel_minutes }}분 · 직선거리 {{ distance(item.inbound_distance_m) }}
   </div>
   <article class="course-item">
     <div class="item-time"><b>{{ item.start_time || '시간 미정' }}</b><small v-if="item.end_time">~ {{ item.end_time }}</small></div>
@@ -54,12 +54,11 @@ const costLabel = (cost: CourseItem['costs'][number]) => {
       <p v-if="item.place_business_status === 'CLOSED'" class="fixed-warning">폐업했거나 관광 정보에서 삭제된 장소예요.</p>
       <p v-if="item.item_source === 'USER_FIXED' && item.congestion_level === 'CROWDED'" class="fixed-warning">사용자 지정 일정이에요. 해당 시간대는 혼잡할 것으로 예상돼요.</p>
       <button v-if="!readonly && item.item_source !== 'USER_FIXED'" class="btn small alternative-button" @click="$emit('alternative', item)">{{ item.place_business_status === 'CLOSED' ? '다른 장소로 바꾸기' : item.congestion_level === 'CROWDED' ? '한산한 대안 보기' : '다른 장소 보기' }}</button>
-      <button v-if="!readonly && item.congestion_level === 'CROWDED'" class="btn small alternative-button reschedule-button" @click="$emit('reschedule', item)"><span class="reschedule-label-desktop">이 장소를 더 한산한 시간으로 옮기기</span><span class="reschedule-label-mobile">한산한 시간 찾기</span></button>
     </div>
   </article>
 </template>
 
 <style scoped>
 .badges .closed-badge{background:rgba(244,54,76,.12);color:var(--busy,#c0392b)}
-.alternative-button{margin-right:6px;white-space:nowrap}.item-weather{margin:7px 0 0;color:var(--course-text-2);font-size:.7rem;font-weight:700}.reschedule-label-mobile{display:none}@media(max-width:767px){.alternative-button{width:100%;max-width:100%;margin-right:0;white-space:nowrap}.reschedule-label-desktop{display:none}.reschedule-label-mobile{display:inline}}
+.alternative-button{margin-right:6px;white-space:nowrap}.item-weather{margin:7px 0 0;color:var(--course-text-2);font-size:.7rem;font-weight:700}@media(max-width:767px){.alternative-button{width:100%;max-width:100%;margin-right:0;white-space:nowrap}}
 </style>

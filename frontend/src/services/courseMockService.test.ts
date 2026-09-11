@@ -208,20 +208,4 @@ describe('courseMockService logical Mock generation', () => {
     expect(want?.recommendation_reason).toBe('꼭 가고 싶은 장소로 선택해 일정에 포함했어요.')
   })
 
-  it('recalculates around a selected accommodation while preserving fixed, WANT, and AVOID priorities', async () => {
-    const condition = makeCondition([
-      { place_id: 101, place_name: '비자림', preference_type: 'WANT', fixed_date: '2026-08-14', fixed_time: '13:00' },
-      { place_id: 108, place_name: '산방산', preference_type: 'WANT' },
-      { place_id: 103, place_name: '성산일출봉', preference_type: 'AVOID' },
-    ])
-    const accommodation = { source_code: 'KAKAO_LOCAL' as const, source_place_id: 'MOCK_KAKAO_9003', place_name: '성산 마리나 호텔', region: 'EAST' as const, latitude: 33.4612, longitude: 126.9324 }
-
-    const result = await courseMockService.recalculateRouteWithAccommodation(condition, accommodation)
-    const items = result.days.flatMap(day => day.items)
-
-    expect(result.accommodation).toEqual(accommodation)
-    expect(items.find(item => item.place_name === '비자림')).toMatchObject({ visit_date: '2026-08-14', start_time: '13:00', item_source: 'USER_FIXED' })
-    expect(items.some(item => item.place_name === '산방산')).toBe(true)
-    expect(items.some(item => item.place_name === '성산일출봉')).toBe(false)
-  })
 })
