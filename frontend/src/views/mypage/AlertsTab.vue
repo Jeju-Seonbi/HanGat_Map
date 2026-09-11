@@ -5,7 +5,6 @@ import { useRouter } from 'vue-router'
 import { useNotificationStore } from '../../stores/notifications.js'
 import { NOTIFICATIONS_ENABLED, notificationDestination, notificationTypeLabel, notificationActionLabel } from '../../api/notifications.js'
 import { fmtRelative } from '../../utils/format.js'
-import GenerationJobs from '../../components/course/GenerationJobs.vue'
 const notifications = useNotificationStore()
 const router = useRouter()
 const actionError = ref('')
@@ -32,7 +31,6 @@ async function readAll () {
       <div><h2 id="notification-title">알림 내역</h2><p>여행의 변화와 코스 생성 결과를 확인하세요.</p></div>
       <button v-if="notifications.unread" type="button" class="btn" :disabled="busy" @click="readAll">모두 읽음</button>
     </header>
-    <GenerationJobs />
     <RouterLink :to="{ name: 'my-profile' }" class="settings-link">알림 수신 설정</RouterLink>
     <p v-if="!NOTIFICATIONS_ENABLED">알림 서비스 준비 중이에요.</p>
     <template v-else>
