@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 코스 상세 (담당: 정동현) - 백엔드 GET /courses/{id} 실데이터만 그린다.
 // 예전에는 문자열 id('sample-aewol')로 목업 코스를 그렸는데, 없는 id에 가짜 코스가 떠서 걷어냈다.
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import CongestionBadge from '../../components/common/CongestionBadge.vue'
 import TripConfirmation from '../../components/course/TripConfirmation.vue'
@@ -32,6 +32,7 @@ let toastTimer: ReturnType<typeof setTimeout> | undefined
 
 // 저장 코스 관리(MY_001) - 본인 코스(manageable)만. 백엔드 PATCH/DELETE 는 있었고 화면 진입점만 없었다
 const renaming = ref(false)
+const renameInput = ref<HTMLInputElement | null>(null)
 const draftTitle = ref('')
 const renameBusy = ref(false)
 const confirmingDelete = ref(false)
@@ -188,9 +189,13 @@ const showToast = (text: string) => {
   toastTimer = setTimeout(() => { toast.value = '' }, 2600)
 }
 
-function startRename () {
+async function startRename () {
   draftTitle.value = live.value?.title ?? ''
   renaming.value = true
+  // 트리거 버튼이 비활성화되며 포커스를 잃는다 - 입력칸으로 옮겨야 키보드 사용자가 맥락을 잃지 않는다
+  await nextTick()
+  renameInput.value?.focus()
+  renameInput.value?.select()
 }
 
 async function saveRename () {
@@ -225,13 +230,19 @@ async function deleteCourse () {
   }
 }
 
-/** 코스 상세는 공개 경로라 주소만 복사하면 된다. 복사가 안 되면 안 됐다고 말한다 - 성공을 지어내지 않는다 */
-async function shareCourse () {
+/**
+ * 현재 주소를 복사한다. 복사가 안 되면 안 됐다고 말한다 - 성공을 지어내지 않는다.
+ * 본인 저장 코스(manageable)는 서버가 소유자에게만 열어 주므로(3307) 남에게는 안 열리는 주소다 -
+ * "공유"라고 부르지 않고 그 사실을 함께 알린다. 공개 공유 링크(/share/:token)는 아직 백엔드가 없다.
+ */
+async function copyAddress () {
   const url = window.location.href
   try {
     if (!navigator.clipboard) throw new Error('clipboard unavailable')
     await navigator.clipboard.writeText(url)
-    showToast('코스 링크를 복사했어요.')
+    showToast(live.value?.manageable
+      ? '주소를 복사했어요. 내 저장 코스라 지금은 나만 열 수 있는 주소예요.'
+      : '코스 주소를 복사했어요.')
   } catch {
     showToast('복사하지 못했어요. 주소창의 주소를 직접 복사해 주세요.')
   }
@@ -307,8 +318,10 @@ async function applySwap (alternative: AlternativePlace) {
           v-if="renaming"
           class="rename-form"
           @submit.prevent="saveRename"
+          @keydown.esc="renaming = false"
         >
           <input
+            ref="renameInput"
             v-model="draftTitle"
             class="rename-input"
             maxlength="100"
@@ -353,9 +366,9 @@ async function applySwap (alternative: AlternativePlace) {
         </button>
         <button
           class="btn ghost"
-          @click="shareCourse"
+          @click="copyAddress"
         >
-          링크 공유
+          주소 복사
         </button>
         <!-- 본인 저장 코스만 - 샘플·임시 코스에는 관리 버튼을 두지 않는다 -->
         <template v-if="live?.manageable">
