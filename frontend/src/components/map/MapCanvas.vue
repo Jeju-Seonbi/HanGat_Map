@@ -7,7 +7,8 @@ import MapPlaceService, { hasCoords } from '@/services/map/MapPlaceService'
 
 import { crowd, tier } from '@/utils/crowd'
 import { cssVar } from '@/utils/geo'
-import { POI_MARKER_CLASS, shouldShowMapLabels } from './mapPresentation'
+import { POI_MARKER_CLASS, shouldShowMapLabels } from './mapPresentation'
+import { JEJU_MAX_LEVEL, clampToJeju } from '@/utils/jejuBounds'
 
 const emit = defineEmits(['select', 'blank-click'])
 
@@ -173,6 +174,16 @@ function fitRegion() {
 
 const onResize = () => map && map.relayout()
 
+/* 제주 밖으로 나가면 되돌린다 - 카카오엔 maxBounds 가 없어 이동이 끝날 때 중심을 상자 안으로 민다 (MAP_001).
+   dragend 가 아니라 idle 인 이유: 손을 뗀 뒤 관성으로 더 미끄러지는데 dragend 는 그 전에 발생해 되돌린 자리를 관성이 덮어쓴다(실측).
+   idle 은 관성까지 끝난 뒤 한 번 오고, 되돌린 뒤의 idle 은 상자 안이라 아무것도 안 해 되풀이되지 않는다 */
+function keepInJeju() {
+  const c = map.getCenter()
+  const { lat, lng } = clampToJeju(c.getLat(), c.getLng())
+  // panTo 가 아니라 setCenter: 먼 거리 panTo 는 1초 넘게 천천히 움직여(실측) 그 사이 다음 드래그와 겹친다. 경계는 즉시 되돌린다
+  if (lat !== c.getLat() || lng !== c.getLng()) map.setCenter(LL(lat, lng))
+}
+
 onMounted(async () => {
   try {
     await loadKakaoMap()
@@ -182,10 +193,11 @@ onMounted(async () => {
   }
   map = new kakao.maps.Map(el.value, { center: LL(33.383, 126.55), level: 10 })
   map.setMinLevel(1)
-  map.setMaxLevel(13)
+  map.setMaxLevel(JEJU_MAX_LEVEL)   // 제주 밖(남해안)까지 축소되지 않게 (MAP_001)
   map.addControl(new kakao.maps.ZoomControl(), kakao.maps.ControlPosition.BOTTOMRIGHT)
   kakao.maps.event.addListener(map, 'click', () => { closeTip(); emit('blank-click') })
   kakao.maps.event.addListener(map, 'zoom_changed', onZoomChanged)
+  kakao.maps.event.addListener(map, 'idle', keepInJeju)
   addEventListener('resize', onResize)
 
   Object.assign(mapBridge, {
@@ -202,7 +214,10 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   removeEventListener('resize', onResize)
-  if (map) kakao.maps.event.removeListener(map, 'zoom_changed', onZoomChanged)
+  if (map) {
+    kakao.maps.event.removeListener(map, 'zoom_changed', onZoomChanged)
+    kakao.maps.event.removeListener(map, 'idle', keepInJeju)
+  }
   clearOverlays()
   mapBridge.ready = false
 })
