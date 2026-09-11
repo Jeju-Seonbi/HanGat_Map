@@ -1,10 +1,14 @@
 import { at, iso } from './date'
 import WeatherService from '../services/map/MapWeatherService'
 
-/* MAP-05: 기상청 실데이터(7일). 로드는 loadPlaces()가 한다 - 범위 밖·실패면 null */
-export function wxOf(i) {
-  return WeatherService.byDate(iso(at(i)))
+/* MAP-05: 기상청 실데이터(7일). 로드는 loadPlaces()가 한다 - 범위 밖·실패면 null.
+   region 은 장소의 권역 표시명(동부/서부/남부/북부) - 안 주면 북부(기존 동작) */
+export function wxOf(i, region) {
+  return WeatherService.byDate(iso(at(i)), region)
 }
+
+/** 기상청 발표 시각(KST ISO) - i 를 주면 그 날 예보의 것, 없으면 그 권역 주간 최근값. 라벨용 - 모르면 null */
+export const wxIssuedAt = (region, i) => WeatherService.issuedAt(region, i == null ? undefined : iso(at(i)))
 
 /* 날씨 아이콘 — 텍스트 글자(☀☁☂)는 브라우저마다 다르게 그려져서 SVG로 직접 그린다.
    구름엔 해를 살짝 겹쳐 '흐리지만 비는 아님'을, 비엔 또렷한 빗방울을 그린다 (2026-09-03 입체 리디자인) */
