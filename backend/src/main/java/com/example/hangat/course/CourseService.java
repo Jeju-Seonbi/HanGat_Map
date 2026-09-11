@@ -39,13 +39,25 @@ public class CourseService {
     private final CourseBudgetService courseBudgetService;
     private final CourseResponseAssembler courseResponseAssembler;
     private final java.util.Optional<CourseDbCandidateService> dbCandidateService;
+    private final CourseDatePolicy courseDatePolicy;
 
     public CourseService(TourApiService tourApiService, CongestionApiService congestionApiService,
             CourseCandidateShortlistService courseCandidateShortlistService, CourseAiPreparationService courseAiPreparationService,
             CourseAiGenerationService courseAiGenerationService, CoursePersistenceService coursePersistenceService,
             CourseBudgetService courseBudgetService, CourseResponseAssembler courseResponseAssembler) {
         this(tourApiService, congestionApiService, courseCandidateShortlistService, courseAiPreparationService,
-                courseAiGenerationService, coursePersistenceService, courseBudgetService, courseResponseAssembler, java.util.Optional.empty());
+                courseAiGenerationService, coursePersistenceService, courseBudgetService, courseResponseAssembler,
+                java.util.Optional.empty(), CourseDatePolicy.legacyTestCompatibility());
+    }
+
+    CourseService(TourApiService tourApiService, CongestionApiService congestionApiService,
+            CourseCandidateShortlistService courseCandidateShortlistService, CourseAiPreparationService courseAiPreparationService,
+            CourseAiGenerationService courseAiGenerationService, CoursePersistenceService coursePersistenceService,
+            CourseBudgetService courseBudgetService, CourseResponseAssembler courseResponseAssembler,
+            java.util.Optional<CourseDbCandidateService> dbCandidateService) {
+        this(tourApiService, congestionApiService, courseCandidateShortlistService, courseAiPreparationService,
+                courseAiGenerationService, coursePersistenceService, courseBudgetService, courseResponseAssembler,
+                dbCandidateService, CourseDatePolicy.legacyTestCompatibility());
     }
 
     /**
@@ -142,6 +154,8 @@ public class CourseService {
         if (endDate.isBefore(startDate)) {
             throw new IllegalArgumentException("종료일은 시작일보다 빠를 수 없습니다.");
         }
+
+        courseDatePolicy.validate(startDate, endDate);
 
         if (people == null || people <= 0) {
             throw new IllegalArgumentException("인원은 1명 이상이어야 합니다.");

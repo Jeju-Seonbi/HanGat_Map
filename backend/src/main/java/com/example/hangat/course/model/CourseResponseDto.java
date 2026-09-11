@@ -32,6 +32,7 @@ public record CourseResponseDto(
         Integer estimatedCostMin,
         Integer estimatedCostMax,
         BudgetSummaryDto budgetSummary,
+        BigDecimal averageCongestionRate,
         List<DayDto> days,
         @JsonInclude(JsonInclude.Include.NON_NULL) String claimToken,
         @JsonInclude(JsonInclude.Include.NON_NULL) Instant claimExpiresAt
@@ -61,6 +62,7 @@ public record CourseResponseDto(
                 null,
                 null,
                 null,
+                null,
                 days,
                 null,
                 null);
@@ -82,7 +84,7 @@ public record CourseResponseDto(
     ) {
         this(id, contractVersion, courseType, generationReason, status, startDate, endDate,
                 people, budgetTotal, transport, accommodation, null, null, null,
-                days, null, null);
+                null, days, null, null);
     }
 
     public CourseResponseDto(
@@ -104,13 +106,26 @@ public record CourseResponseDto(
     ) {
         this(id, contractVersion, courseType, generationReason, status, startDate, endDate,
                 people, budgetTotal, transport, accommodation, estimatedCostMin,
-                estimatedCostMax, budgetSummary, days, null, null);
+                estimatedCostMax, budgetSummary, null, days, null, null);
+    }
+
+    public CourseResponseDto(
+            Long id, String contractVersion, CourseType courseType, GenerationReason generationReason,
+            CourseStatus status, LocalDate startDate, LocalDate endDate, Short people,
+            Integer budgetTotal, Transport transport, AccommodationDto accommodation,
+            Integer estimatedCostMin, Integer estimatedCostMax, BudgetSummaryDto budgetSummary,
+            BigDecimal averageCongestionRate, List<DayDto> days
+    ) {
+        this(id, contractVersion, courseType, generationReason, status, startDate, endDate,
+                people, budgetTotal, transport, accommodation, estimatedCostMin,
+                estimatedCostMax, budgetSummary, averageCongestionRate, days, null, null);
     }
 
     public CourseResponseDto withClaimProof(String token, Instant expiresAt) {
         return new CourseResponseDto(id, contractVersion, courseType, generationReason, status,
                 startDate, endDate, people, budgetTotal, transport, accommodation,
-                estimatedCostMin, estimatedCostMax, budgetSummary, days, token, expiresAt);
+                estimatedCostMin, estimatedCostMax, budgetSummary, averageCongestionRate,
+                days, token, expiresAt);
     }
 
     private static <T> List<T> immutableList(List<T> values) {

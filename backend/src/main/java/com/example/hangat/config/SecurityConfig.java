@@ -168,7 +168,8 @@ public class SecurityConfig {
                 ).permitAll()
                 .requestMatchers(
                         HttpMethod.GET,
-                        "/courses/*/routes/car"
+                        "/courses/*/routes/car",
+                        "/courses/*/routes/transit"
                 ).permitAll()
                 // 스왑(#과밀지역우회)은 비회원 코스에도 열려 있어야 한다 - 생성이 비로그인 허용이라
                 // 생성 직후 대안 교체까지가 한 흐름이다. 소유자 있는 저장 코스는 서비스가 본인 검증

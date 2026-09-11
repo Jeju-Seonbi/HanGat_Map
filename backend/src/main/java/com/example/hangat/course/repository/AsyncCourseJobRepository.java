@@ -274,4 +274,29 @@ public class AsyncCourseJobRepository {
                 courseId, userId
         );
     }
+
+    /** 정리 직전에도 실행 중 작업이 참조하는 코스인지 다시 확인한다. */
+    public boolean hasActiveForCourse(Long courseId) {
+        Long count = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM course_generation_jobs
+                WHERE course_id = ? AND status IN ('QUEUED', 'RUNNING')
+                """, Long.class, courseId);
+        return count != null && count > 0;
+    }
+
+    /** 만료 코스에 연결된 완료 작업과 그 알림만 제거한다. 사용자·다른 작업은 건드리지 않는다. */
+    public int deleteTerminalArtifactsForCourse(Long courseId) {
+        jdbc.update("""
+                DELETE FROM notifications
+                WHERE target_type = 'COURSE_GENERATION'
+                  AND target_id IN (
+                    SELECT id FROM course_generation_jobs
+                    WHERE course_id = ? AND status NOT IN ('QUEUED', 'RUNNING')
+                  )
+                """, courseId);
+        return jdbc.update("""
+                DELETE FROM course_generation_jobs
+                WHERE course_id = ? AND status NOT IN ('QUEUED', 'RUNNING')
+                """, courseId);
+    }
 }

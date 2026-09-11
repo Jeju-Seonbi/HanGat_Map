@@ -10,17 +10,32 @@ import com.example.hangat.course.model.enums.CourseType;
 import com.example.hangat.course.repository.CourseRepository;
 import com.example.hangat.user.model.User;
 import com.example.hangat.user.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@RequiredArgsConstructor
 public class CourseClaimService {
 
     private final UserRepository userRepository;
     private final CourseRepository courseRepository;
     private final CourseClaimTokenService tokenService;
+    private final CourseRetentionPolicy retentionPolicy;
+
+    @Autowired
+    public CourseClaimService(UserRepository userRepository, CourseRepository courseRepository,
+            CourseClaimTokenService tokenService, CourseRetentionPolicy retentionPolicy) {
+        this.userRepository = userRepository;
+        this.courseRepository = courseRepository;
+        this.tokenService = tokenService;
+        this.retentionPolicy = retentionPolicy;
+    }
+
+    /** 기존 단위 테스트 호환용. 운영 주입은 위 생성자를 사용한다. */
+    CourseClaimService(UserRepository userRepository, CourseRepository courseRepository,
+            CourseClaimTokenService tokenService) {
+        this(userRepository, courseRepository, tokenService, new CourseRetentionPolicy());
+    }
 
     @Transactional
     public CourseClaimTokenService.ClaimProof renew(Long courseId, String token) {
@@ -35,6 +50,8 @@ public class CourseClaimService {
         Course course = courseRepository.findByIdForClaim(courseId)
                 .orElseThrow(() ->
                         new BaseException(BaseResponseStatus.COURSE_NOT_FOUND));
+
+        retentionPolicy.requireAvailable(course);
 
         if (course.getStatus() != CourseStatus.READY
                 || course.getCourseType() == CourseType.SAMPLE
@@ -51,6 +68,8 @@ public class CourseClaimService {
                 .orElseThrow(() -> new BaseException(BaseResponseStatus.USER_NOT_FOUND));
         Course course = courseRepository.findByIdForClaim(courseId)
                 .orElseThrow(() -> new BaseException(BaseResponseStatus.COURSE_NOT_FOUND));
+
+        retentionPolicy.requireAvailable(course);
 
         if (course.getStatus() != CourseStatus.READY
                 || course.getCourseType() == CourseType.SAMPLE) {

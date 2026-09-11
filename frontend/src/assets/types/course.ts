@@ -111,7 +111,7 @@ export interface CourseResult {
   swappable?: boolean; manageable?: boolean
   claim_token?: string; claim_expires_at?: string
   start_date: string; end_date: string; people: number; budget_total?: number; transport: Transport
-  estimated_cost_min?: number; estimated_cost_max?: number; average_congestion_rate?: number
+  estimated_cost_min?: number; estimated_cost_max?: number; average_congestion_rate?: number | null
   cost_summary?: CourseCostSummary; budget_summary?: CourseBudgetSummary
   generation_error_code?: string; accommodation?: AccommodationInput | null; days: CourseDay[]
   car_route?: CarRouteResult
@@ -120,16 +120,6 @@ export interface AlternativePlace {
   place_id: number; place_name: string; category_name: string; subcategory_name?: string; image_url?: string
   distance_m: number; congestion_rate?: number; congestion_level?: CongestionLevel
   recommendation_reason: string; replacement_reason: string; radius_km?: 10|20
-}
-export interface CongestionRescheduleOption {
-  visit_date: string
-  start_time: string
-  end_time: string
-  congestion_rate: number
-  congestion_level: CongestionLevel
-  weather_condition: WeatherCondition
-  temperature: number
-  precipitation_probability: number
 }
 export interface SavedCourseSummary {
   course_id: number

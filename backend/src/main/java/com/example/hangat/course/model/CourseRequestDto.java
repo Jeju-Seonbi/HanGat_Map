@@ -41,4 +41,7 @@ public class CourseRequestDto {
     private List<PlacePreferenceDto> coursePlacePreferences;
 
     private AccommodationDto accommodation;
+
+    /** Same conditions, explicitly requesting a different composition. */
+    private boolean regenerate;
 }

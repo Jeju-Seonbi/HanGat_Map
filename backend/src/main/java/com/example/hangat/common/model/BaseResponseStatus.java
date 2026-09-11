@@ -56,6 +56,7 @@ public enum BaseResponseStatus {
     COURSE_ITEM_NOT_FOUND(false, 3306, "존재하지 않는 코스 일정입니다."),
     COURSE_FORBIDDEN(false, 3307, "본인의 코스만 변경할 수 있습니다."),
     COURSE_PLACE_DUPLICATED(false, 3308, "이미 코스에 담긴 장소입니다."),
+    COURSE_EXPIRED(false, 3309, "저장하지 않은 코스의 2시간 보관 기간이 만료되었습니다."),
 
     // 3400번대 혼잡 예보
     CONGESTION_NOT_FOUND(false, 3401, "해당 날짜의 혼잡 예보가 없습니다."),

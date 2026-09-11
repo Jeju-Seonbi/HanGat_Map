@@ -25,8 +25,8 @@ export const routes = [
   { path: '/', name: 'home', component: () => import('../views/home/HomeView.vue'), meta: { skin: 'toss', styleScope: 'content', title: '메인' } },
   { path: '/ai-course', name: 'ai-course', component: () => import('../views/ai-course/AiCourseView.vue'), meta: { styleScope: 'content', title: 'AI 코스' } },
   { path: '/ai-course/jobs/:jobId', name: 'course-generation-job', component: () => import('../views/ai-course/GenerationJobView.vue'), meta: { requiresAuth: true, styleScope: 'content', title: '코스 생성 상태' } },
-  { path: '/travel/search', name: 'travel-search', component: () => import('../views/ai-course/TravelSearchView.vue'), meta: { requiresAuth: true, styleScope: 'content', title: '여행 조건' } },
-  { path: '/recommendation', name: 'recommendation', component: () => import('../views/ai-course/RecommendationView.vue'), meta: { requiresAuth: true, styleScope: 'content', title: '추천 코스' } },
+  { path: '/travel/search', redirect: to => ({ path: '/ai-course', query: to.query }) },
+  { path: '/recommendation', redirect: to => ({ path: '/ai-course', query: to.query }) },
 
   /* ── 지도 — 전용 레이아웃 (문서 스크롤 없음) ── */
   { path: '/map', name: 'map', component: () => import('../views/map/MapView.vue'), meta: { layout: 'map', title: '지도' } },

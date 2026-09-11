@@ -4,9 +4,11 @@ import com.example.hangat.course.ai.CourseAiResultDto;
 import com.example.hangat.course.facts.CandidateIdentity;
 import com.example.hangat.course.facts.CourseCandidate;
 import com.example.hangat.course.facts.CourseGenerationFacts;
+import com.example.hangat.course.facts.CongestionFact;
 import com.example.hangat.course.facts.ExternalClassificationFact;
 import com.example.hangat.course.facts.InternalPlaceCategory;
 import com.example.hangat.course.facts.PlaceFact;
+import com.example.hangat.course.facts.TravelFact;
 import com.example.hangat.course.facts.UserConstraint;
 import com.example.hangat.course.model.CourseRequestDto;
 import com.example.hangat.course.model.GenerationReason;
@@ -40,6 +42,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import com.example.hangat.map.model.enums.CongestionLevel;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -331,6 +334,53 @@ class CoursePersistenceServiceTest {
     }
 
     @Test
+    void persistsPlanningTravelDwellAndAverageOnlyFromKnownSelectedForecasts() throws Exception {
+        LocalDate date = LocalDate.of(2026, 8, 27);
+        CourseCandidate first = withCongestion(candidate(
+                "first", null, "KTO", "first-1", "첫 장소", null, null,
+                "EAST", "TOURIST", UserConstraint.none(), "A01"), date, "20.00");
+        CourseCandidate second = withCongestion(candidate(
+                "second", null, "KTO", "second-1", "둘째 장소", null, null,
+                "EAST", "TOURIST", UserConstraint.none(), "A01"), date, "80.00");
+        TravelFact travel = new TravelFact("first", "second", new BigDecimal("1250.4"),
+                "HAVERSINE", null, 25,
+                com.example.hangat.course.model.Transport.RENTAL_CAR, null, null);
+        CourseGenerationFacts facts = new CourseGenerationFacts(
+                List.of(first, second), List.of(), List.of(travel));
+        CourseAiResultDto schedule = new CourseAiResultDto("2.0", List.of(
+                new CourseAiResultDto.DayDto(date, List.of(
+                        item("first", "09:00"), item("second", "12:00")))));
+
+        CoursePersistenceResult persisted = persistenceService.persist(
+                request(), facts, schedule, metadata(GenerationReason.INITIAL, null));
+        List<CourseItem> items = courseItemRepository.findItemsWithPlace(persisted.course().getId());
+
+        assertThat(items).extracting(CourseItem::getEndTime)
+                .containsExactly(LocalTime.of(10, 30), LocalTime.of(13, 30));
+        assertThat(items.get(0).getInboundDistanceM()).isNull();
+        assertThat(items.get(1).getInboundDistanceM()).isEqualTo(1250);
+        assertThat(items.get(1).getInboundTravelMinutes()).isEqualTo((short) 25);
+        assertThat(persisted.course().getAverageCongestionRate()).isEqualByComparingTo("50.00");
+    }
+
+    @Test
+    void persistsDwellFromSelectedStylesInsteadOfAllPlaceTags() throws Exception {
+        CourseCandidate original = candidate("photo", null, "KTO", "photo-1", "사진 장소",
+                null, null, "EAST", "TOURIST", UserConstraint.none(), "A01");
+        CourseCandidate tagged = new CourseCandidate(original.identity(), original.place(), original.userConstraint(),
+                original.regionCode(), original.externalClassifications(), original.internalPlaceCategory(),
+                List.of(new com.example.hangat.course.facts.StyleHint("PHOTO", "TEST", "사진"),
+                        new com.example.hangat.course.facts.StyleHint("NATURE", "TEST", "자연")),
+                original.congestionFacts(), original.weatherFactSetId());
+        CourseRequestDto selected = objectMapper.readValue(
+                objectMapper.writeValueAsString(request()).replace("NATURE", "PHOTO"), CourseRequestDto.class);
+        var persisted = persistenceService.persist(selected, facts(tagged),
+                result("photo", "2026-08-27", "09:00"), metadata(GenerationReason.INITIAL, null));
+        assertThat(courseItemRepository.findItemsWithPlace(persisted.course().getId()))
+                .extracting(CourseItem::getEndTime).containsExactly(LocalTime.of(10, 15));
+    }
+
+    @Test
     void rejectsUnknownResultCandidateAndDuplicateFactCandidateIdsBeforeInsert()
             throws Exception {
         CourseCandidate candidate = candidate(
@@ -454,6 +504,13 @@ class CoursePersistenceServiceTest {
 
     private CourseGenerationFacts facts(CourseCandidate... candidates) {
         return new CourseGenerationFacts(List.of(candidates), List.of(), List.of());
+    }
+
+    private CourseCandidate withCongestion(CourseCandidate candidate, LocalDate date, String rate) {
+        return new CourseCandidate(candidate.identity(), candidate.place(), candidate.userConstraint(),
+                candidate.regionCode(), candidate.externalClassifications(), candidate.internalPlaceCategory(),
+                candidate.styleHints(), List.of(new CongestionFact(null, date, new BigDecimal(rate),
+                        CongestionLevel.from(new BigDecimal(rate)), "TEST")), candidate.weatherFactSetId());
     }
 
     private CourseCandidate candidate(

@@ -26,19 +26,22 @@ public class CourseAccommodationService {
     private final CoursePlaceResolver placeResolver;
     private final CourseItemRepository itemRepository;
     private final KakaoAccommodationProvider kakaoAccommodationProvider;
+    private final CourseRetentionPolicy retentionPolicy;
 
     public CourseAccommodationService(
             CourseRepository courseRepository,
             CourseClaimTokenService claimTokenService,
             CoursePlaceResolver placeResolver,
             CourseItemRepository itemRepository,
-            KakaoAccommodationProvider kakaoAccommodationProvider
+            KakaoAccommodationProvider kakaoAccommodationProvider,
+            CourseRetentionPolicy retentionPolicy
     ) {
         this.courseRepository = courseRepository;
         this.claimTokenService = claimTokenService;
         this.placeResolver = placeResolver;
         this.itemRepository = itemRepository;
         this.kakaoAccommodationProvider = kakaoAccommodationProvider;
+        this.retentionPolicy = retentionPolicy;
     }
 
     @Transactional(readOnly = true)
@@ -107,6 +110,7 @@ public class CourseAccommodationService {
             String claimToken,
             Long authUserId
     ) {
+        retentionPolicy.requireAvailable(course);
         if (course.getStatus() == CourseStatus.DELETED) {
             throw new BaseException(BaseResponseStatus.COURSE_NOT_FOUND);
         }

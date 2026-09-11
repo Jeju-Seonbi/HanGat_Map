@@ -2,6 +2,9 @@
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { congestionLabel } from '../../utils/congestion'
 import { dayWeatherLabels } from '../../services/course/dailyWeather'
+import { useTransitRoute } from '../../services/course/transitRoute'
+import TransitDayRoute from '../../components/course/TransitDayRoute.vue'
+import TransitLegCard from '../../components/course/TransitLegCard.vue'
 import { todayKst, addCalendarDays, formatCalendarDate } from '../../utils/format.js'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../app/stores/auth'
@@ -9,7 +12,6 @@ import CourseConditionForm from '../../components/course/CourseConditionForm.vue
 import CourseItemCard from '../../components/course/CourseItemCard.vue'
 import BudgetGauge from '../../components/course/BudgetGauge.vue'
 import AlternativePlaceModal from '../../components/course/AlternativePlaceModal.vue'
-import CongestionRescheduleModal from '../../components/course/CongestionRescheduleModal.vue'
 import AccommodationRecommendations from '../../components/course/AccommodationRecommendations.vue'
 import { courseGenerationErrorMessage, courseMockService, toCourseRequestPayload } from '../../services/courseMockService'
 import { ASYNC_COURSES_ENABLED } from '../../api/notifications.js'
@@ -19,7 +21,7 @@ import { storePendingCourseClaim, takePendingCourseClaim } from '../../services/
 import { routeSummary, accessNotices } from '../../services/course/courseSummary'
 import { ApiError } from '../../api/errors.js'
 import { readRestore, rememberResult, rememberEditing, useResultRestore, validProof, singleFlight, useClaimRenewal, clearCourseProof } from '../../services/course/resultRestore'
-import type { AccommodationInput, AccommodationRecommendation, AlternativePlace, CarDayRoute, CarRouteLeg, CongestionRescheduleOption, CourseCondition, CourseItem, CourseResult } from '../../assets/types/course'
+import type { AccommodationInput, AccommodationRecommendation, AlternativePlace, CarDayRoute, CarRouteLeg, CourseCondition, CourseItem, CourseResult } from '../../assets/types/course'
 
 const today = todayKst()
 
@@ -44,9 +46,6 @@ const alternatives = ref<AlternativePlace[]>([])
 const altLoading = ref(false)
 const altNotice = ref('')
 const swapping = ref(false)
-const rescheduleSelected = ref<CourseItem>()
-const rescheduleOptions = ref<CongestionRescheduleOption[]>([])
-const rescheduleLoading = ref(false)
 const recommendedAccommodations = ref<AccommodationRecommendation[]>([])
 const accommodationLoading = ref(false)
 const accommodationError = ref('')
@@ -74,6 +73,8 @@ if (typeof route.query.course === 'string' && /^[1-9]\d{0,14}$/.test(route.query
 // The form clones its initial props: hydrate before its first render, not onMounted.
 if (restoringState.value) Object.assign(condition, restoringState.value.condition)
 const fetchRoute = singleFlight(courseMockService.getCarRoute)
+const transit = useTransitRoute()
+const { data: transitData, loading: transitLoading, error: transitError } = transit
 const now = ref(Date.now())
 let clock: ReturnType<typeof setInterval> | undefined
 let viewEpoch = 0
@@ -89,11 +90,12 @@ function rememberCurrent() {
   }
 }
 function editConditions() {
+  transit.cancel()
   restoration.cancel(); renewal.cancel(); viewEpoch++; routeEpoch++
   if (result.value) clearCourseProof(result.value)
   restoringState.value = null; editing.value = true; loading.value = false; routeLoading.value = false
   jobResultError.value = ''
-  selected.value = undefined; rescheduleSelected.value = undefined; saveOpen.value = false
+  selected.value = undefined; saveOpen.value = false
   accommodationPickerOpen.value = false
   rememberEditing(condition)
   if (route.query.course != null || route.query.job != null) void router.replace({ path: route.path, query: { ...route.query, course: undefined, job: undefined } })
@@ -126,7 +128,7 @@ async function restoreResult() {
     }
   }
 }
-onUnmounted(() => { restoration.cancel(); renewal.cancel(); viewEpoch++; routeEpoch++; if (clock) clearInterval(clock) })
+onUnmounted(() => { transit.cancel(); restoration.cancel(); renewal.cancel(); viewEpoch++; routeEpoch++; if (clock) clearInterval(clock) })
 watch(now, () => {
   if (result.value?.claim_token && !validProof(result.value, now.value)) { clearCourseProof(result.value); rememberCurrent() }
 })
@@ -142,6 +144,8 @@ async function viewOnMap() {
 }
 
 async function loadCarRoute() {
+  if (result.value?.transport === 'PUBLIC_TRANSIT') { await transit.load(result.value); return }
+  transit.cancel()
   if (!result.value || result.value.transport !== 'RENTAL_CAR') return
   const course = result.value
   const ticket = ++routeEpoch
@@ -155,6 +159,10 @@ async function loadCarRoute() {
   } finally {
     if (ticket === routeEpoch) routeLoading.value = false
   }
+}
+
+function transitLeg(dayNo: number, fromId: string) {
+  return transitData.value?.days.find(d => d.day_no === dayNo)?.legs.find(l => l.from.id === fromId)
 }
 
 const routeForDay = (dayNo: number): CarDayRoute | undefined =>
@@ -173,6 +181,16 @@ const transportLabel = {
 const tripDays = computed(() => result.value?.days.length ?? 0)
 const tripNights = computed(() => Math.max(0, tripDays.value - 1))
 const visitCount = computed(() => result.value?.days.reduce((count, day) => count + day.items.length, 0) ?? 0)
+const congestionCoverage = computed(() => {
+  const items = result.value?.days.flatMap(day => day.items) ?? []
+  return { known: items.filter(item => item.congestion_rate != null).length, total: items.length }
+})
+const averageCongestionText = computed(() => {
+  const coverage = congestionCoverage.value
+  if (!coverage.known) return '정보 부족'
+  const base = congestionLabel(result.value?.average_congestion_rate)
+  return coverage.known === coverage.total ? base : `${base} (${coverage.known}/${coverage.total}개 예보)`
+})
 const regionSummary = computed(() => condition.course_regions.map(region => region.name).join(' · ') || '전체')
 const styleSummary = computed(() => condition.course_styles.map(style => style.name).join(' · '))
 const estimatedCost = computed(() => {
@@ -186,19 +204,21 @@ const estimatedCost = computed(() => {
 
 async function generate(next: CourseCondition, regenerate = false) {
   if (loading.value) return
+  transit.cancel()
   restoration.cancel(); renewal.cancel(); routeEpoch++
   const ticket = ++viewEpoch
   Object.assign(condition, JSON.parse(JSON.stringify(next)) as CourseCondition)
   loading.value = true
   error.value = ''
+  const previous = regenerate ? result.value : undefined
   try {
-    if (ASYNC_COURSES_ENABLED && auth.isAuthenticated && !regenerate) {
-      const job = await submitGenerationJob(toCourseRequestPayload(condition))
+    if (ASYNC_COURSES_ENABLED && auth.isAuthenticated) {
+      const job = await submitGenerationJob(toCourseRequestPayload(condition, regenerate, previous))
       if (ticket === viewEpoch) await router.push({ name: 'course-generation-job', params: { jobId: job.jobId } })
       return
     }
     const generated = regenerate
-      ? await courseMockService.regenerateCourse(condition)
+      ? await courseMockService.regenerateCourse(condition, previous)
       : await courseMockService.generateCourse(condition)
     if (ticket !== viewEpoch) return
     result.value = generated
@@ -313,27 +333,6 @@ async function replace(alternative: AlternativePlace) {
   setTimeout(() => { toast.value = '' }, 2600)
 }
 
-async function openReschedule(item: CourseItem) {
-  if (!result.value || !canSwap.value) return
-  rescheduleSelected.value = item
-  rescheduleOptions.value = []
-  rescheduleLoading.value = true
-  try {
-    rescheduleOptions.value = await courseMockService.getQuieterTimeOptions(result.value, item.id)
-  } finally {
-    rescheduleLoading.value = false
-  }
-}
-
-async function reschedule(option: CongestionRescheduleOption) {
-  if (!result.value || !rescheduleSelected.value) return
-  const item = rescheduleSelected.value
-  result.value = await courseMockService.rescheduleCourseItem(result.value, item.id, option)
-  rescheduleSelected.value = undefined
-  toast.value = `${item.place_name} 방문 시간을 ${formatDate(option.visit_date)} ${option.start_time}로 변경했어요. 변경 시간대는 ${congestionLabel(option.congestion_rate)}으로 예상돼요.`
-  setTimeout(() => { toast.value = '' }, 3200)
-}
-
 function openSave() {
   if (!canModify.value) return
   title.value = result.value?.title || ''
@@ -373,7 +372,7 @@ async function restoreJobResult () {
     return true
   }
   const ticket = ++viewEpoch
-  restoration.cancel(); renewal.cancel(); loading.value = true; jobResultError.value = ''
+  transit.cancel(); restoration.cancel(); renewal.cancel(); loading.value = true; jobResultError.value = ''
   try {
     if (!/^[a-f\d]{8}(-[a-f\d]{4}){3}-[a-f\d]{12}$/i.test(id)) throw new Error('INVALID_JOB')
     const response = await getGenerationResult(id)
@@ -397,12 +396,12 @@ async function restoreJobResult () {
   return true
 }
 watch(() => route.query.job, (id, previous) => {
-  viewEpoch++; routeEpoch++; jobResultError.value = ''
+  transit.cancel(); viewEpoch++; routeEpoch++; jobResultError.value = ''
   if (id) void restoreJobResult()
   else if (previous) { loading.value = false; editing.value = true; result.value = undefined }
 })
 watch(() => (auth.user as { userId: number } | null)?.userId, () => {
-  viewEpoch++; routeEpoch++; restoration.cancel(); renewal.cancel()
+  transit.cancel(); viewEpoch++; routeEpoch++; restoration.cancel(); renewal.cancel()
   if (route.query.job) { result.value = undefined; editing.value = true; loading.value = false; void restoreJobResult() }
 })
 onMounted(async () => {
@@ -477,7 +476,7 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
             <span v-if="styleSummary">{{ styleSummary }}</span>
           </div>
           <div class="result-metrics">
-            <span>평균 혼잡도 <b>{{ congestionLabel(result.average_congestion_rate) }}</b></span>
+            <span>평균 혼잡도 <b>{{ averageCongestionText }}</b></span>
             <span>예상 비용 <b>{{ estimatedCost }}</b></span>
           </div>
         </div>
@@ -495,20 +494,23 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
           <section v-for="day in result.days" :key="day.day_no" class="course-day">
             <header><b>DAY {{ day.day_no }}</b><span>{{ formatDate(day.visit_date) }}</span></header>
             <p v-for="weather in dayWeatherLabels(day.items)" :key="weather" class="daily-weather">{{ weather }}</p>
+            <TransitDayRoute v-if="result.transport === 'PUBLIC_TRANSIT'" :day="transitData?.days.find(d => d.day_no === day.day_no)" :loading="transitLoading" :error="transitError" />
             <p v-if="result.transport === 'RENTAL_CAR'" class="route-summary">
               총 이동 {{ routeSummary([routeForDay(day.day_no) ?? {}], routeLoading) }}
             </p>
             <div class="day-timeline">
               <p v-for="notice in accessNotices(routeForDay(day.day_no) ? [routeForDay(day.day_no)!] : [])" :key="notice" class="route-status">{{ notice }}</p>
-              <div v-if="result.accommodation" class="travel-line"><span>↓</span> 숙소 출발 · {{ result.accommodation.place_name }}<template v-if="day.accommodation_departure_travel_minutes"> · {{ transportLabel[result.transport] }} {{ day.accommodation_departure_travel_minutes }}분 · {{ formatDistance(day.accommodation_departure_distance_m) }}</template></div>
-              <template v-for="item in day.items" :key="item.id">
+              <TransitLegCard v-if="result.transport === 'PUBLIC_TRANSIT' && result.accommodation && day.items.length" :leg="transitLeg(day.day_no, 'ACCOMMODATION')" :from="result.accommodation.place_name" :to="day.items[0]!.place_name" :loading="transitLoading" />
+              <div v-if="result.accommodation && result.transport !== 'PUBLIC_TRANSIT'" class="travel-line"><span>↓</span> 숙소 출발 · {{ result.accommodation.place_name }}<template v-if="day.accommodation_departure_travel_minutes"> · {{ transportLabel[result.transport] }} {{ day.accommodation_departure_travel_minutes }}분 · {{ formatDistance(day.accommodation_departure_distance_m) }}</template></div>
+              <template v-for="(item,itemIndex) in day.items" :key="item.id">
                 <div v-if="inboundRoute(day.day_no, item.id)" class="travel-line">
                   <span>↓</span> 이동 약 {{ formatDuration(inboundRoute(day.day_no, item.id)?.duration_seconds) }} ·
                   {{ formatDistance(inboundRoute(day.day_no, item.id)?.distance_meters) }}
                 </div>
-                <CourseItemCard :item="item" :transport="result.transport" :readonly="!canSwap" @alternative="openAlternatives" @reschedule="openReschedule" />
+                <CourseItemCard :item="item" :transport="result.transport" :readonly="!canSwap" :show-inbound-estimate="result.transport !== 'PUBLIC_TRANSIT' && !inboundRoute(day.day_no, item.id)" @alternative="openAlternatives" />
+                <TransitLegCard v-if="result.transport === 'PUBLIC_TRANSIT' && (day.items[itemIndex + 1] || result.accommodation)" :leg="transitLeg(day.day_no, `ITEM:${item.id}`)" :from="item.place_name" :to="day.items[itemIndex + 1]?.place_name ?? result.accommodation!.place_name" :loading="transitLoading" />
               </template>
-              <div v-if="result.accommodation" class="travel-line"><span>↓</span> 숙소 복귀 · {{ result.accommodation.place_name }}<template v-if="day.accommodation_return_travel_minutes"> · {{ transportLabel[result.transport] }} {{ day.accommodation_return_travel_minutes }}분 · {{ formatDistance(day.accommodation_return_distance_m) }}</template></div>
+              <div v-if="result.accommodation && result.transport !== 'PUBLIC_TRANSIT'" class="travel-line"><span>↓</span> 숙소 복귀 · {{ result.accommodation.place_name }}<template v-if="day.accommodation_return_travel_minutes"> · {{ transportLabel[result.transport] }} {{ day.accommodation_return_travel_minutes }}분 · {{ formatDistance(day.accommodation_return_distance_m) }}</template></div>
             </div>
           </section>
           <p v-if="routeLoading" class="route-status">자동차 이동 경로를 불러오는 중이에요.</p>
@@ -523,7 +525,7 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
             <dl>
               <dt>여행 일정</dt><dd>{{ tripNights }}박 {{ tripDays }}일</dd>
               <dt>방문 장소</dt><dd>{{ visitCount }}곳</dd>
-              <dt>평균 혼잡도</dt><dd>{{ congestionLabel(result.average_congestion_rate) }}</dd>
+              <dt>평균 혼잡도</dt><dd>{{ averageCongestionText }}</dd>
               <dt>예상 비용</dt><dd>{{ estimatedCost }}</dd>
               <dt>전체 예산</dt><dd>{{ result.budget_total?.toLocaleString() }}원</dd>
               <dt>이동수단</dt><dd>{{ transportLabel[result.transport] }}</dd>
@@ -543,12 +545,12 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
 
       <div class="result-actions">
         <button class="btn" @click="editConditions">조건 수정</button>
-        <button class="btn primary" :disabled="loading" @click="editConditions">다른 코스 만들기</button>
+        <button class="btn primary" :disabled="loading" @click="generate(condition, true)">{{ loading ? '새 코스를 만드는 중…' : '같은 조건으로 다른 코스 만들기' }}</button>
+        <p v-if="result?.status === 'READY'" class="temporary-course-notice">저장하지 않은 코스는 생성 후 2시간 뒤 삭제됩니다.</p>
       </div>
     </section>
 
     <AlternativePlaceModal v-if="selected" :item="selected" :alternatives="alternatives" :loading="altLoading" :notice="altNotice" :busy="swapping" @close="selected = undefined" @select="replace" />
-    <CongestionRescheduleModal v-if="rescheduleSelected" :item="rescheduleSelected" :options="rescheduleOptions" :loading="rescheduleLoading" @close="rescheduleSelected = undefined" @select="reschedule" />
     <div v-if="saveOpen" class="modal-backdrop" @click.self="saveOpen = false">
       <section class="course-modal save-modal">
         <button class="modal-close" @click="saveOpen = false">×</button>
