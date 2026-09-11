@@ -61,6 +61,13 @@ public interface CongestionForecastRepository extends JpaRepository<CongestionFo
     boolean existsByBaseAtAndForecastAt(LocalDateTime baseAt, LocalDateTime forecastAt);
 
     /**
+     * 한 발표 버전에 예보가 있는 장소 id - 관광공사 집중률 집계 대상(= 주요 관광지) 목록.
+     * 숨은 명소 판정(HiddenGemRule)이 "유명도 하위"의 기준으로 쓴다.
+     */
+    @Query("select distinct f.place.id from CongestionForecast f where f.baseAt = :baseAt")
+    List<Long> findPlaceIdsOfVersion(@Param("baseAt") LocalDateTime baseAt);
+
+    /**
      * 화면용 전체 조회 - 한 발표 버전의 (place_id, forecast_at, rate) 전부.
      *
      * <p>엔티티가 아니라 <b>필요한 세 값만</b> 뽑는다. 7,000행을 엔티티로 읽으면
