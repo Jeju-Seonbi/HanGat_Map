@@ -22,7 +22,6 @@ const route = useRoute()
 const router = useRouter()
 const courseId = String(route.params.courseId ?? '')
 const editing = ref(false)
-const shared = ref(false)
 const live = ref<CourseDetail | null>(null)
 const loading = ref(true)
 
@@ -227,6 +226,18 @@ const showToast = (text: string) => {
   toastTimer = setTimeout(() => { toast.value = '' }, 2600)
 }
 
+/** 코스 상세는 공개 경로라 주소만 복사하면 된다. 복사가 안 되면 안 됐다고 말한다 - 성공을 지어내지 않는다 */
+async function shareCourse () {
+  const url = window.location.href
+  try {
+    if (!navigator.clipboard) throw new Error('clipboard unavailable')
+    await navigator.clipboard.writeText(url)
+    showToast('코스 링크를 복사했어요.')
+  } catch {
+    showToast('복사하지 못했어요. 주소창의 주소를 직접 복사해 주세요.')
+  }
+}
+
 async function openSwap (stop: Stop) {
   if (!stop.liveItem || !stop.visitDate || !live.value) return
   swapTarget.value = stop
@@ -315,10 +326,11 @@ async function applySwap (alternative: AlternativePlace) {
           지도에서 보기
         </button>
         <button
+          v-if="live"
           class="btn ghost"
-          @click="shared = true"
+          @click="shareCourse"
         >
-          {{ shared ? '링크 복사됨 ✓' : '공유' }}
+          링크 공유
         </button>
         <button class="btn primary">
           저장됨 ✓
