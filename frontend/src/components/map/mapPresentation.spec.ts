@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 
-import { MAP_LABEL_MAX_LEVEL, POI_GROUPS, POI_MARKER_CLASS, shouldShowMapLabels, spotPinSpec } from './mapPresentation'
+import { MAP_LABEL_MAX_LEVEL, POI_GROUPS, POI_MARKER_CLASS, SPOT_ICON_GROUPS, shouldShowMapLabels, spotIconGroup, spotPinSpec } from './mapPresentation'
 
 const mapCss = readFileSync(new URL('../../assets/styles/hangat.css', import.meta.url), 'utf8')
 const sharedCss = readFileSync(new URL('../../assets/styles.css', import.meta.url), 'utf8')
@@ -39,9 +39,14 @@ describe('mapPresentation', () => {
 
   describe('spotPinSpec - 관광지 핀 모습(핀 재사용의 변경 감지 기준)', () => {
     it('선택·코스 정류지는 20px 최상단, 필터 안은 15px, 필터 밖은 9px 흐림', () => {
-      expect(spotPinSpec('busy', true, true)).toMatchObject({ cls: 'pn busy pick', size: 20, z: 400 })
-      expect(spotPinSpec('calm', false, true)).toMatchObject({ cls: 'pn calm', size: 15, z: 200 })
-      expect(spotPinSpec('mid', false, false)).toMatchObject({ cls: 'pn mid dim', size: 9, z: 100 })
+      expect(spotPinSpec('busy', true, true)).toMatchObject({ cls: 'pn busy ic-mt pick', size: 20, z: 400 })
+      expect(spotPinSpec('calm', false, true)).toMatchObject({ cls: 'pn calm ic-mt', size: 15, z: 200 })
+      expect(spotPinSpec('mid', false, false)).toMatchObject({ cls: 'pn mid ic-mt dim', size: 9, z: 100 })
+    })
+
+    it('아이콘 묶음이 클래스에 들어가고 서명에도 반영된다', () => {
+      expect(spotPinSpec('calm', false, true, 'sea').cls).toBe('pn calm ic-sea')
+      expect(spotPinSpec('calm', false, true, 'sea').sig).not.toBe(spotPinSpec('calm', false, true, 'mt').sig)
     })
 
     it('혼잡 단계만 달라져도 서명이 달라진다 - 날짜 이동 때 색이 갱신되는 근거', () => {
@@ -56,6 +61,32 @@ describe('mapPresentation', () => {
     expect(mapCss).toMatch(/\.pl-layer\{[^}]*width:0;height:0/)
     expect(mapCss).toMatch(/\.pw\.pl\{position:absolute;margin:-10px 0 0 -10px/)
     expect(mapCss).toContain('.pw.hid{display:none}')
+  })
+
+  describe('spotIconGroup - 관광지 아이콘 7묶음(관광공사 분류 코드 앞자리)', () => {
+    it('앞 4자리 우선, 없으면 앞 2자리, 모르면 산 - 미분류가 없다', () => {
+      expect(spotIconGroup('NA010100')).toBe('mt')       // 산·오름
+      expect(spotIconGroup('NA020700')).toBe('sea')      // 항구
+      expect(spotIconGroup('NA040700')).toBe('park')     // 수목원
+      expect(spotIconGroup('VE030100')).toBe('park')     // 시민공원
+      expect(spotIconGroup('VE070100')).toBe('culture')  // 박물관
+      expect(spotIconGroup('VE990000')).toBe('culture')  // 처음 보는 문화시설 하위
+      expect(spotIconGroup('HS030100')).toBe('history')  // 불교
+      expect(spotIconGroup('LS010700')).toBe('leisure')  // 승마
+      expect(spotIconGroup('EX030300')).toBe('play')     // 체험농장
+      expect(spotIconGroup('VE020100')).toBe('play')     // 테마파크
+      expect(spotIconGroup('EV010200')).toBe('play')     // 축제
+      expect(spotIconGroup('AC050100')).toBe('play')     // 야영장
+      expect(spotIconGroup(null)).toBe('mt')
+      expect(spotIconGroup('ZZ000000')).toBe('mt')
+    })
+
+    it('산을 뺀 6묶음은 CSS 에 마스크 아이콘 규칙이 있다(산은 .pn 기본값)', () => {
+      expect(SPOT_ICON_GROUPS).toHaveLength(7)
+      for (const g of SPOT_ICON_GROUPS.filter(g => g !== 'mt')) {
+        expect(mapCss).toMatch(new RegExp(`\\.pn\\.ic-${g}\\{--ico:url\\("data:image/svg\\+xml,`))
+      }
+    })
   })
 
   it('핀 아이콘: 관광지(.pn)와 업종 마커 전부 마스크 아이콘이 있고, 흐린 9px 핀엔 없다', () => {

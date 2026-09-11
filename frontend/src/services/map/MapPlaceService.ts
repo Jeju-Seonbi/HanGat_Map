@@ -26,6 +26,8 @@ export interface MapPlace {
   r: string
   /** 세부분류 표시명 (오름/해수욕장/박물관…). 미분류면 '정보 없음' */
   c: string
+  /** 세부분류 코드 (관광공사 NA010100 등). 관광지 핀 아이콘 묶음을 앞자리로 정한다 - 없으면 null */
+  tc: string | null
   /** 카테고리 코드 (TOURIST/FOOD/CAFE/…) - 검색 결과의 핀 색 구분용 */
   cat: string
   addr: string | null
@@ -231,6 +233,7 @@ function toMapPlace (row: BackendPlace): MapPlace {
     r: row.regionName,
     // 세부분류가 없는 장소가 있다 - 빈 문자열로 두면 드롭다운에 빈 항목이 생긴다
     c: row.tagName ?? '정보 없음',
+    tc: row.tagCode ?? null,   // 관광공사 분류 코드 - 관광지 핀 아이콘 묶음(spotIconGroup)이 앞자리로 나눈다
     cat: row.categoryCode,
     addr: row.roadAddress ?? row.lotAddress,
     tel: row.phone,

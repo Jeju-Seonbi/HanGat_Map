@@ -7,7 +7,7 @@ import MapPlaceService, { hasCoords } from '@/services/map/MapPlaceService'
 
 import { crowd, tier } from '@/utils/crowd'
 import { cssVar } from '@/utils/geo'
-import { POI_MARKER_CLASS, POI_GROUPS, spotPinSpec, shouldShowMapLabels } from './mapPresentation'
+import { POI_MARKER_CLASS, POI_GROUPS, spotPinSpec, spotIconGroup, shouldShowMapLabels } from './mapPresentation'
 import { JEJU_MAX_LEVEL, clampToJeju } from '@/utils/jejuBounds'
 import { goodPriceSourceLine } from '@/utils/dataSources'
 
@@ -217,7 +217,7 @@ function draw() {
     const e = ensurePin(key, 'spot', s)
     e.data = s
     const on = inFilter(s)
-    const spec = spotPinSpec(L.crowd ? tier(crowd(s, di)) : 'calm', !!(inCourse(s.n) || (sel && sel.n === s.n)), on)
+    const spec = spotPinSpec(L.crowd ? tier(crowd(s, di)) : 'calm', !!(inCourse(s.n) || (sel && sel.n === s.n)), on, spotIconGroup(s.tc))
     const sig = spec.sig + '|' + s.n
     if (sig !== e.sig) {
       e.sig = sig
@@ -271,7 +271,7 @@ function drawExtras(di, sel, course, courseDay, L) {
 
   if (selPin) {
     const pin = sel.cat === 'TOURIST'
-      ? `<div class="pn ${selTier} pick" style="width:20px;height:20px"></div>`
+      ? `<div class="pn ${selTier} ic-${spotIconGroup(sel.tc)} pick" style="width:20px;height:20px"></div>`
       : `<div class="poi-marker sel-pick ${sel.good ? 'mk-food' : (CAT_MARKER[sel.cat] ?? 'mk-dine')}"></div>`
     addPin('sel', sel.y, sel.x, `<div class="lb-t sel-on">${sel.n}</div>` + pin, () => emit('select', sel), 500)
   }
