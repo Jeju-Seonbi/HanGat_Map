@@ -8,6 +8,7 @@ import MapPlaceService, { hasCoords } from '@/services/map/MapPlaceService'
 import { crowd, tier } from '@/utils/crowd'
 import { cssVar } from '@/utils/geo'
 import { POI_MARKER_CLASS, POI_GROUPS, spotPinSpec, spotIconGroup, shouldShowMapLabels } from './mapPresentation'
+import { clusterModeFor, hideDimFor, clusterByUnit, clusterPins, dominantTier, clusterSize } from '@/utils/cluster'
 import { JEJU_MAX_LEVEL, clampToJeju } from '@/utils/jejuBounds'
 import { goodPriceSourceLine } from '@/utils/dataSources'
 
@@ -54,6 +55,7 @@ function clearOverlays() {
   closeTip()
   clearExtras()
   if (layerOv) { layerOv.setMap(null); layerOv = null; layerNode = null }
+  clusterNodes = []
   pool.clear()
 }
 
@@ -118,12 +120,69 @@ function keepAnchorOnScreen() {
   layerNode.style.transform = `translate(${originPt.x - a.x}px,${originPt.y - a.y}px)`
 }
 
-const onZoomChanged = () => { syncLabelVisibility(); relayoutPins() }
+/* 줌이 바뀌면 핀을 다시 놓고(relayout) 묶음도 다시 계산한다(draw - 핀 서명은 같아 싸다) */
+const onZoomChanged = () => { syncLabelVisibility(); relayoutPins(); draw() }
 
 function place(e) {
   const pt = proj.pointFromCoords(LL(e.data.y, e.data.x))
-  e.node.style.left = (pt.x - originPt.x) + 'px'
-  e.node.style.top = (pt.y - originPt.y) + 'px'
+  e.px = pt.x - originPt.x   // 묶음 계산도 이 값을 쓴다
+  e.py = pt.y - originPt.y
+  e.node.style.left = e.px + 'px'
+  e.node.style.top = e.py + 'px'
+}
+
+/* ── 묶음 핀 (축소 뷰) ──
+   레벨 10 이상은 행정 단위(읍면·시내·중문) 하나에 묶음 하나(이름표 = 단위), 8~9 는 픽셀 40px 로 이름 없이, 7 이하는 전부 개별 핀 (utils/cluster).
+   레이어별로 따로 묶고(관광지는 관광지끼리) 묶인 핀은 숨긴다. 매 draw 마다 다시 계산한다 -
+   묶음은 많아야 300개라 노드를 새로 만들어도 수 ms 이고, 날짜가 바뀌면 테두리 비율이 달라져 어차피 다시 그려야 한다 */
+let clusterNodes = []
+
+function clusterPass(lv) {
+  clusterNodes.forEach(n => n.remove())
+  clusterNodes = []
+  for (const e of pool.values()) e.node.classList.remove('cl-in')
+  const mode = clusterModeFor(lv)
+  if (!mode.unit && !mode.radius) return
+  const byGroup = new Map()
+  for (const e of pool.values()) {
+    if (!e.shown || e.pick) continue   // 선택·코스 핀은 묶지 않고 위에 남긴다
+    if (!byGroup.has(e.group)) byGroup.set(e.group, [])
+    byGroup.get(e.group).push(e)
+  }
+  for (const [group, list] of byGroup) {
+    const clusters = mode.unit ? clusterByUnit(list, e => e.data.unit) : clusterPins(list, mode.radius)
+    // 혼자인 장소는 묶지 않고 핀 그대로 보여준다(2026-09-12 결정) - 근처에 아무도 없는 곳은 "1" 묶음보다 핀이 더 말이 된다
+    for (const c of clusters) {
+      if (c.members.length < 2) continue
+      c.members.forEach(e => e.node.classList.add('cl-in'))
+      clusterNodes.push(makeCluster(group, c, mode.unit ? c.name : null))
+    }
+  }
+}
+
+/** 묶음 노드: 색 원 + 흰 숫자(디자인 A안). 관광지는 대표 혼잡 색(선택한 날짜 기준, 예보 있는 곳만 세서 다수), 업종은 업종 색.
+    이름표는 행정 단위(섬 전체 뷰에서만). 클릭하면 그 자리로 2단계 확대 - 픽셀 묶음으로 바뀌어 안에 뭐가 어디 있는지 보인다 */
+function makeCluster(group, c, name) {
+  const n = c.members.length
+  const node = document.createElement('div')
+  let cls = group === 'spot' ? 'cl' : `cl poi ${POI_MARKER_CLASS[group]}`
+  if (group === 'spot') {
+    const cnt = { calm: 0, mid: 0, busy: 0, none: 0 }
+    for (const e of c.members) cnt[state.L.crowd ? tier(crowd(e.data, state.di)) : 'calm']++
+    cls += ' ' + dominantTier(cnt)
+  }
+  node.className = cls
+  const size = clusterSize(n)
+  node.style.cssText = `left:${c.x}px;top:${c.y}px;width:${size}px;height:${size}px`
+  node.innerHTML = `<b>${n}</b>` + (name ? `<div class="lb-t">${name}</div>` : '')
+  const lat = c.members.reduce((a, e) => a + e.data.y, 0) / n
+  const lng = c.members.reduce((a, e) => a + e.data.x, 0) / n
+  node.addEventListener('click', ev => {
+    ev.stopPropagation()
+    map.setLevel(Math.max(1, map.getLevel() - 2), { anchor: LL(lat, lng) })
+  })
+  layerNode.appendChild(node)
+  return node
 }
 
 /** 풀 핀이 들어갈 레이어(CustomOverlay 1개). 클릭은 레이어에서 한 번만 받아 핀 키로 찾는다 -
@@ -158,7 +217,7 @@ function ensurePin(key, group, p) {
   node.innerHTML = group === 'spot'
     ? '<div class="lb-t"></div><div class="pn"></div>'
     : `<div class="lb-t"></div><div class="poi-marker ${POI_MARKER_CLASS[group]}"></div>`
-  e = { node, lb: node.firstElementChild, dot: node.lastElementChild, data: p, sig: '', shown: true, group }
+  e = { node, lb: node.firstElementChild, dot: node.lastElementChild, data: p, sig: '', shown: true, group, pick: false, px: 0, py: 0 }
   if (group !== 'spot') node.style.zIndex = 60
   place(e)
   layerNode.appendChild(node)
@@ -207,17 +266,23 @@ function draw() {
   const { di, sel, course, courseDay, L } = state
   const inCourse = n => course && course.stops.some(s => s.o && s.o.n === n)
   const seen = new Set()
+  const lv = map.getLevel()
+  // 축소 뷰(레벨 8 이상)에선 필터 밖 흐린 핀을 아예 숨긴다 - 섬 전체 뷰의 회색 점 600개는 정보가 아니라 잡음.
+  // 묶음 개수에도 안 들어가 왼쪽 목록과 기준이 같다. 확대하면(레벨 7 이하) 다시 보인다
+  const hideDim = hideDimFor(lv)
 
   // 관광지 - 날짜가 바뀌면 달라지는 건 색·크기뿐. 좌표 없는 장소는 못 찍는다(KTO 원본 좌표 오류로 null 인 건)
   prune('spot', state.layers.spot)
   if (L.spot) for (const s of state.layers.spot) {
     if (!hasCoords(s)) continue
+    const on = inFilter(s)
+    if (!on && hideDim) continue
     const key = 'spot:' + (s.id ?? s.n)
     seen.add(key)
     const e = ensurePin(key, 'spot', s)
     e.data = s
-    const on = inFilter(s)
-    const spec = spotPinSpec(L.crowd ? tier(crowd(s, di)) : 'calm', !!(inCourse(s.n) || (sel && sel.n === s.n)), on, spotIconGroup(s.tc))
+    const pick = !!(inCourse(s.n) || (sel && sel.n === s.n))
+    const spec = spotPinSpec(L.crowd ? tier(crowd(s, di)) : 'calm', pick, on, spotIconGroup(s.tc))
     const sig = spec.sig + '|' + s.n
     if (sig !== e.sig) {
       e.sig = sig
@@ -227,6 +292,7 @@ function draw() {
       e.lb.classList.toggle('off', !on)   // 이름표는 필터 안 장소만
       e.node.style.zIndex = spec.z
     }
+    e.pick = pick
     show(e, true)
   }
 
@@ -245,9 +311,10 @@ function draw() {
     }
   }
 
-  // 이번 패스에 없는 핀(끈 레이어·권역 밖)은 숨긴다
+  // 이번 패스에 없는 핀(끈 레이어·권역 밖·축소 뷰의 흐린 핀)은 숨긴다
   for (const [key, e] of pool) if (!seen.has(key)) show(e, false)
 
+  clusterPass(lv)
   drawExtras(di, sel, course, courseDay, L)
 }
 

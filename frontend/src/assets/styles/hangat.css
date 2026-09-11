@@ -49,6 +49,21 @@
 .pl-layer{position:relative;width:0;height:0}
 .pw.pl{position:absolute;margin:-10px 0 0 -10px}
 .pw.hid{display:none}
+/* 묶음 핀 (축소 뷰, 2026-09-12 결정 · 디자인 A안 단색 채움): 대표 혼잡 색으로 채운 원 + 흰 숫자. 업종 묶음은 업종 색(.mk-*).
+   도넛 링(4색 비율)은 회색이 절반이라 안 읽혀 뺐다. 핀과 같은 레이어에 절대배치. 묶인 핀은 .cl-in 으로 숨긴다(풀은 유지).
+   선택·코스 핀(z 400+)은 안 묶여 위에 남는다 */
+.pw.cl-in{display:none}
+.cl{position:absolute;transform:translate(-50%,-50%);border-radius:50%;display:flex;align-items:center;justify-content:center;
+  cursor:pointer;border:2.5px solid #fff;box-sizing:border-box;box-shadow:0 2px 8px rgba(0,0,0,.28);z-index:300;
+  color:#fff;font-size:13px;font-weight:800;line-height:1;transition:transform .12s}
+.cl:hover{transform:translate(-50%,-50%) scale(1.08)}
+.cl.calm{background:var(--pin-calm)}
+.cl.mid{background:var(--pin-mid)}
+.cl.busy{background:var(--pin-busy)}
+.cl.none{background:var(--pin-none)}
+.cl.poi{z-index:250}
+.cl .lb-t{position:absolute;top:calc(100% + 5px);left:50%;transform:translateX(-50%);pointer-events:none;
+  font-size:11px;font-weight:700;padding:2px 8px;box-shadow:0 1px 4px rgba(30,50,80,.14);z-index:1}
 
 /* 글로우 핀 */
 .pn{border-radius:50%;border:2px solid #fff;box-sizing:border-box;
@@ -56,7 +71,7 @@
 .pn:hover{transform:scale(1.18)}
 /* 혼잡 단계 색의 단일 출처 - 핀·범례 점·상세 배지·주간 카드 막대가 전부 이 값을 쓴다.
    글자용 토큰(--mid 등)은 흰 배경 대비를 위해 어둡게 만든 값이라 면(배경)에 쓰면 색이 달라 보인다 */
-.stage{--pin-calm:#00b894;--pin-mid:#ff9500;--pin-busy:#f4364c}
+.stage{--pin-calm:#00b894;--pin-mid:#ff9500;--pin-busy:#f4364c;--pin-none:#aeb8c2}
 .pn.calm{background:var(--pin-calm);box-shadow:0 0 0 4px rgba(0,184,148,.28),0 2px 6px rgba(0,0,0,.26)}
 .pn.mid{background:var(--pin-mid);box-shadow:0 0 0 4px rgba(255,149,0,.28),0 2px 6px rgba(0,0,0,.26)}
 .pn.busy{background:var(--pin-busy);box-shadow:0 0 0 5px rgba(244,54,76,.3),0 2px 7px rgba(0,0,0,.28)}
