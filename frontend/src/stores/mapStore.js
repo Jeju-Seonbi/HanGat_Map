@@ -117,7 +117,7 @@ export async function toggleLayer (key) {
 
 /**
  * 딥링크(?place=id) 복원 — 공유 링크·마이페이지 "장소 보기"가 이걸 탄다.
- * 이미 받아온 레이어에서 먼저 찾고, 없으면 지연 레이어(카페·편의점·마트)를
+ * 이미 받아온 레이어에서 먼저 찾고, 없으면 지연 레이어(관광지 외 전부, LAZY_LAYERS 순서)를
  * 하나씩 내려받아 찾는다. 찾은 장소의 업종 칩은 켠다 - 핀이 보여야 상세가 말이 된다.
  */
 export async function findPlaceById (id) {
