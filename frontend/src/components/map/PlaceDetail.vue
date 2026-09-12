@@ -117,6 +117,8 @@ function onThumbError (e, p) {
 /* 후기 요약은 상세 API(places.rating_avg 비정규화)가 준다 - localStorage 데모 아님 */
 const reviewCount = computed(() => detail.value?.reviewCount ?? 0)
 const ratingAvg = computed(() => detail.value?.ratingAvg ?? null)
+/** 후기 첫 페이지 원본 - ReviewSection 에 그대로 넘겨 같은 요청을 두 번 보내지 않는다. null = 못 받음 */
+const reviewPage = ref(null)
 /** 하단 미리보기용 최근 3건 */
 const previewReviews = ref([])
 const rvDate = iso => { const d = new Date(iso); return `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}` }
@@ -139,6 +141,7 @@ async function loadDetail() {
   // 응답이 늦게 와도 그새 다른 장소를 열었으면 버린다
   if (s.value.id === id) {
     detail.value = d
+    reviewPage.value = rv
     previewReviews.value = rv?.content.slice(0, 3) ?? []
   }
 }
@@ -442,7 +445,7 @@ async function shareNative() {
         <div style="flex:1"><h4>{{ s.n }}</h4><div class="sub">방문 후기</div></div>
         <button class="pox" @click="emit('close')">×</button>
       </div>
-      <ReviewSection :place="s" :rating-avg="ratingAvg"
+      <ReviewSection :place="s" :rating-avg="ratingAvg" :first-page="reviewPage"
         @open-photo="p => emit('open-photo', p)" @changed="loadDetail" />
     </div>
   </div>

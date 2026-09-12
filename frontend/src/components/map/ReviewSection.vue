@@ -1,6 +1,6 @@
 <script setup>
 /* MAP-09 후기 — 실 API. 열람은 누구나, 작성·삭제는 회원만 (JWT) */
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import StarIcon from './StarIcon.vue'
 import ProfileAvatar from '../common/ProfileAvatar.vue'
@@ -12,7 +12,11 @@ import { CROWD_KO } from '@/utils/crowd'
 const props = defineProps({
   place: { type: Object, required: true },
   /** 부모(상세 API)가 주는 별점 평균 - 목록 첫 페이지만으로는 못 구한다 */
-  ratingAvg: { type: Number, default: null }
+  ratingAvg: { type: Number, default: null },
+  /** 부모(PlaceDetail)가 미리보기용으로 이미 받은 후기 첫 페이지. 여기서 또 받지 않는다 -
+      이 탭은 v-show 라 상세를 열 때 같이 마운트되므로 onMounted 로 받으면 같은 요청이 2번 나갔다(2026-09-12 실측).
+      null 이면 부모가 못 받은 것 - 목록만 비우고 작성 폼은 살려 둔다 */
+  firstPage: { type: Object, default: null }
 })
 const emit = defineEmits(['open-photo', 'changed'])
 
@@ -32,12 +36,23 @@ const totalPages = ref(0)
 const totalElements = ref(0)
 const loading = ref(false)
 
-async function load (reset = true) {
+/** 첫 페이지는 부모가 준다 - 처음 열 때, 장소가 바뀔 때, 작성·삭제 뒤(changed → 부모가 다시 읽음) 모두 이 경로로 갱신된다 */
+function applyPage (page) {
+  items.value = page?.content ?? []
+  pageNo.value = page?.number ?? 0
+  totalPages.value = page?.totalPages ?? 0
+  totalElements.value = page?.totalElements ?? 0
+}
+watch(() => props.firstPage, applyPage, { immediate: true })
+watch(() => props.place.id, resetForm)
+
+/** '더보기' - 다음 페이지를 이어 붙인다 */
+async function loadMore () {
   if (props.place.id == null) return    // 목업 장소는 후기 미지원
   loading.value = true
   try {
-    const page = await ReviewApiService.getReviews(props.place.id, reset ? 0 : pageNo.value + 1)
-    items.value = reset ? page.content : [...items.value, ...page.content]
+    const page = await ReviewApiService.getReviews(props.place.id, pageNo.value + 1)
+    items.value = [...items.value, ...page.content]
     pageNo.value = page.number
     totalPages.value = page.totalPages
     totalElements.value = page.totalElements
@@ -47,8 +62,6 @@ async function load (reset = true) {
     loading.value = false
   }
 }
-onMounted(load)
-watch(() => props.place.id, () => { resetForm(); load() })
 
 const counts = computed(() => {
   const c = { calm: 0, mid: 0, busy: 0 }
@@ -103,8 +116,7 @@ async function submit () {
       imageUrls
     })
     resetForm()
-    await load()
-    emit('changed')             // 부모가 상세를 다시 읽어 별점 요약을 갱신한다
+    emit('changed')             // 부모가 상세와 후기 첫 페이지를 다시 읽는다 - 별점 요약과 이 목록(firstPage)이 함께 갱신된다
     toast('후기가 등록됐어요')
   } catch (err) {
     toast(err?.message ?? '후기 등록에 실패했어요')
@@ -116,7 +128,6 @@ async function submit () {
 async function removeReview (r) {
   try {
     await ReviewApiService.remove(r.id)
-    await load()
     emit('changed')
     toast('후기를 삭제했어요')
   } catch (err) {
@@ -196,7 +207,7 @@ async function removeReview (r) {
       </div>
 
       <button v-if="pageNo + 1 < totalPages" class="rvchip"
-        style="justify-content:center;margin-top:8px" :disabled="loading" @click="load(false)">
+        style="justify-content:center;margin-top:8px" :disabled="loading" @click="loadMore">
         <span class="ct">후기 {{ totalElements - items.length }}개 더보기</span>
       </button>
     </template>
