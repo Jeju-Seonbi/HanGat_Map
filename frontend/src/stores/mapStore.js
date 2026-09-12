@@ -149,11 +149,28 @@ export async function findPlaceById (id) {
   return { place: null, error }
 }
 
+/* ── 재진입 재사용 ──
+   스토어는 모듈 전역이라 지도를 나갔다 와도 장소·예보(series)·날씨 캐시가 메모리에 다 있다.
+   그런데도 진입마다 처음부터 다시 받으면(요청 9건·1MB) 그동안 목록이 "불러오는 중"으로 비고,
+   장소가 도착하는 순간 예보 안 붙은 새 객체로 바뀌어 핀이 전부 회색 + "예보가 있는 곳이 없어요"가 잠깐 뜬다(3G 실측 0.5초).
+   장소 02:20·예보 03:00·날씨 03:30/06:30, 하루 한두 번 갱신이라 12시간 묵어도 서버와 같다.
+   날짜가 바뀌면 예보가 '오늘' 기준으로 붙어 있어 기간 안이라도 다시 받는다.
+   새로고침·새 탭은 메모리가 비어 어차피 처음부터 받는다 (2026-09-12, docs/성능_브랜치B_재분석_MAP_20260912.md) */
+const REUSE_MS = 12 * 60 * 60 * 1000
+let loadedAt = 0        // 마지막으로 전부 제대로 받은 시각(ms). 0 = 아직
+let loadedDate = ''     // 그때의 날짜(YYYY-MM-DD) - attachSeries 가 쓰는 iso() 와 같은 기준
+
+/** 마지막으로 전부 받은 지 12시간 안이고 같은 날이면 true - loadPlaces 가 요청을 건너뛴다 */
+export function canReuse (now = new Date()) {
+  return loadedAt > 0 && now.getTime() - loadedAt < REUSE_MS && iso(now) === loadedDate
+}
+
 /**
- * 장소·예보를 받아 state에 채운다. 지도 화면 진입 시 한 번 호출한다.
+ * 장소·예보를 받아 state에 채운다. 지도 화면에 들어올 때마다 호출하지만, 같은 날 12시간 안 재진입은 건너뛴다.
  * 예보는 장소보다 늦게 와도 되므로 따로 기다렸다가 붙인다 - 지도가 먼저 뜬다.
  */
 export async function loadPlaces () {
+  if (canReuse()) return
   state.loading = true
   const { live, layers, failed } = await MapPlaceService.getAll()
   state.layers = layers
@@ -170,6 +187,12 @@ export async function loadPlaces () {
   state.forecastDays = forecast.days
   attachSeries(state.layers.spot, forecast, iso(new Date()))
   state.forecastVersion++
+  // 전부 제대로 받았을 때만 기록한다. 레이어 하나라도 못 받았거나 예보가 비어 왔으면 기록하지 않아
+  // 다음 진입에 처음부터 다시 받는다 - "실패한 것만 골라 재시도"하는 코드 없이 재시도가 된다
+  if (live && !failed.length && forecast.live) {
+    loadedAt = Date.now()
+    loadedDate = iso(new Date())
+  }
 }
 
 /** 지역·종류 필터를 함께 적용 */
