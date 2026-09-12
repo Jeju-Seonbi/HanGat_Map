@@ -131,13 +131,16 @@ interface BackendPlaceImage {
 export type LayerKey = 'spot' | 'food' | 'dine' | 'cafe' | 'cvs' | 'stay' | 'mart'
 
 /**
- * 첫 진입에 싣지 않는 대용량 레이어 (소상공인 상가 5,419곳).
- * 칩을 처음 켤 때 getLayer()로 그때 받아온다 - 안 쓰는 사람은 다운로드 비용 0.
+ * 첫 진입에 싣지 않는 레이어 = 관광지 빼고 전부.
+ * 첫 화면은 관광지 칩만 켜져 있어(state.L 기본값) 나머지는 받아 놓아도 쓰이지 않는데,
+ * 착한가격·식당·숙소 571KB 를 첫 진입마다 받고 있었다(2026-09-12 실측: Slow 4G 첫 진입 8.8초 중 약 3초).
+ * 칩을 처음 켤 때 getLayer()로 그때 받아온다(toggleLayer) - 안 켜는 사람은 다운로드 비용 0.
+ * 딥링크(findPlaceById)는 이 목록을 차례로 받아 보며 찾고, 없으면 단건 조회로 떨어진다.
  */
-export const LAZY_LAYERS: LayerKey[] = ['cafe', 'cvs', 'mart']
+export const LAZY_LAYERS: LayerKey[] = ['food', 'dine', 'stay', 'cafe', 'cvs', 'mart']
 
 export interface MapPlaces {
-  /** true = 레이어를 하나라도 받았다. false = 전부 실패(백엔드 다운) */
+  /** true = 첫 진입 레이어(관광지)를 받았다. false = 못 받았다(백엔드 다운) - 화면이 '새로고침' 안내를 띄운다 */
   live: boolean
   layers: Record<LayerKey, MapPlace[]>
   /** 이번 진입에서 못 받아온 레이어. 화면이 안내하고, 칩을 다시 켜면 그 레이어만 재시도한다 */
@@ -146,12 +149,11 @@ export interface MapPlaces {
 
 export const MapPlaceService = {
   /**
-   * 지도가 쓰는 레이어를 한 번에 받아온다.
-   * 레이어마다 호출이 나가지만 전부 같은 테이블이라 서버 부담은 크지 않고,
-   * 하나가 실패해도 나머지가 살아 있도록 개별로 처리한다.
+   * 첫 진입 레이어를 받아온다 - 지금은 관광지 하나. 나머지는 칩을 켤 때(LAZY_LAYERS).
+   * 목록·부분 실패 구조는 그대로 둔다 - 첫 진입 레이어가 다시 늘어도 호출부(loadPlaces)가 안 바뀌게.
    */
   async getAll (): Promise<MapPlaces> {
-    const keys: LayerKey[] = ['spot', 'food', 'dine', 'stay']   // 기본 레이어만 - 대용량은 LAZY_LAYERS
+    const keys: LayerKey[] = ['spot']
     const results = await Promise.allSettled(keys.map(k => apiGet<BackendPlace[]>(`/places?type=${k}`)))
     const layers = emptyLayers()
     const failed: LayerKey[] = []
