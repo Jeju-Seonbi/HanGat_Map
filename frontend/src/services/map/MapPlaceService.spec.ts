@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import MapPlaceService from './MapPlaceService'
+import MapPlaceService, { thumbOf } from './MapPlaceService'
 
 /** getDetail 사진 매핑 검증. 값은 2026-08-30 실응답에서 가져왔다. */
 const REAL_DETAIL = {
@@ -46,12 +46,21 @@ describe('상세 조회 사진 매핑', () => {
     expect(d?.imageAttribution).toBe('출처: 한국관광공사 국문 관광정보 서비스')
   })
 
-  it('썸네일이 없으면 원본을 쓴다', async () => {
+  it('축소본 주소가 없거나 원본과 같으면 공사 규칙(_image3_)으로 축소본을 쓰고, 크게 보기용 url 은 원본 그대로다', async () => {
     mockFetch(REAL_DETAIL)
 
     const d = await MapPlaceService.getDetail(9)
 
-    expect(d?.images[1].thumb).toBe(d?.images[1].url)
+    expect(d?.images[0].thumb).toBe('https://tong.visitkorea.or.kr/cms/resource/86/3026686_image3_1.jpg')   // 축소본 = 원본으로 온 것
+    expect(d?.images[1].thumb).toBe('https://tong.visitkorea.or.kr/cms/resource/87/3026687_image3_1.jpg')   // 축소본 null
+    expect(d?.images[0].url).toContain('_image2_')
+  })
+
+  it('thumbOf: 따로 온 축소본은 그대로, 공사 규칙이 안 맞는 주소는 원본 그대로', () => {
+    expect(thumbOf('https://tong.visitkorea.or.kr/a/1_image2_1.jpg', 'https://tong.visitkorea.or.kr/a/1_image3_1.jpg'))
+      .toBe('https://tong.visitkorea.or.kr/a/1_image3_1.jpg')
+    expect(thumbOf('https://example.com/photo.jpg', null)).toBe('https://example.com/photo.jpg')
+    expect(thumbOf('https://example.com/photo.jpg', 'https://example.com/photo.jpg')).toBe('https://example.com/photo.jpg')
   })
 
   it('사진이 없으면 빈 배열이고 출처도 없다 - 화면이 사진 영역을 숨기는 근거', async () => {

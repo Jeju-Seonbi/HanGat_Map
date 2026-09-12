@@ -110,6 +110,10 @@ const introOpen = ref(false)
 
 /** 관광공사(KTO) 공식 사진 - 상세에 싣는 사진은 이것뿐이다 */
 const ktoImages = computed(() => detail.value?.images ?? [])
+/** 축소본(_image3_)이 없는 사진(표본 40장 중 2장)은 원본으로 되돌린다. 원본까지 실패하면 그대로 둔다 - 무한 재시도 방지 */
+function onThumbError (e, p) {
+  if (e.target.src !== p.url) e.target.src = p.url
+}
 /* 후기 요약은 상세 API(places.rating_avg 비정규화)가 준다 - localStorage 데모 아님 */
 const reviewCount = computed(() => detail.value?.reviewCount ?? 0)
 const ratingAvg = computed(() => detail.value?.ratingAvg ?? null)
@@ -259,8 +263,11 @@ async function shareNative() {
       <!-- 장소 사진(MAP-08): 관광공사(KTO) 공식 사진만 싣는다.
            사용자 사진은 방문 후기(MAP_008)에서만 올린다 - 상세 직접 업로드(데모)는 2026-09-03 제거 -->
       <div v-if="ktoImages.length" class="pimg">
+        <!-- width/height 는 공사 사진 비율(3:2)의 96px 칸 - 받기 전에 자리를 잡아 띠가 흔들리지 않는다. lazy: 띠 밖 사진은 스크롤할 때 -->
         <img v-for="(p, i) in ktoImages" :key="p.url" :src="p.thumb" :alt="p.caption || `${s.n} 사진`"
+          width="144" height="96" loading="lazy"
           title="클릭하면 크게 보기" style="cursor:zoom-in"
+          @error="onThumbError($event, p)"
           @click="emit('open-photo', { photos: ktoImages.map(x => x.url), index: i })">
       </div>
       <div v-if="ktoImages.length && detail?.imageAttribution" class="pimg-src">

@@ -147,6 +147,18 @@ export interface MapPlaces {
   failed: LayerKey[]
 }
 
+/**
+ * 상세 사진 띠(높이 96px)에 쓸 축소본 주소.
+ * 관광공사가 사진 절반은 축소본 주소를 원본과 똑같이 준다(2026-09-12 DB: 9,354장 중 4,547장) - 그대로 쓰면
+ * 96px 칸에 940×627 원본(장당 40~104KB)이 들어간다. 공사 URL 규칙(원본 `_image2_`, 축소본 `_image3_`, 장당 6~14KB)으로
+ * 바꿔 쓴다 - 무지개해안도로 10장 592KB → 87KB. 축소본이 없는 사진(표본 40장 중 2장)은 화면의 onerror 가 원본으로 되돌린다.
+ * 다른 도메인 주소는 규칙이 없어 replace 가 아무것도 안 바꾸고 원본 그대로다. 크게 보기(라이트박스)는 원본 url 을 쓴다.
+ */
+export function thumbOf (url: string, thumbnailUrl?: string | null): string {
+  if (thumbnailUrl && thumbnailUrl !== url) return thumbnailUrl
+  return url.replace('_image2_', '_image3_')
+}
+
 export const MapPlaceService = {
   /**
    * 첫 진입 레이어를 받아온다 - 지금은 관광지 하나. 나머지는 칩을 켤 때(LAZY_LAYERS).
@@ -196,7 +208,7 @@ export const MapPlaceService = {
       const row = await apiGet<BackendPlaceDetail>(`/places/${id}`)
       const images = (row.images ?? []).map(i => ({
         url: i.url,
-        thumb: i.thumbnailUrl ?? i.url,
+        thumb: thumbOf(i.url, i.thumbnailUrl),
         caption: i.caption
       }))
       return {
