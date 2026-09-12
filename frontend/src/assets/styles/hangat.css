@@ -45,6 +45,10 @@
 #map.labels-visible .pw .lb-t{display:block}
 /* 필터 밖 관광지(흐린 핀)는 줌과 무관하게 이름표 없음 - 핀을 재사용하므로 노드를 빼지 않고 클래스로 숨긴다 */
 #map .pw .lb-t.off{display:none}
+/* 카페·편의점·숙소·마트는 줌과 무관하게 이름표 없음 - 상세 줌 시내에서 이름표가 지도를 덮는다(2026-09-12 사용자 결정 "그냥 이름을 빼자", 숙소·마트도 추가).
+   선택 핀 이름표(sel-on)는 남긴다 - 탭하면 그 자리에 이름이 뜬다. 업종 클래스는 안쪽 마커에만 있어 :has 로 래퍼를 고른다.
+   식당·착한가격·관광지는 이름표 유지 */
+#map .pw:has(.mk-cafe,.mk-cvs,.mk-stay,.mk-mart) .lb-t:not(.sel-on){display:none}
 /* 풀 핀은 자체 레이어(CustomOverlay 1개) 안에 절대배치 - 핀마다 setMap 하면 붙은 핀 수에 비례해 느려진다(실측).
    레이어는 0×0 이라 빈 곳 클릭·드래그는 지도로 간다. 숨김도 클래스로만(떼었다 붙이면 같은 비용이 다시 든다) */
 .pl-layer{position:relative;width:0;height:0}
