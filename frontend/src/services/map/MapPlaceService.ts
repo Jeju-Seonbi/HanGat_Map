@@ -131,27 +131,41 @@ interface BackendPlaceImage {
 export type LayerKey = 'spot' | 'food' | 'dine' | 'cafe' | 'cvs' | 'stay' | 'mart'
 
 /**
- * 첫 진입에 싣지 않는 대용량 레이어 (소상공인 상가 5,419곳).
- * 칩을 처음 켤 때 getLayer()로 그때 받아온다 - 안 쓰는 사람은 다운로드 비용 0.
+ * 첫 진입에 싣지 않는 레이어 = 관광지 빼고 전부.
+ * 첫 화면은 관광지 칩만 켜져 있어(state.L 기본값) 나머지는 받아 놓아도 쓰이지 않는데,
+ * 착한가격·식당·숙소 571KB 를 첫 진입마다 받고 있었다(2026-09-12 실측: Slow 4G 첫 진입 8.8초 중 약 3초).
+ * 칩을 처음 켤 때 getLayer()로 그때 받아온다(toggleLayer) - 안 켜는 사람은 다운로드 비용 0.
+ * 딥링크(findPlaceById)는 이 목록을 차례로 받아 보며 찾고, 없으면 단건 조회로 떨어진다.
  */
-export const LAZY_LAYERS: LayerKey[] = ['cafe', 'cvs', 'mart']
+export const LAZY_LAYERS: LayerKey[] = ['food', 'dine', 'stay', 'cafe', 'cvs', 'mart']
 
 export interface MapPlaces {
-  /** true = 레이어를 하나라도 받았다. false = 전부 실패(백엔드 다운) */
+  /** true = 첫 진입 레이어(관광지)를 받았다. false = 못 받았다(백엔드 다운) - 화면이 '새로고침' 안내를 띄운다 */
   live: boolean
   layers: Record<LayerKey, MapPlace[]>
   /** 이번 진입에서 못 받아온 레이어. 화면이 안내하고, 칩을 다시 켜면 그 레이어만 재시도한다 */
   failed: LayerKey[]
 }
 
+/**
+ * 상세 사진 띠(높이 96px)에 쓸 축소본 주소.
+ * 관광공사가 사진 절반은 축소본 주소를 원본과 똑같이 준다(2026-09-12 DB: 9,354장 중 4,547장) - 그대로 쓰면
+ * 96px 칸에 940×627 원본(장당 40~104KB)이 들어간다. 공사 URL 규칙(원본 `_image2_`, 축소본 `_image3_`, 장당 6~14KB)으로
+ * 바꿔 쓴다 - 무지개해안도로 10장 592KB → 87KB. 축소본이 없는 사진(표본 40장 중 2장)은 화면의 onerror 가 원본으로 되돌린다.
+ * 다른 도메인 주소는 규칙이 없어 replace 가 아무것도 안 바꾸고 원본 그대로다. 크게 보기(라이트박스)는 원본 url 을 쓴다.
+ */
+export function thumbOf (url: string, thumbnailUrl?: string | null): string {
+  if (thumbnailUrl && thumbnailUrl !== url) return thumbnailUrl
+  return url.replace('_image2_', '_image3_')
+}
+
 export const MapPlaceService = {
   /**
-   * 지도가 쓰는 레이어를 한 번에 받아온다.
-   * 레이어마다 호출이 나가지만 전부 같은 테이블이라 서버 부담은 크지 않고,
-   * 하나가 실패해도 나머지가 살아 있도록 개별로 처리한다.
+   * 첫 진입 레이어를 받아온다 - 지금은 관광지 하나. 나머지는 칩을 켤 때(LAZY_LAYERS).
+   * 목록·부분 실패 구조는 그대로 둔다 - 첫 진입 레이어가 다시 늘어도 호출부(loadPlaces)가 안 바뀌게.
    */
   async getAll (): Promise<MapPlaces> {
-    const keys: LayerKey[] = ['spot', 'food', 'dine', 'stay']   // 기본 레이어만 - 대용량은 LAZY_LAYERS
+    const keys: LayerKey[] = ['spot']
     const results = await Promise.allSettled(keys.map(k => apiGet<BackendPlace[]>(`/places?type=${k}`)))
     const layers = emptyLayers()
     const failed: LayerKey[] = []
@@ -194,7 +208,7 @@ export const MapPlaceService = {
       const row = await apiGet<BackendPlaceDetail>(`/places/${id}`)
       const images = (row.images ?? []).map(i => ({
         url: i.url,
-        thumb: i.thumbnailUrl ?? i.url,
+        thumb: thumbOf(i.url, i.thumbnailUrl),
         caption: i.caption
       }))
       return {
