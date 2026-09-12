@@ -136,8 +136,8 @@ function place(e) {
 }
 
 /* ── 묶음 핀 (축소 뷰) ──
-   레벨 10 이상은 행정 단위(읍면·시내·중문) 하나에 묶음 하나(이름표 = 단위), 그 아래는 픽셀 40px 로 이름 없이 - 관광지·착한가격·식당·숙소는
-   9까지, 카페·편의점·마트는 8까지 - 그 다음부터 전부 개별 핀 (utils/cluster).
+   레벨 10 이상은 행정 단위(읍면·시내·중문) 하나에 묶음 하나(이름표 = 단위), 그 아래는 픽셀 40px 로 이름 없이 - 관광지·착한가격·숙소는
+   9까지, 카페·편의점·마트·식당은 6까지(2km 뷰) - 그 다음부터 전부 개별 핀 (utils/cluster).
    레이어별로 따로 묶고(관광지는 관광지끼리) 묶인 핀은 숨긴다. 매 draw 마다 다시 계산한다 -
    묶음은 많아야 300개라 노드를 새로 만들어도 수 ms 이고, 날짜가 바뀌면 테두리 비율이 달라져 어차피 다시 그려야 한다 */
 let clusterNodes = []
@@ -153,7 +153,7 @@ function clusterPass(lv) {
     byGroup.get(e.group).push(e)
   }
   for (const [group, list] of byGroup) {
-    const mode = clusterModeFor(lv, group)   // 관광지·착한가격·식당·숙소는 9까지, 카페·편의점·마트는 8까지 묶는다
+    const mode = clusterModeFor(lv, group)   // 관광지·착한가격·숙소는 9까지, 카페·편의점·마트·식당은 6까지(2km 뷰) 묶는다
     if (!mode.unit && !mode.radius) continue
     const clusters = mode.unit ? clusterByUnit(list, e => e.data.unit) : clusterPins(list, mode.radius)
     // 혼자인 장소는 묶지 않고 핀 그대로 보여준다(2026-09-12 결정) - 근처에 아무도 없는 곳은 "1" 묶음보다 핀이 더 말이 된다
@@ -376,8 +376,10 @@ function drawExtras(di, sel, course, courseDay, L) {
   exSig = sig
 
   if (selPin) {
-    const pin = sel.cat === 'TOURIST'
-      ? `<div class="pn ${selTier} ic-${spotIconGroup(sel.tc)} pick" style="width:20px;height:20px"></div>`
+    // 관광지 선택 핀의 클래스·지름은 spotPinSpec 한 곳에서 - 풀 핀(pick)과 같은 모습이어야 한다
+    const sp = sel.cat === 'TOURIST' ? spotPinSpec(selTier, true, true, spotIconGroup(sel.tc)) : null
+    const pin = sp
+      ? `<div class="${sp.cls}" style="width:${sp.size}px;height:${sp.size}px"></div>`
       : `<div class="poi-marker sel-pick ${sel.good ? 'mk-food' : (CAT_MARKER[sel.cat] ?? 'mk-dine')}"></div>`
     addPin('sel', sel.y, sel.x, `<div class="lb-t sel-on">${sel.n}</div>` + pin, () => emit('select', sel), 500)
   }

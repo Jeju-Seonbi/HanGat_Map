@@ -38,9 +38,9 @@ describe('mapPresentation', () => {
   })
 
   describe('spotPinSpec - 관광지 핀 모습(핀 재사용의 변경 감지 기준)', () => {
-    it('선택·코스 정류지는 20px 최상단, 필터 안은 15px, 필터 밖은 9px 흐림', () => {
-      expect(spotPinSpec('busy', true, true)).toMatchObject({ cls: 'pn busy ic-mt pick', size: 20, z: 400 })
-      expect(spotPinSpec('calm', false, true)).toMatchObject({ cls: 'pn calm ic-mt', size: 15, z: 200 })
+    it('선택·코스 정류지는 24px 최상단, 필터 안은 18px, 필터 밖은 9px 흐림 (2026-09-12 20/15 → 24/18)', () => {
+      expect(spotPinSpec('busy', true, true)).toMatchObject({ cls: 'pn busy ic-mt pick', size: 24, z: 400 })
+      expect(spotPinSpec('calm', false, true)).toMatchObject({ cls: 'pn calm ic-mt', size: 18, z: 200 })
       expect(spotPinSpec('mid', false, false)).toMatchObject({ cls: 'pn mid ic-mt dim', size: 9, z: 100 })
     })
 
@@ -58,6 +58,8 @@ describe('mapPresentation', () => {
   it('핀 래퍼는 크기가 고정이고 풀 핀은 레이어 안 절대배치, 숨김·이름표 숨김은 클래스로 - 핀 재사용 전제', () => {
     expect(mapCss).toMatch(/\.pw\{[^}]*width:20px;height:20px/)
     expect(mapCss).toContain('#map .pw .lb-t.off{display:none}')
+    // 카페·편의점·숙소·마트는 이름표 없음(2026-09-12), 선택 핀 이름표는 예외
+    expect(mapCss).toContain('#map .pw:has(.mk-cafe,.mk-cvs,.mk-stay,.mk-mart) .lb-t:not(.sel-on){display:none}')
     expect(mapCss).toMatch(/\.pl-layer\{[^}]*width:0;height:0/)
     expect(mapCss).toMatch(/\.pw\.pl\{position:absolute;margin:-10px 0 0 -10px/)
     expect(mapCss).toContain('.pw.hid{display:none}')

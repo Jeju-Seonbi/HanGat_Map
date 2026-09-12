@@ -34,9 +34,10 @@
 #map{position:absolute;inset:0;background:var(--bg)}
 
 /* 카카오 CustomOverlay 안에서 핀과 라벨을 겹쳐 배치.
-   크기를 20px로 고정하는 이유: 카카오는 노드 크기로 앵커(중심)를 잡는데 핀을 재사용하며 점 지름을 9→15→20으로
+   크기를 20px로 고정하는 이유: 카카오는 노드 크기로 앵커(중심)를 잡는데 핀을 재사용하며 점 지름을 9→18→24로
    바꾸면 래퍼 크기가 달라져 다시 재기 전까지 핀이 몇 px 어긋난다. 래퍼는 고정, 안쪽 점만 커지고 작아진다(가운데 정렬) */
 .pw{position:relative;display:flex;align-items:center;justify-content:center;width:20px;height:20px}
+.pw>.pn,.pw>.poi-marker{flex-shrink:0}   /* 24px 선택 핀이 20px 래퍼에 가로만 눌려 20×24 타원이 되지 않게 - 가운데 정렬로 양쪽 2px 넘친다 (2026-09-12) */
 /* 핀 이름표는 상세 줌(level 7 이하)에서만 - 관광지·업종 공통. 축소 뷰의 라벨 밭 방지.
    위치는 핀 아래(2026-09-12 결정) - 아이콘이 들어간 핀 위에 이름표가 얹히면 핀이 가려 보인다 */
 .pw .lb-t{position:absolute;top:calc(100% + 5px);left:50%;transform:translateX(-50%);
@@ -44,6 +45,10 @@
 #map.labels-visible .pw .lb-t{display:block}
 /* 필터 밖 관광지(흐린 핀)는 줌과 무관하게 이름표 없음 - 핀을 재사용하므로 노드를 빼지 않고 클래스로 숨긴다 */
 #map .pw .lb-t.off{display:none}
+/* 카페·편의점·숙소·마트는 줌과 무관하게 이름표 없음 - 상세 줌 시내에서 이름표가 지도를 덮는다(2026-09-12 사용자 결정 "그냥 이름을 빼자", 숙소·마트도 추가).
+   선택 핀 이름표(sel-on)는 남긴다 - 탭하면 그 자리에 이름이 뜬다. 업종 클래스는 안쪽 마커에만 있어 :has 로 래퍼를 고른다.
+   식당·착한가격·관광지는 이름표 유지 */
+#map .pw:has(.mk-cafe,.mk-cvs,.mk-stay,.mk-mart) .lb-t:not(.sel-on){display:none}
 /* 풀 핀은 자체 레이어(CustomOverlay 1개) 안에 절대배치 - 핀마다 setMap 하면 붙은 핀 수에 비례해 느려진다(실측).
    레이어는 0×0 이라 빈 곳 클릭·드래그는 지도로 간다. 숨김도 클래스로만(떼었다 붙이면 같은 비용이 다시 든다) */
 .pl-layer{position:relative;width:0;height:0}
@@ -66,25 +71,26 @@
   font-size:11px;font-weight:700;padding:2px 8px;box-shadow:0 1px 4px rgba(30,50,80,.14);z-index:1}
 
 /* 글로우 핀 */
-.pn{border-radius:50%;border:0;box-sizing:border-box;   /* 흰 테두리 없음(2026-09-12) - 색 면적이 넓어 보이게. 구분은 반투명 글로우가 */
+.pn{border-radius:50%;border:0;box-sizing:border-box;   /* 흰 테두리는 border 가 아니라 아래 box-shadow 의 2px 흰 링 - border 로 하면 ::after 아이콘 영역(inset:0 = 패딩 박스)이 줄어 아이콘이 작아진다.
+                                                            2026-09-12 새벽에 색 면적을 위해 뺐다가, 핀을 18/24px 로 키운 뒤 같은 날 다시 넣음(사용자 요청) */
   transition:transform .15s;cursor:pointer}
 .pn:hover{transform:scale(1.18)}
 /* 혼잡 단계 색의 단일 출처 - 핀·범례 점·상세 배지·주간 카드 막대가 전부 이 값을 쓴다.
    글자용 토큰(--mid 등)은 흰 배경 대비를 위해 어둡게 만든 값이라 면(배경)에 쓰면 색이 달라 보인다 */
 .stage{--pin-calm:#00b894;--pin-mid:#ff9500;--pin-busy:#f4364c;--pin-none:#aeb8c2}
-.pn.calm{background:var(--pin-calm);box-shadow:0 0 0 4px rgba(0,184,148,.28),0 2px 6px rgba(0,0,0,.26)}
-.pn.mid{background:var(--pin-mid);box-shadow:0 0 0 4px rgba(255,149,0,.28),0 2px 6px rgba(0,0,0,.26)}
-.pn.busy{background:var(--pin-busy);box-shadow:0 0 0 5px rgba(244,54,76,.3),0 2px 7px rgba(0,0,0,.28)}
+.pn.calm{background:var(--pin-calm);box-shadow:0 0 0 2px #fff,0 0 0 6px rgba(0,184,148,.28),0 2px 6px rgba(0,0,0,.26)}
+.pn.mid{background:var(--pin-mid);box-shadow:0 0 0 2px #fff,0 0 0 6px rgba(255,149,0,.28),0 2px 6px rgba(0,0,0,.26)}
+.pn.busy{background:var(--pin-busy);box-shadow:0 0 0 2px #fff,0 0 0 7px rgba(244,54,76,.3),0 2px 7px rgba(0,0,0,.28)}
 .tier-bg.calm{background:var(--pin-calm)}
 .tier-bg.mid{background:var(--pin-mid)}
 .tier-bg.busy{background:var(--pin-busy)}
 .tier-bg.none{background:var(--none)}
-.pn.pick{box-shadow:0 0 0 7px rgba(0,184,163,.36),0 3px 11px rgba(0,0,0,.32)}
+.pn.pick{box-shadow:0 0 0 2px #fff,0 0 0 9px rgba(0,184,163,.36),0 3px 11px rgba(0,0,0,.32)}
 .pn.dim{opacity:.42;box-shadow:none}
 .lb-t{background:var(--surf);border-radius:var(--rp);padding:3px 10px;font-size:11.5px;
   font-weight:800;color:var(--tx);box-shadow:0 2px 7px rgba(30,50,80,.18);white-space:nowrap}
-.poi-marker{width:17px;height:17px;border-radius:50%;border:0;box-sizing:border-box;
-  box-shadow:0 2px 7px rgba(16,35,48,.35);cursor:pointer}
+.poi-marker{width:20px;height:20px;border-radius:50%;border:0;box-sizing:border-box;   /* 17 → 20px (2026-09-12, 관광지 핀 18과 맞춤). 흰 링은 관광지 핀과 같은 2px box-shadow */
+  box-shadow:0 0 0 2px #fff,0 2px 7px rgba(16,35,48,.35);cursor:pointer}
 /* 업종별 마커 — 혼잡 3색(민트·앰버·레드)과 겹치지 않는 색만 사용 */
 .mk-food{background:var(--pink)}
 .mk-dine{background:#7b6ef6}
@@ -94,7 +100,7 @@
 .mk-mart{background:#c2571a}
 /* 핀 아이콘 (2026-09-12 결정): 관광지는 산(기본) + 종류 묶음 6개, 업종은 필터 칩과 같은 아이콘(LayerIcon.vue 패스 그대로).
    노드를 늘리지 않고 ::after 마스크로 점 위에 그린다 - 핀 재사용(클래스 교체)과 호환, 줌 무관 항상 표시.
-   inset:0 은 테두리 안쪽(패딩 박스) 기준이라 테두리를 없앴으니 15px 핀 전체가 영역 - 72% 크기·선 1.8 아이콘(≈11px, 테두리 있을 때와 같은 크기). 9px 흐린 핀엔 안 들어가 뺀다.
+   inset:0 은 테두리 안쪽(패딩 박스) 기준이라 흰 링은 border 가 아니라 box-shadow 라 18px 핀 전체가 영역 - 72% 크기·선 1.8 아이콘(≈13px). 9px 흐린 핀엔 안 들어가 뺀다.
    관광지 묶음(ic-*)은 mapPresentation.ts spotIconGroup 이 관광공사 코드 앞자리로 정한다.
    이 블록은 scratchpad/gen_pin_icons.py 가 만든다 - 손으로 고치지 말고 스크립트를 다시 돌릴 것 */
 .pn,.poi-marker{position:relative}
@@ -497,7 +503,7 @@
   .stage.both .panel.push{left:296px}
   .stage.both .slid.s2{left:576px}}
 /* ── 결측 핀 (MAP_004 예외: 집중률 없음 = 회색, 한산 취급 금지) ── */
-.pn.none{background:#aeb8c2;box-shadow:0 0 0 3px rgba(140,150,160,.22),0 1px 4px rgba(0,0,0,.2)}
+.pn.none{background:#aeb8c2;box-shadow:0 0 0 2px #fff,0 0 0 5px rgba(140,150,160,.22),0 1px 4px rgba(0,0,0,.2)}   /* 흰 링 2px 은 다른 단계와 동일 */
 .rpin.none{background:#aeb8c2;box-shadow:0 0 0 3px rgba(140,150,160,.24),0 1px 4px rgba(0,0,0,.18)}
 /* ── 찜 (MAP_009) ── */
 .fav{font-size:16px;line-height:1;color:var(--tx3);padding:5px 9px;border-radius:var(--rp);background:var(--surf2)}

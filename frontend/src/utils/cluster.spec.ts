@@ -2,13 +2,15 @@ import { describe, expect, it } from 'vitest'
 import { clusterByUnit, clusterModeFor, clusterPins, clusterSize, dominantTier, hideDimFor } from './cluster'
 
 describe('cluster - 축소 뷰 핀 묶기', () => {
-  it('방식은 레벨·레이어로: 10 이상 행정 단위, 관광지·착한가격·식당·숙소는 9까지 픽셀 40px·8부터 개별, 카페·편의점·마트는 8까지 픽셀', () => {
+  it('방식은 레벨·레이어로: 10 이상 행정 단위, 관광지·착한가격·숙소는 9까지 픽셀 40px·8부터 개별, 카페·편의점·마트·식당은 6까지 픽셀·5부터 개별', () => {
     expect(clusterModeFor(11)).toEqual({ unit: true, radius: 0 })
     expect(clusterModeFor(10, 'cafe')).toEqual({ unit: true, radius: 0 })
     expect(clusterModeFor(9)).toEqual({ unit: false, radius: 40 })
-    for (const g of ['spot', 'food', 'dine', 'stay']) expect(clusterModeFor(8, g)).toEqual({ unit: false, radius: 0 })
-    for (const g of ['cafe', 'cvs', 'mart']) expect(clusterModeFor(8, g)).toEqual({ unit: false, radius: 40 })
-    expect(clusterModeFor(7, 'cafe')).toEqual({ unit: false, radius: 0 })
+    for (const g of ['spot', 'food', 'stay']) expect(clusterModeFor(8, g)).toEqual({ unit: false, radius: 0 })
+    for (const g of ['cafe', 'cvs', 'mart', 'dine']) {
+      for (const lv of [8, 7, 6]) expect(clusterModeFor(lv, g)).toEqual({ unit: false, radius: 40 })   // 4km~1km 뷰 - 개별이면 끊기던 구간
+      expect(clusterModeFor(5, g)).toEqual({ unit: false, radius: 0 })                                 // 1km 뷰(676개)부터 개별
+    }
     expect(clusterModeFor(4)).toEqual({ unit: false, radius: 0 })
   })
 
