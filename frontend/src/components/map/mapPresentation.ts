@@ -50,7 +50,9 @@ export function spotIconGroup (tagCode: string | null | undefined): SpotIconGrou
  */
 export function spotPinSpec (tier: string, pick: boolean, on: boolean, icon: SpotIconGroup = 'mt') {
   const cls = `pn ${tier} ic-${icon}${pick ? ' pick' : ''}${on ? '' : ' dim'}`
-  const size = pick ? 20 : on ? 15 : 9
+  // 지름: 선택 24 · 필터 안 18 · 필터 밖 9. 2026-09-12 사용자 요청으로 20/15 → 24/18(아이콘 72% = 13px, 4km 뷰에서 그림이 읽힘).
+  // 흐린 핀은 배경이라 그대로. 래퍼 .pw 는 20px 고정(앵커 기준) - 24px 선택 핀은 가운데 정렬로 양쪽 2px 넘칠 뿐 위치는 같다
+  const size = pick ? 24 : on ? 18 : 9
   const z = pick ? 400 : on ? 200 : 100
   return { cls, size, z, sig: `${cls}|${size}|${z}` }
 }

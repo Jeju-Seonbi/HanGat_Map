@@ -376,8 +376,10 @@ function drawExtras(di, sel, course, courseDay, L) {
   exSig = sig
 
   if (selPin) {
-    const pin = sel.cat === 'TOURIST'
-      ? `<div class="pn ${selTier} ic-${spotIconGroup(sel.tc)} pick" style="width:20px;height:20px"></div>`
+    // 관광지 선택 핀의 클래스·지름은 spotPinSpec 한 곳에서 - 풀 핀(pick)과 같은 모습이어야 한다
+    const sp = sel.cat === 'TOURIST' ? spotPinSpec(selTier, true, true, spotIconGroup(sel.tc)) : null
+    const pin = sp
+      ? `<div class="${sp.cls}" style="width:${sp.size}px;height:${sp.size}px"></div>`
       : `<div class="poi-marker sel-pick ${sel.good ? 'mk-food' : (CAT_MARKER[sel.cat] ?? 'mk-dine')}"></div>`
     addPin('sel', sel.y, sel.x, `<div class="lb-t sel-on">${sel.n}</div>` + pin, () => emit('select', sel), 500)
   }
