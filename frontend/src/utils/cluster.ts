@@ -1,21 +1,25 @@
 /* 축소 뷰 핀 묶기 (2026-09-12 결정, A안).
    섬 전체 뷰(레벨 10 이상)는 행정 단위(읍·면 / 제주시내 / 서귀포시내 / 중문) 하나에 묶음 하나 - 이름이 겹치지 않는다.
    픽셀 거리로만 묶으면 같은 읍면 안에 묶음이 여러 개 생겨 "서귀포시 ×3"처럼 이름이 겹쳤다(실측 52묶음 중 유일한 이름 21개).
-   한 단계 확대(레벨 8~9)부터는 화면 픽셀 거리(40px)로 묶고 이름 없이 개수만 - 확대하면 거리가 2배가 되므로 저절로 갈라진다.
-   레벨 5~7(장소 이름표 뜨는 동네 뷰)은 실제로 겹치는 것만(24px), 4 이하는 안 묶는다.
+   한 단계 확대(레벨 9 이하)부터는 화면 픽셀 거리(40px)로 묶고 이름 없이 개수만 - 확대하면 거리가 2배가 되므로 저절로 갈라진다.
+   어느 레벨까지 묶을지는 레이어별로 다르다(clusterModeFor). 그 아래는 안 묶는다.
    실측(관광지 812, 40px): 레벨 9 묶음 119+개별 18 · 8 → 184+119 · 7 → 154+319 */
 
 export interface ClusterItem { px: number; py: number }
 export interface Cluster<T extends ClusterItem> { x: number; y: number; members: T[]; name?: string }
 
 /** 레벨별·레이어별 묶음 방식. unit=true 면 행정 단위 묶기, 아니면 radius(px) 픽셀 묶기(0 이면 안 묶음).
-    관광지·착한가격·식당·숙소(각 200~970개)는 레벨 9(4km 뷰)까지만 묶고 8부터 전부 개별 핀 - 사용자가 "여기까지만 모아서" 결정(2026-09-12).
-    카페·편의점·마트(1,058~3,039개)는 8까지 묶는다. 묶음은 2곳 이상일 때만 만들고 혼자인 장소는 핀 그대로 둔다.
+    관광지·착한가격·숙소(각 200~812개)는 레벨 9(4km 뷰)까지만 묶고 8부터 전부 개별 핀 - 사용자가 "여기까지만 모아서" 결정(2026-09-12).
+    카페·편의점·마트·식당(698~3,039개)은 레벨 6(2km·1km 뷰)까지 묶고 5(1km 뷰)부터 개별 - 2026-09-12 저녁 결정.
+    처음엔 8까지였는데 카페를 켠 2km 뷰(레벨 7) 제주시에서 개별 핀 1,443개가 떠 드래그마다 멈췄다(사용자 "끊겨").
+    이름표를 빼도 핀 수 자체가 비용이라(드래그당 250ms, CSS 격리·아이콘·그림자 제거 전부 효과 0) 묶음으로만 줄일 수 있다.
+    실측(카페만, 제주시): 개별 핀 레벨 7 = 1,649개 250ms/회 · 6 = 1,225개 110ms · 5 = 676개 15ms → 5부터 개별.
+    묶음은 2곳 이상일 때만 만들고 혼자인 장소는 핀 그대로 둔다.
     그 아래는 아예 안 묶고 전부 개별 핀 - 겹치는 핀은 그 동네 뷰에선 같은 자리라는 뜻이라 그대로 둔다 */
-const DENSE_GROUPS = new Set(['cafe', 'cvs', 'mart'])
+const DENSE_GROUPS = new Set(['cafe', 'cvs', 'mart', 'dine'])
 export function clusterModeFor (level: number, group: string = 'spot'): { unit: boolean; radius: number } {
   if (level >= 10) return { unit: true, radius: 0 }
-  const minPixelLevel = DENSE_GROUPS.has(group) ? 8 : 9
+  const minPixelLevel = DENSE_GROUPS.has(group) ? 6 : 9
   return { unit: false, radius: level >= minPixelLevel ? 40 : 0 }
 }
 
