@@ -1,6 +1,6 @@
 <script setup>
 /* MAP_007 장소 상세 — 상세 화면과 후기 화면을 한 패널 안에서 전환한다 */
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import StarIcon from './StarIcon.vue'
 import ReviewSection from './ReviewSection.vue'
 import ProfileAvatar from '../common/ProfileAvatar.vue'
@@ -173,13 +173,22 @@ function jumpToBest() {
   if (best.value.k !== state.di) state.di = best.value.k
 }
 
+/* 찾기는 안내 문장을 먼저 보여주고 1초 뒤에 날짜를 옮긴다. 그 1초 안에 패널을 닫거나 다른 장소를 열면
+   예약된 이동이 그대로 실행돼 전역 날짜가 이유 없이 튀었다 - 타이머를 보관해 두고 언마운트(닫기·장소 전환) 때 취소한다(최종점검 #20) */
+let calmTimer = null
+function jumpLater(k) {
+  clearTimeout(calmTimer)
+  calmTimer = setTimeout(() => { state.di = k }, 1000)
+}
+onBeforeUnmount(() => clearTimeout(calmTimer))
+
 /** 한산한 날 찾기 — 앞으로 2주 안에서 */
 function findCalmDay() {
   if (c.value == null) {
     // 예보는 있는데 선택 날짜가 범위 밖이면 예보가 있는 날 중 최저일로 옮긴다 - '대상 아님'이라고 막지 않는다
     if (outOfRange.value && best.value.c != null) {
       hint.value = `<span style="color:var(--calm)">이 날짜는 아직 예보가 없어 예보가 있는 날 중에서 찾았어요 · <b>${fmtK(at(best.value.k))}</b>로 옮길게요.</span>`
-      setTimeout(() => { state.di = best.value.k }, 1000)
+      jumpLater(best.value.k)
       return
     }
     hint.value = forecastDown.value
@@ -201,7 +210,7 @@ function findCalmDay() {
   }
   const g = c.value - b.c, word = g >= 25 ? '훨씬' : g >= 12 ? '꽤' : '조금'
   hint.value = `<span style="color:var(--calm)"><b>${fmtK(at(b.k))}</b>로 옮기면 ${word} 한산해져요.</span>`
-  setTimeout(() => { state.di = b.k }, 1000)
+  jumpLater(b.k)
 }
 
 /** '오늘' 또는 '9월 22일' - 선택한 날이 오늘이 아닌데 '오늘'이라고 부르던 문구(#19)를 고친다 */
