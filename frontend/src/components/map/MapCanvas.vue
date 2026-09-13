@@ -419,8 +419,12 @@ function coveredInsets() {
   for (const c of document.querySelectorAll('.cond, .pop, .panel')) {
     const r = c.getBoundingClientRect()
     if (!r.width || !r.height) continue
-    if (r.width >= box.width * 0.9) bottom = Math.max(bottom, box.bottom - r.top)   // 화면 폭을 다 쓰는 아래 시트(모바일)
-    else left = Math.max(left, r.right - box.left)
+    if (r.width >= box.width * 0.9) {
+      // 화면 폭을 다 쓰는 아래 시트(모바일). 사진·소개가 늦게 도착하면 시트가 max-height(68vh)까지 자라므로 지금 높이가 아니라 최대 높이로 잡는다 -
+      // 처음 잰 높이로 맞추면 잠시 뒤 시트가 커져 핀을 덮었다
+      const maxH = parseFloat(getComputedStyle(c).maxHeight)
+      bottom = Math.max(bottom, box.bottom - r.top, Number.isFinite(maxH) ? maxH : 0)
+    } else left = Math.max(left, r.right - box.left)
   }
   return { left, bottom }
 }
@@ -495,7 +499,14 @@ onMounted(async () => {
 
   Object.assign(mapBridge, {
     ready: true,
-    panTo: (lat, lng) => map.panTo(LL(lat, lng)),
+    // 카드(필터·상세·코스)가 덮지 않는 영역의 가운데로 옮긴다 - 화면 정중앙에 두면 1280px 폭에선 중앙(640)이 상세 패널
+    // 오른쪽 가장자리(664) 뒤라 선택 핀이 가려졌다. 상세 패널은 다음 틱에 그려지므로 한 틱 뒤에 잰다(2026-09-14)
+    panTo: (lat, lng) => nextTick(() => {
+      const ins = coveredInsets()
+      const proj = map.getProjection()
+      const p = proj.containerPointFromCoords(LL(lat, lng))
+      map.panTo(proj.coordsFromContainerPoint(new kakao.maps.Point(p.x - ins.left / 2, p.y + ins.bottom / 2)))
+    }),
     zoomTo: lv => { if (map.getLevel() > lv) map.setLevel(lv) },
     fitRegion, fitPoints,
     relayout: onResize,
