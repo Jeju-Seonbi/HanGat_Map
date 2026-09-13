@@ -16,7 +16,6 @@
  *    `img-src 'self'` 로는 외부 이미지가 차단된다(vite.config.js).
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import ThemeToggle from '../layout/ThemeToggle.vue'
 import { nextHeroIndex } from '../../utils/heroCarousel.js'
 
 const props = defineProps({
@@ -93,10 +92,6 @@ onBeforeUnmount(() => {
 
     <!-- 오른쪽: 폼 캔버스 -->
     <section class="panel">
-      <div class="ptop">
-        <ThemeToggle variant="icon" />
-      </div>
-
       <div class="form">
         <div class="brand-row">
           <RouterLink v-if="backTo" :to="backTo" class="back-link" :aria-label="backLabel" :title="backLabel">
@@ -189,7 +184,6 @@ onBeforeUnmount(() => {
   display: flex; flex-direction: column;
   overflow-y: auto;
 }
-.ptop { display: flex; justify-content: flex-end; }
 
 .form { width: 100%; max-width: 420px; margin: auto; padding: var(--sp-lg) 0; }
 
@@ -197,6 +191,8 @@ onBeforeUnmount(() => {
 .back-link {
   display: inline-flex; align-items: center; justify-content: center;
   width: 44px; height: 44px; flex-shrink: 0;
+  /* SVG 내부 여백까지 보정해 화살표의 왼쪽 선을 본문에 맞춘다. 클릭 영역은 44px 유지. */
+  margin-left: -17px;
   color: var(--ac); border-radius: var(--rp);
 }
 .back-link:hover { background: var(--ac-bg); }
