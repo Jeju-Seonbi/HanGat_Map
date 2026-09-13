@@ -121,6 +121,8 @@
 .mk-stay{--ico:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='%23000'%20stroke-width='1.8'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpath%20d='M3%2019.5v-9M3%2014.2h18v5.3M21%2019.5v-5.3a2.6%202.6%200%200%200-2.6-2.6H10.4v2.6'/%3E%3Ccircle%20cx='7'%20cy='11.2'%20r='1.9'/%3E%3C/svg%3E")}
 .mk-mart{--ico:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='%23000'%20stroke-width='1.8'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Ccircle%20cx='9.6'%20cy='19.4'%20r='1.5'/%3E%3Ccircle%20cx='17.4'%20cy='19.4'%20r='1.5'/%3E%3Cpath%20d='M2.6%203.6h2.7l2.4%2011.5h11l1.9-7.7H6.5'/%3E%3C/svg%3E")}
 /* 핀 아이콘 끝 */
+/* 찜한 장소(MAP_009): 관광지·업종 핀 모두 안쪽 아이콘을 ♥ 로. 원 색(혼잡·업종)과 크기는 그대로 - 위 분류 아이콘(.ic-*, .mk-*)보다 뒤에 있어 이긴다 */
+.pn.fav,.poi-marker.fav{--ico:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='%23000'%3E%3Cpath%20d='M12%2021s-7.2-4.6-9.6-9.1C.6%208.5%202.4%204.6%206.2%204.1c2.2-.3%204.2.8%205.8%202.7%201.6-1.9%203.6-3%205.8-2.7%203.8.5%205.6%204.4%203.8%207.8C19.2%2016.4%2012%2021%2012%2021Z'/%3E%3C/svg%3E")}
 /* 착한가격 클릭 툴팁 (MAP_001: 상호·대표메뉴·가격) */
 .gp-tip{display:flex;flex-direction:column;gap:3px;background:var(--surf);border-radius:12px;
   padding:9px 13px;box-shadow:0 3px 14px rgba(30,50,80,.26);white-space:nowrap}
@@ -252,6 +254,8 @@
 .stop .tm{font-size:11px;color:var(--tx3);padding-top:3px;font-weight:600}
 .stop .hd{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .stop .hd .rpin{margin:0}
+/* 코스 패널의 업종 정류지 점 - 지도 업종 핀(.poi-marker.mk-*) 그대로, 크기만 목록에 맞춰 18px */
+.stop .hd .cpin{width:18px;height:18px;flex-shrink:0;cursor:inherit}
 .stop .nm{font-size:14px;font-weight:700}
 .stop .why{font-size:11.5px;color:var(--tx3);margin-top:3px;line-height:1.5}
 .stop .pr{font-size:11.5px;color:var(--tx2);margin-top:2px;font-weight:600}
@@ -554,8 +558,11 @@
 .catsel:focus{border-color:var(--ac);background-color:var(--surf)}
 .catsel.on{background-color:var(--ac-bg);color:var(--ac-dk)}
 /* ── 코스 일차 전환 (MAP_006) ── */
-.days{display:flex;gap:5px;margin-left:auto}
-.days .chip{padding:4px 10px}
+/* 칩은 헤더 둘째 줄 전체 폭(flex-basis:100%) - 첫 줄(제목·×)과 한 줄에 두면 3일차부터 제목이 세로로 깨졌다(최종점검 #15). 일수가 많으면 칩끼리 줄바꿈 */
+.panel .ph{flex-wrap:wrap;row-gap:9px}
+.panel .ph h3{white-space:nowrap}
+.days{display:flex;flex-wrap:wrap;gap:5px;flex:1 0 100%}
+.days .chip{padding:4px 10px;white-space:nowrap}
 /* ── 토스트 ── */
 .toast{position:fixed;left:50%;bottom:34px;transform:translateX(-50%) translateY(14px);
   background:var(--tx);color:var(--surf);font-size:13px;font-weight:600;padding:11px 20px;

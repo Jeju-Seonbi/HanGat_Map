@@ -100,6 +100,8 @@ export interface PlaceDetail {
   overview: string | null
   /** 착한가격 명단 기준일(행안부 CSV 발행일, ISO 날짜). 착한가격이 아니거나 모르면 null - 가격표 밑 출처 줄이 쓴다 */
   goodPriceBaseDate: string | null
+  /** 같은 응답에서 뽑은 장소 기본 정보(업종·권역·주소…). 코스 경유지처럼 {id,n,x,y}만 든 대체 객체로 열렸을 때 빈 칸을 채운다(최종점검 #13) */
+  place: MapPlace
 }
 
 export interface PlaceImage {
@@ -109,7 +111,8 @@ export interface PlaceImage {
 }
 
 /** 백엔드 PlaceDetailResponse 중 이 화면이 쓰는 부분 */
-interface BackendPlaceDetail {
+/** 상세 응답은 목록 응답(BackendPlace)의 상위 집합이다 - 업종·권역·주소가 그대로 들어 있다 */
+interface BackendPlaceDetail extends BackendPlace {
   restDayText: string | null
   useFeeText: string | null
   free: boolean
@@ -220,7 +223,8 @@ export const MapPlaceService = {
         images,
         imageAttribution: row.images?.[0]?.attribution ?? null,
         overview: row.overview ?? null,
-        goodPriceBaseDate: row.goodPriceBaseDate ?? null
+        goodPriceBaseDate: row.goodPriceBaseDate ?? null,
+        place: toMapPlace(row)
       }
     } catch {
       return null

@@ -49,6 +49,14 @@ describe('mapPresentation', () => {
       expect(spotPinSpec('calm', false, true, 'sea').sig).not.toBe(spotPinSpec('calm', false, true, 'mt').sig)
     })
 
+    it('찜한 장소는 fav 클래스가 붙고(아이콘만 ♥, 색·크기는 그대로) 찜/해제가 서명에 반영된다 (MAP_009, 2026-09-14)', () => {
+      const fav = spotPinSpec('mid', false, true, 'mt', true), plain = spotPinSpec('mid', false, true, 'mt', false)
+      expect(fav.cls).toBe('pn mid ic-mt fav')
+      expect(fav).toMatchObject({ size: 18, z: 200 })          // 크기·층은 찜과 무관
+      expect(fav.sig).not.toBe(plain.sig)                       // 찜 토글 때 핀이 다시 그려지는 근거
+      expect(spotPinSpec('busy', true, true, 'sea', true).cls).toBe('pn busy ic-sea pick fav')
+    })
+
     it('혼잡 단계만 달라져도 서명이 달라진다 - 날짜 이동 때 색이 갱신되는 근거', () => {
       expect(spotPinSpec('calm', false, true).sig).not.toBe(spotPinSpec('busy', false, true).sig)
       expect(spotPinSpec('calm', false, true).sig).toBe(spotPinSpec('calm', false, true).sig)
