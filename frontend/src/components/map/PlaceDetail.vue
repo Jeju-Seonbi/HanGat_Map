@@ -120,11 +120,16 @@ const ktoImages = computed(() => detail.value?.images ?? [])
 function onThumbError (e, p) {
   if (e.target.src !== p.url) e.target.src = p.url
 }
-/* 후기 요약은 상세 API(places.rating_avg 비정규화)가 준다 - localStorage 데모 아님 */
-const reviewCount = computed(() => detail.value?.reviewCount ?? 0)
+/* 후기 요약은 상세 API(places.rating_avg 비정규화)가 준다 - localStorage 데모 아님.
+   상세 API 가 죽었을 땐 후기 목록의 총 건수로 보완한다 - 둘 중 하나만 살아 있어도 "첫 후기를 남겨보세요"라고 거짓말하지 않게 */
+const reviewCount = computed(() => detail.value?.reviewCount ?? reviewPage.value?.totalElements ?? 0)
 const ratingAvg = computed(() => detail.value?.ratingAvg ?? null)
-/** 후기 첫 페이지 원본 - ReviewSection 에 그대로 넘겨 같은 요청을 두 번 보내지 않는다. null = 못 받음 */
+/** 후기 첫 페이지 원본 - ReviewSection 에 그대로 넘겨 같은 요청을 두 번 보내지 않는다. null = 아직 안 받았거나 실패 */
 const reviewPage = ref(null)
+/** 후기 목록 요청이 실패했다 - "아직 후기가 없어요"와 구분해 다시 시도를 보여준다(최종점검 #23) */
+const reviewFailed = ref(false)
+/** 상세·후기 둘 다 아직이면 칩에 건수도 "첫 후기" 문구도 내지 않는다(로딩 중 깜빡임·장애 중 거짓 빈 상태 방지) */
+const reviewsKnown = computed(() => detail.value != null || reviewPage.value != null)
 /** 하단 미리보기용 최근 3건 */
 const previewReviews = ref([])
 const rvDate = iso => { const d = new Date(iso); return `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}` }
@@ -153,13 +158,14 @@ async function fetchDetail() {
   const id = s.value.id
   const [d, rv] = await Promise.all([
     MapPlaceService.getDetail(id),
-    ReviewApiService.getReviews(id, 0).catch(() => null)
+    ReviewApiService.getReviews(id, 0).then(page => ({ page, failed: false }), () => ({ page: null, failed: true }))
   ])
   // 응답이 늦게 와도 그새 다른 장소를 열었으면 버린다
   if (s.value.id === id) {
     detail.value = d
-    reviewPage.value = rv
-    previewReviews.value = rv?.content.slice(0, 3) ?? []
+    reviewFailed.value = rv.failed
+    reviewPage.value = rv.page
+    previewReviews.value = rv.page?.content.slice(0, 3) ?? []
   }
 }
 
@@ -296,6 +302,10 @@ async function shareNative() {
             <StarIcon filled :size="15" /><span class="sc">{{ ratingAvg.toFixed(1) }}</span>
           </template>
           <span class="ct">후기 {{ reviewCount }}</span>
+        </template>
+        <template v-else-if="!reviewsKnown">
+          <StarIcon :size="15" />
+          <span class="ct" style="font-weight:700;color:var(--tx2)">후기</span>
         </template>
         <template v-else>
           <StarIcon :size="15" />
@@ -485,6 +495,10 @@ async function shareNative() {
             {{ reviewCount > 3 ? `후기 ${reviewCount}개 모두 보기 ›` : '후기 남기기 ›' }}
           </button>
         </template>
+        <template v-else-if="reviewFailed">
+          <div class="rv-none">후기를 불러오지 못했어요.</div>
+          <button class="rvp-more" @click="fetchDetail">다시 시도 ›</button>
+        </template>
         <template v-else>
           <div class="rv-none">아직 후기가 없어요.</div>
           <button class="rvp-more" @click="view = 'rv'">첫 후기 남기기 ›</button>
@@ -498,7 +512,7 @@ async function shareNative() {
         <div style="flex:1"><h4>{{ s.n }}</h4><div class="sub">방문 후기</div></div>
         <button class="pox" @click="emit('close')">×</button>
       </div>
-      <ReviewSection :place="s" :rating-avg="ratingAvg" :first-page="reviewPage"
+      <ReviewSection :place="s" :rating-avg="ratingAvg" :first-page="reviewPage" :first-page-failed="reviewFailed"
         @open-photo="p => emit('open-photo', p)" @changed="fetchDetail" />
     </div>
   </div>

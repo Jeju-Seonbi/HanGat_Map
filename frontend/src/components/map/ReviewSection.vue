@@ -15,7 +15,9 @@ const props = defineProps({
   /** 부모(PlaceDetail)가 미리보기용으로 이미 받은 후기 첫 페이지. 여기서 또 받지 않는다 -
       이 탭은 v-show 라 상세를 열 때 같이 마운트되므로 onMounted 로 받으면 같은 요청이 2번 나갔다(2026-09-12 실측).
       null 이면 부모가 못 받은 것 - 목록만 비우고 작성 폼은 살려 둔다 */
-  firstPage: { type: Object, default: null }
+  firstPage: { type: Object, default: null },
+  /** 부모의 후기 목록 요청이 실패했다 - "아직 후기가 없어요" 대신 다시 시도를 보여준다(최종점검 #23) */
+  firstPageFailed: { type: Boolean, default: false }
 })
 const emit = defineEmits(['open-photo', 'changed'])
 
@@ -64,7 +66,7 @@ async function loadMore () {
     totalPages.value = page.totalPages
     totalElements.value = page.totalElements
   } catch {
-    // 목록만 실패 - 작성 폼은 살려 둔다
+    toast('후기를 더 불러오지 못했어요')   // 목록만 실패 - 작성 폼은 살려 둔다
   } finally {
     loading.value = false
   }
@@ -244,6 +246,11 @@ async function removeReview (r) {
       </button>
     </template>
 
+    <template v-else-if="firstPageFailed">
+      <div class="rv-none">후기를 불러오지 못했어요.</div>
+      <!-- changed 는 부모가 상세·후기 첫 페이지를 다시 받는 신호 - 등록·삭제 뒤와 같은 경로 -->
+      <button class="rvchip" style="justify-content:center" @click="emit('changed')"><span class="ct">다시 시도</span></button>
+    </template>
     <div v-else class="rv-none">아직 후기가 없어요.<br>첫 방문 후기를 남겨보세요.</div>
   </div>
 </template>
