@@ -17,7 +17,10 @@ export function loadKakaoMap() {
   loading = new Promise((resolve, reject) => {
     if (!KEY) return reject(new Error('VITE_KAKAO_MAP_KEY가 비어 있어요 (.env 확인)'))
     const el = document.createElement('script')
-    el.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${KEY}&autoload=false`
+    // libraries=services 는 지도 자체엔 필요 없지만 AI코스의 장소·숙소 검색(kakaoPlaceSearchService)이 쓴다.
+    // SDK 는 한 페이지에 한 번만 붙고 코스용 로더(KakaoMapLoader.ts)는 window.kakao.maps 가 있으면 다시 안 부르므로,
+    // 지도를 먼저 연 사용자가 AI코스로 가면 services 없는 SDK 만 남아 검색이 세션 내내 실패했다(2026-09-13, 최종점검 #14)
+    el.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${KEY}&autoload=false&libraries=services`
     el.async = true
     el.onload = () => window.kakao.maps.load(() => resolve(window.kakao))
     el.onerror = () => reject(new Error('카카오맵 SDK를 불러오지 못했어요'))
