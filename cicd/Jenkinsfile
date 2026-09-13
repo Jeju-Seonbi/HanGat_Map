@@ -206,6 +206,7 @@ pipeline {
                           --build-arg VITE_TRIP_ALERTS_ENABLED=true \
                           --build-arg VITE_TRIP_NOTIFICATIONS_ENABLED=true \
                           --secret id=kakao_map_key,env=KAKAO_MAP_KEY \
+                          --no-cache \
                           --file cicd/frontend.Dockerfile \
                           --tag "$FRONTEND_IMAGE:$IMAGE_TAG" \
                           .
