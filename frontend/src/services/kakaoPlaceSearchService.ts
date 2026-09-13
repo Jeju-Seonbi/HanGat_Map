@@ -16,6 +16,7 @@ const PAGE_SIZE = 5
 const JEJU_RECT = '126.08,33.10,126.98,33.61'
 const accommodationKeyword = /(호텔|리조트|펜션|숙소|게스트하우스|게하|모텔|호스텔|스테이|콘도|민박|캠핑|야영장)/i
 const normalize = (value: string) => value.normalize('NFKC').replace(/\s+/g, '').toLocaleLowerCase('ko-KR')
+export const isSearchableKakaoQuery = (value: string) => normalize(value).length >= 2
 const isJejuPlace = (result: KakaoPlaceSearchDocument) =>
   /제주특별자치도\s*(제주시|서귀포시)/.test(`${result.address_name ?? ''} ${result.road_address_name ?? ''}`)
 const isAccommodation = (result: KakaoPlaceSearchDocument) =>
@@ -71,7 +72,7 @@ export const kakaoPlaceSearchService = {
   async search(query: string, options: { mode: KakaoPlaceSearchMode; page?: number }): Promise<KakaoPlaceSearchPage> {
     const clean = query.trim()
     const page = options.page ?? 1
-    if (clean.length < 2) return { items: [], current_page: 1, last_page: 1, total_count: 0, source: 'KAKAO' }
+    if (!isSearchableKakaoQuery(clean)) return { items: [], current_page: 1, last_page: 1, total_count: 0, source: 'KAKAO' }
     return await searchKakaoPlaces(clean, options.mode, page)
   },
 }
