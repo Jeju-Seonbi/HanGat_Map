@@ -127,10 +127,6 @@ const TABS = [
         </div>
       </div>
 
-      <p v-if="!['my-reviews', 'my-favorites', 'my-profile'].includes(route.name)" class="foot note">
-        혼잡 · 날씨 · 주소는 <b>샘플 예보</b>라 실제와 다를 수 있어요.
-        실서비스는 한국관광공사 · 행정안전부 · 기상청 자료를 씁니다.
-      </p>
     </div>
   </main>
 </template>
@@ -218,8 +214,6 @@ h1 { font-size: 28px; letter-spacing: -.03em; margin-bottom: 8px; }
   background: var(--mid-st); flex-shrink: 0;
 }
 
-.foot { margin-top: var(--sp-xl); padding-top: var(--sp-md); border-top: 1px solid var(--line); }
-.foot b { color: var(--tx2); font-weight: 700; }
 
 /* ── 좁은 화면: 시안의 `flex md:flex-col` — 탭이 가로로 눕는다 ── */
 @media (max-width: 900px) {
