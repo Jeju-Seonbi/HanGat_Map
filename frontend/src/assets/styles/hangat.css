@@ -556,8 +556,11 @@
 .catsel:focus{border-color:var(--ac);background-color:var(--surf)}
 .catsel.on{background-color:var(--ac-bg);color:var(--ac-dk)}
 /* ── 코스 일차 전환 (MAP_006) ── */
-.days{display:flex;gap:5px;margin-left:auto}
-.days .chip{padding:4px 10px}
+/* 칩은 헤더 둘째 줄 전체 폭(flex-basis:100%) - 첫 줄(제목·×)과 한 줄에 두면 3일차부터 제목이 세로로 깨졌다(최종점검 #15). 일수가 많으면 칩끼리 줄바꿈 */
+.panel .ph{flex-wrap:wrap;row-gap:9px}
+.panel .ph h3{white-space:nowrap}
+.days{display:flex;flex-wrap:wrap;gap:5px;flex:1 0 100%}
+.days .chip{padding:4px 10px;white-space:nowrap}
 /* ── 토스트 ── */
 .toast{position:fixed;left:50%;bottom:34px;transform:translateX(-50%) translateY(14px);
   background:var(--tx);color:var(--surf);font-size:13px;font-weight:600;padding:11px 20px;

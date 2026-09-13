@@ -41,8 +41,10 @@ const poiClass = o => (o?.cat === 'FOOD' && o.good ? 'mk-food' : POI_CLASS[o?.ca
 
 <template>
   <div v-if="course" class="fl panel" :class="{ push: !!state.sel }">
+    <!-- 제목·닫기가 첫 줄, 일차 칩은 둘째 줄. 한 줄에 다 넣으면 3일차부터 폭이 모자라 제목이 한 글자씩 세로로 깨졌다(최종점검 #15) -->
     <div class="ph">
       <h3>추천 코스</h3>
+      <button class="x" @click="emit('close')">×</button>
       <div class="days">
         <span class="chip" :class="{ on: state.courseDay === 'all' }"
           @click="state.courseDay = 'all'">전체</span>
@@ -50,7 +52,6 @@ const poiClass = o => (o?.cat === 'FOOD' && o.good ? 'mk-food' : POI_CLASS[o?.ca
           :class="{ on: String(state.courseDay) === String(d) }"
           @click="state.courseDay = +d">{{ d }}일차</span>
       </div>
-      <button class="x" @click="emit('close')">×</button>
     </div>
 
     <div class="pb">
