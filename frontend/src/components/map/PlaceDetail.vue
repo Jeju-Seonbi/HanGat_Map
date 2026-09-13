@@ -173,13 +173,25 @@ function findCalmDay() {
       : '<span style="color:var(--tx3)">관광공사 혼잡 예측 대상이 아니라 예보가 없는 장소예요.</span>'
     return
   }
-  const b = bestDay(s.value, state.di, 14)
+  // 요구사항(155행)대로 '오늘~+14일'에서 찾는다 - 선택한 날부터 뒤지던 것을 2026-09-13 결정(가)으로 오늘 기준에 맞춤.
+  // 팁 박스(오늘~30일)와 기준이 같아져 두 기능이 서로 다른 날을 가리키지 않는다
+  const b = bestDay(s.value, 0, 15)
+  if (b.k === state.di) {
+    hint.value = `<span style="color:var(--calm)">앞으로 2주 중엔 ${dayWord(state.di)}이 가장 한산해요.</span>`
+    return
+  }
+  if (b.c >= c.value) {
+    // 보고 있는 날(2주 밖일 수 있음)이 2주 안 최저보다 한산하면 옮기지 않는다 - 더 붐비는 날로 데려가지 않게
+    hint.value = `<span style="color:var(--calm)">앞으로 2주 안엔 ${dayWord(state.di)}보다 한산한 날이 없어요 · 2주 중 최저는 <b>${fmtK(at(b.k))}</b>이에요.</span>`
+    return
+  }
   const g = c.value - b.c, word = g >= 25 ? '훨씬' : g >= 12 ? '꽤' : '조금'
-  hint.value = b.k === state.di
-    ? '<span style="color:var(--calm)">앞으로 2주 중엔 오늘이 가장 한산해요.</span>'
-    : `<span style="color:var(--calm)"><b>${fmtK(at(b.k))}</b>로 옮기면 ${word} 한산해져요.</span>`
-  if (b.k !== state.di) setTimeout(() => { state.di = b.k }, 1000)
+  hint.value = `<span style="color:var(--calm)"><b>${fmtK(at(b.k))}</b>로 옮기면 ${word} 한산해져요.</span>`
+  setTimeout(() => { state.di = b.k }, 1000)
 }
+
+/** '오늘' 또는 '9월 22일' - 선택한 날이 오늘이 아닌데 '오늘'이라고 부르던 문구(#19)를 고친다 */
+const dayWord = k => (k === 0 ? '오늘' : fmtK(at(k)))
 
 /* 근처 대안 - 버튼을 누른 뒤엔 날짜(state.di)가 바뀔 때마다 다시 계산한다(computed).
    버튼 누른 순간의 스냅샷(ref)으로 두면 7일 카드·달력·'한산한 날 찾기'로 날짜를 옮긴 뒤에도 이전 날짜 기준 3곳이 남았다 -
@@ -337,7 +349,7 @@ async function shareNative() {
       <!-- 범위 밖 날짜여도 이 장소의 예보가 있으면 팁은 살린다 - 예보가 있는 날로 돌아갈 길 -->
       <div v-if="(c != null || outOfRange) && best.c != null && !s.closed" class="tipbox" @click="jumpToBest">
         <template v-if="outOfRange">🕐 예보가 있는 날 중엔 <b>{{ fmtK(at(best.k)) }}</b>이 가장 한산해요. 눌러서 옮겨보세요.</template>
-        <template v-else-if="!tipText">✓ 30일 중 <b>오늘이 가장 한산</b>해요.</template>
+        <template v-else-if="!tipText">✓ 30일 중 <b>{{ dayWord(state.di) }}이 가장 한산</b>해요.</template>
         <template v-else>🕐 <b>{{ fmtK(at(best.k)) }}</b>로 가면 <b>{{ tipText }}</b> 날이에요. 눌러서 옮겨보세요.</template>
       </div>
 
