@@ -206,6 +206,17 @@ public class Place {
     }
 
     /**
+     * 숨은 명소 판정 결과를 기록한다(HiddenGemScoringService). 원천 적재(updateFromSource)는 이 값을 건드리지 않는다.
+     * 점수는 판정과 무관하게 남긴다 - 화면·심사 설명서가 근거를 보여야 한다.
+     */
+    public void updateHiddenGem(BigDecimal score, boolean hiddenGem, String algorithmVersion, LocalDateTime calculatedAt) {
+        this.hiddenGemScore = score;
+        this.isHiddenGem = hiddenGem;
+        this.hiddenGemAlgorithmVersion = algorithmVersion;
+        this.hiddenGemCalculatedAt = calculatedAt;
+    }
+
+    /**
      * 출처 목록에서 두 번 연속 사라진 장소를 폐업으로 표시한다(PlacePresenceReconciler).
      * 행을 지우지 않는다 - 찜·후기·코스가 참조하고, 원천 오탐이면 다음 적재에 되살린다.
      */
@@ -261,6 +272,11 @@ public class Place {
 
     private static boolean isGoodPriceMenu(String overview) {
         return overview != null && overview.startsWith(GOOD_PRICE_MENU_PREFIX);
+    }
+
+    /** 관광공사 소개글(detailCommon2). 메뉴 문단 등 이미 있는 값은 덮지 않는다 - 가격표가 소개글로 바뀌면 안 된다 */
+    public void updateOverview(String text) {
+        if (this.overview == null && text != null) this.overview = text;
     }
 
     /** 음식점 메뉴 배치(detailIntro2)가 채운다 - 착한가격이 이미 넣은 overview는 지우지 않는다 */

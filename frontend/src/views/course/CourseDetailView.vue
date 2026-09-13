@@ -554,6 +554,12 @@ async function applySwap (alternative: AlternativePlace) {
 .course-not-found .panel{padding:64px 30px}
 .course-not-found .btn{margin-top:20px}
 @media(max-width:767px){
+  /* 버튼 4개가 한 줄에 끼면 글자가 한 자씩 세로로 접힌다 - 두 개씩 두 줄 */
+  .page-head .actions{flex-wrap:wrap;margin:18px 0 0}
+  .page-head .actions .btn{flex:1 1 calc(50% - 6px);min-width:0;padding:12px 10px;white-space:nowrap;text-align:center}
+  /* 입력칸은 한 줄 통째로, 저장·취소는 그 아래 나란히. 16px 미만이면 iOS가 포커스 때 화면을 확대한다 */
+  .rename-input{flex:1 1 100%;font-size:16px}
+  .rename-form .btn{flex:1 1 calc(50% - 4px)}
   .course-stop-head{align-items:flex-start}
   .place-detail-link{padding:6px 8px}
   .course-day-head{align-items:flex-start}

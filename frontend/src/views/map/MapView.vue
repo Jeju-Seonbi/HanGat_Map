@@ -7,7 +7,7 @@ import DatePicker from '@/components/map/DatePicker.vue'
 import PlaceDetail from '@/components/map/PlaceDetail.vue'
 import CoursePanel from '@/components/map/CoursePanel.vue'
 import PhotoLightbox from '@/components/map/PhotoLightbox.vue'
-import { state, toast, loadPlaces, findPlaceById, loadFavorites } from '@/stores/mapStore'
+import { state, toast, loadPlaces, findPlaceById, loadFavorites, placeKey } from '@/stores/mapStore'
 import { useAuthStore } from '@/stores/auth'
 
 import { at, iso, D0, FORECAST_DAYS } from '@/utils/date'
@@ -31,6 +31,8 @@ const lightbox = ref(null)
 /* 열린 패널 수만큼 날짜 버튼이 오른쪽으로 비켜난다 */
 const openCount = computed(() => (state.sel ? 1 : 0) + (state.course ? 1 : 0))
 
+/* 장소 객체로 연다. 문자열(이름)은 코스 정류지가 관광지 레이어와 매칭되지 않았을 때(CoursePanel s.f.n)만 오는 폴백 -
+   이름은 동명 장소 중 첫 번째를 고르므로 정확하지 않다. 목록·검색·근처 대안은 전부 객체를 넘긴다(2026-09-13) */
 function openPlace(nameOrSpot) {
   const s = typeof nameOrSpot === 'string' ? state.layers.spot.find(x => x.n === nameOrSpot) : nameOrSpot
   if (!s) return
@@ -158,7 +160,8 @@ const reload = () => location.reload()
     <FilterPanel :mobile-suppressed="openCount > 0"
       @open-place="openPlace" @toggle-course="toggleCourse" />
 
-    <PlaceDetail v-if="state.sel" :place="state.sel" @close="closeDetail"
+    <!-- :key 가 장소 식별자라 다른 장소를 열면 패널이 새로 만들어진다 - 탭·힌트·근처 대안·후기 목록이 이월되지 않는다 -->
+    <PlaceDetail v-if="state.sel" :key="placeKey(state.sel)" :place="state.sel" @close="closeDetail"
       @open-place="openPlace" @open-photo="p => lightbox.show(p.photos, p.index)" />
 
     <CoursePanel @close="state.course = null" @open-place="openPlace" />

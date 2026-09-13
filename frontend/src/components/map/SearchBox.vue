@@ -1,7 +1,7 @@
 <script setup>
 /* MAP_002 검색 — 로컬 즉시 필터(관광지·착한가격) + 백엔드 통합 검색(이름·메뉴, 전 카테고리)을 합쳐 보여준다 */
 import { ref, computed, watch } from 'vue'
-import { state } from '@/stores/mapStore'
+import { state, placeKey } from '@/stores/mapStore'
 
 import { crowd, tier } from '@/utils/crowd'
 import { won } from '@/utils/geo'
@@ -94,11 +94,12 @@ const showPanel = computed(() => open.value && q.value.trim().length > 0)
 
 function close() { q.value = ''; open.value = false }
 
-function pickSpot(name) { close(); emit('pick-spot', name) }
+/* 관광지는 레이어의 그 객체를 그대로 넘긴다 - 이름으로 넘기면 동명 관광지 중 첫 번째가 열린다 */
+function pickSpot(spot) { close(); emit('pick-spot', spot) }
 
 /* 착한가격·백엔드 결과는 좌표로 이동해 상세 패널까지 연다 - 핀 클릭과 같은 문법 */
 function pick(h) {
-  if (h.type === 'spot') { pickSpot(h.o.n); return }
+  if (h.type === 'spot') { pickSpot(h.o); return }
   close()
   mapBridge.panTo(h.o.y, h.o.x)
   mapBridge.zoomTo(7)
@@ -132,7 +133,7 @@ defineExpose({ close })
 
   <div class="sb-rs" :class="{ on: showPanel }">
     <template v-if="hits.length">
-      <div v-for="h in hits" :key="h.type + h.o.n" class="sr" @click="pick(h)">
+      <div v-for="h in hits" :key="h.type + placeKey(h.o)" class="sr" @click="pick(h)">
         <span class="rpin" :class="pinCls(h)"></span>
         <span class="info">
           <span class="rn">{{ h.o.n }}</span>
