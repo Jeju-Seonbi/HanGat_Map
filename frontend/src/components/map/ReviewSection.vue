@@ -52,10 +52,13 @@ watch(() => props.place.id, resetForm)
 
 /** '더보기' - 다음 페이지를 이어 붙인다 */
 async function loadMore () {
-  if (props.place.id == null) return    // 목업 장소는 후기 미지원
+  const id = props.place.id
+  if (id == null) return    // 목업 장소는 후기 미지원
   loading.value = true
   try {
-    const page = await ReviewApiService.getReviews(props.place.id, pageNo.value + 1)
+    const page = await ReviewApiService.getReviews(id, pageNo.value + 1)
+    // 응답을 기다리는 사이 다른 장소로 바뀌었으면 버린다 - 안 그러면 이전 장소의 2페이지가 새 장소 목록 뒤에 붙었다(최종점검 #24)
+    if (props.place.id !== id) return
     items.value = [...items.value, ...page.content]
     pageNo.value = page.number
     totalPages.value = page.totalPages
