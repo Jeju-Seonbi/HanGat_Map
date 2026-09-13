@@ -25,13 +25,16 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.HashSet;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
- * 후기 업무 처리 - 장소별 목록, 작성, 본인 삭제와 평점 요약을 관리한다.
+ * 후기 업무 처리 - 장소별 목록, 작성, 본인 수정·삭제와 평점 요약을 관리한다.
  * 사진 검증은 사진 서비스에 맡기고, DB 삭제 확정 후 파일 정리 이벤트를 전달한다.
  */
 @Service
@@ -117,16 +120,81 @@ public class ReviewService {
         return ReviewResponse.from(review, images, authorsOf(List.of(userId)).get(userId));
     }
 
-    /** 본인 후기만 논리 삭제하고, 커밋이 성공한 경우에만 사진 정리를 진행한다. */
+    /** 최초 작성 후 7일 이내에만 수정한다. 기존 첨부는 유지하고 새 사진만 소유권을 검증한다. */
     @Transactional
-    public void delete(Long reviewId, Long userId) {
-        Review review = reviewRepository.findById(reviewId)
+    public ReviewResponse update(Long reviewId, Long userId, ReviewCreateRequest req) {
+        Review review = ownedReviewForUpdate(reviewId, userId);
+        assertEditable(review);
+        validate(req);
+        var report = parseReport(req.getCongestionReport());
+        List<String> urls = req.getImageUrls() == null ? List.of() : req.getImageUrls();
+        if (urls.stream().anyMatch(Objects::isNull) || new HashSet<>(urls).size() != urls.size()) {
+            throw new BaseException(BaseResponseStatus.REQUEST_ERROR);
+        }
+        List<ReviewImage> previous = imageRepository.findByReviewIdOrderBySortOrder(reviewId);
+        Map<String, ReviewImage> retained = previous.stream()
+                .collect(Collectors.toMap(ReviewImage::getImageUrl, i -> i));
+        boolean changed = !Objects.equals(review.getRating(), req.getRating())
+                || !Objects.equals(review.getCongestionReport(), report)
+                || !Objects.equals(Objects.toString(review.getContent(), ""), Objects.toString(req.getContent(), ""))
+                || !previous.stream().map(ReviewImage::getImageUrl).toList().equals(urls);
+        if (!changed) {
+            return ReviewResponse.from(review, previous, authorsOf(List.of(userId)).get(userId));
+        }
+
+        // 현재 후기의 사진만 재사용할 수 있다. 다른 후기·다른 사용자의 사진은 검증에서 거절된다.
+        var added = photoService.validateAttachments(
+                urls.stream().filter(url -> !retained.containsKey(url)).toList(), userId).stream()
+                .collect(Collectors.toMap(ReviewPhotoService.Attachment::url, a -> a));
+        // 저장소 조회 중 기한이 지날 수도 있으므로 실제 변경 직전 다시 확인한다.
+        LocalDateTime now = assertEditable(review);
+        List<ReviewImage> removed = previous.stream().filter(i -> !urls.contains(i.getImageUrl())).toList();
+        imageRepository.deleteAll(removed);
+        List<ReviewImage> images = new ArrayList<>();
+        for (int i = 0; i < urls.size(); i++) {
+            String url = urls.get(i);
+            ReviewImage image = retained.get(url);
+            if (image != null) {
+                image.reorder(i);
+            } else {
+                var attachment = added.get(url);
+                image = imageRepository.save(ReviewImage.builder().review(review)
+                        .storageKey(attachment.key()).imageUrl(attachment.url()).sortOrder(i).build());
+            }
+            images.add(image);
+        }
+        review.edit(req.getRating(), report, req.getContent(), now);
+        refreshSummary(review.getPlace());
+        if (!removed.isEmpty()) {
+            events.publishEvent(new ReviewPhotosDeleted(removed.stream().map(ReviewImage::getStorageKey).toList()));
+        }
+        return ReviewResponse.from(review, images, authorsOf(List.of(userId)).get(userId));
+    }
+
+    /** 클라이언트의 버튼 표시와 무관하게 서버 시각으로 기한을 강제한다. */
+    private LocalDateTime assertEditable(Review review) {
+        LocalDateTime now = LocalDateTime.now();
+        if (!review.canEditAt(now)) {
+            throw new BaseException(BaseResponseStatus.REVIEW_EDIT_EXPIRED);
+        }
+        return now;
+    }
+
+    /** 같은 후기의 편집과 삭제는 잠금 이후 상태·소유자를 검사한다. */
+    private Review ownedReviewForUpdate(Long reviewId, Long userId) {
+        Review review = reviewRepository.findForUpdate(reviewId)
                 .filter(r -> r.getStatus() == ReviewStatus.ACTIVE)
                 .orElseThrow(() -> new BaseException(BaseResponseStatus.REVIEW_NOT_FOUND));
-        // 본인 확인 - 다른 사람 후기 id 를 넣어 지우는 것을 막는다
         if (!review.getUserId().equals(userId)) {
             throw new BaseException(BaseResponseStatus.REVIEW_FORBIDDEN);
         }
+        return review;
+    }
+
+    /** 본인 후기만 논리 삭제하고, 커밋이 성공한 경우에만 사진 정리를 진행한다. */
+    @Transactional
+    public void delete(Long reviewId, Long userId) {
+        Review review = ownedReviewForUpdate(reviewId, userId);
         review.delete();
         refreshSummary(review.getPlace());
         // 수신자는 AFTER_COMMIT이므로 DB 롤백 시 파일이 먼저 사라지지 않는다.
