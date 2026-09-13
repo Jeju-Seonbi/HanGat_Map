@@ -97,4 +97,31 @@ describe('사진 업로드', () => {
     await expect(ReviewApiService.uploadPhotos([file]))
       .rejects.toThrow('최대 5장')
   })
+
+  /* 실패 응답의 모양이 제각각이다 - 어느 경우에도 영어 오류가 토스트에 뜨지 않아야 한다 */
+  const mockFail = (status: number, body: () => unknown) =>
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status, json: async () => body() })))
+
+  it('검증 실패(400 JSON)는 서버 문구를 그대로 쓴다', async () => {
+    mockFail(400, () => ({ success: false, code: 3000, message: '입력값을 확인해주세요.' }))
+    await expect(ReviewApiService.uploadPhotos([file])).rejects.toThrow('입력값을 확인해주세요.')
+  })
+
+  it('5MB 초과(413, 본문에 message 없음)는 크기를 줄이라고 안내한다', async () => {
+    mockFail(413, () => ({ timestamp: '2026-09-13T00:00:00', status: 413, error: 'Payload Too Large', path: '/reviews/photos' }))
+    await expect(ReviewApiService.uploadPhotos([file])).rejects.toThrow('5MB 이하로 줄여 주세요')
+  })
+
+  it('JSON 이 아닌 본문(빈 413·프록시 HTML)이어도 우리 문구로 던진다 - 예전엔 "Unexpected end of JSON input" 이 떴다', async () => {
+    mockFail(413, () => { throw new SyntaxError('Unexpected end of JSON input') })
+    await expect(ReviewApiService.uploadPhotos([file])).rejects.toThrow('5MB 이하로 줄여 주세요')
+
+    mockFail(502, () => { throw new SyntaxError('Unexpected token <') })
+    await expect(ReviewApiService.uploadPhotos([file])).rejects.toThrow('잠시 후 다시 시도해 주세요')
+  })
+
+  it('연결이 끊겨 fetch 가 실패하면 영어 대신 인터넷 연결을 확인하라고 한다', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch') }))
+    await expect(ReviewApiService.uploadPhotos([file])).rejects.toThrow('인터넷 연결을 확인해 주세요')
+  })
 })

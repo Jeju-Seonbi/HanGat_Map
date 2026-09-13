@@ -550,7 +550,10 @@
 .toast{position:fixed;left:50%;bottom:34px;transform:translateX(-50%) translateY(14px);
   background:var(--tx);color:var(--surf);font-size:13px;font-weight:600;padding:11px 20px;
   border-radius:var(--rp);box-shadow:var(--sh2);opacity:0;pointer-events:none;
-  transition:opacity .2s,transform .2s;z-index:2000;white-space:nowrap}
+  transition:opacity .2s,transform .2s;z-index:2000;
+  /* 긴 문구(파일 이름이 든 사진 안내 등)는 390px 폭에서 잘리지 않고 줄을 바꾼다 - 짧은 문구는 전과 같이 한 줄.
+     left:50% 인 요소는 남은 폭(화면 절반)에 맞춰 줄을 바꾸므로 width:max-content 로 먼저 한 줄로 재고 max-width 에서만 접는다 */
+  width:max-content;max-width:calc(100vw - 32px);box-sizing:border-box;text-align:center;line-height:1.4}
 .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
 /* ── 모바일: 상세/코스 패널 = 바텀시트 (MAP_007 비고) ── */
 @media(max-width:768px){
