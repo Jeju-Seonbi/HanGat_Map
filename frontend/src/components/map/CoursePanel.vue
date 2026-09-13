@@ -6,6 +6,7 @@ import { at, fmt, D0 } from '@/utils/date'
 import { tier } from '@/utils/crowd'
 import { won } from '@/utils/geo'
 import { wxOf, wxIcon } from '@/utils/weather'
+import { poiMarkerClass } from './mapPresentation'
 
 const emit = defineEmits(['close', 'open-place'])
 const course = computed(() => state.course)
@@ -41,9 +42,8 @@ const dayRegion = d => (byDay.value[d] ?? []).map(s => s.o?.r).find(Boolean) ?? 
 const dayWeather = d => { const r = dayRegion(d); return r ? wxOf(dayK(d), r) : null }
 
 /* 정류지 점: 식당·카페·숙소는 지도 핀과 같은 업종 원+아이콘(.poi-marker.mk-*), 관광지는 혼잡 색 점.
-   전엔 업종 장소도 회색 '예보 없음' 점이라 예보가 빠진 관광지처럼 보였다(2026-09-14 결정). 착한가격 식당은 지도처럼 분홍 */
-const POI_CLASS = { FOOD: 'mk-dine', CAFE: 'mk-cafe', LODGING: 'mk-stay', CONVENIENCE: 'mk-cvs', MART: 'mk-mart' }
-const poiClass = o => (o?.cat === 'FOOD' && o.good ? 'mk-food' : POI_CLASS[o?.cat] ?? null)
+   전엔 업종 장소도 회색 '예보 없음' 점이라 예보가 빠진 관광지처럼 보였다(2026-09-14 결정). 매핑은 검색 결과와 공유(poiMarkerClass) */
+const poiClass = poiMarkerClass
 
 </script>
 

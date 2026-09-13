@@ -190,7 +190,8 @@ export const MapPlaceService = {
   },
 
   /** 통합 검색 (MAP_002) - 이름·메뉴 부분 일치 상위 20건. 화면 필터(권역·업종) 범위를 함께 보낸다. 실패하면 빈 배열. */
-  async search (q: string, opts?: { region?: string | null, categories?: string[] }): Promise<MapPlace[]> {
+  /** 통합 검색 - 정렬·범위는 서버가 정한다(2026-09-14 단일화). 실패는 null - 빈 배열(0건)과 구분해 화면이 "연결 실패"를 보여준다(최종점검 #26) */
+  async search (q: string, opts?: { region?: string | null, categories?: string[] }): Promise<MapPlace[] | null> {
     try {
       const params = new URLSearchParams({ q })
       if (opts?.region) params.set('region', opts.region)
@@ -198,7 +199,7 @@ export const MapPlaceService = {
       const rows = await apiGet<BackendPlace[]>(`/places/search?${params}`)
       return withUnits(rows.map(toMapPlace))
     } catch {
-      return []
+      return null
     }
   },
 

@@ -190,3 +190,23 @@ describe('폐업 장소', () => {
     expect(await MapPlaceService.getById(1)).toBeNull()
   })
 })
+
+describe('통합 검색 (2026-09-14 백엔드 단일화)', () => {
+  it('업종을 좁히지 않으면 categories 를 보내지 않고, 권역만 붙인다 - 결과는 목록과 같은 모양에 읍면(unit)이 붙는다', async () => {
+    mockFetch([{ ...ROW, roadAddress: '제주특별자치도 제주시 애월읍 애월로 1' }])
+    const rows = await MapPlaceService.search('스타벅스', { region: 'NORTH' })
+    const url = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string
+    expect(url).toContain('/places/search?q=')
+    expect(url).toContain('region=NORTH')
+    expect(url).not.toContain('categories=')
+    expect(rows).toHaveLength(1)
+    expect(rows![0]).toMatchObject({ c: '카페', unit: '애월읍' })
+  })
+
+  it('실패하면 null - 빈 배열(0건)과 구분해 화면이 "연결하지 못했어요"를 보여준다(#26)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('down')))
+    expect(await MapPlaceService.search('국수')).toBeNull()
+    mockFetch([])
+    expect(await MapPlaceService.search('없는이름')).toEqual([])
+  })
+})
