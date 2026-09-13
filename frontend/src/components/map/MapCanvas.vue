@@ -2,7 +2,7 @@
 import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { loadKakaoMap } from '@/composables/useKakaoLoader'
 import { mapBridge } from '@/composables/mapBridge'
-import { state, inFilter, inRegion, placeKey } from '@/stores/mapStore'
+import { state, inFilter, inRegion, placeKey, isFav } from '@/stores/mapStore'
 import MapPlaceService, { hasCoords } from '@/services/map/MapPlaceService'
 
 import { crowd, tier } from '@/utils/crowd'
@@ -321,7 +321,7 @@ function draw() {
     const e = ensurePin(key, 'spot', s)
     e.data = s
     const pick = !!(inCourse(s) || (sel && placeKey(sel) === placeKey(s)))
-    const spec = spotPinSpec(L.crowd ? tier(crowd(s, di)) : 'calm', pick, on, spotIconGroup(s.tc))
+    const spec = spotPinSpec(L.crowd ? tier(crowd(s, di)) : 'calm', pick, on, spotIconGroup(s.tc), isFav(s))
     const sig = spec.sig + '|' + s.n
     if (sig !== e.sig) {
       e.sig = sig
@@ -345,7 +345,9 @@ function draw() {
       seen.add(key)
       const e = ensurePin(key, g, f)
       e.data = f
-      if (e.sig !== f.n) { e.sig = f.n; e.lb.textContent = f.n }
+      const fav = isFav(f)
+      const sig = f.n + (fav ? '|fav' : '')
+      if (e.sig !== sig) { e.sig = sig; e.lb.textContent = f.n; e.dot.classList.toggle('fav', fav) }
       e.wanted = true
     }
   }
@@ -367,7 +369,7 @@ function drawExtras(di, sel, course, courseDay, L) {
     && !(course && course.stops.some(cs => cs.o === sel)))
   const selTier = sel?.cat === 'TOURIST' ? (L.crowd ? tier(crowd(sel, di)) : 'calm') : ''
   const sig = [
-    selPin ? `${sel.id ?? sel.n}|${selTier}` : '',
+    selPin ? `${sel.id ?? sel.n}|${selTier}|${isFav(sel) ? 'fav' : ''}` : '',
     course ? course.stops.map(s => (s.o ? `${s.o.id ?? s.o.n}@${s.d}` : '')).join(',') : '',
     courseDay,
     course && sel ? (sel.id ?? sel.n) : '',   // 번호 핀의 pick 강조
@@ -378,10 +380,10 @@ function drawExtras(di, sel, course, courseDay, L) {
 
   if (selPin) {
     // 관광지 선택 핀의 클래스·지름은 spotPinSpec 한 곳에서 - 풀 핀(pick)과 같은 모습이어야 한다
-    const sp = sel.cat === 'TOURIST' ? spotPinSpec(selTier, true, true, spotIconGroup(sel.tc)) : null
+    const sp = sel.cat === 'TOURIST' ? spotPinSpec(selTier, true, true, spotIconGroup(sel.tc), isFav(sel)) : null
     const pin = sp
       ? `<div class="${sp.cls}" style="width:${sp.size}px;height:${sp.size}px"></div>`
-      : `<div class="poi-marker sel-pick ${sel.good ? 'mk-food' : (CAT_MARKER[sel.cat] ?? 'mk-dine')}"></div>`
+      : `<div class="poi-marker sel-pick ${sel.good ? 'mk-food' : (CAT_MARKER[sel.cat] ?? 'mk-dine')}${isFav(sel) ? ' fav' : ''}"></div>`
     addPin('sel', sel.y, sel.x, `<div class="lb-t sel-on">${sel.n}</div>` + pin, () => emit('select', sel), 500)
   }
 
@@ -516,7 +518,7 @@ onBeforeUnmount(() => {
 
 /* 상태가 바뀌면 다시 적용한다. 지도 자체는 새로 만들지 않는다 */
 watch(() => [state.di, state.sel, state.course, state.courseDay, state.F.reg, state.F.cat,
-  ...Object.values(state.L)], draw, { deep: true })
+  ...Object.values(state.L), state.favIds], draw, { deep: true })   // favIds: 찜/해제 즉시 핀 아이콘이 ♥ 로 바뀌게
 /* 레이어 배열 자체가 바뀔 때(진입·칩 재요청·재진입 재적재)도 본다 - 장소는 API로 비동기로 오므로 지도가 먼저 뜨고
    데이터가 나중에 도착한다. 이걸 빼면 첫 렌더 때 빈 배열로 그린 뒤 다시 그리지 않아 지도에 핀이 하나도 안 찍힌다.
    forecastVersion 도 함께 본다 - 예보는 장소보다 늦게 도착해 series 를 뒤늦게 채운다.
