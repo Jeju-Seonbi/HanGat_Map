@@ -124,7 +124,8 @@ public class SecurityConfig {
                 // 운영 및 API 문서
                 .requestMatchers(
                         "/actuator/health",
-                        "/actuator/health/**"
+                        "/actuator/health/**",
+                        "/actuator/info"
                 ).permitAll()
                 .requestMatchers(
                         "/v3/api-docs/**",
