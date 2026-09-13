@@ -89,10 +89,18 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
                                                            @Param("goodPrice") Boolean goodPrice);
 
     /**
-     * 통합 검색 (MAP_002) - 이름·메뉴(overview) 부분 일치. 화면의 필터(권역·업종 칩) 범위 안에서만 찾는다.
+     * 통합 검색 (MAP_002) - 이름·세부분류(태그)·메뉴(overview) 부분 일치. 권역은 화면 칩 범위, 업종은 호출부가 정한다.
      * 좌표 없는 장소는 뺀다: 결과 클릭 = 지도 이동이라 좌표가 필수다.
-     * 이름 일치를 메뉴 일치보다 앞세운다 - 검색 엔진 없이 내는 최소한의 연관도.
      * overview는 CLOB이라 SELECT에는 여전히 싣지 않고(§9.1) 조건으로만 쓴다.
+     *
+     * <p><b>2026-09-14 검색을 백엔드로 단일화</b>(프론트가 받아 둔 관광지를 따로 뒤지던 것을 없앰):
+     * <ul>
+     *   <li>태그 매칭 추가 - "오름"·"해변"처럼 세부분류로 찾는 건 프론트 로컬에서만 되던 것.</li>
+     *   <li>overview 매칭은 <b>업소(관광지 외)만</b> - 관광지 소개글은 긴 문장이라 "라면"이 "…이라면…"에 걸려
+     *       서건도·수산봉이 라면 검색에 나왔다. 업소 overview 는 "대표메뉴: …" 형태라 메뉴 검색으로 쓸 만하다.</li>
+     *   <li>정렬 확정 - 이름 > 태그 > 메뉴, 같은 급이면 관광지 먼저(혼잡 예보가 있는 제품의 중심), 그 안에서 접두 > 포함 > 짧은 이름.
+     *       "오름"은 개오름·금오름(관광지)이 오름가든(식당)보다 위, "성산"은 성산일출봉이 지점명들보다 위.</li>
+     * </ul>
      *
      * <p><b>{@code :q}는 서비스가 LIKE 특수문자를 이스케이프한 값이어야 한다</b>({@code PlaceService#escapeLike}).
      * 사용자가 친 {@code %}·{@code _}가 그대로 들어가면 "아무 글자"로 해석돼 {@code %%}만 쳐도 전부 매칭된다.
@@ -102,23 +110,29 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
 
              and p.latitude is not null and p.longitude is not null
              and (:region is null or r.code = :region)
-             and (p.name like concat('%', :q, '%') escape '!' or p.overview like concat('%', :q, '%') escape '!')""";
+             and (p.name like concat('%', :q, '%') escape '!'
+                  or t.name like concat('%', :q, '%') escape '!'
+                  or (c.code <> 'TOURIST' and p.overview like concat('%', :q, '%') escape '!'))""";
 
-    /** 접두 일치 > 이름 포함 > 메뉴 매칭, 같은 급이면 짧은 이름 우선 - "성산" 검색에 성산일출봉이 성산점 지점명보다 위로 온다. */
+    /** 이름 > 태그 > 메뉴 → 관광지 먼저 → 접두 > 포함 → 짧은 이름. 위 javadoc 참고.
+     *  이름 길이는 "[유네스코 세계자연유산]" 같은 괄호 주석을 뺀 본이름으로 잰다 - 안 그러면 "성산" 검색에 성산일출봉이 성산포성당 뒤로 밀린다 */
     String SEARCH_ORDER = """
 
-            order by case when p.name like concat(:q, '%') escape '!' then 0
-                          when p.name like concat('%', :q, '%') escape '!' then 1
+            order by case when p.name like concat('%', :q, '%') escape '!' then 0
+                          when t.name like concat('%', :q, '%') escape '!' then 1
                           else 2 end,
-                     length(p.name), p.id""";
+                     case when c.code = 'TOURIST' then 0 else 1 end,
+                     case when p.name like concat(:q, '%') escape '!' then 0 else 1 end,
+                     case when locate('[', p.name) > 0 then locate('[', p.name) - 1 else length(p.name) end,
+                     p.id""";
 
-    /** 업종 칩이 하나도 없거나 전부 켜진 상태 - 카테고리 조건 없이 찾는다. */
+    /** 카테고리 조건 없이 찾는다 - 지도 검색창의 기본 경로(2026-09-14부터 업종 칩과 무관하게 전체 검색). */
     @Query(LIST_SELECT + SEARCH_WHERE + SEARCH_ORDER)
     List<PlaceListResponse> searchList(@Param("q") String q,
                                        @Param("region") String region,
                                        Pageable pageable);
 
-    /** 켜진 업종 칩의 카테고리 안에서만. JPQL의 in은 빈 목록을 못 받아 쿼리를 나눈다 - 분기는 서비스가 한다. */
+    /** 카테고리를 좁혀 찾는다(API 파라미터로 남겨 둔다). JPQL의 in은 빈 목록을 못 받아 쿼리를 나눈다 - 분기는 서비스가 한다. */
     @Query(LIST_SELECT + SEARCH_WHERE + " and c.code in :categories" + SEARCH_ORDER)
     List<PlaceListResponse> searchListInCategories(@Param("q") String q,
                                                    @Param("region") String region,
