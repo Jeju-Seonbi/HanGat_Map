@@ -4,7 +4,7 @@ import { ref, computed, watch } from 'vue'
 import StarIcon from './StarIcon.vue'
 import ReviewSection from './ReviewSection.vue'
 import ProfileAvatar from '../common/ProfileAvatar.vue'
-import { state, toggleFav, isFav, toast } from '@/stores/mapStore'
+import { state, toggleFav, isFav, toast, placeKey } from '@/stores/mapStore'
 
 import { crowd, tier, tierKo, rank30, bestDay, CROWD_KO } from '@/utils/crowd'
 import { at, fmtK } from '@/utils/date'
@@ -123,7 +123,10 @@ const reviewPage = ref(null)
 const previewReviews = ref([])
 const rvDate = iso => { const d = new Date(iso); return `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}` }
 
-watch(() => props.place.n, loadDetail, { immediate: true })
+/* 감시 키는 id(placeKey) - 이름으로 보면 동명 장소(카페 A→B, 관광지 보롬왓→카페 보롬왓)로 바꿔도 안 깨어나
+   이전 장소의 사진·소개·메뉴·휴무·후기가 그대로 남았다. MapView 가 :key 로 패널을 새로 만들기도 하지만
+   같은 인스턴스에서 place 가 바뀌는 경로가 생겨도 안전하게 여기서도 본다 */
+watch(() => placeKey(props.place), loadDetail, { immediate: true })
 
 async function loadDetail() {
   view.value = 'info'
@@ -166,7 +169,7 @@ function findCalmDay() {
 
 const nearby = ref([])
 function findNearby() {
-  nearby.value = state.layers.spot.filter(x => x.n !== s.value.n)
+  nearby.value = state.layers.spot.filter(x => placeKey(x) !== placeKey(s.value))   // 자기 자신만 뺀다 - 동명 다른 장소는 대안 후보
     .map(x => ({ s: x, c: crowd(x, state.di), d: dist(s.value, x) }))
     .filter(o => o.d < 12 && o.c != null && o.c < 40)
     .sort((a, b) => a.c - b.c).slice(0, 3)
@@ -395,7 +398,7 @@ async function shareNative() {
           근처에 한산한 곳이 있어요 ·
           <template v-for="(o, i) in nearby" :key="o.s.n">
             <a style="color:var(--calm);cursor:pointer;font-weight:700"
-              @click="emit('open-place', o.s.n)">{{ o.s.n }}</a><template v-if="i < nearby.length - 1">, </template>
+              @click="emit('open-place', o.s)">{{ o.s.n }}</a><template v-if="i < nearby.length - 1">, </template>
           </template>
         </template>
       </div>

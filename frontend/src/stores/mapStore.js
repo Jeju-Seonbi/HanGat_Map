@@ -195,6 +195,12 @@ export async function loadPlaces () {
   }
 }
 
+/** 장소 식별자 - id 가 있으면 id, 없으면(목업·검색 API 임시 객체) 이름.
+    상세 갱신 감시·패널 key·선택 강조·목록 key 가 전부 이걸 쓴다. 이름은 식별자가 못 된다:
+    같은 이름 장소가 310그룹 802곳(스타벅스 35·씨유 44, 관광지↔카페 동명 보롬왓·거문오름·미깡창고).
+    이름으로 감시하던 시절엔 카페 A→카페 B 로 바꿔도 상세를 다시 안 받아 이전 장소의 사진·메뉴가 남았다(2026-09-13) */
+export const placeKey = p => (p?.id ?? p?.n)
+
 /** 지역·종류 필터를 함께 적용 */
 export const inFilter = s =>
   (state.F.reg === '전체' || s.r === state.F.reg) && (!state.F.cat || s.c === state.F.cat)

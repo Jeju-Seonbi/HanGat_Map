@@ -37,6 +37,18 @@ beforeEach(() => {
 })
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals() })
 
+describe('placeKey - 장소 식별자는 이름이 아니라 id', () => {
+  it('id 가 있으면 id, 없으면 이름 - 같은 이름의 다른 장소는 키가 다르고 목업(id 없음)은 이름으로 구분한다', async () => {
+    const s = await freshStore()
+    const starbucksA = { id: 6723, n: '스타벅스', r: '북부' }
+    const starbucksB = { id: 6725, n: '스타벅스', r: '북부' }
+    expect(s.placeKey(starbucksA)).toBe(6723)
+    expect(s.placeKey(starbucksA)).not.toBe(s.placeKey(starbucksB))   // 이름으로 감시하면 여기서 상세가 안 바뀌었다
+    expect(s.placeKey({ n: '목업 장소' })).toBe('목업 장소')
+    expect(s.placeKey(null)).toBeUndefined()
+  })
+})
+
 describe('loadPlaces 재진입 재사용 (성능 B 커밋 1)', () => {
   it('첫 진입은 장소·예보·날씨를 한 번씩 받는다', async () => {
     const s = await freshStore()
