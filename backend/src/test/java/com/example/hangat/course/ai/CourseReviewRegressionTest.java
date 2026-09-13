@@ -15,16 +15,32 @@ class CourseReviewRegressionTest {
 
     private CourseAiInputDto input(int days, List<String> selected,
             List<CourseAiInputDto.RequiredCandidateConstraintDto> required) {
+        return input(days, selected, required, List.of(candidate("a"), candidate("b"), candidate("c")));
+    }
+
+    private CourseAiInputDto input(int days, List<String> selected,
+            List<CourseAiInputDto.RequiredCandidateConstraintDto> required,
+            List<CourseAiInputDto.CandidateFactDto> candidates) {
         return new CourseAiInputDto("2.0",
                 new CourseAiInputDto.TripConstraintDto(start, start.plusDays(days - 1), Transport.PUBLIC_TRANSIT),
                 new CourseAiInputDto.SoftPreferencesDto(List.of("EAST"), selected),
                 new CourseAiInputDto.HardConstraintsDto(required), null,
-                List.of(candidate("a"), candidate("b"), candidate("c")), List.of(), List.of(), null);
+                candidates, List.of(), List.of(), null);
     }
 
     private CourseAiInputDto.CandidateFactDto candidate(String id) {
         return new CourseAiInputDto.CandidateFactDto(id, id, "EAST", "TOURIST",
                 List.of("PHOTO", "NATURE"), List.of(), null, null);
+    }
+
+    private CourseAiInputDto.CandidateFactDto food(String id) {
+        return new CourseAiInputDto.CandidateFactDto(id, id, "EAST", "FOOD",
+                List.of(), List.of(), null, null);
+    }
+
+    private CourseAiInputDto.CandidateFactDto cafe(String id) {
+        return new CourseAiInputDto.CandidateFactDto(id, id, "EAST", "CAFE",
+                List.of("CAFE"), List.of(), null, null);
     }
 
     private CourseAiResultDto result(CourseAiResultDto.DayDto... days) {
@@ -88,5 +104,38 @@ class CourseReviewRegressionTest {
         assertThat(CourseSchedulePolicy.dwellMinutes(List.of("PHOTO", "NATURE"), List.of("NATURE", "PHOTO"), "TOURIST")).isEqualTo(120);
         assertThat(CourseSchedulePolicy.dwellMinutes(List.of("PHOTO"), List.of("NATURE"), "TOURIST")).isEqualTo(90);
         assertThat(CourseSchedulePolicy.dwellMinutes(List.of(), List.of("NATURE"), "CAFE")).isEqualTo(60);
+    }
+
+    @Test void cafeStyleRejectsFoodOnlyResultWhenConfirmedCafeCandidateExists() {
+        var input = input(1, List.of("CAFE"), List.of(),
+                List.of(food("restaurant"), cafe("cafe")));
+        assertThatThrownBy(() -> validator.validate(input, dayResult("restaurant")))
+                .isInstanceOfSatisfying(CourseAiValidationException.class,
+                        e -> assertThat(e.getCode()).isEqualTo(CourseAiValidationCode.AI_RESULT_SELECTED_STYLE_MISSING));
+    }
+
+    @Test void deterministicFallbackIncludesCafeForCafeOnlyAndMultipleStyles() {
+        var candidates = List.of(food("restaurant"), candidate("nature"), cafe("cafe"));
+        for (var styles : List.of(List.of("CAFE"), List.of("NATURE", "CAFE"))) {
+            var input = input(1, styles, List.of(), candidates);
+            var fallback = new DeterministicCourseFallback().generate(input);
+            assertThat(fallback.days().get(0).items()).extracting(CourseAiResultDto.ItemDto::candidateId)
+                    .contains("cafe");
+            assertThatCode(() -> validator.validate(input, fallback)).doesNotThrowAnyException();
+        }
+    }
+
+    @Test void cafeStyleDoesNotReclassifyRestaurantOrSilentlyRelaxWhenNoCafeCandidateExists() {
+        var input = input(1, List.of("CAFE"), List.of(), List.of(food("restaurant")));
+        assertThatThrownBy(() -> validator.validate(input, dayResult("restaurant")))
+                .isInstanceOfSatisfying(CourseAiValidationException.class,
+                        e -> assertThat(e.getCode()).isEqualTo(CourseAiValidationCode.AI_RESULT_SELECTED_STYLE_MISSING));
+        assertThatThrownBy(() -> new DeterministicCourseFallback().generate(input))
+                .isInstanceOf(CourseAiException.class);
+    }
+
+    private CourseAiResultDto dayResult(String id) {
+        return result(new CourseAiResultDto.DayDto(start,
+                List.of(new CourseAiResultDto.ItemDto(id, LocalTime.of(10, 0), "확인된 후보"))));
     }
 }
