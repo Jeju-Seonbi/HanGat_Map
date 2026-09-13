@@ -12,7 +12,6 @@ import com.example.hangat.course.model.enums.CourseType;
 import com.example.hangat.course.repository.CourseRepository;
 import com.example.hangat.map.model.entity.PlaceSourceMapping;
 import com.example.hangat.map.model.entity.Place;
-import com.example.hangat.map.model.entity.Region;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -78,18 +77,9 @@ public class CourseAccommodationService {
     public KakaoAccommodationProvider.VerifiedAccommodation verifyGeneratedAccommodation(
             AccommodationDto accommodation, CourseService.ComputedCourse computed) {
         if (accommodation == null) return null;
-        var candidates = computed.facts().candidates().stream().collect(java.util.stream.Collectors.toMap(
-                candidate -> candidate.identity().candidateId(), candidate -> candidate));
-        // 기존 숙소 추천과 동일하게 일정 순서의 권역별 첫 장소를 기준점으로 사용한다.
-        List<Place> anchors = computed.result().days().stream()
-                .flatMap(day -> day.items().stream())
-                .map(item -> candidates.get(item.candidateId()))
-                .map(candidate -> Place.builder()
-                        .region(Region.builder().code(candidate.regionCode()).build())
-                        .latitude(candidate.place().latitude()).longitude(candidate.place().longitude()).build())
-                .toList();
-        return kakaoAccommodationProvider.verify(anchors,
-                accommodation.getSourceCode(), accommodation.getSourcePlaceId());
+        return kakaoAccommodationProvider.verifySelected(
+                accommodation.getSourceCode(), accommodation.getSourcePlaceId(),
+                accommodation.getLatitude(), accommodation.getLongitude());
     }
 
     /** 검증된 숙소 매핑도 코스·작업·알림과 같은 트랜잭션에서 저장한다. */

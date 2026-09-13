@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { transitTotal, transitState, type TransitDay } from '../../services/course/transitRoute'
-const props = defineProps<{ day?: TransitDay; loading: boolean; error: string }>()
+import { transitTotal, transitState, type TransitDay, type TransitEdge } from '../../services/course/transitRoute'
+const props = defineProps<{ day?: TransitDay; expectedEdges?: TransitEdge[]; loading: boolean; error: string }>()
 const state = computed(() => transitState(props.day, props.loading, props.error))
 </script>
 <template>
@@ -11,7 +11,7 @@ const state = computed(() => transitState(props.day, props.loading, props.error)
     <p v-else-if="state === 'DISABLED'">대중교통 경로 조회가 아직 활성화되지 않았어요.</p>
     <p v-else-if="state === 'FAILED'">대중교통 경로 정보를 불러오지 못했어요.</p>
     <p v-else-if="state === 'UNQUERIED'">아직 조회된 경로 정보가 없어요.</p>
-    <p v-else-if="day">총 이동 {{ transitTotal(day) }}</p>
+    <p v-else-if="day">총 이동 {{ transitTotal(day, expectedEdges) }}</p>
   </section>
 </template>
 <style scoped>
