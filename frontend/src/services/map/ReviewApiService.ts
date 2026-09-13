@@ -15,7 +15,7 @@ import {
 /** backendClient(JS)의 추론 타입에 body 가 빠져 있어 여기서 시그니처를 못 박는다 */
 const apiRequest = rawApiRequest as (
   path: string,
-  opts?: { method?: string, body?: unknown, auth?: boolean, retryAuth?: boolean }
+  opts?: { method?: string, body?: unknown, auth?: boolean, retryAuth?: boolean, sessionBound?: boolean }
 ) => Promise<never>
 
 /** 후기 목록 한 번에 받는 개수 - "더 보기" 단위. 백엔드 상한 20 안이어야 한다(넘으면 400). 2026-09-07 6 → 10 */
@@ -35,6 +35,8 @@ export interface ReviewItem {
   content: string | null
   imageUrls: string[]
   createdAt: string
+  editedAt?: string | null
+  editableUntil?: string | null
 }
 
 export interface ReviewPage {
@@ -83,13 +85,24 @@ export const ReviewApiService = {
     return apiRequest(`/places/${placeId}/reviews`, { method: 'POST', body: input, auth: true })
   },
 
+  /** 수정 - 최초 작성 후 7일 이내, 계정 전환 시 재전송하지 않는다. */
+  update (reviewId: number, input: ReviewCreateInput): Promise<ReviewItem> {
+    return apiRequest(`/reviews/${reviewId}`, { method: 'PUT', body: input, auth: true, sessionBound: true })
+  },
+
   /** 삭제 - 작성자 본인만 */
   remove (reviewId: number): Promise<void> {
     return apiRequest(`/reviews/${reviewId}`, { method: 'DELETE', auth: true })
   },
 
   /** 사진 업로드 → URL 배열. 작성 요청의 imageUrls 로 넘긴다 */
-  async uploadPhotos (files: File[]): Promise<string[]> {
+  async uploadPhotos (files: File[], { sessionBound = false } = {}): Promise<string[]> {
+    // 편집 중 계정이 바뀌면 다른 계정으로 사진을 재전송하지 않는다.
+    if (sessionBound) {
+      const form = new FormData()
+      files.forEach(f => form.append('files', f))
+      return apiRequest('/reviews/photos', { method: 'POST', body: form, auth: true, sessionBound: true })
+    }
     const send = async (): Promise<Response> => {
       const form = new FormData()
       files.forEach(f => form.append('files', f))

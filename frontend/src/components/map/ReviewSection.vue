@@ -4,6 +4,8 @@ import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import StarIcon from './StarIcon.vue'
 import ProfileAvatar from '../common/ProfileAvatar.vue'
+import ReviewEditDialog from '../review/ReviewEditDialog.vue'
+import { useReviewEditWindow } from '@/composables/useReviewEditWindow.js'
 import { toast } from '@/stores/mapStore'
 import { useAuthStore } from '@/stores/auth.js'
 import ReviewApiService, { LEVEL_TO_KEY, absUrl } from '@/services/map/ReviewApiService'
@@ -75,7 +77,15 @@ const counts = computed(() => {
   return c
 })
 const total = computed(() => (counts.value.calm + counts.value.mid + counts.value.busy) || 1)
-const myId = computed(() => ReviewApiService.myUserId())
+const myId = computed(() => auth.user?.userId ?? null)
+const editing = ref(null)
+const { canEdit } = useReviewEditWindow()
+watch([() => props.place.id, () => auth.user?.userId], () => { editing.value = null }, { flush: 'sync' })
+function onEdited() {
+  editing.value = null
+  emit('changed')
+  toast('후기를 저장했어요')
+}
 
 const dateOf = iso => { const d = new Date(iso); return `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}` }
 
@@ -202,9 +212,11 @@ async function removeReview (r) {
           <ProfileAvatar :src="r.profileImageUrl" :nickname="r.nickname" />
           <!-- 탈퇴 등으로 닉네임이 없으면(null) 익명 표기로 대체한다 -->
           <span class="rv-nm">{{ r.nickname ?? `여행자${r.userId}` }}</span>
-          <span class="rv-dt">{{ dateOf(r.createdAt) }} 작성</span>
-          <button v-if="myId === r.userId" class="rv-del" aria-label="내 후기 삭제"
-            @click="removeReview(r)">삭제</button>
+          <span class="rv-dt">{{ dateOf(r.createdAt) }} 작성 <span v-if="r.editedAt">(수정)</span></span>
+          <span v-if="myId === r.userId" class="rv-actions">
+            <button v-if="canEdit(r)" class="rv-edit" aria-label="내 후기 수정" @click="editing = r">수정</button>
+            <button class="rv-del" aria-label="내 후기 삭제" @click="removeReview(r)">삭제</button>
+          </span>
         </div>
         <div class="rv-mt">
           <template v-if="r.rating"><StarIcon v-for="n in 5" :key="n" :filled="n <= r.rating" :size="12" /></template>
@@ -227,10 +239,13 @@ async function removeReview (r) {
     </template>
 
     <div v-else class="rv-none">아직 후기가 없어요.<br>첫 방문 후기를 남겨보세요.</div>
+    <ReviewEditDialog v-if="editing" :key="editing.id" :review="editing" @close="editing = null" @saved="onEdited" />
   </div>
 </template>
 
 <style scoped>
-.rv-del{margin-left:auto;background:none;border:0;color:var(--tx3);font-size:11px}
+.rv-actions{margin-left:auto;display:flex;gap:8px;flex-shrink:0}
+.rv-del,.rv-edit{background:none;border:0;color:var(--tx3);font-size:11px;padding:6px 0}
+.rv-edit:hover{color:var(--ac-dk)}
 .rv-del:hover{color:#b02c2c}
 </style>
