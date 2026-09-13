@@ -28,6 +28,12 @@ const TO_LEVEL = { calm: 'QUIET', mid: 'NORMAL', busy: 'CROWDED' }
 const FROM_LEVEL = LEVEL_TO_KEY
 
 const MAX_PHOTOS = 5
+/* 서버(ImageValidator)가 받는 기준과 같다 - 5MB 이하, JPG·PNG·WEBP. 고르는 순간 걸러야
+   등록 버튼을 누른 뒤에야 "입력값을 확인해주세요"(서버 문구)를 보는 일이 없다 */
+const MAX_PHOTO_BYTES = 5 * 1024 * 1024
+const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+/* 브라우저가 type 을 못 채우는 경우(일부 윈도우의 webp)는 확장자로 본다 */
+const isPhotoType = f => PHOTO_TYPES.includes(f.type) || (!f.type && /\.(jpe?g|png|webp)$/i.test(f.name))
 
 /* ── 목록 ── */
 const items = ref([])
@@ -90,10 +96,18 @@ function resetForm () {
 function onFiles (e) {
   const remain = MAX_PHOTOS - photos.value.length
   if (remain <= 0) { toast(`사진은 최대 ${MAX_PHOTOS}장까지예요`); e.target.value = ''; return }
-  for (const f of [...e.target.files].slice(0, remain)) {
+  const picked = [...e.target.files]
+  const ok = picked.filter(f => f.size <= MAX_PHOTO_BYTES && isPhotoType(f))
+  for (const f of ok.slice(0, remain)) {
     photos.value.push({ file: f, preview: URL.createObjectURL(f) })
   }
-  if (e.target.files.length > remain) toast(`사진은 최대 ${MAX_PHOTOS}장까지예요`)
+  if (ok.length > remain) toast(`사진은 최대 ${MAX_PHOTOS}장까지예요`)
+  // 서버가 거절할 파일은 빼고 나머지만 담았다고 알린다. 토스트는 한 번에 하나라 첫 파일 이름과 나머지 장수만 적는다
+  const bad = picked.filter(f => !ok.includes(f))
+  if (bad.length) {
+    const why = bad[0].size > MAX_PHOTO_BYTES ? '5MB가 넘는 사진은 뺐어요' : 'JPG·PNG·WEBP 사진만 올릴 수 있어요'
+    toast(`${why} · ${bad[0].name}${bad.length > 1 ? ` 외 ${bad.length - 1}장` : ''}`)
+  }
   e.target.value = ''
 }
 
@@ -158,7 +172,7 @@ async function removeReview (r) {
       <button v-if="photos.length < MAX_PHOTOS" class="rv-phadd" @click="fileInput.click()">
         사진<br>{{ photos.length }}/{{ MAX_PHOTOS }}
       </button>
-      <input ref="fileInput" type="file" accept="image/*" multiple style="display:none" @change="onFiles">
+      <input ref="fileInput" type="file" accept="image/jpeg,image/png,image/webp" multiple style="display:none" @change="onFiles">
     </div>
 
     <div class="rv-in">

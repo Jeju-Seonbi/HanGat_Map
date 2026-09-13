@@ -296,6 +296,16 @@
 .map-offline button{background:var(--ac);color:#fff;border-radius:8px;padding:6px 11px;
   font-size:12px;font-weight:800}
 .map-offline button:hover{filter:brightness(.95)}
+/* 카카오 SDK 실패 안내 - 지도 영역 가운데. 전엔 스타일이 없어 좌상단 맨 글자로 찍혀 왼쪽 패널·날짜 버튼에 가려졌다(최종점검 #52).
+   z 70: 패널(왼쪽)·날짜 버튼(위)보다 아래지만 가운데는 비어 있어 겹치지 않는다 */
+.map-fail{position:absolute;inset:0;z-index:70;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:10px;padding:24px;text-align:center;background:var(--bg);word-break:keep-all}
+.map-fail>b{font-size:16px;font-weight:800;color:var(--tx)}
+.map-fail>span{max-width:360px;font-size:13px;line-height:1.6;color:var(--tx2)}
+.map-fail button{margin-top:2px;background:var(--ac);color:var(--on-ac);border-radius:10px;padding:10px 18px;font-size:13px;font-weight:800}
+.map-fail button:hover{filter:brightness(.95)}
+.map-fail small{max-width:420px;margin-top:6px;font-size:11.5px;line-height:1.55;color:var(--tx3)}
+.map-fail small b{color:var(--tx2);word-break:break-all}
 .pox{color:var(--tx3);font-size:17px;line-height:1;padding:2px 5px}
 .lead{font-size:13px;line-height:1.65;margin-bottom:12px}
 .lead b{font-weight:800}
@@ -550,7 +560,10 @@
 .toast{position:fixed;left:50%;bottom:34px;transform:translateX(-50%) translateY(14px);
   background:var(--tx);color:var(--surf);font-size:13px;font-weight:600;padding:11px 20px;
   border-radius:var(--rp);box-shadow:var(--sh2);opacity:0;pointer-events:none;
-  transition:opacity .2s,transform .2s;z-index:2000;white-space:nowrap}
+  transition:opacity .2s,transform .2s;z-index:2000;
+  /* 긴 문구(파일 이름이 든 사진 안내 등)는 390px 폭에서 잘리지 않고 줄을 바꾼다 - 짧은 문구는 전과 같이 한 줄.
+     left:50% 인 요소는 남은 폭(화면 절반)에 맞춰 줄을 바꾸므로 width:max-content 로 먼저 한 줄로 재고 max-width 에서만 접는다 */
+  width:max-content;max-width:calc(100vw - 32px);box-sizing:border-box;text-align:center;line-height:1.4}
 .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
 /* ── 모바일: 상세/코스 패널 = 바텀시트 (MAP_007 비고) ── */
 @media(max-width:768px){
