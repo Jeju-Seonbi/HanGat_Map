@@ -1,7 +1,6 @@
 <script setup>
 /* MAP-09 후기 — 실 API. 열람은 누구나, 작성·삭제는 회원만 (JWT) */
-import { ref, computed, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, watch, nextTick } from 'vue'
 import StarIcon from './StarIcon.vue'
 import ProfileAvatar from '../common/ProfileAvatar.vue'
 import { toast } from '@/stores/mapStore'
@@ -16,11 +15,12 @@ const props = defineProps({
   /** 부모(PlaceDetail)가 미리보기용으로 이미 받은 후기 첫 페이지. 여기서 또 받지 않는다 -
       이 탭은 v-show 라 상세를 열 때 같이 마운트되므로 onMounted 로 받으면 같은 요청이 2번 나갔다(2026-09-12 실측).
       null 이면 부모가 못 받은 것 - 목록만 비우고 작성 폼은 살려 둔다 */
-  firstPage: { type: Object, default: null }
+  firstPage: { type: Object, default: null },
+  /** 부모의 후기 목록 요청이 실패했다 - "아직 후기가 없어요" 대신 다시 시도를 보여준다(최종점검 #23) */
+  firstPageFailed: { type: Boolean, default: false }
 })
 const emit = defineEmits(['open-photo', 'changed'])
 
-const router = useRouter()
 const auth = useAuthStore()
 
 /* 화면 키(calm/mid/busy) → 서버 레벨 */
@@ -54,16 +54,19 @@ watch(() => props.place.id, resetForm)
 
 /** '더보기' - 다음 페이지를 이어 붙인다 */
 async function loadMore () {
-  if (props.place.id == null) return    // 목업 장소는 후기 미지원
+  const id = props.place.id
+  if (id == null) return    // 목업 장소는 후기 미지원
   loading.value = true
   try {
-    const page = await ReviewApiService.getReviews(props.place.id, pageNo.value + 1)
+    const page = await ReviewApiService.getReviews(id, pageNo.value + 1)
+    // 응답을 기다리는 사이 다른 장소로 바뀌었으면 버린다 - 안 그러면 이전 장소의 2페이지가 새 장소 목록 뒤에 붙었다(최종점검 #24)
+    if (props.place.id !== id) return
     items.value = [...items.value, ...page.content]
     pageNo.value = page.number
     totalPages.value = page.totalPages
     totalElements.value = page.totalElements
   } catch {
-    // 목록만 실패 - 작성 폼은 살려 둔다
+    toast('후기를 더 불러오지 못했어요')   // 목록만 실패 - 작성 폼은 살려 둔다
   } finally {
     loading.value = false
   }
@@ -111,13 +114,19 @@ function onFiles (e) {
   e.target.value = ''
 }
 
+/* 비로그인으로 등록을 누르면 화면 가운데 안내만 띄운다 - 로그인 화면으로 보내지 않는다(2026-09-13 결정).
+   전엔 토스트를 띄우자마자 /login 으로 보내 토스트는 안 보이고, 로그인 뒤엔 홈으로 떨어져 보던 장소가 사라졌다(최종점검 #22) */
+const loginAsk = ref(false)
+const askOk = ref(null)
+async function askLogin () {
+  loginAsk.value = true
+  await nextTick()
+  askOk.value?.focus()          // 확인 버튼에 포커스 - Enter·Esc 로 바로 닫힌다
+}
+
 async function submit () {
   if (!canSubmit.value) return
-  if (!auth.isLoggedIn) {
-    toast('로그인하면 후기를 남길 수 있어요')
-    router.push({ name: 'login', query: { redirect: '/map' } })
-    return
-  }
+  if (!auth.isLoggedIn) { askLogin(); return }
   submitting.value = true
   try {
     const imageUrls = photos.value.length
@@ -180,6 +189,17 @@ async function removeReview (r) {
       <button :disabled="!canSubmit" @click="submit">{{ submitting ? '등록 중…' : '등록' }}</button>
     </div>
 
+    <!-- 비로그인 등록 시 가운데 안내. body 로 옮겨 그리는 이유는 달력(DatePicker)과 같다 - 모바일 바텀시트 안에서 fixed 가 시트 기준이 되지 않게 -->
+    <Teleport to="body">
+      <div v-if="loginAsk" class="rv-ask-bd" @click.self="loginAsk = false" @keydown.esc="loginAsk = false">
+        <div class="rv-ask" role="alertdialog" aria-modal="true" aria-labelledby="rv-ask-title">
+          <b id="rv-ask-title">로그인이 필요해요</b>
+          <p>후기는 로그인을 하셔야 남길 수 있어요</p>
+          <button ref="askOk" type="button" @click="loginAsk = false">확인</button>
+        </div>
+      </div>
+    </Teleport>
+
     <template v-if="items.length">
       <div class="rv-sum">
         <StarIcon filled :size="15" />
@@ -226,6 +246,11 @@ async function removeReview (r) {
       </button>
     </template>
 
+    <template v-else-if="firstPageFailed">
+      <div class="rv-none">후기를 불러오지 못했어요.</div>
+      <!-- changed 는 부모가 상세·후기 첫 페이지를 다시 받는 신호 - 등록·삭제 뒤와 같은 경로 -->
+      <button class="rvchip" style="justify-content:center" @click="emit('changed')"><span class="ct">다시 시도</span></button>
+    </template>
     <div v-else class="rv-none">아직 후기가 없어요.<br>첫 방문 후기를 남겨보세요.</div>
   </div>
 </template>
@@ -233,4 +258,12 @@ async function removeReview (r) {
 <style scoped>
 .rv-del{margin-left:auto;background:none;border:0;color:var(--tx3);font-size:11px}
 .rv-del:hover{color:#b02c2c}
+/* 비로그인 안내 - Teleport 로 body 에 그리므로 hangat.css(@scope .map-shell) 밖. 달력 백드롭과 같은 z·톤 */
+.rv-ask-bd{position:fixed;inset:0;z-index:2500;background:rgba(15,25,35,.45);display:flex;align-items:center;justify-content:center;padding:20px}
+.rv-ask{background:var(--surf);color:var(--tx);border-radius:18px;box-shadow:var(--sh2);width:300px;max-width:100%;
+  padding:22px 20px 18px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:8px;word-break:keep-all}
+.rv-ask b{font-size:15.5px;font-weight:800;letter-spacing:-.02em}
+.rv-ask p{margin:0;font-size:13px;line-height:1.55;color:var(--tx2)}
+.rv-ask button{margin-top:8px;min-width:120px;padding:10px 18px;border-radius:11px;background:var(--ac);color:var(--on-ac);font-size:13px;font-weight:800}
+.rv-ask button:hover{filter:brightness(.95)}
 </style>
