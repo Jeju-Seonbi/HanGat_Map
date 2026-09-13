@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref, watch } from 'vue'
-import { kakaoPlaceSearchService, type KakaoPlaceSearchMode } from '../../services/kakaoPlaceSearchService'
+import { onBeforeUnmount, ref } from 'vue'
+import { isSearchableKakaoQuery, kakaoPlaceSearchService, type KakaoPlaceSearchMode } from '../../services/kakaoPlaceSearchService'
+import { createKakaoPlaceSearchInput } from '../../services/course/kakaoPlaceSearchInput'
 import type { KakaoPlaceSearchResult } from '../../assets/types/course'
 import KakaoPagination from './KakaoPagination.vue'
 
@@ -19,12 +20,11 @@ const searched = ref(false)
 const failed = ref(false)
 const currentPage = ref(1)
 const lastPage = ref(1)
-let debounceTimer: ReturnType<typeof setTimeout> | undefined
 let searchToken = 0
 
 async function search(page: number) {
   const clean = query.value.trim()
-  if (clean.length < 2) return
+  if (!isSearchableKakaoQuery(clean)) return
   const token = ++searchToken
   loading.value = true
   failed.value = false
@@ -42,21 +42,34 @@ async function search(page: number) {
   }
 }
 
-watch(query, value => {
+function resetForQueryChange() {
   emit('queryChange')
-  if (debounceTimer) clearTimeout(debounceTimer)
   searchToken += 1
   results.value = []
   searched.value = false
   failed.value = false
   currentPage.value = 1
   lastPage.value = 1
-  if (value.trim().length < 2) {
-    loading.value = false
-    return
-  }
-  debounceTimer = setTimeout(() => { void search(1) }, 280)
-})
+  loading.value = false
+}
+
+const searchInput = createKakaoPlaceSearchInput(resetForQueryChange, () => { void search(1) })
+
+function onInput(event: Event) {
+  const value = (event.currentTarget as HTMLInputElement).value
+  query.value = value
+  searchInput.input(value)
+}
+
+function onCompositionStart() {
+  searchInput.compositionStart()
+}
+
+function onCompositionEnd(event: CompositionEvent) {
+  const completed = (event.currentTarget as HTMLInputElement).value
+  query.value = completed
+  searchInput.compositionEnd(completed)
+}
 
 function choose(item: KakaoPlaceSearchResult) {
   emit('select', { ...item })
@@ -74,12 +87,13 @@ function reset() {
 }
 
 defineExpose({ reset })
-onBeforeUnmount(() => { if (debounceTimer) clearTimeout(debounceTimer) })
+onBeforeUnmount(() => searchInput.dispose())
 </script>
 
 <template>
   <div class="kakao-place-search">
-    <input v-model="query" type="search" autocomplete="off" :placeholder="placeholder">
+    <input :value="query" type="search" autocomplete="off" :placeholder="placeholder"
+      @input="onInput" @compositionstart="onCompositionStart" @compositionend="onCompositionEnd">
     <small class="field-help">2글자 이상 입력하면 제주 지역 후보를 정확도 순으로 검색해요.</small>
     <div v-if="loading" class="search-status">{{ loadingText }}</div>
     <div v-else-if="failed" class="search-status search-error">장소 검색에 실패했어요. <button type="button" @click="search(currentPage)">다시 시도</button></div>

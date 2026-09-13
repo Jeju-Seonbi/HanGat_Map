@@ -22,6 +22,7 @@ import com.example.hangat.map.model.entity.Place;
 import com.example.hangat.map.model.entity.PlaceCategory;
 import com.example.hangat.map.model.entity.PlaceSourceMapping;
 import com.example.hangat.map.model.entity.Region;
+import com.example.hangat.map.goodprice.KakaoLocalClient.KakaoPlace;
 import com.example.hangat.map.repository.DataSourceRepository;
 import com.example.hangat.map.repository.PlaceCategoryRepository;
 import com.example.hangat.map.repository.PlaceRepository;
@@ -37,6 +38,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -72,12 +74,14 @@ class CoursePersistenceServiceTest {
     private PlaceCategoryRepository categoryRepository;
     @Autowired
     private DataSourceRepository dataSourceRepository;
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
     void setUpReferences() {
         courseItemRepository.deleteAll();
-        mappingRepository.deleteAll();
         courseRepository.deleteAll();
+        mappingRepository.deleteAll();
         placeRepository.deleteAll();
         categoryRepository.deleteAll();
         regionRepository.deleteAll();
@@ -89,8 +93,34 @@ class CoursePersistenceServiceTest {
                 .code("TOURIST").name("관광지").displayOrder((short) 1).build());
         categoryRepository.save(PlaceCategory.builder()
                 .code("CAFE").name("카페").displayOrder((short) 2).build());
+        categoryRepository.save(PlaceCategory.builder()
+                .code("LODGING").name("숙박").displayOrder((short) 3).build());
         dataSourceRepository.save(dataSource("KTO", (short) 1));
         dataSourceRepository.save(dataSource("KAKAO_LOCAL", (short) 2));
+    }
+
+    @Test
+    void persistsVerifiedAccommodationIdentityOnTheGeneratedCourse() throws Exception {
+        CourseCandidate candidate = candidate(
+                "candidate-kto-1001", null, "KTO", "1001", "성산일출봉",
+                null, null, "EAST", "TOURIST", UserConstraint.none(), "A01");
+        Region region = regionRepository.findByCode("EAST").orElseThrow();
+        var verified = new KakaoAccommodationProvider.VerifiedAccommodation(
+                new KakaoPlace("hotel-real-1", "선택 숙소", "제주 지번", "제주 도로명",
+                        new BigDecimal("33.4000000"), new BigDecimal("126.5000000"),
+                        "AD5", "숙박", null, null, 1000), region);
+
+        CoursePersistenceResult persisted = persistenceService.persist(
+                request(), facts(candidate), result("candidate-kto-1001", "2026-08-27", "09:00"),
+                metadata(GenerationReason.INITIAL, null), verified);
+
+        String storedIdentity = jdbcTemplate.queryForObject("""
+                SELECT CONCAT(m.source_code, ':', m.source_place_id)
+                FROM courses c
+                JOIN place_source_mappings m ON m.id = c.accommodation_source_mapping_id
+                WHERE c.id = ?
+                """, String.class, persisted.course().getId());
+        assertThat(storedIdentity).isEqualTo("KAKAO_LOCAL:hotel-real-1");
     }
 
     @Test

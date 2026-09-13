@@ -1,6 +1,6 @@
 import { describe,it,expect,vi } from 'vitest'
 import { apiRequest } from '../../api/backendClient.js'
-import { useTransitRoute,transitTotal,transitSignature,minutes, type TransitRoute } from './transitRoute'
+import { expectedTransitEdges, transitTopologyMatches, useTransitRoute,transitTotal,transitSignature,minutes, type TransitRoute } from './transitRoute'
 import type { CourseResult } from '../../assets/types/course'
 vi.mock('../../api/backendClient.js',()=>({apiRequest:vi.fn()}))
 vi.mock('../../api/notifications.js',()=>({ASYNC_COURSES_ENABLED:true}))
@@ -17,8 +17,27 @@ describe('course-only transit routes',()=>{
  })
  it('uses provider totals, preserves real zero and incomplete totals',()=>{
    expect(transitTotal(response.days[0])).toBe('36분 · 5.0km')
+   expect(transitTotal(response.days[0], [{ from_id: 'ACCOMMODATION', to_id: '1' }, { from_id: '1', to_id: '2' }])).toBe('일부 구간 정보 없음')
+   expect(transitTotal(response.days[0], [{ from_id: '1', to_id: '2' }])).toBe('36분 · 5.0km')
    expect(minutes(0)).toBe('0분');expect(minutes(null)).toBe('정보 없음')
    expect(transitTotal({...response.days[0],legs:[{...response.days[0].legs[0],status:'NO_RESULTS',duration_seconds:null}]})).toBe('일부 구간 정보 없음')
+ })
+ it('detects a stale accommodation when the server route snapshot has tourist legs only',()=>{
+   const twoItems={...structuredClone(course),days:[{...structuredClone(course.days[0]),items:[
+     {...course.days[0]!.items[0],id:394,position:1},
+     {...course.days[0]!.items[0],id:395,position:2},
+   ]}]} as CourseResult
+   const hotelCourse={...twoItems,accommodation:{source_code:'KAKAO_LOCAL',source_place_id:'hotel',place_name:'롯데호텔 제주',latitude:33.4,longitude:126.5}} as CourseResult
+   const touristOnly={...response,course_id:15,days:[{...response.days[0],legs:[{
+     ...response.days[0]!.legs[0],from:{id:'ITEM:394',name:'김녕요트투어'},to:{id:'ITEM:395',name:'해녀촌'},
+   }]}]} as TransitRoute
+   expect(expectedTransitEdges(hotelCourse,1)).toEqual([
+     {from_id:'ACCOMMODATION',to_id:'ITEM:394'},
+     {from_id:'ITEM:394',to_id:'ITEM:395'},
+     {from_id:'ITEM:395',to_id:'ACCOMMODATION'},
+   ])
+   expect(transitTopologyMatches(hotelCourse,touristOnly)).toBe(false)
+   expect(transitTopologyMatches(twoItems,touristOnly)).toBe(true)
  })
  it('deduplicates concurrent loads and drops late old schedule response after swap',async()=>{
    let resolve!:(r:TransitRoute)=>void
