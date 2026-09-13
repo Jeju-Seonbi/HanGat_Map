@@ -17,6 +17,7 @@ const emit = defineEmits(['select', 'blank-click'])
 const el = ref(null)
 const failed = ref('')
 const origin = location.origin
+const reload = () => location.reload()
 let map = null
 
 /* ── 핀 풀 + 자체 레이어 (성능: 오버레이 재사용) ──
@@ -504,11 +505,14 @@ watch(() => [state.layers, ...Object.values(state.layers), state.forecastVersion
 
 <template>
   <div id="map" ref="el">
-    <div v-if="failed" class="map-fail">
-      지도를 불러오지 못했어요.
-      <span>{{ failed }}<br>
-        카카오 개발자 콘솔에 <b>{{ origin }}</b> 도메인이 등록됐는지,
-        제품 설정 &gt; 카카오맵이 켜져 있는지 확인해 주세요.</span>
+    <!-- 카카오 SDK 실패 안내. 사용자 행동(새로고침)을 먼저, 개발자용 단서(도메인·제품 설정)는 아래 작게 -
+         배포 직후 도메인 미등록 때 제일 먼저 보는 화면이라 origin 은 남긴다(최종점검 #50·#52) -->
+    <div v-if="failed" class="map-fail" role="alert">
+      <b>지도를 불러오지 못했어요</b>
+      <span>{{ failed }} · 인터넷 연결을 확인하고 다시 시도해 주세요</span>
+      <button type="button" @click="reload">새로고침</button>
+      <small>계속 안 되면 카카오 개발자 콘솔에 <b>{{ origin }}</b> 도메인이 등록됐는지,
+        제품 설정 &gt; 카카오맵이 켜져 있는지 확인해 주세요.</small>
     </div>
   </div>
 </template>
