@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { loadKakaoMap } from '@/composables/useKakaoLoader'
 import { mapBridge } from '@/composables/mapBridge'
 import { state, inFilter, inRegion, placeKey } from '@/stores/mapStore'
@@ -409,21 +409,43 @@ function drawExtras(di, sel, course, courseDay, L) {
   }
 }
 
-/** 좌측 카드·우측 패널에 가리지 않도록 여백을 주고 맞춘다 (화면이 좁으면 비율로 축소) */
+/** 지도 위에 떠 있는 카드(필터·상세·코스)가 덮는 영역 - 데스크톱은 왼쪽에 나란히, 모바일은 아래 시트.
+    전엔 "왼쪽 340 + 오른쪽 380" 고정값이었는데 코스 패널은 오른쪽이 아니라 왼쪽 두 번째 자리라 코스 핀이 패널 뒤에 숨었다(최종점검 #12) */
+function coveredInsets() {
+  const box = el.value.getBoundingClientRect()
+  let left = 0, bottom = 0
+  for (const c of document.querySelectorAll('.cond, .pop, .panel')) {
+    const r = c.getBoundingClientRect()
+    if (!r.width || !r.height) continue
+    if (r.width >= box.width * 0.9) bottom = Math.max(bottom, box.bottom - r.top)   // 화면 폭을 다 쓰는 아래 시트(모바일)
+    else left = Math.max(left, r.right - box.left)
+  }
+  return { left, bottom }
+}
+
+/** 카드에 가리지 않도록 여백을 주고 맞춘다. 패널은 다음 틱에 그려지므로(v-if) 한 틱 뒤에 잰다 */
 function fitPoints(pts, minLevel) {
   if (!map || !pts?.length) return
-  const W = el.value.clientWidth, H = el.value.clientHeight
-  if (!W || !H) return
   if (pts.length === 1) {
     map.setCenter(LL(pts[0][0], pts[0][1]))
     if (map.getLevel() > (minLevel || 6)) map.setLevel(minLevel || 6)
     return
   }
-  const b = new kakao.maps.LatLngBounds()
-  pts.forEach(p => b.extend(LL(p[0], p[1])))
-  const left = Math.min(340, Math.round(W * 0.26)), right = Math.min(380, Math.round(W * 0.28))
-  const top = Math.min(90, Math.round(H * 0.14)), bottom = Math.min(130, Math.round(H * 0.18))
-  map.setBounds(b, top, right, bottom, left)
+  nextTick(() => {
+    if (!map || !el.value) return
+    const W = el.value.clientWidth, H = el.value.clientHeight
+    if (!W || !H) return
+    const b = new kakao.maps.LatLngBounds()
+    pts.forEach(p => b.extend(LL(p[0], p[1])))
+    const ins = coveredInsets()
+    // 여백은 카드 끝 + 24px. 카드가 화면의 2/3를 넘게 덮으면(좁은 창) 그 이상은 양보하지 않는다 - 지도가 우표만큼 남는 것보단 낫다
+    const left = Math.min(Math.round(W * 0.66), ins.left ? ins.left + 24 : Math.min(340, Math.round(W * 0.26)))
+    const right = 56   // 오른쪽엔 줌 컨트롤뿐
+    const top = Math.min(90, Math.round(H * 0.14))
+    // 모바일 시트는 화면 2/3를 덮는다 - 남은 띠(최소 100px)에 맞추면 줌이 한두 단계 더 빠질 뿐, 시트 뒤에 핀을 숨기는 것보단 낫다
+    const bottom = Math.min(H - top - 100, Math.max(Math.min(130, Math.round(H * 0.18)), ins.bottom + 24))
+    map.setBounds(b, top, right, bottom, left)
+  })
 }
 
 function fitRegion() {
