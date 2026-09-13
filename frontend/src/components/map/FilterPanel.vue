@@ -114,8 +114,12 @@ function toggleCourse() {
 
       <div class="rows">
         <div v-if="state.loading" class="empty">장소를 불러오는 중이에요…</div>
+        <!-- 빈 이유를 구분한다: 장소 못 받음 / 예보 못 받음 / 선택 날짜가 예보 범위 밖 / 진짜로 조건에 맞는 곳 없음 (2026-09-13) -->
         <div v-else-if="!rankedRows.length" class="empty">
-          {{ state.live ? '이 조건에는 혼잡 예보가 있는 곳이 없어요' : '장소 데이터를 불러오지 못했어요 · 새로고침해 주세요' }}
+          {{ !state.live ? '장소 데이터를 불러오지 못했어요 · 새로고침해 주세요'
+            : forecastDown ? '혼잡 예보를 불러오지 못했어요 · 새로고침해 주세요'
+            : (state.forecastUntil >= 0 && state.di > state.forecastUntil) ? `${fmtK(at(state.forecastUntil))} 이후는 아직 혼잡 예보가 없어요`
+            : '이 조건에는 혼잡 예보가 있는 곳이 없어요' }}
         </div>
         <!-- 혼잡 상태는 왼쪽 핀 색으로만 표시한다 (오른쪽 뱃지와 의미가 중복되어 제거) -->
         <div v-for="(o, i) in rankedRows" :key="placeKey(o.s)" class="row" :class="o.t"

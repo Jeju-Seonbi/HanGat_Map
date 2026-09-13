@@ -36,6 +36,12 @@ const t = computed(() => tier(c.value))
    관광지는 예보가 없어도 왜 없는지 말해야 하므로 리드를 유지한다 (MAP_004) */
 const hasForecast = computed(() => Array.isArray(s.value.series) && s.value.series.some(v => v != null))
 const crowdUi = computed(() => hasForecast.value || s.value.cat === 'TOURIST')
+/* 값이 없는(c == null) 이유는 셋이고 문구가 달라야 한다(2026-09-13, 최종점검 #4):
+   ① 예보 API 자체를 못 받음(forecastDays 0) ② 이 장소는 예보가 있는데 선택 날짜가 범위 밖(outOfRange)
+   ③ 원래 관광공사 예측 대상이 아님. 전엔 ①②도 ③ 문구("예측 대상이 아니라")로 나가 성산일출봉이 10월 초에 '대상 아님'이 됐다 */
+const forecastDown = computed(() => state.forecastDays === 0)
+const outOfRange = computed(() => hasForecast.value && c.value == null)
+const untilText = computed(() => (state.forecastUntil >= 0 ? fmtK(at(state.forecastUntil)) : null))
 
 /* 리드 문장은 그 장소의 30일 예보 안에서의 순위만 말한다 — 다른 장소와 비교하지 않는다 */
 const rankText = computed(() => {
@@ -156,7 +162,15 @@ function jumpToBest() {
 /** 한산한 날 찾기 — 앞으로 2주 안에서 */
 function findCalmDay() {
   if (c.value == null) {
-    hint.value = '<span style="color:var(--tx3)">관광공사 혼잡 예측 대상이 아니라 예보가 없는 장소예요.</span>'
+    // 예보는 있는데 선택 날짜가 범위 밖이면 예보가 있는 날 중 최저일로 옮긴다 - '대상 아님'이라고 막지 않는다
+    if (outOfRange.value && best.value.c != null) {
+      hint.value = `<span style="color:var(--calm)">이 날짜는 아직 예보가 없어 예보가 있는 날 중에서 찾았어요 · <b>${fmtK(at(best.value.k))}</b>로 옮길게요.</span>`
+      setTimeout(() => { state.di = best.value.k }, 1000)
+      return
+    }
+    hint.value = forecastDown.value
+      ? '<span style="color:var(--tx3)">혼잡 예보를 불러오지 못해 지금은 찾을 수 없어요 · 새로고침해 주세요.</span>'
+      : '<span style="color:var(--tx3)">관광공사 혼잡 예측 대상이 아니라 예보가 없는 장소예요.</span>'
     return
   }
   const b = bestDay(s.value, state.di, 14)
@@ -299,7 +313,15 @@ async function shareNative() {
           <span class="bdg" style="background:var(--busy);color:#fff">폐업</span>
           &nbsp;폐업했거나 관광 정보에서 삭제된 장소예요. 찜·코스에는 그대로 남아 있어요.
         </template>
-        <!-- MAP_004 예외: 예보 미제공 — 없는 데이터는 추측하지 않는다 -->
+        <!-- MAP_004 예외: 예보 미제공 — 없는 데이터는 추측하지 않되, '왜 없는지'는 세 갈래로 정확히 말한다 -->
+        <template v-else-if="c == null && forecastDown">
+          <span class="bdg" style="background:var(--none);color:#fff">예보 없음</span>
+          &nbsp;혼잡 예보를 불러오지 못했어요 · 새로고침해 주세요.
+        </template>
+        <template v-else-if="outOfRange">
+          <span class="bdg" style="background:var(--none);color:#fff">예보 전</span>
+          &nbsp;{{ fmtK(at(state.di)) }}은 아직 혼잡 예보가 없어요<template v-if="untilText"> · 예보는 {{ untilText }}까지 있어요</template>.
+        </template>
         <template v-else-if="c == null">
           <span class="bdg" style="background:var(--none);color:#fff">예보 없음</span>
           &nbsp;관광공사 혼잡 예측 대상이 아니라 이 장소는 예보가 없어요.
@@ -312,8 +334,10 @@ async function shareNative() {
         </template>
       </div>
 
-      <div v-if="c != null && !s.closed" class="tipbox" @click="jumpToBest">
-        <template v-if="!tipText">✓ 30일 중 <b>오늘이 가장 한산</b>해요.</template>
+      <!-- 범위 밖 날짜여도 이 장소의 예보가 있으면 팁은 살린다 - 예보가 있는 날로 돌아갈 길 -->
+      <div v-if="(c != null || outOfRange) && best.c != null && !s.closed" class="tipbox" @click="jumpToBest">
+        <template v-if="outOfRange">🕐 예보가 있는 날 중엔 <b>{{ fmtK(at(best.k)) }}</b>이 가장 한산해요. 눌러서 옮겨보세요.</template>
+        <template v-else-if="!tipText">✓ 30일 중 <b>오늘이 가장 한산</b>해요.</template>
         <template v-else>🕐 <b>{{ fmtK(at(best.k)) }}</b>로 가면 <b>{{ tipText }}</b> 날이에요. 눌러서 옮겨보세요.</template>
       </div>
 
@@ -339,7 +363,7 @@ async function shareNative() {
         </div>
       </div>
       <div v-if="hasWx" class="wx-src">{{ wxSource }}</div>
-      <div v-if="weatherGap && wxUntil" class="wx-note">날씨는 {{ wxUntil }}까지 제공돼요<template v-if="crowdUi"> · 혼잡은 30일 표시</template></div>
+      <div v-if="weatherGap && wxUntil" class="wx-note">날씨는 {{ wxUntil }}까지 제공돼요<template v-if="crowdUi && untilText"> · 혼잡은 {{ untilText }}까지</template></div>
       </template>
 
       <!-- 없는 정보(null)는 배지를 그리지 않는다 - '주차 없음'과 '주차 정보 없음'은 다르다 -->

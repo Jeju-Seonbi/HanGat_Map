@@ -49,6 +49,15 @@ describe('placeKey - 장소 식별자는 이름이 아니라 id', () => {
   })
 })
 
+describe('forecastUntilOf - 오늘 기준 예보가 있는 마지막 날', () => {
+  it('관광지 전체에서 값이 있는 가장 뒤 칸을 고르고, 장소마다 빠진 날이 달라도 가장 긴 쪽을 따른다', async () => {
+    const s = await freshStore()
+    expect(s.forecastUntilOf([{ series: [10, 20, null, null] }, { series: [5, null, 7] }])).toBe(2)   // 두 번째 장소가 D+2 까지
+    expect(s.forecastUntilOf([{ series: [null, null] }, { n: 'series 없음' }])).toBe(-1)
+    expect(s.forecastUntilOf([])).toBe(-1)
+  })
+})
+
 describe('loadPlaces 재진입 재사용 (성능 B 커밋 1)', () => {
   it('첫 진입은 장소·예보·날씨를 한 번씩 받는다', async () => {
     const s = await freshStore()
