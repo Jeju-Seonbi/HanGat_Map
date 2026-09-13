@@ -32,6 +32,11 @@ const rest = computed(() => course.value.bud - course.value.spent)
 
 const dayWeather = d => wxOf(state.di + +d - 1)
 
+/* 정류지 점: 식당·카페·숙소는 지도 핀과 같은 업종 원+아이콘(.poi-marker.mk-*), 관광지는 혼잡 색 점.
+   전엔 업종 장소도 회색 '예보 없음' 점이라 예보가 빠진 관광지처럼 보였다(2026-09-14 결정). 착한가격 식당은 지도처럼 분홍 */
+const POI_CLASS = { FOOD: 'mk-dine', CAFE: 'mk-cafe', LODGING: 'mk-stay', CONVENIENCE: 'mk-cvs', MART: 'mk-mart' }
+const poiClass = o => (o?.cat === 'FOOD' && o.good ? 'mk-food' : POI_CLASS[o?.cat] ?? null)
+
 </script>
 
 <template>
@@ -86,7 +91,8 @@ const dayWeather = d => wxOf(state.di + +d - 1)
             <div>
               <!-- 혼잡·업종은 목록과 같은 핀 색으로 표시 (뱃지와 의미 중복 제거) -->
               <div class="hd">
-                <span class="rpin" :class="s.o ? tier(s.c) : 'food'"></span>
+                <span v-if="s.o && poiClass(s.o)" class="poi-marker cpin" :class="poiClass(s.o)"></span>
+                <span v-else class="rpin" :class="s.o ? tier(s.c) : 'food'"></span>
                 <span class="nm">{{ s.o ? s.o.n : s.f.n }}</span>
               </div>
               <div class="why">{{ s.o ? s.why : `${s.f.m} · ${s.why}` }}</div>
