@@ -325,4 +325,20 @@ class PlaceRepositoryTest {
     private PlaceListResponse findByName(List<PlaceListResponse> places, String name) {
         return places.stream().filter(p -> name.equals(p.getName())).findFirst().orElseThrow();
     }
+
+    @Test
+    void 대안_후보에서_폐업_장소는_빠진다() {
+        em.persist(Place.builder().region(west).primaryCategory(tourist).name("열린곳").normalizedName("열린곳")
+                .latitude(new BigDecimal("33.40")).longitude(new BigDecimal("126.30")).build());
+        Place closed = Place.builder().region(west).primaryCategory(tourist).name("닫힌곳").normalizedName("닫힌곳")
+                .latitude(new BigDecimal("33.41")).longitude(new BigDecimal("126.31")).build();
+        closed.markClosed();
+        em.persist(closed);
+        em.flush();
+
+        List<Place> found = placeRepository.findCandidatesInBox("TOURIST",
+                new BigDecimal("33.0"), new BigDecimal("34.0"), new BigDecimal("126.0"), new BigDecimal("127.0"));
+
+        assertThat(found).extracting(Place::getName).containsExactly("열린곳");
+    }
 }

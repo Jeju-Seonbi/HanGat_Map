@@ -12,6 +12,7 @@
  *   ⚠️ `x`가 경도, `y`가 위도다 - 뒤집으면 제주 전역 핀이 통째로 엉뚱한 곳에 찍힌다.
  */
 import { apiGet } from '../apiClient'
+import { inferUnits, placeUnit } from '../../utils/emd'
 
 /** 화면이 쓰는 장소 한 건. 기존 placesMap.js 한 줄과 같은 모양이다. */
 export interface MapPlace {
@@ -24,8 +25,12 @@ export interface MapPlace {
   y: number
   /** 권역 표시명 (동부/서부/남부/북부) */
   r: string
-  /** 세부분류 표시명 (오름/해수욕장/박물관…). 미분류면 '정보 없음' */
+  /** 세부분류 표시명 (오름/해수욕장/박물관…). 태그가 없으면 대분류(카페/편의점/마트/음식점), 그것도 없으면 '정보 없음' */
   c: string
+  /** 세부분류 코드 (관광공사 NA010100 등). 관광지 핀 아이콘 묶음을 앞자리로 정한다 - 없으면 null */
+  tc: string | null
+  /** 묶음 단위(읍·면 / 제주시내 / 서귀포시내 / 중문) - 주소에서 뽑고, 없으면 가장 가까운 장소의 단위(inferUnits). 섬 전체 뷰 묶음 핀용 */
+  unit: string | null
   /** 카테고리 코드 (TOURIST/FOOD/CAFE/…) - 검색 결과의 핀 색 구분용 */
   cat: string
   addr: string | null
@@ -46,6 +51,8 @@ export interface MapPlace {
   fee: number | null
   d: number | null
   in: number | null
+  /** 폐업(businessStatus CLOSED). 목록·검색엔 안 나오고 찜·공유 링크로 열릴 때만 true - 패널이 '폐업' 배지를 단다 */
+  closed: boolean
 }
 
 /** 백엔드 PlaceListResponse (map/model/dto/PlaceListResponse.java 와 동일 모양) */
@@ -91,6 +98,8 @@ export interface PlaceDetail {
   imageAttribution: string | null
   /** 소개 원문. 착한가격업소는 "대표메뉴: ○○ 9,000원 · …" 형태 - 핀 툴팁이 쓴다 */
   overview: string | null
+  /** 착한가격 명단 기준일(행안부 CSV 발행일, ISO 날짜). 착한가격이 아니거나 모르면 null - 가격표 밑 출처 줄이 쓴다 */
+  goodPriceBaseDate: string | null
 }
 
 export interface PlaceImage {
@@ -108,6 +117,7 @@ interface BackendPlaceDetail {
   reviewCount: number
   images: BackendPlaceImage[]
   overview: string | null
+  goodPriceBaseDate?: string | null
 }
 
 interface BackendPlaceImage {
@@ -121,32 +131,46 @@ interface BackendPlaceImage {
 export type LayerKey = 'spot' | 'food' | 'dine' | 'cafe' | 'cvs' | 'stay' | 'mart'
 
 /**
- * 첫 진입에 싣지 않는 대용량 레이어 (소상공인 상가 5,419곳).
- * 칩을 처음 켤 때 getLayer()로 그때 받아온다 - 안 쓰는 사람은 다운로드 비용 0.
+ * 첫 진입에 싣지 않는 레이어 = 관광지 빼고 전부.
+ * 첫 화면은 관광지 칩만 켜져 있어(state.L 기본값) 나머지는 받아 놓아도 쓰이지 않는데,
+ * 착한가격·식당·숙소 571KB 를 첫 진입마다 받고 있었다(2026-09-12 실측: Slow 4G 첫 진입 8.8초 중 약 3초).
+ * 칩을 처음 켤 때 getLayer()로 그때 받아온다(toggleLayer) - 안 켜는 사람은 다운로드 비용 0.
+ * 딥링크(findPlaceById)는 이 목록을 차례로 받아 보며 찾고, 없으면 단건 조회로 떨어진다.
  */
-export const LAZY_LAYERS: LayerKey[] = ['cafe', 'cvs', 'mart']
+export const LAZY_LAYERS: LayerKey[] = ['food', 'dine', 'stay', 'cafe', 'cvs', 'mart']
 
 export interface MapPlaces {
-  /** true = 레이어를 하나라도 받았다. false = 전부 실패(백엔드 다운) */
+  /** true = 첫 진입 레이어(관광지)를 받았다. false = 못 받았다(백엔드 다운) - 화면이 '새로고침' 안내를 띄운다 */
   live: boolean
   layers: Record<LayerKey, MapPlace[]>
   /** 이번 진입에서 못 받아온 레이어. 화면이 안내하고, 칩을 다시 켜면 그 레이어만 재시도한다 */
   failed: LayerKey[]
 }
 
+/**
+ * 상세 사진 띠(높이 96px)에 쓸 축소본 주소.
+ * 관광공사가 사진 절반은 축소본 주소를 원본과 똑같이 준다(2026-09-12 DB: 9,354장 중 4,547장) - 그대로 쓰면
+ * 96px 칸에 940×627 원본(장당 40~104KB)이 들어간다. 공사 URL 규칙(원본 `_image2_`, 축소본 `_image3_`, 장당 6~14KB)으로
+ * 바꿔 쓴다 - 무지개해안도로 10장 592KB → 87KB. 축소본이 없는 사진(표본 40장 중 2장)은 화면의 onerror 가 원본으로 되돌린다.
+ * 다른 도메인 주소는 규칙이 없어 replace 가 아무것도 안 바꾸고 원본 그대로다. 크게 보기(라이트박스)는 원본 url 을 쓴다.
+ */
+export function thumbOf (url: string, thumbnailUrl?: string | null): string {
+  if (thumbnailUrl && thumbnailUrl !== url) return thumbnailUrl
+  return url.replace('_image2_', '_image3_')
+}
+
 export const MapPlaceService = {
   /**
-   * 지도가 쓰는 레이어를 한 번에 받아온다.
-   * 레이어마다 호출이 나가지만 전부 같은 테이블이라 서버 부담은 크지 않고,
-   * 하나가 실패해도 나머지가 살아 있도록 개별로 처리한다.
+   * 첫 진입 레이어를 받아온다 - 지금은 관광지 하나. 나머지는 칩을 켤 때(LAZY_LAYERS).
+   * 목록·부분 실패 구조는 그대로 둔다 - 첫 진입 레이어가 다시 늘어도 호출부(loadPlaces)가 안 바뀌게.
    */
   async getAll (): Promise<MapPlaces> {
-    const keys: LayerKey[] = ['spot', 'food', 'dine', 'stay']   // 기본 레이어만 - 대용량은 LAZY_LAYERS
+    const keys: LayerKey[] = ['spot']
     const results = await Promise.allSettled(keys.map(k => apiGet<BackendPlace[]>(`/places?type=${k}`)))
     const layers = emptyLayers()
     const failed: LayerKey[] = []
     results.forEach((r, i) => {
-      if (r.status === 'fulfilled') layers[keys[i]] = r.value.map(toMapPlace)
+      if (r.status === 'fulfilled') layers[keys[i]] = withUnits(r.value.map(toMapPlace))
       else failed.push(keys[i])
     })
     return { live: failed.length < keys.length, layers, failed }
@@ -156,7 +180,7 @@ export const MapPlaceService = {
   async getLayer (key: LayerKey): Promise<MapPlace[] | null> {
     try {
       const rows = await apiGet<BackendPlace[]>(`/places?type=${key}`)
-      return rows.map(toMapPlace)
+      return withUnits(rows.map(toMapPlace))
     } catch {
       return null
     }
@@ -169,7 +193,7 @@ export const MapPlaceService = {
       if (opts?.region) params.set('region', opts.region)
       if (opts?.categories?.length) params.set('categories', opts.categories.join(','))
       const rows = await apiGet<BackendPlace[]>(`/places/search?${params}`)
-      return rows.map(toMapPlace)
+      return withUnits(rows.map(toMapPlace))
     } catch {
       return []
     }
@@ -181,11 +205,10 @@ export const MapPlaceService = {
    */
   async getDetail (id: number): Promise<PlaceDetail | null> {
     try {
-      // 15초: 핀 전량 재생성이 메인 스레드를 5초 넘게 잠그면 5초 기본값으론 응답이 Abort로 죽는다
-      const row = await apiGet<BackendPlaceDetail>(`/places/${id}`, 15000)
+      const row = await apiGet<BackendPlaceDetail>(`/places/${id}`)
       const images = (row.images ?? []).map(i => ({
         url: i.url,
-        thumb: i.thumbnailUrl ?? i.url,
+        thumb: thumbOf(i.url, i.thumbnailUrl),
         caption: i.caption
       }))
       return {
@@ -196,8 +219,21 @@ export const MapPlaceService = {
         reviewCount: row.reviewCount ?? 0,
         images,
         imageAttribution: row.images?.[0]?.attribution ?? null,
-        overview: row.overview ?? null
+        overview: row.overview ?? null,
+        goodPriceBaseDate: row.goodPriceBaseDate ?? null
       }
+    } catch {
+      return null
+    }
+  },
+
+  /**
+   * 목록에 없는 장소를 id 로 받는다 - 폐업(CLOSED) 장소는 목록·검색에서 빠지지만 찜·공유 링크로는 들어온다.
+   * 상세 응답은 목록 응답의 상위 집합이라 같은 변환을 쓴다. 없거나 실패하면 null.
+   */
+  async getById (id: number): Promise<MapPlace | null> {
+    try {
+      return toMapPlace(await apiGet<BackendPlace>(`/places/${id}`))
     } catch {
       return null
     }
@@ -205,6 +241,12 @@ export const MapPlaceService = {
 }
 
 /** 백엔드 응답 → 화면 형식. 좌표가 없는 장소는 지도에 못 그리므로 호출부에서 걸러진다. */
+/** 한 레이어를 통째로 받은 뒤 단위 없는 장소를 이웃 장소로 채운다 - 묶음 핀에서 빠지는 곳이 없게 */
+function withUnits (rows: MapPlace[]): MapPlace[] {
+  inferUnits(rows)
+  return rows
+}
+
 function toMapPlace (row: BackendPlace): MapPlace {
   return {
     id: row.id,
@@ -213,7 +255,11 @@ function toMapPlace (row: BackendPlace): MapPlace {
     y: row.latitude ?? 0,
     r: row.regionName,
     // 세부분류가 없는 장소가 있다 - 빈 문자열로 두면 드롭다운에 빈 항목이 생긴다
-    c: row.tagName ?? '정보 없음',
+    // 세부 태그(오름·호텔·관광식당)가 없으면 대분류(카페·편의점·마트·음식점)로 - 소상공인 상가 5,419곳과 착한가격 268곳은 태그가 없어
+    // '정보 없음 · 서부'로 보였다(2026-09-13). 찜 탭 매퍼(api/favorites.js)와 같은 규칙
+    c: row.tagName ?? row.categoryName ?? '정보 없음',
+    tc: row.tagCode ?? null,   // 관광공사 분류 코드 - 관광지 핀 아이콘 묶음(spotIconGroup)이 앞자리로 나눈다
+    unit: placeUnit(row.lotAddress, row.roadAddress),
     cat: row.categoryCode,
     addr: row.roadAddress ?? row.lotAddress,
     tel: row.phone,
@@ -225,7 +271,8 @@ function toMapPlace (row: BackendPlace): MapPlace {
     b: null,
     fee: null,
     d: null,
-    in: null
+    in: null,
+    closed: row.businessStatus === 'CLOSED'
   }
 }
 

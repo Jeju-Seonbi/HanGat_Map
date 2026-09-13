@@ -5,12 +5,14 @@ import AccommodationSearch from './AccommodationSearch.vue'
 import KakaoPlaceSearch from './KakaoPlaceSearch.vue'
 import { findPreferenceConflict } from '../../services/placePreferenceService'
 import type { AccommodationInput, CourseCondition, CourseStyle, KakaoPlaceSearchResult, PlacePreference, PreferenceType, RegionRef, Transport } from '../../assets/types/course'
+import { courseDateError, courseDateWindow } from '../../services/course/courseDatePolicy'
 
 const props = defineProps<{ initial: CourseCondition; loading: boolean }>()
 const emit = defineEmits<{ submit: [condition: CourseCondition]; draft: [condition: CourseCondition] }>()
 
 const cloneCondition = (value: CourseCondition) => JSON.parse(JSON.stringify(value)) as CourseCondition
 const form = reactive<CourseCondition>(cloneCondition(props.initial))
+const { minimum: minimumDate, maximum: maximumDate } = courseDateWindow()
 watch(form, () => emit('draft', cloneCondition(form)), { deep: true })
 const preferenceKey = (item: PlacePreference) => item.source_place_id ? `KAKAO:${item.source_place_id}` : `DB:${item.place_id ?? item.place_name}`
 const fixedSchedules = reactive(new Set(form.course_place_preferences.filter(item => item.fixed_date || item.fixed_time).map(preferenceKey)))
@@ -172,8 +174,7 @@ function validatePreferences() {
 function validate() {
   clearErrors()
 
-  if (!form.start_date || !form.end_date) basicErrors.dates = '여행 시작일과 종료일을 모두 입력해 주세요.'
-  else if (form.start_date > form.end_date) basicErrors.dates = '여행 종료일은 시작일보다 빠를 수 없어요.'
+  basicErrors.dates = courseDateError(form.start_date, form.end_date, minimumDate)
 
   if (!Number.isFinite(Number(form.people)) || Number(form.people) < 1) basicErrors.people = '인원은 1명 이상 입력해 주세요.'
   if (!Number.isFinite(Number(form.budget_total)) || Number(form.budget_total) <= 0) basicErrors.budget = '전체 예산을 1원 이상 입력해 주세요.'
@@ -210,8 +211,9 @@ const summary = computed(() => ({
         <section class="condition-section basic-condition">
           <div class="section-title"><span>01</span><div><h2>여행 기본 정보</h2><p>여행 기간과 인원, 전체 예산을 입력해 주세요.</p></div></div>
           <div class="field-grid">
-            <label>여행 시작일<input v-model="form.start_date" type="date" @input="basicErrors.dates = ''"></label>
-            <label>여행 종료일<input v-model="form.end_date" type="date" @input="basicErrors.dates = ''"></label>
+            <label>여행 시작일<input v-model="form.start_date" type="date" :min="minimumDate" :max="maximumDate" @input="basicErrors.dates = ''"></label>
+            <label>여행 종료일<input v-model="form.end_date" type="date" :min="minimumDate" :max="maximumDate" @input="basicErrors.dates = ''"></label>
+            <small class="field-span field-help">오늘부터 30일까지 혼잡 예보 범위로 선택할 수 있어요. 범위 안이어도 아직 적재되지 않은 예보는 '정보 없음'으로 표시돼요.</small>
             <p v-if="basicErrors.dates" class="course-field-error field-span">{{ basicErrors.dates }}</p>
             <label>인원<input v-model.number="form.people" type="number" min="1" @input="basicErrors.people = ''"><small v-if="basicErrors.people" class="course-field-error">{{ basicErrors.people }}</small></label>
             <label>전체 예산<input v-model.number="form.budget_total" type="number" min="1" step="10000" placeholder="원 단위" @input="basicErrors.budget = ''"><small v-if="basicErrors.budget" class="course-field-error">{{ basicErrors.budget }}</small></label>

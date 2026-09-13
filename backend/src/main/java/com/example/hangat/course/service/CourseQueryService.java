@@ -48,15 +48,27 @@ public class CourseQueryService {
     private final CourseItemRepository itemRepository;
     private final CongestionService congestionService;
     private final com.example.hangat.course.DbCourseWeatherFactsProvider weatherProvider;
+    private final com.example.hangat.course.CourseRetentionPolicy retentionPolicy;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public CourseQueryService(CourseRepository courseRepository,
+                              CourseItemRepository itemRepository,
+                              CongestionService congestionService,
+                              com.example.hangat.course.DbCourseWeatherFactsProvider weatherProvider,
+                              com.example.hangat.course.CourseRetentionPolicy retentionPolicy) {
+        this.courseRepository = courseRepository;
+        this.itemRepository = itemRepository;
+        this.congestionService = congestionService;
+        this.weatherProvider = weatherProvider;
+        this.retentionPolicy = retentionPolicy;
+    }
 
     public CourseQueryService(CourseRepository courseRepository,
                               CourseItemRepository itemRepository,
                               CongestionService congestionService,
                               com.example.hangat.course.DbCourseWeatherFactsProvider weatherProvider) {
-        this.courseRepository = courseRepository;
-        this.itemRepository = itemRepository;
-        this.congestionService = congestionService;
-        this.weatherProvider = weatherProvider;
+        this(courseRepository, itemRepository, congestionService, weatherProvider,
+                new com.example.hangat.course.CourseRetentionPolicy());
     }
 
     /**
@@ -158,6 +170,7 @@ public class CourseQueryService {
         if (course.getStatus() == CourseStatus.DELETED) {
             throw new BaseException(BaseResponseStatus.COURSE_NOT_FOUND, courseId);
         }
+        retentionPolicy.requireAvailable(course);
         if (course.getUser() != null
                 && (authUserId == null || !course.getUser().getId().equals(authUserId))) {
             throw new BaseException(BaseResponseStatus.COURSE_FORBIDDEN, courseId);
@@ -227,6 +240,7 @@ public class CourseQueryService {
                 place.getName(),
                 place.getPrimaryCategory().getName(),
                 place.getRegion().getName(),
+                place.getBusinessStatus(),
                 place.getImageUrl(),
                 place.getLatitude() == null ? null : place.getLatitude().doubleValue(),
                 place.getLongitude() == null ? null : place.getLongitude().doubleValue(),

@@ -31,6 +31,8 @@ spring:
     properties:
       mail:
         smtp:
+          # HELO/EHLO가 OS 호스트명에 의존하면 일부 SMTP 서버가 문법 오류로 거부할 수 있다.
+          localhost: ${MAIL_SMTP_LOCALHOST:localhost}
           auth: true
           starttls:
             enable: true

@@ -46,8 +46,9 @@ class CourseServiceAiGenerationFlowTest {
         AtomicBoolean providerCalled = new AtomicBoolean();
         CourseAiGenerationService generationService = new CourseAiGenerationService(
                 input -> {
-                    assertThat(input.candidates()).hasSize(1);
-                    assertThat(input.candidates().get(0).identity().candidateId()).isEqualTo("candidate-1");
+                    assertThat(input.candidates())
+                            .extracting(candidate -> candidate.identity().candidateId())
+                            .containsExactlyInAnyOrder("candidate-1", "candidate-2", "candidate-3");
                     providerCalled.set(true);
                     return new CourseAiResultDto(input.contractVersion(), List.of(
                             new CourseAiResultDto.DayDto(
@@ -55,7 +56,15 @@ class CourseServiceAiGenerationFlowTest {
                                     List.of(new CourseAiResultDto.ItemDto(
                                             "candidate-1",
                                             LocalTime.of(9, 0),
-                                            "한글 추천 이유")))));
+                                            "한글 추천 이유"))),
+                            new CourseAiResultDto.DayDto(
+                                    LocalDate.of(2026, 8, 28),
+                                    List.of(new CourseAiResultDto.ItemDto(
+                                            "candidate-2", LocalTime.of(9, 0), "둘째 날 추천 이유"))),
+                            new CourseAiResultDto.DayDto(
+                                    LocalDate.of(2026, 8, 29),
+                                    List.of(new CourseAiResultDto.ItemDto(
+                                            "candidate-3", LocalTime.of(9, 0), "셋째 날 추천 이유")))));
                 },
                 new CourseAiResultValidator());
         CoursePersistenceService persistenceService = mock(CoursePersistenceService.class);
@@ -69,18 +78,13 @@ class CourseServiceAiGenerationFlowTest {
         when(course.getPeople()).thenReturn((short) 2);
         when(course.getBudgetTotal()).thenReturn(500000);
         when(course.getTransport()).thenReturn(Transport.RENTAL_CAR);
-        Place place = mock(Place.class);
-        when(place.getId()).thenReturn(301L);
-        CourseItem persistedItem = mock(CourseItem.class);
-        when(persistedItem.getId()).thenReturn(201L);
-        when(persistedItem.getCourse()).thenReturn(course);
-        when(persistedItem.getPlace()).thenReturn(place);
-        when(persistedItem.getDayNo()).thenReturn((short) 1);
-        when(persistedItem.getPosition()).thenReturn((short) 1);
-        when(persistedItem.getVisitDate()).thenReturn(LocalDate.of(2026, 8, 27));
-        when(persistedItem.getStartTime()).thenReturn(LocalTime.of(9, 0));
-        when(persistedItem.getItemSource()).thenReturn(CourseItemSource.AI_RECOMMENDED);
-        when(persistedItem.getRecommendationReason()).thenReturn("한글 추천 이유");
+        // 저장 결과도 3일의 서로 다른 장소를 반환해야 응답 조립까지 검증할 수 있다.
+        CourseItem firstItem = persistedItem(course, 201L, 301L, (short) 1,
+                LocalDate.of(2026, 8, 27), "한글 추천 이유");
+        CourseItem secondItem = persistedItem(course, 202L, 302L, (short) 2,
+                LocalDate.of(2026, 8, 28), "둘째 날 추천 이유");
+        CourseItem thirdItem = persistedItem(course, 203L, 303L, (short) 3,
+                LocalDate.of(2026, 8, 29), "셋째 날 추천 이유");
         when(persistenceService.persist(
                 any(CourseRequestDto.class),
                 any(com.example.hangat.course.facts.CourseGenerationFacts.class),
@@ -88,8 +92,10 @@ class CourseServiceAiGenerationFlowTest {
                 any(CourseGenerationMetadata.class)))
                 .thenReturn(new CoursePersistenceResult(
                         course,
-                        java.util.Map.of("candidate-1", persistedItem),
-                        java.util.Map.of("candidate-1", "관광지")));
+                        java.util.Map.of("candidate-1", firstItem,
+                                "candidate-2", secondItem, "candidate-3", thirdItem),
+                        java.util.Map.of("candidate-1", "관광지",
+                                "candidate-2", "관광지", "candidate-3", "관광지")));
         CourseBudgetService budgetService = mock(CourseBudgetService.class);
         when(budgetService.calculateAndCache(101L))
                 .thenReturn(CourseBudgetCalculation.noData(500000));
@@ -112,14 +118,30 @@ class CourseServiceAiGenerationFlowTest {
         verify(persistenceService).persist(
                 any(CourseRequestDto.class),
                 org.mockito.ArgumentMatchers.argThat(facts ->
-                        facts.candidates().size() == 1
-                                && "candidate-1".equals(
-                                facts.candidates().get(0).identity().candidateId())),
-                any(CourseAiResultDto.class),
+                        facts.candidates().stream().map(candidate -> candidate.identity().candidateId())
+                                .collect(java.util.stream.Collectors.toSet())
+                                .equals(java.util.Set.of("candidate-1", "candidate-2", "candidate-3"))),
+                org.mockito.ArgumentMatchers.argThat(result ->
+                        result.days().stream().map(CourseAiResultDto.DayDto::date).toList()
+                                .equals(List.of(LocalDate.of(2026, 8, 27),
+                                        LocalDate.of(2026, 8, 28), LocalDate.of(2026, 8, 29)))
+                                && result.days().stream().flatMap(day -> day.items().stream())
+                                .map(CourseAiResultDto.ItemDto::recommendationReason).toList()
+                                .equals(List.of("한글 추천 이유", "둘째 날 추천 이유", "셋째 날 추천 이유"))),
                 org.mockito.ArgumentMatchers.argThat(metadata ->
                         metadata.generationReason()
                                 == com.example.hangat.course.model.GenerationReason.INITIAL));
-        assertThat(response.days()).hasSize(1);
+        assertThat(response.days()).hasSize(3);
+        assertThat(response.days()).extracting(day -> day.dayNo())
+                .containsExactly(1, 2, 3);
+        assertThat(response.days()).allSatisfy(day -> assertThat(day.items()).hasSize(1));
+        assertThat(response.days().stream().flatMap(day -> day.items().stream()))
+                .extracting(item -> item.visitDate())
+                .containsExactly(LocalDate.of(2026, 8, 27),
+                        LocalDate.of(2026, 8, 28), LocalDate.of(2026, 8, 29));
+        assertThat(response.days().stream().flatMap(day -> day.items().stream()))
+                .extracting(item -> item.placeName())
+                .containsExactly("만장굴", "성산일출봉", "비자림");
         assertThat(response.budgetSummary().hasCostData()).isFalse();
         assertThat(response.budgetSummary().budgetTotal()).isEqualTo(500000);
         assertThat(response.days().get(0).items().get(0).placeName()).isEqualTo("만장굴");
@@ -170,6 +192,23 @@ class CourseServiceAiGenerationFlowTest {
                 """, CourseRequestDto.class);
     }
 
+    private CourseItem persistedItem(Course course, long itemId, long placeId,
+                                     short dayNo, LocalDate visitDate, String reason) {
+        Place place = mock(Place.class);
+        when(place.getId()).thenReturn(placeId);
+        CourseItem item = mock(CourseItem.class);
+        when(item.getId()).thenReturn(itemId);
+        when(item.getCourse()).thenReturn(course);
+        when(item.getPlace()).thenReturn(place);
+        when(item.getDayNo()).thenReturn(dayNo);
+        when(item.getPosition()).thenReturn((short) 1);
+        when(item.getVisitDate()).thenReturn(visitDate);
+        when(item.getStartTime()).thenReturn(LocalTime.of(9, 0));
+        when(item.getItemSource()).thenReturn(CourseItemSource.AI_RECOMMENDED);
+        when(item.getRecommendationReason()).thenReturn(reason);
+        return item;
+    }
+
     private final class StubTourApiService extends TourApiService {
         @Override
         public List<TourPlaceDto> getTourPlaces() {
@@ -177,6 +216,14 @@ class CourseServiceAiGenerationFlowTest {
                 return List.of(objectMapper.readValue("""
                         {"contentid":"candidate-1","title":"만장굴","addr1":"주소 미상",
                          "mapy":33.529,"mapx":126.771,"cat1":"A01"}
+                        """, TourPlaceDto.class),
+                        objectMapper.readValue("""
+                        {"contentid":"candidate-2","title":"성산일출봉","addr1":"주소 미상",
+                         "mapy":33.458,"mapx":126.942,"cat1":"A01"}
+                        """, TourPlaceDto.class),
+                        objectMapper.readValue("""
+                        {"contentid":"candidate-3","title":"비자림","addr1":"주소 미상",
+                         "mapy":33.491,"mapx":126.811,"cat1":"A01"}
                         """, TourPlaceDto.class));
             } catch (Exception exception) {
                 throw new RuntimeException(exception);

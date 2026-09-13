@@ -94,6 +94,7 @@ public class CourseResponseAssembler {
                 budget.totalExpectedMin(),
                 budget.totalExpectedMax(),
                 budgetSummary,
+                course.getAverageCongestionRate(),
                 days);
     }
 

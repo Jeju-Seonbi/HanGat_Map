@@ -58,4 +58,21 @@ describe('production Content-Security-Policy', () => {
     )
     expect(html).not.toContain('minio.fileinnout.svc.cluster.local')
   }, BUILD_TIMEOUT_MS)
+
+  it('lets the kakao share form follow its login redirect', async () => {
+    outputDirectory = await mkdtemp(join(tmpdir(), 'hangat-csp-'))
+
+    await build({
+      root: FRONTEND_ROOT,
+      logLevel: 'silent',
+      build: { outDir: outputDirectory, emptyOutDir: true }
+    })
+
+    const html = await readFile(join(outputDirectory, 'index.html'), 'utf8')
+
+    // 로그인 안 된 사용자는 sharer → accounts 로 302 된다. 둘 중 하나만 있으면 팝업이 about:blank 로 멈춘다
+    expect(html).toContain(
+      "form-action 'self' https://sharer.kakao.com https://accounts.kakao.com"
+    )
+  }, BUILD_TIMEOUT_MS)
 })

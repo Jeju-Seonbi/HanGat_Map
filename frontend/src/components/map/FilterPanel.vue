@@ -3,8 +3,9 @@
 import { computed, ref, watch } from 'vue'
 import SearchBox from './SearchBox.vue'
 import LayerIcon from './LayerIcon.vue'
-import { state, rankedRows, CATEGORIES, REGIONS, LAYERS, FILTER_VISIBLE, toggleLayer } from '@/stores/mapStore'
+import { state, rankedRows, CATEGORIES, REGIONS, LAYERS, FILTER_VISIBLE, toggleLayer, placeKey } from '@/stores/mapStore'
 import { at, fmtK } from '@/utils/date'
+import { sourceLine } from '@/utils/dataSources'
 import { mapBridge } from '@/composables/mapBridge'
 
 const emit = defineEmits(['open-place', 'toggle-course'])
@@ -22,6 +23,9 @@ const sectionTitle = computed(() =>
    평소 회색 핀의 뜻은 범례 라벨('예보 없음')과 상세 문장이 말한다 */
 const forecastDown = computed(() => !state.loading && state.live && state.forecastDays === 0)
 
+/* 데이터 출처 - 지도에서 보는 데이터의 출처는 지도에 적는다(공공데이터 이용조건·심사 확인 항목). 켜진 레이어에 따라 원천이 늘어난다 */
+const sources = computed(() => sourceLine(state.L))
+
 const maxOffset = computed(() => Math.max(0, LAYERS.length - FILTER_VISIBLE))
 const shift = computed(() => `translateX(-${state.filterOffset * (100 / FILTER_VISIBLE)}%)`)
 
@@ -35,9 +39,9 @@ function setRegion(r) {
   mapBridge.fitRegion()
 }
 
-function openPlace(name) {
+function openPlace(place) {   // 장소 객체(목록 행·검색 결과) - 이름이 아니라 id 로 열려야 동명 장소가 구분된다
   mobileOpen.value = false
-  emit('open-place', name)
+  emit('open-place', place)
 }
 
 function toggleCourse() {
@@ -110,12 +114,16 @@ function toggleCourse() {
 
       <div class="rows">
         <div v-if="state.loading" class="empty">장소를 불러오는 중이에요…</div>
+        <!-- 빈 이유를 구분한다: 장소 못 받음 / 예보 못 받음 / 선택 날짜가 예보 범위 밖 / 진짜로 조건에 맞는 곳 없음 (2026-09-13) -->
         <div v-else-if="!rankedRows.length" class="empty">
-          {{ state.live ? '이 조건에는 혼잡 예보가 있는 곳이 없어요' : '장소 데이터를 불러오지 못했어요 · 새로고침해 주세요' }}
+          {{ !state.live ? '장소 데이터를 불러오지 못했어요 · 새로고침해 주세요'
+            : forecastDown ? '혼잡 예보를 불러오지 못했어요 · 새로고침해 주세요'
+            : (state.forecastUntil >= 0 && state.di > state.forecastUntil) ? `${fmtK(at(state.forecastUntil))} 이후는 아직 혼잡 예보가 없어요`
+            : '이 조건에는 혼잡 예보가 있는 곳이 없어요' }}
         </div>
         <!-- 혼잡 상태는 왼쪽 핀 색으로만 표시한다 (오른쪽 뱃지와 의미가 중복되어 제거) -->
-        <div v-for="(o, i) in rankedRows" :key="o.s.n" class="row" :class="o.t"
-          @click="openPlace(o.s.n)">
+        <div v-for="(o, i) in rankedRows" :key="placeKey(o.s)" class="row" :class="o.t"
+          @click="openPlace(o.s)">
           <span class="rk">{{ i + 1 }}</span>
           <span class="rpin" :class="o.t"></span>
           <span class="info">
@@ -137,6 +145,7 @@ function toggleCourse() {
         <span style="color:var(--tx3)" title="관광공사 혼잡 예측 대상이 아닌 장소"><i class="dot" style="background:var(--tx3)"></i>예보 없음</span>
       </div>
       <p v-if="forecastDown" class="cta-note">혼잡 예보를 불러오지 못했어요 · 새로고침해 주세요</p>
+      <p class="cta-src">{{ sources }}</p>
     </div>
   </div>
 </template>

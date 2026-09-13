@@ -16,9 +16,11 @@ import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * KTO 관광정보를 places 테이블로 적재한다 - 설계서 §3.2 / 커밋 2-2
@@ -60,19 +62,23 @@ public class PlaceIngestService {
     private final RegionResolver regionResolver;
     private final PlaceIngestWriter writer;
     private final TagSyncService tagSyncService;
+    private final PlacePresenceReconciler reconciler;
 
     public PlaceIngestService(PublicApiClient client, RegionResolver regionResolver,
-                              PlaceIngestWriter writer, TagSyncService tagSyncService) {
+                              PlaceIngestWriter writer, TagSyncService tagSyncService,
+                              PlacePresenceReconciler reconciler) {
         this.client = client;
         this.regionResolver = regionResolver;
         this.writer = writer;
         this.tagSyncService = tagSyncService;
+        this.reconciler = reconciler;
     }
 
     /** 적재 결과 요약. 제외 건수를 함께 돌려줘 "왜 2,147이 아닌지" 바로 알 수 있게 한다. */
     public record IngestResult(int fetched, int inserted, int updated, int unchanged,
                                int skippedNoRegion, int skippedNoCategory, int skippedNoId,
-                               int tagged, int skippedNoTag) {
+                               int tagged, int skippedNoTag,
+                               PlacePresenceReconciler.Result presence) {
     }
 
     public IngestResult ingest() {
@@ -89,12 +95,14 @@ public class PlaceIngestService {
         int noCategory = 0;
         int noId = 0;
         int noTag = 0;
+        Set<String> seen = new HashSet<>();   // 출석 체크용 - 권역·카테고리로 거르기 전의 원천 ID 전부
 
         for (KtoPlaceItem item : items) {
             if (isBlank(item.contentid()) || isBlank(item.title())) {
                 noId++;
                 continue;
             }
+            seen.add(item.contentid());
             String categoryCode = TYPE_TO_CATEGORY.get(item.contenttypeid());
             if (categoryCode == null) {
                 noCategory++;
@@ -139,8 +147,10 @@ public class PlaceIngestService {
             tagged += r.tagged();
         }
 
+        // 목록에서 사라진 장소 판정 - 저장이 다 끝난 뒤 한 번
+        PlacePresenceReconciler.Result presence = reconciler.reconcile(SOURCE_CODE, seen);
         IngestResult result = new IngestResult(items.size(), inserted, updated, unchanged,
-                noRegion, noCategory, noId, tagged, noTag);
+                noRegion, noCategory, noId, tagged, noTag, presence);
         log.info("KTO 적재 완료 {}", result);
         if (noRegion > 0) {
             log.warn("권역 판정 실패로 제외 {}건 - 추자도 등 본섬 밖은 의도된 제외다(설계서 §5.1)", noRegion);

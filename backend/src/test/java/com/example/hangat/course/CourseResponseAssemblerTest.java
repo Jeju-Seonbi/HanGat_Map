@@ -85,6 +85,7 @@ class CourseResponseAssemblerTest {
 
         assertThat(response.id()).isEqualTo(101L);
         assertThat(response.contractVersion()).isEqualTo("2.0");
+        assertThat(response.averageCongestionRate()).isEqualByComparingTo("33.00");
         assertThat(response.days()).singleElement().satisfies(day -> {
             assertThat(day.dayNo()).isEqualTo(1);
             assertThat(day.visitDate()).isEqualTo(visitDate);
@@ -399,6 +400,7 @@ class CourseResponseAssemblerTest {
         when(course.getBudgetTotal()).thenReturn(400000);
         when(course.getTransport()).thenReturn(
                 com.example.hangat.course.model.enums.Transport.RENTAL_CAR);
+        when(course.getAverageCongestionRate()).thenReturn(new BigDecimal("33.00"));
 
         Map<String, CourseItem> items = new LinkedHashMap<>();
         for (int index = 0; index < candidateIds.size(); index++) {

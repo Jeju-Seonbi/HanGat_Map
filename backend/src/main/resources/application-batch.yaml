@@ -1,5 +1,12 @@
 # prod,batch 순서로 활성화한다. DB 스키마·마스터 초기화는 API 배포가 먼저 완료해야 한다.
 spring:
+  # 회원 API 관련 자동 설정은 배치에서 만들지 않는다. 가짜 비밀값을 채워서 우회하지 않는다.
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.mail.MailSenderAutoConfiguration
+      - org.springframework.boot.autoconfigure.mail.MailSenderValidatorAutoConfiguration
+      - org.springframework.boot.autoconfigure.security.oauth2.client.servlet.OAuth2ClientAutoConfiguration
+      - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
   main:
     web-application-type: none
   flyway:
@@ -14,6 +21,8 @@ spring:
       minimum-idle: 0
 
 hangat:
+  async:
+    enabled: false
   scheduling:
     enabled: false
 

@@ -114,6 +114,12 @@ describe('same-tab result restoration', () => {
     expect(flow.terminal.value).toBe(true)
     expect(flow.restoreError.value).toBe(code === 3301 ? '삭제되었거나 찾을 수 없는 코스예요.' : '코스가 만료되었거나 조회 권한이 없어요.')
   })
+  it('shows the explicit two-hour expiry response without exposing server detail', async () => {
+    const flow = useResultRestore(vi.fn().mockRejectedValue(new ApiError(410, 3309, 'private detail')))
+    await flow.restore(state, false)
+    expect(flow.terminal.value).toBe(true)
+    expect(flow.restoreError.value).toBe('저장하지 않은 코스의 2시간 보관 기간이 만료되었어요.')
+  })
   it.each(['EXPIRED', 'DELETED', 'FAILED', 'GENERATING'])('unavailable server status %s is not shown as ready', async status => {
     vi.mocked(apiRequest).mockResolvedValue({ ...detail, status }); await expect(fetchRestoredCourse(state, false)).rejects.toHaveProperty('status', 410)
   })

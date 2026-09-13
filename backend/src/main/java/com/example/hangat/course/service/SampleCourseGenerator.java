@@ -19,6 +19,7 @@ import com.example.hangat.domain.weather.model.enums.WeatherGranularity;
 import com.example.hangat.domain.weather.repository.WeatherForecastRepository;
 import com.example.hangat.map.model.entity.CongestionForecast;
 import com.example.hangat.map.model.entity.Place;
+import com.example.hangat.map.model.enums.BusinessStatus;
 import com.example.hangat.map.model.enums.CongestionLevel;
 import com.example.hangat.map.repository.PlaceRepository;
 import com.example.hangat.map.service.PlaceNameNormalizer;
@@ -185,6 +186,7 @@ public class SampleCourseGenerator {
         Map<String, List<Place>> byRegion = new HashMap<>();
         for (Place place : placeRepository.findAllById(forecasts.keySet())) {
             if (!TOURIST_CODE.equals(place.getPrimaryCategory().getCode())) continue;
+            if (place.getBusinessStatus() == BusinessStatus.CLOSED) continue;   // 폐업은 샘플에 안 넣는다
             if (place.getLatitude() == null || place.getLongitude() == null) continue;
             byRegion.computeIfAbsent(place.getRegion().getCode(), k -> new ArrayList<>()).add(place);
         }
@@ -295,6 +297,7 @@ public class SampleCourseGenerator {
 
         return placeRepository.findAllById(forecasts.keySet()).stream()
                 .filter(p -> TOURIST_CODE.equals(p.getPrimaryCategory().getCode()))
+                .filter(p -> p.getBusinessStatus() != BusinessStatus.CLOSED)
                 .filter(p -> regionCode.equals(p.getRegion().getCode()))
                 .filter(p -> p.getLatitude() != null && p.getLongitude() != null)
                 .filter(p -> !used.contains(p.getId()))

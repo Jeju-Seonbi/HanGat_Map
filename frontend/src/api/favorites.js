@@ -67,11 +67,14 @@ export function toItem (r, weather = null) {
     /** 목업 호환 - 실데이터엔 숫자 요금이 없다 */
     fee: null,
     crowd,
-    crowdTier: tier(crowd),
+    /** 상세 패널과 같은 규칙 - 예보가 있거나 관광지면 점(없으면 회색), 예보 없는 식당·카페·숙소는 점 자체를 생략(null) */
+    crowdTier: crowd != null || r.categoryCode === 'TOURIST' ? tier(crowd) : null,
     weather,
     rating: r.ratingAvg == null ? null : Number(r.ratingAvg),
     reviewCount: r.reviewCount ?? 0,
     businessStatus: r.businessStatus,
+    /** 폐업(CLOSED) - 목록·검색에선 빠지지만 찜은 남기고 '폐업'으로 표시한다 */
+    closed: r.businessStatus === 'CLOSED',
     imageUrl: r.imageUrl ?? null
   }
 }

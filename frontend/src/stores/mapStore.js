@@ -1,4 +1,4 @@
-import { reactive, computed } from 'vue'
+import { reactive, computed, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { crowd, tier } from '@/utils/crowd'
 import { iso, D0 } from '@/utils/date'
@@ -23,6 +23,19 @@ export const LAYERS = [
 ]
 export const FILTER_VISIBLE = 4
 
+/* 권역 기본값은 '전체'. 탭이 살아 있는 동안은 마지막 선택을 기억한다(sessionStorage) -
+   메인↔지도를 오가도 보던 권역이 유지되고, 탭을 닫으면 다시 '전체'로 시작한다.
+   공유 링크의 ?r= 은 MapView.loadFromURL 이 이 값 위에 덮어쓴다 (MAP_001, 2026-09-11 결정) */
+const REGION_KEY = 'hangat_map_region'
+export function savedRegion (storage = globalThis.sessionStorage) {
+  try {
+    const v = storage?.getItem(REGION_KEY)
+    return REGIONS.includes(v) ? v : '전체'
+  } catch {
+    return '전체'   // 저장소 접근 불가(프라이빗 모드 등) - 기본값으로
+  }
+}
+
 export const state = reactive({
   /* ── 서버에서 받아오는 장소 데이터 ──
      하드코딩 시절엔 import 하는 순간 값이 있었지만 이제 비동기라 처음엔 비어 있다.
@@ -33,8 +46,14 @@ export const state = reactive({
   live: false,
   /** 이번 진입에서 못 받아온 레이어 키 - 칩을 다시 켜면 그 레이어만 재시도한다 */
   loadFailed: [],
-  /** 예보 일수. 화면은 30일 캘린더인데 실측은 21~22일이라 남는 날은 '정보 없음' */
+  /** 예보 일수(원시값, 0 = 예보를 못 받음). 화면은 30일 캘린더인데 실측은 21~22일이라 남는 날은 '정보 없음' */
   forecastDays: 0,
+  /** 오늘 기준 예보가 있는 마지막 날 인덱스(0 = 오늘, -1 = 없음). 관광지 전체에서 값이 있는 가장 뒤 칸.
+      "이 날짜는 아직 예보가 없어요 · 예보는 M/D까지" 같은 문구가 쓴다 - 없는 날을 '예측 대상 아님'이라 부르지 않게(2026-09-13) */
+  forecastUntil: -1,
+  /** 예보를 장소에 붙일 때마다 1 증가 - 지도가 이걸 보고 핀 색을 다시 칠한다.
+      일수(forecastDays)로는 안 된다: 재진입 때 22→22 로 값이 같아 watch 가 안 깨어나 핀이 회색으로 굳는다 */
+  forecastVersion: 0,
 
   di: 0,                 // 선택한 날짜 (오늘로부터 며칠 뒤)
   sel: null,             // 상세를 연 장소
@@ -42,11 +61,16 @@ export const state = reactive({
   course: null,
   courseDay: 'all',
   filterOffset: 0,       // 업종 필터 캐러셀 위치
-  F: { reg: '서부', bud: 150000, cat: '' },   // cat='' = 모든 종류
-  L: { crowd: 1, spot: 1, food: 1, dine: 0, cafe: 0, cvs: 0, stay: 0, mart: 0, rain: 1 },
+  F: { reg: savedRegion(), bud: 150000, cat: '' },   // reg 기본 '전체'(탭 안 마지막 선택 기억), cat='' = 모든 종류
+  // 기본은 관광지 핀만 - 착한가격(271)까지 켜면 전체 권역에서 분홍 마커가 혼잡 색을 가린다. 칩으로 켠다 (2026-09-11 결정)
+  L: { crowd: 1, spot: 1, food: 0, dine: 0, cafe: 0, cvs: 0, stay: 0, mart: 0, rain: 1 },
   /** 로그인한 회원이 찜한 장소 ID (MAP_009). 백엔드 /favorites 가 원본이고 이건 화면용 사본. 비로그인이면 빈 배열 */
   favIds: [],
   toast: '',
+})
+
+watch(() => state.F.reg, r => {
+  try { sessionStorage.setItem(REGION_KEY, r) } catch { /* 저장소 접근 불가 - 기억만 못 할 뿐 */ }
 })
 
 /* ── 파생값 ── */
@@ -96,7 +120,7 @@ export async function toggleLayer (key) {
 
 /**
  * 딥링크(?place=id) 복원 — 공유 링크·마이페이지 "장소 보기"가 이걸 탄다.
- * 이미 받아온 레이어에서 먼저 찾고, 없으면 지연 레이어(카페·편의점·마트)를
+ * 이미 받아온 레이어에서 먼저 찾고, 없으면 지연 레이어(관광지 외 전부, LAZY_LAYERS 순서)를
  * 하나씩 내려받아 찾는다. 찾은 장소의 업종 칩은 켠다 - 핀이 보여야 상세가 말이 된다.
  */
 export async function findPlaceById (id) {
@@ -122,14 +146,34 @@ export async function findPlaceById (id) {
     const p = rows.find(x => x.id === id)
     if (p) { state.L[k] = 1; return { place: p, error: false } }
   }
+  // 어느 레이어에도 없는 장소 - 폐업(CLOSED)은 목록에서 빠지지만 찜·공유 링크로는 들어온다. 상세를 직접 받아 연다
+  const single = await MapPlaceService.getById(id)
+  if (single) return { place: single, error: false }
   return { place: null, error }
 }
 
+/* ── 재진입 재사용 ──
+   스토어는 모듈 전역이라 지도를 나갔다 와도 장소·예보(series)·날씨 캐시가 메모리에 다 있다.
+   그런데도 진입마다 처음부터 다시 받으면(요청 9건·1MB) 그동안 목록이 "불러오는 중"으로 비고,
+   장소가 도착하는 순간 예보 안 붙은 새 객체로 바뀌어 핀이 전부 회색 + "예보가 있는 곳이 없어요"가 잠깐 뜬다(3G 실측 0.5초).
+   장소 02:20·예보 03:00·날씨 03:30/06:30, 하루 한두 번 갱신이라 12시간 묵어도 서버와 같다.
+   날짜가 바뀌면 예보가 '오늘' 기준으로 붙어 있어 기간 안이라도 다시 받는다.
+   새로고침·새 탭은 메모리가 비어 어차피 처음부터 받는다 (2026-09-12, docs/성능_브랜치B_재분석_MAP_20260912.md) */
+const REUSE_MS = 12 * 60 * 60 * 1000
+let loadedAt = 0        // 마지막으로 전부 제대로 받은 시각(ms). 0 = 아직
+let loadedDate = ''     // 그때의 날짜(YYYY-MM-DD) - attachSeries 가 쓰는 iso() 와 같은 기준
+
+/** 마지막으로 전부 받은 지 12시간 안이고 같은 날이면 true - loadPlaces 가 요청을 건너뛴다 */
+export function canReuse (now = new Date()) {
+  return loadedAt > 0 && now.getTime() - loadedAt < REUSE_MS && iso(now) === loadedDate
+}
+
 /**
- * 장소·예보를 받아 state에 채운다. 지도 화면 진입 시 한 번 호출한다.
+ * 장소·예보를 받아 state에 채운다. 지도 화면에 들어올 때마다 호출하지만, 같은 날 12시간 안 재진입은 건너뛴다.
  * 예보는 장소보다 늦게 와도 되므로 따로 기다렸다가 붙인다 - 지도가 먼저 뜬다.
  */
 export async function loadPlaces () {
+  if (canReuse()) return
   state.loading = true
   const { live, layers, failed } = await MapPlaceService.getAll()
   state.layers = layers
@@ -145,7 +189,33 @@ export async function loadPlaces () {
   const [forecast] = await Promise.all([CrowdService.getForecast(), WeatherService.load()])
   state.forecastDays = forecast.days
   attachSeries(state.layers.spot, forecast, iso(new Date()))
+  state.forecastUntil = forecastUntilOf(state.layers.spot)
+  state.forecastVersion++
+  // 전부 제대로 받았을 때만 기록한다. 레이어 하나라도 못 받았거나 예보가 비어 왔으면 기록하지 않아
+  // 다음 진입에 처음부터 다시 받는다 - "실패한 것만 골라 재시도"하는 코드 없이 재시도가 된다
+  if (live && !failed.length && forecast.live) {
+    loadedAt = Date.now()
+    loadedDate = iso(new Date())
+  }
 }
+
+/** 오늘 기준 예보가 있는 마지막 날 인덱스. attachSeries 뒤의 series 는 0 = 오늘이라 값이 있는 가장 뒤 칸이 답이다.
+    장소마다 빠진 날이 달라 "전체 중 가장 뒤"로 잡는다 - 어떤 장소든 예보가 있는 마지막 날. 하나도 없으면 -1 */
+export function forecastUntilOf (spots) {
+  let last = -1
+  for (const s of spots) {
+    const arr = s.series
+    if (!Array.isArray(arr)) continue
+    for (let i = arr.length - 1; i > last; i--) if (arr[i] != null) { last = i; break }
+  }
+  return last
+}
+
+/** 장소 식별자 - id 가 있으면 id, 없으면(목업·검색 API 임시 객체) 이름.
+    상세 갱신 감시·패널 key·선택 강조·목록 key 가 전부 이걸 쓴다. 이름은 식별자가 못 된다:
+    같은 이름 장소가 310그룹 802곳(스타벅스 35·씨유 44, 관광지↔카페 동명 보롬왓·거문오름·미깡창고).
+    이름으로 감시하던 시절엔 카페 A→카페 B 로 바꿔도 상세를 다시 안 받아 이전 장소의 사진·메뉴가 남았다(2026-09-13) */
+export const placeKey = p => (p?.id ?? p?.n)
 
 /** 지역·종류 필터를 함께 적용 */
 export const inFilter = s =>

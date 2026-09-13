@@ -67,6 +67,8 @@ export interface CourseBudgetSummary {
 }
 export interface CourseItem {
   id: number; course_id: number; place_id: number; place_name: string; category_name: string; image_url?: string
+  /** 폐업(CLOSED)이면 카드가 '폐업' 배지를 단다 - 저장된 코스에서 지우지는 않는다 */
+  place_business_status?: 'OPEN' | 'TEMP_CLOSED' | 'CLOSED' | 'UNKNOWN' | null
   candidate_id?: string; source_code?: PlaceSourceCode; source_place_id?: string
   address?: string; road_address?: string; latitude?: number; longitude?: number
   day_no: number; position: number; visit_date: string; start_time?: string; end_time?: string
@@ -109,7 +111,7 @@ export interface CourseResult {
   swappable?: boolean; manageable?: boolean
   claim_token?: string; claim_expires_at?: string
   start_date: string; end_date: string; people: number; budget_total?: number; transport: Transport
-  estimated_cost_min?: number; estimated_cost_max?: number; average_congestion_rate?: number
+  estimated_cost_min?: number; estimated_cost_max?: number; average_congestion_rate?: number | null
   cost_summary?: CourseCostSummary; budget_summary?: CourseBudgetSummary
   generation_error_code?: string; accommodation?: AccommodationInput | null; days: CourseDay[]
   car_route?: CarRouteResult
@@ -118,16 +120,6 @@ export interface AlternativePlace {
   place_id: number; place_name: string; category_name: string; subcategory_name?: string; image_url?: string
   distance_m: number; congestion_rate?: number; congestion_level?: CongestionLevel
   recommendation_reason: string; replacement_reason: string; radius_km?: 10|20
-}
-export interface CongestionRescheduleOption {
-  visit_date: string
-  start_time: string
-  end_time: string
-  congestion_rate: number
-  congestion_level: CongestionLevel
-  weather_condition: WeatherCondition
-  temperature: number
-  precipitation_probability: number
 }
 export interface SavedCourseSummary {
   course_id: number
