@@ -4,6 +4,7 @@ import { ref, computed, watch } from 'vue'
 import { state, placeKey } from '@/stores/mapStore'
 
 import { crowd, tier } from '@/utils/crowd'
+import { poiMarkerClass } from './mapPresentation'
 import { won } from '@/utils/geo'
 import { mapBridge } from '@/composables/mapBridge'
 import MapPlaceService from '@/services/map/MapPlaceService'
@@ -82,13 +83,9 @@ const hits = computed(() => {
   }).slice(0, 10)
 })
 
-/* 검색 결과 핀 색 - 관광지는 혼잡색, 착한가격은 분홍, 나머지는 지도 마커와 같은 업종색 */
-const API_PIN = { FOOD: 'dine', CAFE: 'cafe', CONVENIENCE: 'cvs', LODGING: 'stay', MART: 'mart' }
-function pinCls(h) {
-  if (h.type === 'spot') return tier(h.c)
-  if (h.type === 'food' || h.o.good) return 'food'
-  return API_PIN[h.o.cat] ?? 'none'
-}
+/* 검색 결과 점 - 관광지는 혼잡 색 점(.rpin), 그 외는 지도 핀과 같은 업종 원+아이콘(.poi-marker.mk-*).
+   전엔 색만 다른 점이라 착한가격(분홍 네모)·식당(보라 점)이 무슨 종류인지 바로 안 읽혔다(2026-09-14 사용자 요청). 코스 패널과 같은 모양 */
+const poiCls = h => (h.type === 'spot' ? null : poiMarkerClass(h.o) ?? (h.type === 'food' ? 'mk-food' : null))
 
 const showPanel = computed(() => open.value && q.value.trim().length > 0)
 
@@ -134,7 +131,8 @@ defineExpose({ close })
   <div class="sb-rs" :class="{ on: showPanel }">
     <template v-if="hits.length">
       <div v-for="h in hits" :key="h.type + placeKey(h.o)" class="sr" @click="pick(h)">
-        <span class="rpin" :class="pinCls(h)"></span>
+        <span v-if="poiCls(h)" class="poi-marker cpin" :class="poiCls(h)"></span>
+        <span v-else class="rpin" :class="h.type === 'spot' ? tier(h.c) : 'none'"></span>
         <span class="info">
           <span class="rn">{{ h.o.n }}</span>
           <!-- 라이브 착한가격엔 메뉴·가격 필드가 없다 - 업종으로 통일, 가격은 있을 때만 -->

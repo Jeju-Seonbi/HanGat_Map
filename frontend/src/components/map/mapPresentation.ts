@@ -13,6 +13,14 @@ export const POI_MARKER_CLASS = {
 
 export type PoiGroup = keyof typeof POI_MARKER_CLASS
 
+/** 장소 업종 코드 → 지도 업종 핀 클래스. 착한가격 식당은 분홍(mk-food), 관광지·모르는 업종은 null(혼잡 색 점을 쓴다).
+    코스 패널·검색 결과가 지도 핀과 같은 모양으로 업종을 보여줄 때 쓴다(2026-09-14) */
+const CAT_MARKER_CLASS: Record<string, string> = { FOOD: 'mk-dine', CAFE: 'mk-cafe', LODGING: 'mk-stay', CONVENIENCE: 'mk-cvs', MART: 'mk-mart' }
+export function poiMarkerClass (o?: { cat?: string | null, good?: boolean | null } | null): string | null {
+  if (!o?.cat) return null
+  return o.cat === 'FOOD' && o.good ? 'mk-food' : (CAT_MARKER_CLASS[o.cat] ?? null)
+}
+
 /** 업종 레이어 키 - MapCanvas 가 이 순서로 핀을 적용한다 */
 export const POI_GROUPS = Object.keys(POI_MARKER_CLASS) as PoiGroup[]
 
