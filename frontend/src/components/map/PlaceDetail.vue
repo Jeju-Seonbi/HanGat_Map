@@ -167,14 +167,18 @@ function findCalmDay() {
   if (b.k !== state.di) setTimeout(() => { state.di = b.k }, 1000)
 }
 
-const nearby = ref([])
-function findNearby() {
-  nearby.value = state.layers.spot.filter(x => placeKey(x) !== placeKey(s.value))   // 자기 자신만 뺀다 - 동명 다른 장소는 대안 후보
+/* 근처 대안 - 버튼을 누른 뒤엔 날짜(state.di)가 바뀔 때마다 다시 계산한다(computed).
+   버튼 누른 순간의 스냅샷(ref)으로 두면 7일 카드·달력·'한산한 날 찾기'로 날짜를 옮긴 뒤에도 이전 날짜 기준 3곳이 남았다 -
+   가마오름 9/13 기준 3곳이 9/14 화면에 그대로(실제 9/14 대안은 전부 다른 곳). 2026-09-13 */
+const nearbyOn = ref(false)
+const nearby = computed(() => {
+  if (!nearbyOn.value) return []
+  return state.layers.spot.filter(x => placeKey(x) !== placeKey(s.value))   // 자기 자신만 뺀다 - 동명 다른 장소는 대안 후보
     .map(x => ({ s: x, c: crowd(x, state.di), d: dist(s.value, x) }))
     .filter(o => o.d < 12 && o.c != null && o.c < 40)
     .sort((a, b) => a.c - b.c).slice(0, 3)
-  hint.value = nearby.value.length ? '' : '<span style="color:var(--tx3)">반경 12km 안에는 한산한 대안이 없어요.</span>'
-}
+})
+function findNearby() { nearbyOn.value = true; hint.value = '' }
 
 async function copyAddr() {
   toast(await copyText(s.value.addr)
@@ -392,15 +396,17 @@ async function shareNative() {
         <button v-if="crowdUi" class="p1" @click="findCalmDay">한산한 날 찾기</button>
         <button @click="findNearby">근처 대안 보기</button>
       </div>
-      <div v-if="hint || nearby.length" class="hint" style="display:block">
+      <div v-if="hint || nearbyOn" class="hint" style="display:block">
         <span v-if="hint" v-html="hint"></span>
         <template v-if="nearby.length">
           근처에 한산한 곳이 있어요 ·
-          <template v-for="(o, i) in nearby" :key="o.s.n">
+          <template v-for="(o, i) in nearby" :key="placeKey(o.s)">
             <a style="color:var(--calm);cursor:pointer;font-weight:700"
               @click="emit('open-place', o.s)">{{ o.s.n }}</a><template v-if="i < nearby.length - 1">, </template>
           </template>
         </template>
+        <!-- 대안이 없는 날짜로 옮기면 목록 대신 이 문구로 바뀐다 - 날짜와 함께 다시 계산되므로 -->
+        <span v-else-if="nearbyOn" style="color:var(--tx3)">반경 12km 안에는 한산한 대안이 없어요.</span>
       </div>
 
       <!-- 상세 하단 후기 미리보기 (최근 3개, 실 API) -->
