@@ -151,6 +151,16 @@ describe('폐업 장소', () => {
     expect(rows?.map(r => r.closed)).toEqual([true, false])
   })
 
+  it('부제(c)는 세부 태그 → 대분류 → 정보 없음 순 - 태그 없는 카페는 "카페"로 보인다', async () => {
+    mockFetch([
+      ROW,                                                          // 카페, tagName null
+      { ...ROW, id: 1, tagName: '호텔', categoryName: '숙소' },      // 태그 있으면 태그
+      { ...ROW, id: 2, tagName: null, categoryName: null },         // 둘 다 없을 때만 정보 없음
+    ])
+    const rows = await MapPlaceService.getLayer('cafe')
+    expect(rows?.map(r => r.c)).toEqual(['카페', '호텔', '정보 없음'])
+  })
+
   it('getById 는 상세 응답을 목록과 같은 모양으로 돌려준다', async () => {
     mockFetch({ ...CLOSED_ROW, overview: '소개', images: [] })
     const p = await MapPlaceService.getById(77)
