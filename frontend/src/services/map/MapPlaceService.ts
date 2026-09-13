@@ -25,7 +25,7 @@ export interface MapPlace {
   y: number
   /** 권역 표시명 (동부/서부/남부/북부) */
   r: string
-  /** 세부분류 표시명 (오름/해수욕장/박물관…). 미분류면 '정보 없음' */
+  /** 세부분류 표시명 (오름/해수욕장/박물관…). 태그가 없으면 대분류(카페/편의점/마트/음식점), 그것도 없으면 '정보 없음' */
   c: string
   /** 세부분류 코드 (관광공사 NA010100 등). 관광지 핀 아이콘 묶음을 앞자리로 정한다 - 없으면 null */
   tc: string | null
@@ -255,7 +255,9 @@ function toMapPlace (row: BackendPlace): MapPlace {
     y: row.latitude ?? 0,
     r: row.regionName,
     // 세부분류가 없는 장소가 있다 - 빈 문자열로 두면 드롭다운에 빈 항목이 생긴다
-    c: row.tagName ?? '정보 없음',
+    // 세부 태그(오름·호텔·관광식당)가 없으면 대분류(카페·편의점·마트·음식점)로 - 소상공인 상가 5,419곳과 착한가격 268곳은 태그가 없어
+    // '정보 없음 · 서부'로 보였다(2026-09-13). 찜 탭 매퍼(api/favorites.js)와 같은 규칙
+    c: row.tagName ?? row.categoryName ?? '정보 없음',
     tc: row.tagCode ?? null,   // 관광공사 분류 코드 - 관광지 핀 아이콘 묶음(spotIconGroup)이 앞자리로 나눈다
     unit: placeUnit(row.lotAddress, row.roadAddress),
     cat: row.categoryCode,

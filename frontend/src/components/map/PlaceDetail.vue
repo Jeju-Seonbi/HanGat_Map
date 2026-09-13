@@ -4,7 +4,7 @@ import { ref, computed, watch } from 'vue'
 import StarIcon from './StarIcon.vue'
 import ReviewSection from './ReviewSection.vue'
 import ProfileAvatar from '../common/ProfileAvatar.vue'
-import { state, toggleFav, isFav, toast } from '@/stores/mapStore'
+import { state, toggleFav, isFav, toast, placeKey } from '@/stores/mapStore'
 
 import { crowd, tier, tierKo, rank30, bestDay, CROWD_KO } from '@/utils/crowd'
 import { at, fmtK } from '@/utils/date'
@@ -36,6 +36,12 @@ const t = computed(() => tier(c.value))
    관광지는 예보가 없어도 왜 없는지 말해야 하므로 리드를 유지한다 (MAP_004) */
 const hasForecast = computed(() => Array.isArray(s.value.series) && s.value.series.some(v => v != null))
 const crowdUi = computed(() => hasForecast.value || s.value.cat === 'TOURIST')
+/* 값이 없는(c == null) 이유는 셋이고 문구가 달라야 한다(2026-09-13, 최종점검 #4):
+   ① 예보 API 자체를 못 받음(forecastDays 0) ② 이 장소는 예보가 있는데 선택 날짜가 범위 밖(outOfRange)
+   ③ 원래 관광공사 예측 대상이 아님. 전엔 ①②도 ③ 문구("예측 대상이 아니라")로 나가 성산일출봉이 10월 초에 '대상 아님'이 됐다 */
+const forecastDown = computed(() => state.forecastDays === 0)
+const outOfRange = computed(() => hasForecast.value && c.value == null)
+const untilText = computed(() => (state.forecastUntil >= 0 ? fmtK(at(state.forecastUntil)) : null))
 
 /* 리드 문장은 그 장소의 30일 예보 안에서의 순위만 말한다 — 다른 장소와 비교하지 않는다 */
 const rankText = computed(() => {
@@ -123,7 +129,10 @@ const reviewPage = ref(null)
 const previewReviews = ref([])
 const rvDate = iso => { const d = new Date(iso); return `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}` }
 
-watch(() => props.place.n, loadDetail, { immediate: true })
+/* 감시 키는 id(placeKey) - 이름으로 보면 동명 장소(카페 A→B, 관광지 보롬왓→카페 보롬왓)로 바꿔도 안 깨어나
+   이전 장소의 사진·소개·메뉴·휴무·후기가 그대로 남았다. MapView 가 :key 로 패널을 새로 만들기도 하지만
+   같은 인스턴스에서 place 가 바뀌는 경로가 생겨도 안전하게 여기서도 본다 */
+watch(() => placeKey(props.place), loadDetail, { immediate: true })
 
 async function loadDetail() {
   view.value = 'info'
@@ -153,25 +162,49 @@ function jumpToBest() {
 /** 한산한 날 찾기 — 앞으로 2주 안에서 */
 function findCalmDay() {
   if (c.value == null) {
-    hint.value = '<span style="color:var(--tx3)">관광공사 혼잡 예측 대상이 아니라 예보가 없는 장소예요.</span>'
+    // 예보는 있는데 선택 날짜가 범위 밖이면 예보가 있는 날 중 최저일로 옮긴다 - '대상 아님'이라고 막지 않는다
+    if (outOfRange.value && best.value.c != null) {
+      hint.value = `<span style="color:var(--calm)">이 날짜는 아직 예보가 없어 예보가 있는 날 중에서 찾았어요 · <b>${fmtK(at(best.value.k))}</b>로 옮길게요.</span>`
+      setTimeout(() => { state.di = best.value.k }, 1000)
+      return
+    }
+    hint.value = forecastDown.value
+      ? '<span style="color:var(--tx3)">혼잡 예보를 불러오지 못해 지금은 찾을 수 없어요 · 새로고침해 주세요.</span>'
+      : '<span style="color:var(--tx3)">관광공사 혼잡 예측 대상이 아니라 예보가 없는 장소예요.</span>'
     return
   }
-  const b = bestDay(s.value, state.di, 14)
+  // 요구사항(155행)대로 '오늘~+14일'에서 찾는다 - 선택한 날부터 뒤지던 것을 2026-09-13 결정(가)으로 오늘 기준에 맞춤.
+  // 팁 박스(오늘~30일)와 기준이 같아져 두 기능이 서로 다른 날을 가리키지 않는다
+  const b = bestDay(s.value, 0, 15)
+  if (b.k === state.di) {
+    hint.value = `<span style="color:var(--calm)">앞으로 2주 중엔 ${dayWord(state.di)}이 가장 한산해요.</span>`
+    return
+  }
+  if (b.c >= c.value) {
+    // 보고 있는 날(2주 밖일 수 있음)이 2주 안 최저보다 한산하면 옮기지 않는다 - 더 붐비는 날로 데려가지 않게
+    hint.value = `<span style="color:var(--calm)">앞으로 2주 안엔 ${dayWord(state.di)}보다 한산한 날이 없어요 · 2주 중 최저는 <b>${fmtK(at(b.k))}</b>이에요.</span>`
+    return
+  }
   const g = c.value - b.c, word = g >= 25 ? '훨씬' : g >= 12 ? '꽤' : '조금'
-  hint.value = b.k === state.di
-    ? '<span style="color:var(--calm)">앞으로 2주 중엔 오늘이 가장 한산해요.</span>'
-    : `<span style="color:var(--calm)"><b>${fmtK(at(b.k))}</b>로 옮기면 ${word} 한산해져요.</span>`
-  if (b.k !== state.di) setTimeout(() => { state.di = b.k }, 1000)
+  hint.value = `<span style="color:var(--calm)"><b>${fmtK(at(b.k))}</b>로 옮기면 ${word} 한산해져요.</span>`
+  setTimeout(() => { state.di = b.k }, 1000)
 }
 
-const nearby = ref([])
-function findNearby() {
-  nearby.value = state.layers.spot.filter(x => x.n !== s.value.n)
+/** '오늘' 또는 '9월 22일' - 선택한 날이 오늘이 아닌데 '오늘'이라고 부르던 문구(#19)를 고친다 */
+const dayWord = k => (k === 0 ? '오늘' : fmtK(at(k)))
+
+/* 근처 대안 - 버튼을 누른 뒤엔 날짜(state.di)가 바뀔 때마다 다시 계산한다(computed).
+   버튼 누른 순간의 스냅샷(ref)으로 두면 7일 카드·달력·'한산한 날 찾기'로 날짜를 옮긴 뒤에도 이전 날짜 기준 3곳이 남았다 -
+   가마오름 9/13 기준 3곳이 9/14 화면에 그대로(실제 9/14 대안은 전부 다른 곳). 2026-09-13 */
+const nearbyOn = ref(false)
+const nearby = computed(() => {
+  if (!nearbyOn.value) return []
+  return state.layers.spot.filter(x => placeKey(x) !== placeKey(s.value))   // 자기 자신만 뺀다 - 동명 다른 장소는 대안 후보
     .map(x => ({ s: x, c: crowd(x, state.di), d: dist(s.value, x) }))
     .filter(o => o.d < 12 && o.c != null && o.c < 40)
     .sort((a, b) => a.c - b.c).slice(0, 3)
-  hint.value = nearby.value.length ? '' : '<span style="color:var(--tx3)">반경 12km 안에는 한산한 대안이 없어요.</span>'
-}
+})
+function findNearby() { nearbyOn.value = true; hint.value = '' }
 
 async function copyAddr() {
   toast(await copyText(s.value.addr)
@@ -292,7 +325,15 @@ async function shareNative() {
           <span class="bdg" style="background:var(--busy);color:#fff">폐업</span>
           &nbsp;폐업했거나 관광 정보에서 삭제된 장소예요. 찜·코스에는 그대로 남아 있어요.
         </template>
-        <!-- MAP_004 예외: 예보 미제공 — 없는 데이터는 추측하지 않는다 -->
+        <!-- MAP_004 예외: 예보 미제공 — 없는 데이터는 추측하지 않되, '왜 없는지'는 세 갈래로 정확히 말한다 -->
+        <template v-else-if="c == null && forecastDown">
+          <span class="bdg" style="background:var(--none);color:#fff">예보 없음</span>
+          &nbsp;혼잡 예보를 불러오지 못했어요 · 새로고침해 주세요.
+        </template>
+        <template v-else-if="outOfRange">
+          <span class="bdg" style="background:var(--none);color:#fff">예보 전</span>
+          &nbsp;{{ fmtK(at(state.di)) }}은 아직 혼잡 예보가 없어요<template v-if="untilText"> · 예보는 {{ untilText }}까지 있어요</template>.
+        </template>
         <template v-else-if="c == null">
           <span class="bdg" style="background:var(--none);color:#fff">예보 없음</span>
           &nbsp;관광공사 혼잡 예측 대상이 아니라 이 장소는 예보가 없어요.
@@ -305,8 +346,10 @@ async function shareNative() {
         </template>
       </div>
 
-      <div v-if="c != null && !s.closed" class="tipbox" @click="jumpToBest">
-        <template v-if="!tipText">✓ 30일 중 <b>오늘이 가장 한산</b>해요.</template>
+      <!-- 범위 밖 날짜여도 이 장소의 예보가 있으면 팁은 살린다 - 예보가 있는 날로 돌아갈 길 -->
+      <div v-if="(c != null || outOfRange) && best.c != null && !s.closed" class="tipbox" @click="jumpToBest">
+        <template v-if="outOfRange">🕐 예보가 있는 날 중엔 <b>{{ fmtK(at(best.k)) }}</b>이 가장 한산해요. 눌러서 옮겨보세요.</template>
+        <template v-else-if="!tipText">✓ 30일 중 <b>{{ dayWord(state.di) }}이 가장 한산</b>해요.</template>
         <template v-else>🕐 <b>{{ fmtK(at(best.k)) }}</b>로 가면 <b>{{ tipText }}</b> 날이에요. 눌러서 옮겨보세요.</template>
       </div>
 
@@ -332,7 +375,7 @@ async function shareNative() {
         </div>
       </div>
       <div v-if="hasWx" class="wx-src">{{ wxSource }}</div>
-      <div v-if="weatherGap && wxUntil" class="wx-note">날씨는 {{ wxUntil }}까지 제공돼요<template v-if="crowdUi"> · 혼잡은 30일 표시</template></div>
+      <div v-if="weatherGap && wxUntil" class="wx-note">날씨는 {{ wxUntil }}까지 제공돼요<template v-if="crowdUi && untilText"> · 혼잡은 {{ untilText }}까지</template></div>
       </template>
 
       <!-- 없는 정보(null)는 배지를 그리지 않는다 - '주차 없음'과 '주차 정보 없음'은 다르다 -->
@@ -389,15 +432,17 @@ async function shareNative() {
         <button v-if="crowdUi" class="p1" @click="findCalmDay">한산한 날 찾기</button>
         <button @click="findNearby">근처 대안 보기</button>
       </div>
-      <div v-if="hint || nearby.length" class="hint" style="display:block">
+      <div v-if="hint || nearbyOn" class="hint" style="display:block">
         <span v-if="hint" v-html="hint"></span>
         <template v-if="nearby.length">
           근처에 한산한 곳이 있어요 ·
-          <template v-for="(o, i) in nearby" :key="o.s.n">
+          <template v-for="(o, i) in nearby" :key="placeKey(o.s)">
             <a style="color:var(--calm);cursor:pointer;font-weight:700"
-              @click="emit('open-place', o.s.n)">{{ o.s.n }}</a><template v-if="i < nearby.length - 1">, </template>
+              @click="emit('open-place', o.s)">{{ o.s.n }}</a><template v-if="i < nearby.length - 1">, </template>
           </template>
         </template>
+        <!-- 대안이 없는 날짜로 옮기면 목록 대신 이 문구로 바뀐다 - 날짜와 함께 다시 계산되므로 -->
+        <span v-else-if="nearbyOn" style="color:var(--tx3)">반경 12km 안에는 한산한 대안이 없어요.</span>
       </div>
 
       <!-- 상세 하단 후기 미리보기 (최근 3개, 실 API) -->

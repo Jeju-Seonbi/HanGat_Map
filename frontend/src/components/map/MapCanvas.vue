@@ -2,7 +2,7 @@
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { loadKakaoMap } from '@/composables/useKakaoLoader'
 import { mapBridge } from '@/composables/mapBridge'
-import { state, inFilter, inRegion } from '@/stores/mapStore'
+import { state, inFilter, inRegion, placeKey } from '@/stores/mapStore'
 import MapPlaceService, { hasCoords } from '@/services/map/MapPlaceService'
 
 import { crowd, tier } from '@/utils/crowd'
@@ -302,7 +302,7 @@ function draw() {
   closeTip()
   ensureLayer()
   const { di, sel, course, courseDay, L } = state
-  const inCourse = n => course && course.stops.some(s => s.o && s.o.n === n)
+  const inCourse = p => course && course.stops.some(st => st.o && placeKey(st.o) === placeKey(p))   // id 기준 - 동명 장소가 같이 커지지 않게
   const seen = new Set()
   const lv = map.getLevel()
   // 관광지가 묶이는 축소 뷰(레벨 9 이상)에선 필터 밖 흐린 핀을 아예 숨긴다 - 섬 전체 뷰의 회색 점 600개는 정보가 아니라 잡음.
@@ -319,7 +319,7 @@ function draw() {
     seen.add(key)
     const e = ensurePin(key, 'spot', s)
     e.data = s
-    const pick = !!(inCourse(s.n) || (sel && sel.n === s.n))
+    const pick = !!(inCourse(s) || (sel && placeKey(sel) === placeKey(s)))
     const spec = spotPinSpec(L.crowd ? tier(crowd(s, di)) : 'calm', pick, on, spotIconGroup(s.tc))
     const sig = spec.sig + '|' + s.n
     if (sig !== e.sig) {

@@ -46,8 +46,11 @@ export const state = reactive({
   live: false,
   /** 이번 진입에서 못 받아온 레이어 키 - 칩을 다시 켜면 그 레이어만 재시도한다 */
   loadFailed: [],
-  /** 예보 일수. 화면은 30일 캘린더인데 실측은 21~22일이라 남는 날은 '정보 없음' */
+  /** 예보 일수(원시값, 0 = 예보를 못 받음). 화면은 30일 캘린더인데 실측은 21~22일이라 남는 날은 '정보 없음' */
   forecastDays: 0,
+  /** 오늘 기준 예보가 있는 마지막 날 인덱스(0 = 오늘, -1 = 없음). 관광지 전체에서 값이 있는 가장 뒤 칸.
+      "이 날짜는 아직 예보가 없어요 · 예보는 M/D까지" 같은 문구가 쓴다 - 없는 날을 '예측 대상 아님'이라 부르지 않게(2026-09-13) */
+  forecastUntil: -1,
   /** 예보를 장소에 붙일 때마다 1 증가 - 지도가 이걸 보고 핀 색을 다시 칠한다.
       일수(forecastDays)로는 안 된다: 재진입 때 22→22 로 값이 같아 watch 가 안 깨어나 핀이 회색으로 굳는다 */
   forecastVersion: 0,
@@ -186,6 +189,7 @@ export async function loadPlaces () {
   const [forecast] = await Promise.all([CrowdService.getForecast(), WeatherService.load()])
   state.forecastDays = forecast.days
   attachSeries(state.layers.spot, forecast, iso(new Date()))
+  state.forecastUntil = forecastUntilOf(state.layers.spot)
   state.forecastVersion++
   // 전부 제대로 받았을 때만 기록한다. 레이어 하나라도 못 받았거나 예보가 비어 왔으면 기록하지 않아
   // 다음 진입에 처음부터 다시 받는다 - "실패한 것만 골라 재시도"하는 코드 없이 재시도가 된다
@@ -194,6 +198,24 @@ export async function loadPlaces () {
     loadedDate = iso(new Date())
   }
 }
+
+/** 오늘 기준 예보가 있는 마지막 날 인덱스. attachSeries 뒤의 series 는 0 = 오늘이라 값이 있는 가장 뒤 칸이 답이다.
+    장소마다 빠진 날이 달라 "전체 중 가장 뒤"로 잡는다 - 어떤 장소든 예보가 있는 마지막 날. 하나도 없으면 -1 */
+export function forecastUntilOf (spots) {
+  let last = -1
+  for (const s of spots) {
+    const arr = s.series
+    if (!Array.isArray(arr)) continue
+    for (let i = arr.length - 1; i > last; i--) if (arr[i] != null) { last = i; break }
+  }
+  return last
+}
+
+/** 장소 식별자 - id 가 있으면 id, 없으면(목업·검색 API 임시 객체) 이름.
+    상세 갱신 감시·패널 key·선택 강조·목록 key 가 전부 이걸 쓴다. 이름은 식별자가 못 된다:
+    같은 이름 장소가 310그룹 802곳(스타벅스 35·씨유 44, 관광지↔카페 동명 보롬왓·거문오름·미깡창고).
+    이름으로 감시하던 시절엔 카페 A→카페 B 로 바꿔도 상세를 다시 안 받아 이전 장소의 사진·메뉴가 남았다(2026-09-13) */
+export const placeKey = p => (p?.id ?? p?.n)
 
 /** 지역·종류 필터를 함께 적용 */
 export const inFilter = s =>
