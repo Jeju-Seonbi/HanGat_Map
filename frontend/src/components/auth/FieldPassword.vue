@@ -30,6 +30,51 @@ const uid = useId()
 const inputId = computed(() => `pw-${uid}`)
 const msgId = computed(() => `pwm-${uid}`)
 const reveal = ref(false)
+const inputRejected = ref(false)
+let lastAcceptedValue = props.modelValue || ''
+let selectionBeforeInput = null
+
+watch(() => props.modelValue, v => { lastAcceptedValue = v || '' }, { flush: 'sync' })
+
+function onBeforeInput (event) {
+  selectionBeforeInput = [event.target.selectionStart, event.target.selectionEnd]
+  if (event.data && !hasAllowedPasswordCharacters(event.data) && event.cancelable) {
+    event.preventDefault()
+    inputRejected.value = true
+  }
+}
+
+function onPaste (event) {
+  const text = event.clipboardData?.getData('text')
+  // 일부 문자만 제거하면 사용자가 의도한 비밀번호와 달라지므로 붙여넣기 전체를 거절한다.
+  if (text && !hasAllowedPasswordCharacters(text)) {
+    event.preventDefault()
+    inputRejected.value = true
+  }
+}
+
+function onInput (event) {
+  const input = event.target
+  if (input.value && !hasAllowedPasswordCharacters(input.value)) {
+    // 취소할 수 없는 IME 조합·자동완성 입력도 화면과 모델에 남기지 않는다.
+    input.value = lastAcceptedValue
+    if (selectionBeforeInput?.[0] != null) input.setSelectionRange(...selectionBeforeInput)
+    inputRejected.value = true
+    return
+  }
+  inputRejected.value = false
+  lastAcceptedValue = input.value
+  emit('update:modelValue', input.value)
+}
+
+function onEnter (event) {
+  // 한글 조합을 확정하는 Enter는 로그인/가입 요청으로 전달하지 않는다.
+  if (event.isComposing || event.keyCode === 229) {
+    event.preventDefault()
+    return
+  }
+  emit('enter')
+}
 
 const value = computed(() => props.modelValue || '')
 const isNewPassword = computed(() => props.autocomplete === 'new-password')
@@ -63,6 +108,7 @@ const barWidth = computed(() => `${((strength.value.score + 1) / 5) * 100}%`)
 const barClass = computed(() => ['s0', 's1', 's2', 's3', 's4'][strength.value.score])
 
 const message = computed(() => {
+  if (inputRejected.value) return { text: PASSWORD_CHARACTER_MESSAGE, kind: 'err' }
   if (characterError.value) return { text: characterError.value, kind: 'err' }
   if (props.error) return { text: props.error, kind: 'err' }
   if (breach.value.breached) {
@@ -100,9 +146,12 @@ const message = computed(() => {
         autocorrect="off"
         :aria-invalid="props.error || characterError || breach.breached ? 'true' : undefined"
         :aria-describedby="message || props.showGuidance ? msgId : undefined"
-        @input="emit('update:modelValue', $event.target.value)"
+        @beforeinput="onBeforeInput"
+        @paste="onPaste"
+        @input="onInput"
+        @compositionend="onInput"
         @blur="emit('blur')"
-        @keydown.enter="emit('enter')"
+        @keydown.enter="onEnter"
       >
       <button
         class="peek"
