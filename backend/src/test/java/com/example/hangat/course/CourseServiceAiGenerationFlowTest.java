@@ -16,6 +16,8 @@ import com.example.hangat.course.model.enums.CourseType;
 import com.example.hangat.course.model.enums.GenerationReason;
 import com.example.hangat.course.model.enums.Transport;
 import com.example.hangat.map.model.entity.Place;
+import com.example.hangat.map.model.entity.Region;
+import com.example.hangat.map.goodprice.KakaoLocalClient.KakaoPlace;
 import com.example.hangat.course.travel.CourseTravelService;
 import com.example.hangat.course.travel.StraightLineDistanceCalculator;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -34,12 +36,62 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 
 class CourseServiceAiGenerationFlowTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper()
             .registerModule(new JavaTimeModule());
+
+    @Test
+    void synchronousGenerationVerifiesAndPersistsSelectedAccommodationIdentity() throws Exception {
+        CoursePersistenceService persistence = mock(CoursePersistenceService.class);
+        CourseBudgetService budget = mock(CourseBudgetService.class);
+        CourseResponseAssembler assembler = mock(CourseResponseAssembler.class);
+        CourseAccommodationService accommodations = mock(CourseAccommodationService.class);
+        CourseService service = spy(new CourseService(
+                new StubTourApiService(), new StubCongestionApiService(),
+                new CourseCandidateShortlistService(),
+                new CourseAiPreparationService(new CourseAiInputAssembler(),
+                        new CourseTravelService(new StraightLineDistanceCalculator()), Optional.empty()),
+                mock(CourseAiGenerationService.class), persistence, budget, assembler));
+        service.setAccommodationService(accommodations);
+        CourseRequestDto request = objectMapper.readValue("""
+                {"start_date":"2026-08-27","end_date":"2026-08-27","people":2,
+                 "budget_total":500000,"transport":"PUBLIC_TRANSIT","course_regions":[],
+                 "course_styles":[{"code":"NATURE","weight":1}],"course_place_preferences":[],
+                 "accommodation":{"source_code":"KAKAO_LOCAL","source_place_id":"hotel-real-1",
+                    "place_name":"선택 숙소","latitude":33.4,"longitude":126.5}}
+                """, CourseRequestDto.class);
+        CourseService.ComputedCourse computed = mock(CourseService.ComputedCourse.class);
+        var verified = mock(KakaoAccommodationProvider.VerifiedAccommodation.class);
+        var verifiedPlace = new KakaoPlace(
+                "hotel-real-1", "서버 확인 숙소", "제주 지번", "제주 도로명",
+                new java.math.BigDecimal("33.4907"), new java.math.BigDecimal("126.4869"),
+                "AD5", "여행 > 숙박", "064", "https://place.map.kakao.com/hotel-real-1", 0);
+        var verifiedRegion = Region.builder().code("NORTH").name("북부").displayOrder((byte) 1).build();
+        when(verified.place()).thenReturn(verifiedPlace);
+        when(verified.region()).thenReturn(verifiedRegion);
+        Course course = mock(Course.class);
+        when(course.getId()).thenReturn(101L);
+        CoursePersistenceResult stored = new CoursePersistenceResult(course, java.util.Map.of(), java.util.Map.of());
+        doReturn(computed).when(service).computeCourse(request);
+        when(accommodations.verifyGeneratedAccommodation(request.getAccommodation(), computed)).thenReturn(verified);
+        when(persistence.persist(request, computed.facts(), computed.result(), computed.metadata(), verified)).thenReturn(stored);
+        when(budget.calculateAndCache(101L)).thenReturn(CourseBudgetCalculation.noData(500000));
+
+        service.createCourse(request);
+
+        verify(accommodations).verifyGeneratedAccommodation(request.getAccommodation(), computed);
+        verify(persistence).persist(request, computed.facts(), computed.result(), computed.metadata(), verified);
+        verify(assembler).assemble(any(), any(), any(), argThat(accommodation ->
+                "hotel-real-1".equals(accommodation.getSourcePlaceId())
+                        && "서버 확인 숙소".equals(accommodation.getPlaceName())
+                        && "NORTH".equals(accommodation.getRegion())), any());
+    }
 
     @Test
     void createCoursePreparesInputThenInvokesProviderAndValidator() throws Exception {

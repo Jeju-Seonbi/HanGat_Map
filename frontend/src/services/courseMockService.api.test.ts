@@ -391,6 +391,18 @@ describe('courseMockService Backend generation', () => {
     )
   })
 
+  it('shows a safe 400 field error instead of hiding it behind a generic message', () => {
+    const error = Object.assign(new ApiError(
+      400,
+      3000,
+      '입력값을 확인해주세요.',
+    ), { detail: { accommodation: '선택한 숙소의 Kakao identity를 확인할 수 없습니다.' } })
+
+    expect(courseGenerationErrorMessage(error)).toBe(
+      '선택한 숙소의 Kakao identity를 확인할 수 없습니다.',
+    )
+  })
+
   it('regenerates with the same conditions through the real course API without mock data', async () => {
     const requestMock = vi.mocked(apiRequest).mockResolvedValue(response)
 

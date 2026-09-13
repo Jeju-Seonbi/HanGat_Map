@@ -25,6 +25,8 @@ public class DeterministicCourseFallback {
                 || input.trip().endDate() == null || input.candidates().isEmpty()) throw unavailable();
         List<LocalDate> dates = input.trip().startDate().datesUntil(input.trip().endDate().plusDays(1)).toList();
         if (input.candidates().size() < dates.size()) throw unavailable();
+        if (input.preferences().selectedStyleCodes().contains("CAFE")
+                && input.candidates().stream().noneMatch(this::isCafe)) throw unavailable();
         boolean regenerate = input.generationMetadata() != null
                 && input.generationMetadata().generationReason() == com.example.hangat.course.model.GenerationReason.USER_REGENERATE;
         if (regenerate && input.candidates().size() < 2) throw unavailable();
@@ -87,6 +89,11 @@ public class DeterministicCourseFallback {
     private int styleMatches(CandidateFactDto candidate, CourseAiInputDto input) {
         return (int) candidate.styleHintCodes().stream()
                 .filter(input.preferences().selectedStyleCodes()::contains).count();
+    }
+
+    private boolean isCafe(CandidateFactDto candidate) {
+        return "CAFE".equals(candidate.internalCategoryCode())
+                || candidate.styleHintCodes().contains("CAFE");
     }
 
     private CourseAiResultDto.ItemDto item(CandidateFactDto candidate, LocalTime time, List<String> styles) {
