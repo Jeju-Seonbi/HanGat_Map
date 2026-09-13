@@ -27,7 +27,10 @@ const shareOpen = ref(false)
 /** 휴무일·입장료는 상세 API에만 있다. 못 받아오면 null - 해당 줄만 안 보인다 */
 const detail = ref(null)
 
-const s = computed(() => props.place)
+/* 코스 경유지가 관광지 레이어에 없으면(식당·카페·숙소 - 첫 진입엔 관광지만 받는다) CourseBridge 가 {id,n,x,y} 만 든 대체 객체를 넘긴다.
+   상세 응답은 목록 응답의 상위 집합이라 거기서 업종·권역·주소·태그를 채운다. 대체 객체의 표식은 c(업종)가 없는 것 -
+   레이어에서 온 장소는 c 가 항상 있다. 채워지기 전엔 아래 템플릿이 빈 칸·undefined 를 그리지 않게 각 줄을 방어한다(최종점검 #13) */
+const s = computed(() => (props.place.c === undefined && detail.value?.place) ? { ...detail.value.place, ...props.place } : props.place)
 const c = computed(() => crowd(s.value, state.di))
 const t = computed(() => tier(c.value))
 
@@ -61,7 +64,8 @@ const tipText = computed(() => {
 const week = computed(() => {
   const st = Math.max(0, Math.min(state.di - 1, 23))
   return Array.from({ length: 7 }, (_, j) => {
-    const k = st + j, d = at(k), w = wxOf(k, s.value.r), cc = crowd(s.value, k)
+    // 권역을 모르면 날씨를 비운다 - wxOf 는 권역이 없으면 북부로 대체하는데, 동부 식당에 북부 날씨를 보여주면 틀린 정보다
+    const k = st + j, d = at(k), w = s.value.r ? wxOf(k, s.value.r) : null, cc = crowd(s.value, k)
     return { k, d, w, cc, t: tier(cc), ko: tierKo(cc), label: `${d.getMonth() + 1}/${d.getDate()} ${'일월화수목금토'[d.getDay()]}` }
   })
 })
@@ -80,6 +84,7 @@ const hasWx = computed(() => week.value.some(w => w.w))
 /* 날씨는 이 장소 권역의 기상청 격자 값이다 - 어느 권역 기준이고 언제 발표된 예보인지 적는다 (MAP_006).
    발표 시각은 선택한 날짜 예보의 것(단기 05시·중기 18시가 섞인다). 적재분에만 있어 라이브 폴백이면 권역만 적는다 */
 const wxSource = computed(() => {
+  if (!s.value.r) return '출처: 기상청'          // 권역을 아직 모르면(대체 객체) 'undefined 기준'을 찍지 않는다
   const issued = wxIssuedAt(s.value.r, state.di)
   if (!issued) return `출처: 기상청 · ${s.value.r} 기준`
   const d = new Date(issued)
@@ -290,7 +295,7 @@ async function shareNative() {
       <div class="poh">
         <div style="flex:1">
           <h4>{{ s.n }}</h4>
-          <div class="sub">{{ s.c }} · {{ s.r }}</div>
+          <div class="sub">{{ [s.c, s.r].filter(Boolean).join(' · ') }}</div>
         </div>
         <!-- MAP_009 찜 -->
         <button class="fav" :class="{ on: isFav(s) }" :aria-pressed="isFav(s)" aria-label="찜하기" @click="toggleFav(s)">♥</button>
@@ -425,7 +430,8 @@ async function shareNative() {
 
       <!-- 주소(복사) · 운영시간(있을 때만 — 상시 개방은 줄 자체를 표시하지 않음) · 전화 -->
       <div class="pinfo">
-        <div class="pi">
+        <!-- 주소가 없으면(대체 객체·원천 결측) 빈 줄과 복사 버튼을 내지 않는다 - 누르면 'undefined'가 복사됐다 -->
+        <div v-if="s.addr" class="pi">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
             stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.1-7-11a7 7 0 0 1 14 0c0 4.9-7 11-7 11Z"/>
             <circle cx="12" cy="10" r="2.6"/></svg>
