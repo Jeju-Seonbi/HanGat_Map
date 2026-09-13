@@ -58,6 +58,17 @@ public class PlaceIngestService {
             "39", "FOOD"       // 음식점 716
     );
 
+    /** KTO 음식점(39) 중 세부분류가 카페·찻집이면 CAFE 로 넣는다 - 39 를 통째로 FOOD 로 넣어 관광공사 카페 224곳이
+     *  식당 칩에 섞이고 카페 칩엔 소상공인 상가(메뉴·사진 없음)만 있었다(2026-09-14). 사진·메뉴가 있는 카페가 카페 칩으로 간다 */
+    private static final Set<String> CAFE_TAGS = Set.of("FD050100", "FD050200");   // 카페, 찻집
+
+    /** 콘텐츠 타입 + 세부분류 → 우리 카테고리. 매핑 없는 타입은 null */
+    static String categoryFor(String contentTypeId, String tagCode) {
+        String category = TYPE_TO_CATEGORY.get(contentTypeId);
+        if ("FOOD".equals(category) && tagCode != null && CAFE_TAGS.contains(tagCode)) return "CAFE";
+        return category;
+    }
+
     private final PublicApiClient client;
     private final RegionResolver regionResolver;
     private final PlaceIngestWriter writer;
@@ -103,7 +114,7 @@ public class PlaceIngestService {
                 continue;
             }
             seen.add(item.contentid());
-            String categoryCode = TYPE_TO_CATEGORY.get(item.contenttypeid());
+            String categoryCode = categoryFor(item.contenttypeid(), blankToNull(item.lclsSystm3()));
             if (categoryCode == null) {
                 noCategory++;
                 log.debug("매핑 없는 contenttypeid={} title={}", item.contenttypeid(), item.title());

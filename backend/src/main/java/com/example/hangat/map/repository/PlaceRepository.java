@@ -187,11 +187,13 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
             """)
     List<Place> findWithoutDetail(Pageable pageable);
 
-    /** 메뉴(overview)가 아직 없는 음식점부터. KTO가 메뉴를 안 주는 곳도 다시 잡힌다 - 상세 적재의 empty 와 같은 트레이드오프 */
+    /** 메뉴(overview)가 아직 없는 KTO 음식점·카페부터. KTO가 메뉴를 안 주는 곳도 다시 잡힌다 - 상세 적재의 empty 와 같은 트레이드오프.
+     *  KTO 매핑이 있는 곳만 - 카페엔 소상공인 상가 3,039곳(메뉴 없음, KTO 아님)이 있어 조건 없이 잡으면 페이지가 그걸로 다 찬다(2026-09-14 CAFE 추가) */
     @Query("""
             select p from Place p
-            where p.primaryCategory.code = 'FOOD'
+            where p.primaryCategory.code in ('FOOD', 'CAFE')
               and p.overview is null
+              and exists (select 1 from PlaceSourceMapping m where m.place = p and m.source.code = 'KTO')
             order by p.id
             """)
     List<Place> findFoodWithoutMenu(Pageable pageable);
