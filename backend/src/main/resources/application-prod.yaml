@@ -1,4 +1,10 @@
 # 운영(OCI) 프로필 - 모든 비밀값은 서버 환경변수로 주입한다 (파일에 직접 기입 금지)
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
 spring:
   application:
     name: hangat-api
@@ -92,7 +98,12 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,info
+  info:
+    defaults:
+      enabled: false
+    env:
+      enabled: false
 
 # 날씨 조회용 API
 weather:

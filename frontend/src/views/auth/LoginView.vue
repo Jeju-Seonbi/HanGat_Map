@@ -104,6 +104,8 @@ function startSocialLogin (provider) {
 
 <template>
   <AuthLayout
+    back-to="/home"
+    back-label="홈으로 돌아가기"
     title="환영합니다"
     lead="나만의 제주 여행 코스를 저장하고, 혼잡도를 피해 여유로운 여행을 계획해보세요."
     :hero-images="AUTH_HERO_IMAGES"
