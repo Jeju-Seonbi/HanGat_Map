@@ -133,8 +133,9 @@ function toggleCourse() {
         </div>
       </div>
 
+      <!-- 코스가 있고 패널이 접혀 있으면 '코스 보기' - ×로 접은 패널을 다시 펼치는 유일한 버튼 -->
       <button class="cta" @click="toggleCourse">
-        {{ state.course ? '코스 지우기' : 'AI 코스 만들기' }}
+        {{ !state.course ? 'AI 코스 만들기' : state.coursePanel ? '코스 지우기' : '코스 보기' }}
       </button>
 
       <!-- 도트는 핀과 같은 면색(-st), 글자는 가독용 진한 톤 - 주황 글자는 흰 배경에서 못 읽는다 -->
