@@ -30,7 +30,9 @@ async function freshStore () {
 
 beforeEach(() => {
   vi.useFakeTimers()
-  vi.setSystemTime(new Date('2026-09-12T10:00:00+09:00'))
+  // iso()는 실행 환경의 현지 날짜를 사용한다. 테스트도 같은 기준으로 시각을 만든다.
+  // +09:00 문자열로 고정하면 UTC인 CI에서 자정 전후가 같은 날짜로 해석된다.
+  vi.setSystemTime(new Date(2026, 8, 12, 10, 0))
   placeApi.getAll.mockReset().mockResolvedValue(ok())
   crowdApi.getForecast.mockReset().mockResolvedValue(forecast())
   weatherApi.load.mockReset().mockResolvedValue(true)
@@ -76,7 +78,7 @@ describe('loadPlaces 재진입 재사용 (성능 B 커밋 1)', () => {
     const s = await freshStore()
     await s.loadPlaces()
     const before = s.state.layers
-    vi.setSystemTime(new Date('2026-09-12T21:59:00+09:00'))   // 11시간 59분 뒤
+    vi.setSystemTime(new Date(2026, 8, 12, 21, 59))   // 현지 시각으로 11시간 59분 뒤
     await s.loadPlaces()
     expect(placeApi.getAll).toHaveBeenCalledTimes(1)
     expect(crowdApi.getForecast).toHaveBeenCalledTimes(1)
@@ -89,20 +91,23 @@ describe('loadPlaces 재진입 재사용 (성능 B 커밋 1)', () => {
   it('12시간이 지나면 다시 받는다', async () => {
     const s = await freshStore()
     await s.loadPlaces()
-    vi.setSystemTime(new Date('2026-09-12T22:01:00+09:00'))   // 12시간 1분 뒤, 같은 날
+    vi.setSystemTime(new Date(2026, 8, 12, 22, 1))   // 12시간 1분 뒤, 같은 날
     await s.loadPlaces()
     expect(placeApi.getAll).toHaveBeenCalledTimes(2)
     expect(crowdApi.getForecast).toHaveBeenCalledTimes(2)
   })
 
   it('날짜가 바뀌면 12시간 안이라도 다시 받는다 - 예보가 오늘 기준으로 붙어 있어서', async () => {
-    vi.setSystemTime(new Date('2026-09-12T23:50:00+09:00'))
+    vi.setSystemTime(new Date(2026, 8, 12, 23, 50))
     const s = await freshStore()
     await s.loadPlaces()
-    vi.setSystemTime(new Date('2026-09-13T00:10:00+09:00'))   // 20분 뒤, 다음 날
+    expect(s.canReuse()).toBe(true)
+    vi.setSystemTime(new Date(2026, 8, 13, 0, 10))   // 20분 뒤, 현지 날짜가 바뀜
     expect(s.canReuse()).toBe(false)
     await s.loadPlaces()
     expect(placeApi.getAll).toHaveBeenCalledTimes(2)
+    expect(crowdApi.getForecast).toHaveBeenCalledTimes(2)
+    expect(weatherApi.load).toHaveBeenCalledTimes(2)
   })
 
   it('레이어 하나라도 못 받았으면 기록하지 않아 다음 진입에 전부 다시 받는다(재시도)', async () => {
