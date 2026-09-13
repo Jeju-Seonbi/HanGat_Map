@@ -8,7 +8,7 @@ backend:
 
     FRONTEND_URL: "https://hangatjeju.com"
     BACKEND_URL: "https://api.hangatjeju.com"
-    CORS_ALLOWED_ORIGINS: "https://hangatjeju.com,https://swagger.hangatjeju.com"
+    CORS_ALLOWED_ORIGINS: "https://hangatjeju.com"
 
   persistence:
     enabled: true
@@ -42,5 +42,5 @@ ingress:
     host: api.hangatjeju.com
 
   swagger:
-    enabled: true
+    enabled: false
     host: swagger.hangatjeju.com
