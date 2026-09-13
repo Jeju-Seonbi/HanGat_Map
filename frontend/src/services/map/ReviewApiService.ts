@@ -60,6 +60,18 @@ export const LEVEL_TO_KEY: Record<string, 'calm' | 'mid' | 'busy'> = {
 export const absUrl = (u: string): string =>
   u && u.startsWith('/') ? BACKEND_BASE_URL + u : u
 
+/** 사진 업로드 실패 응답을 사용자에게 보여줄 한 문장으로 바꾼다.
+    서버 검증 실패는 { success:false, message } JSON 이지만, 5MB 를 넘긴 413 은 스프링 기본 오류 본문(message 없음)이고
+    프록시 오류는 HTML 이라 - 그대로 json() 하면 "Unexpected end of JSON input" 이 토스트에 떴다 */
+export async function uploadFailMessage (res: Response): Promise<string> {
+  try {
+    const body = await res.json()
+    if (body?.message) return body.message as string
+  } catch { /* JSON 이 아닌 본문 */ }
+  if (res.status === 413) return '사진이 너무 커서 올리지 못했어요 · 5MB 이하로 줄여 주세요'
+  return '사진을 올리지 못했어요 · 잠시 후 다시 시도해 주세요'
+}
+
 export const ReviewApiService = {
   /** 장소별 후기 목록 - 비로그인 허용, 6개씩 */
   getReviews (placeId: number, page = 0): Promise<ReviewPage> {
@@ -89,15 +101,20 @@ export const ReviewApiService = {
       })
     }
 
-    let res = await send()
+    // 서버가 큰 요청을 받다 연결을 끊거나 네트워크가 없으면 fetch 자체가 영어("Failed to fetch")로 던진다 - 우리 문구로 바꾼다
+    const sendOrExplain = (): Promise<Response> =>
+      send().catch(() => { throw new Error('사진을 올리지 못했어요 · 인터넷 연결을 확인해 주세요') })
+
+    let res = await sendOrExplain()
     // 토큰이 그새 만료됐으면 한 번만 재발급 후 재시도
     if (res.status === 401) {
       await reissueAccessToken()
-      res = await send()
+      res = await sendOrExplain()
     }
+    if (!res.ok) throw new Error(await uploadFailMessage(res))
     const body = await res.json()
     if (!body.success) {
-      throw new Error(body.message ?? '사진 업로드에 실패했습니다.')
+      throw new Error(body.message ?? '사진을 올리지 못했어요')
     }
     return body.result as string[]
   },

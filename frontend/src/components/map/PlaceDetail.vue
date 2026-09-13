@@ -134,12 +134,20 @@ const rvDate = iso => { const d = new Date(iso); return `${d.getFullYear()}.${d.
    같은 인스턴스에서 place 가 바뀌는 경로가 생겨도 안전하게 여기서도 본다 */
 watch(() => placeKey(props.place), loadDetail, { immediate: true })
 
+/** 장소가 바뀌었을 때 - 뷰·힌트·펼침 상태를 초기화하고 처음부터 받는다 */
 async function loadDetail() {
   view.value = 'info'
   hint.value = ''
   shareOpen.value = false
   introOpen.value = false
   detail.value = null
+  await fetchDetail()
+}
+
+/** 상세·후기 첫 페이지만 다시 받는다. 후기 등록·삭제 뒤(@changed)에 쓴다 -
+    전엔 loadDetail 을 그대로 불러서 후기 뷰가 정보 뷰로 튕기고, detail 을 비운 한순간 칩이 '첫 후기를 남겨보세요'로 깜빡였다(2026-09-13, 최종점검 #7).
+    여기선 뷰를 건드리지 않고 detail 도 비우지 않는다 - 응답이 오면 통째로 바꾼다 */
+async function fetchDetail() {
   // 목업 모드는 id 가 없다
   if (s.value.id == null) return
   const id = s.value.id
@@ -491,7 +499,7 @@ async function shareNative() {
         <button class="pox" @click="emit('close')">×</button>
       </div>
       <ReviewSection :place="s" :rating-avg="ratingAvg" :first-page="reviewPage"
-        @open-photo="p => emit('open-photo', p)" @changed="loadDetail" />
+        @open-photo="p => emit('open-photo', p)" @changed="fetchDetail" />
     </div>
   </div>
 </template>
