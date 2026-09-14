@@ -1,13 +1,18 @@
 <script setup>
-/* 후기 사진 확대 보기 — 여러 장이면 좌우로 넘기고, 배경·×·Esc로 닫는다 */
+/* 사진 확대 보기(관광공사 사진·후기 사진 공용) — 여러 장이면 좌우로 넘기고, 배경·×·Esc로 닫는다.
+   출처 문구를 받는다 - 전엔 공공누리 출처가 전면 화면에서 사라졌다(최종점검 #45) */
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 
 const photos = ref([])
+const source = ref('')
 const index = ref(0)
 const open = computed(() => photos.value.length > 0)
 const many = computed(() => photos.value.length > 1)
 
-function show(list, i) { photos.value = list; index.value = i }
+/** list: 사진 URL 배열, i: 시작 장, opts.source: 출처 문구(관광공사 사진) */
+function show(list, i, { source: s = '' } = {}) {
+  photos.value = list; source.value = s; index.value = i
+}
 function close() { photos.value = [] }
 function move(d) { index.value = (index.value + d + photos.value.length) % photos.value.length }
 
@@ -30,7 +35,10 @@ defineExpose({ show, close })
       <img :src="photos[index]" alt="후기 사진">
       <button v-if="many" class="lbx-nav next" aria-label="다음 사진" @click.stop="move(1)">›</button>
       <button class="lbx-x" aria-label="닫기" @click="close">×</button>
-      <div v-if="many" class="lbx-cnt">{{ index + 1 }} / {{ photos.length }}</div>
+      <div class="lbx-foot">
+        <span v-if="many" class="lbx-cnt">{{ index + 1 }} / {{ photos.length }}</span>
+        <span v-if="source" class="lbx-src">{{ source }}</span>
+      </div>
     </div>
   </Teleport>
 </template>
@@ -48,10 +56,13 @@ defineExpose({ show, close })
   width:44px;height:66px;border-radius:12px}
 .lbx-nav.prev{left:12px}
 .lbx-nav.next{right:12px}
-.lbx-cnt{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);color:#fff;
-  font-size:12.5px;font-weight:700;background:rgba(0,0,0,.5);padding:5px 15px;border-radius:var(--rp)}
+.lbx-foot{position:absolute;bottom:20px;left:60px;right:60px;display:flex;justify-content:center;align-items:center;gap:8px;
+  flex-wrap:wrap;pointer-events:none}
+.lbx-cnt,.lbx-src{color:#fff;font-size:12.5px;font-weight:700;background:rgba(0,0,0,.5);padding:5px 15px;border-radius:var(--rp)}
+.lbx-src{font-weight:600;opacity:.92}   /* 공공누리 출처 - 전면 화면에서도 보인다(#45) */
 @media(max-width:768px){
   .map-lightbox{padding:52px 12px}
+  .lbx-foot{left:12px;right:12px}
   .lbx-nav{width:38px;height:56px;font-size:26px}
   .lbx-nav.prev{left:2px}
   .lbx-nav.next{right:2px}

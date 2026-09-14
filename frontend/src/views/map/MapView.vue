@@ -178,7 +178,7 @@ const reload = () => location.reload()
     <div v-if="state.sel" class="pop-dim" @click="closeDetail"></div>
     <!-- :key 가 장소 식별자라 다른 장소를 열면 패널이 새로 만들어진다 - 탭·힌트·근처 대안·후기 목록이 이월되지 않는다 -->
     <PlaceDetail v-if="state.sel" :key="placeKey(state.sel)" :place="state.sel" @close="closeDetail"
-      @open-place="openPlace" @open-photo="p => lightbox.show(p.photos, p.index)" />
+      @open-place="openPlace" @open-photo="p => lightbox.show(p.photos, p.index, p)" />
 
     <!-- × 는 패널만 접는다 - 코스 핀·경로·URL 은 그대로. 지우려면 왼쪽 '코스 지우기' -->
     <CoursePanel @close="state.coursePanel = false" @open-place="openPlace" />
