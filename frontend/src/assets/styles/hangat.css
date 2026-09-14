@@ -66,7 +66,7 @@
 .cl.mid{background:var(--pin-mid)}
 .cl.busy{background:var(--pin-busy)}
 .cl.none{background:var(--pin-none)}
-.cl.poi{z-index:250}
+.cl.poi{z-index:150}   /* 관광지 핀(200) 아래·흐린 관광지(100)·업종 낱개 핀(60) 위 - 겹치면 관광지 우선(MAP-04, 최종점검 #31). 전엔 250 이라 식당 묶음이 관광지를 덮었다 */
 .cl .lb-t{position:absolute;top:calc(100% + 5px);left:50%;transform:translateX(-50%);pointer-events:none;
   font-size:11px;font-weight:700;padding:2px 8px;box-shadow:0 1px 4px rgba(30,50,80,.14);z-index:1}
 
