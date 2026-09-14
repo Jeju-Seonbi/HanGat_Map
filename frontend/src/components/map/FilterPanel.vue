@@ -129,8 +129,9 @@ function toggleCourse() {
       </div>
 
       <div class="chips">
-        <span v-for="r in REGIONS" :key="r" class="chip" :class="{ on: r === state.F.reg }"
-          @click="setRegion(r)">{{ r }}</span>
+        <!-- button: Tab·Enter 로도 고를 수 있게(전엔 span 이라 키보드로 못 갔다, 최종점검 #34). aria-pressed 로 켜진 칩을 낭독기가 읽는다 -->
+        <button v-for="r in REGIONS" :key="r" type="button" class="chip" :class="{ on: r === state.F.reg }"
+          :aria-pressed="r === state.F.reg" @click="setRegion(r)">{{ r }}</button>
       </div>
 
       <div class="ftr-wrap">
@@ -138,8 +139,8 @@ function toggleCourse() {
           @click="moveFilter(-1)">‹</button>
         <div class="ftr-vp">
           <div class="ftr" :style="isMobile ? null : { transform: shift }">
-            <button v-for="l in LAYERS" :key="l.k" :class="[l.k, { on: state.L[l.k] }]"
-              @click="toggleLayer(l.k)">
+            <button v-for="l in LAYERS" :key="l.k" type="button" :class="[l.k, { on: state.L[l.k] }]"
+              :aria-pressed="!!state.L[l.k]" @click="toggleLayer(l.k)">
               <span class="ico"><LayerIcon :name="l.k" /></span>{{ l.t }}
             </button>
           </div>
