@@ -134,6 +134,17 @@ describe('mapPresentation', () => {
     expect(mapCss).toContain('.mtabs,.msum,.mapply,.cond-dim{display:none}')   // 데스크톱에선 폰 전용 요소가 안 보인다
   })
 
+  it('모바일에서 토스트·장소 데이터 배너·닫기 버튼이 탭바·날짜 버튼·손가락과 겹치지 않는다 (#53·#55·#56·#57)', () => {
+    expect(declarations('.toast')).toContain('bottom:calc(var(--mobile-tabbar-h) + 84px)')   // 탭바 + 돋보기 버튼 위
+    expect(declarations('.map-offline')).toContain('top:62px')                              // 날짜 버튼(12+42) 아래 8px
+    expect(declarations('.stage.sheet-open .map-offline')).toContain('display:none')
+    expect(declarations('.pox::before,.ph .x::before')).toContain('inset:-6px')                  // 20×21 → 32×33, 자리는 그대로
+    expect(declarations('.pi .cp::before,.intro-more::before')).toContain('inset:-8px -6px')
+    expect(mobileCss).not.toContain('.pox,.ph .x{min-width')                                     // 제목 칸을 줄이는 방식은 쓰지 않는다
+    expect(mapCss).toContain('.wxc{flex:0 0 auto;width:58px;')                              // 헤더 높이 토큰에 묶이지 않는다
+    expect(mapCss).not.toContain('width:var(--nav-h)')
+  })
+
   it('모바일 검색 버튼과 바텀시트 닫기 버튼이 접근 가능한 상태를 알린다', () => {
     expect(filterPanelSource).toContain('class="filter-fab"')
     expect(filterPanelSource).toContain(':aria-expanded="mobileOpen"')

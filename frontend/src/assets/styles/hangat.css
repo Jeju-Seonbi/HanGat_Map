@@ -335,7 +335,8 @@
 .wxrow{display:flex;gap:7px;overflow-x:auto;padding:2px 0 6px;margin-bottom:13px}
 .wxrow::-webkit-scrollbar{height:4px}
 .wxrow::-webkit-scrollbar-thumb{background:var(--line2);border-radius:3px}
-.wxc{flex:0 0 auto;width:var(--nav-h);padding:8px 0 8px;border-radius:13px;background:var(--surf2);
+/* 카드 폭 58px - 헤더 높이(--nav-h)와 무관한 값인데 통합 때 58px 일괄 치환에 휩쓸려 데스크톱 80px·폰 60px 로 흔들렸다(최종점검 #57) */
+.wxc{flex:0 0 auto;width:58px;padding:8px 0 8px;border-radius:13px;background:var(--surf2);
   text-align:center;cursor:pointer;border:2px solid transparent;transition:transform .12s,box-shadow .12s}
 .wxc:hover{transform:translateY(-2px);box-shadow:var(--sh)}
 .wxc.on{background:var(--ac-bg);border-color:var(--ac)}
@@ -639,5 +640,16 @@
   .slid.s1,.slid.s2{left:10px;right:10px}
   .datebtn{padding:10px 16px;background:var(--surf);border:1px solid var(--line)}
   .stage.sheet-open .cond,.stage.sheet-open .cond-dim,.stage.sheet-open .filter-fab{display:none}
+  /* 토스트를 하단 탭바(--mobile-tabbar-h, iOS 홈 표시줄 포함)와 돋보기 버튼(bottom 20 + 56) 위로 - 전엔 bottom 34px 라 탭바 아이콘을 덮었다(최종점검 #53) */
+  .toast{bottom:calc(var(--mobile-tabbar-h) + 84px)}
+  /* 장소 데이터 배너를 날짜 버튼(top 12 + 높이 42) 아래 8px 로 - 폰에선 날짜 버튼이 위에 있어 배너 글자를 가렸다(최종점검 #55).
+     상세·코스 시트가 열리면 667px 폰에서 시트 위와 겹치므로 그동안은 숨긴다 */
+  .map-offline{top:62px}
+  .stage.sheet-open .map-offline{display:none}
+  /* 터치 타깃(최종점검 #56): 상세·코스 닫기 ×, '복사' 알약, '더보기' 링크는 겉모습·자리는 그대로 두고 누르는 영역만 32px 이상으로 넓힌다.
+     × 를 min-width 로 키우면 제목 칸이 12px 줄어 390px 에서 관광지 12곳 제목이 한 줄 더 꺾였다(검증 실측) */
+  .pox,.ph .x,.pi .cp,.intro-more{position:relative}
+  .pox::before,.ph .x::before{content:'';position:absolute;inset:-6px}
+  .pi .cp::before,.intro-more::before{content:'';position:absolute;inset:-8px -6px}
 }
 }
