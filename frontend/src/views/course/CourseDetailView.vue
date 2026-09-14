@@ -478,14 +478,6 @@ async function applySwap (alternative: AlternativePlace) {
         <p class="route-note">
           장소 간 추천 순서를 나타낸 선이며 실제 도로 경로와 다를 수 있습니다.
         </p>
-        <div class="panel compact">
-          <h3>코스 정보</h3>
-          <dl>
-            <dt>일정</dt><dd>{{ view.dayCount }}일</dd>
-            <dt>장소</dt><dd>{{ view.placeCount }}곳</dd>
-            <dt>평균 혼잡도</dt><dd>{{ view.averageText }}</dd>
-          </dl>
-        </div>
       </aside>
     </div>
   </section>
@@ -539,6 +531,10 @@ async function applySwap (alternative: AlternativePlace) {
 
 <style scoped>
 .course-highlight{margin-top:8px}
+/* 전역 .metrics는 결과 화면(가운데 800px)용 - 여기서는 패널 폭에 맞추고, 칸 사이 선에 글자가 붙지 않게 좌우 여백을 준다 */
+.metrics.panel{max-width:none;margin:24px 0 0}
+.metrics>div{padding:0 24px}
+.metrics>div:first-child{padding-left:0}
 .rename-form{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0 10px}
 .rename-input{flex:1 1 240px;min-width:0;padding:10px 14px;border:1px solid var(--border);border-radius:12px;font-size:1.2rem;font-weight:700;background:transparent;color:inherit}
 .btn.danger{color:#c43c3c;border-color:#e6b4b4}
@@ -557,6 +553,8 @@ async function applySwap (alternative: AlternativePlace) {
 .course-not-found .panel{padding:64px 30px}
 .course-not-found .btn{margin-top:20px}
 @media(max-width:767px){
+  /* 모바일은 전역 규칙으로 2열·구분선 없음 - 칸 여백을 빼서 왼쪽 선을 맞춘다 */
+  .metrics>div{padding:0}
   /* 버튼 4개가 한 줄에 끼면 글자가 한 자씩 세로로 접힌다 - 두 개씩 두 줄 */
   .page-head .actions{flex-wrap:wrap;margin:18px 0 0}
   .page-head .actions .btn{flex:1 1 calc(50% - 6px);min-width:0;padding:12px 10px;white-space:nowrap;text-align:center}
