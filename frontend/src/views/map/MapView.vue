@@ -143,7 +143,12 @@ onMounted(async () => {
     console.error('코스 링크 복원 실패', e)
     toast('링크의 코스를 그리지 못했어요')
   }
-  if (!courseDrawn) loadFromURL()
+  if (!courseDrawn) {
+    loadFromURL()
+    // 권역 복원(?r=·탭 기억) - MapCanvas 의 첫 fitRegion 은 장소 도착 전이라 빈 배열로 되돌아간다(최종점검 #60).
+    // SDK 가 아직이면 mapBridge.fitRegion 은 빈 함수라 무해하고, 그땐 MapCanvas onMounted 의 fitRegion 이 맡는다
+    if (state.F.reg !== '전체') mapBridge.fitRegion()
+  }
   // 코스와 장소가 함께 온 링크도 있다(코스를 보다 장소를 열고 공유) - 코스를 그린 뒤 장소를 연다
   try {
     await openPlaceFromURL()
