@@ -1,8 +1,8 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { loadKakaoMap } from '@/composables/useKakaoLoader'
 import { mapBridge } from '@/composables/mapBridge'
-import { state, inFilter, inRegion, placeKey } from '@/stores/mapStore'
+import { state, inFilter, inRegion, placeKey, isFav } from '@/stores/mapStore'
 import MapPlaceService, { hasCoords } from '@/services/map/MapPlaceService'
 
 import { crowd, tier } from '@/utils/crowd'
@@ -321,7 +321,7 @@ function draw() {
     const e = ensurePin(key, 'spot', s)
     e.data = s
     const pick = !!(inCourse(s) || (sel && placeKey(sel) === placeKey(s)))
-    const spec = spotPinSpec(L.crowd ? tier(crowd(s, di)) : 'calm', pick, on, spotIconGroup(s.tc))
+    const spec = spotPinSpec(L.crowd ? tier(crowd(s, di)) : 'calm', pick, on, spotIconGroup(s.tc), isFav(s))
     const sig = spec.sig + '|' + s.n
     if (sig !== e.sig) {
       e.sig = sig
@@ -345,7 +345,9 @@ function draw() {
       seen.add(key)
       const e = ensurePin(key, g, f)
       e.data = f
-      if (e.sig !== f.n) { e.sig = f.n; e.lb.textContent = f.n }
+      const fav = isFav(f)
+      const sig = f.n + (fav ? '|fav' : '')
+      if (e.sig !== sig) { e.sig = sig; e.lb.textContent = f.n; e.dot.classList.toggle('fav', fav) }
       e.wanted = true
     }
   }
@@ -367,7 +369,7 @@ function drawExtras(di, sel, course, courseDay, L) {
     && !(course && course.stops.some(cs => cs.o === sel)))
   const selTier = sel?.cat === 'TOURIST' ? (L.crowd ? tier(crowd(sel, di)) : 'calm') : ''
   const sig = [
-    selPin ? `${sel.id ?? sel.n}|${selTier}` : '',
+    selPin ? `${sel.id ?? sel.n}|${selTier}|${isFav(sel) ? 'fav' : ''}` : '',
     course ? course.stops.map(s => (s.o ? `${s.o.id ?? s.o.n}@${s.d}` : '')).join(',') : '',
     courseDay,
     course && sel ? (sel.id ?? sel.n) : '',   // 번호 핀의 pick 강조
@@ -378,10 +380,10 @@ function drawExtras(di, sel, course, courseDay, L) {
 
   if (selPin) {
     // 관광지 선택 핀의 클래스·지름은 spotPinSpec 한 곳에서 - 풀 핀(pick)과 같은 모습이어야 한다
-    const sp = sel.cat === 'TOURIST' ? spotPinSpec(selTier, true, true, spotIconGroup(sel.tc)) : null
+    const sp = sel.cat === 'TOURIST' ? spotPinSpec(selTier, true, true, spotIconGroup(sel.tc), isFav(sel)) : null
     const pin = sp
       ? `<div class="${sp.cls}" style="width:${sp.size}px;height:${sp.size}px"></div>`
-      : `<div class="poi-marker sel-pick ${sel.good ? 'mk-food' : (CAT_MARKER[sel.cat] ?? 'mk-dine')}"></div>`
+      : `<div class="poi-marker sel-pick ${sel.good ? 'mk-food' : (CAT_MARKER[sel.cat] ?? 'mk-dine')}${isFav(sel) ? ' fav' : ''}"></div>`
     addPin('sel', sel.y, sel.x, `<div class="lb-t sel-on">${sel.n}</div>` + pin, () => emit('select', sel), 500)
   }
 
@@ -409,21 +411,54 @@ function drawExtras(di, sel, course, courseDay, L) {
   }
 }
 
-/** 좌측 카드·우측 패널에 가리지 않도록 여백을 주고 맞춘다 (화면이 좁으면 비율로 축소) */
+/** 지도 위에 떠 있는 카드(필터·상세·코스)가 덮는 영역 - 데스크톱은 왼쪽에 나란히, 모바일은 아래 시트.
+    전엔 "왼쪽 340 + 오른쪽 380" 고정값이었는데 코스 패널은 오른쪽이 아니라 왼쪽 두 번째 자리라 코스 핀이 패널 뒤에 숨었다(최종점검 #12) */
+function coveredInsets() {
+  const box = el.value.getBoundingClientRect()
+  let left = 0, bottom = 0
+  for (const c of document.querySelectorAll('.cond, .pop, .panel')) {
+    const r = c.getBoundingClientRect()
+    if (!r.width || !r.height) continue
+    // 폰의 닫힌 장소 찾기(.cond)는 pointer-events:none 인 채 자리만 차지하고, 가운데 모달(장소 찾기·상세 = 화면 폭에 위 24px 부터)은
+    // 지도를 통째로 덮는다 - 둘 다 덮는 카드로 세지 않는다. 닫힌 시트를 세면 권역 복원 때 남부가 상단 100px 띠에 몰렸고(최종점검 #60),
+    // 모달을 세면 맞출 자리가 없다. 모달 안에서 고르면 전체 화면 기준으로 맞추고, 모달을 닫으면 그 화면(핀은 가운데)이 보인다
+    if (getComputedStyle(c).pointerEvents === 'none') continue
+    // offsetTop/offsetWidth: 열림 애니메이션(translateY 16px·scale .98) 중이라 getBoundingClientRect 는 아래로 밀려 있다 - 레이아웃 값으로 본다
+    if (c.offsetWidth >= box.width * 0.9 && c.offsetTop < 40) continue
+    if (r.width >= box.width * 0.9) {
+      // 화면 폭을 다 쓰는 아래 시트(모바일). 사진·소개가 늦게 도착하면 시트가 max-height(68vh)까지 자라므로 지금 높이가 아니라 최대 높이로 잡는다 -
+      // 처음 잰 높이로 맞추면 잠시 뒤 시트가 커져 핀을 덮었다
+      const maxH = parseFloat(getComputedStyle(c).maxHeight)
+      bottom = Math.max(bottom, box.bottom - r.top, Number.isFinite(maxH) ? maxH : 0)
+    } else left = Math.max(left, r.right - box.left)
+  }
+  return { left, bottom }
+}
+
+/** 카드에 가리지 않도록 여백을 주고 맞춘다. 패널은 다음 틱에 그려지므로(v-if) 한 틱 뒤에 잰다 */
 function fitPoints(pts, minLevel) {
   if (!map || !pts?.length) return
-  const W = el.value.clientWidth, H = el.value.clientHeight
-  if (!W || !H) return
   if (pts.length === 1) {
     map.setCenter(LL(pts[0][0], pts[0][1]))
     if (map.getLevel() > (minLevel || 6)) map.setLevel(minLevel || 6)
     return
   }
-  const b = new kakao.maps.LatLngBounds()
-  pts.forEach(p => b.extend(LL(p[0], p[1])))
-  const left = Math.min(340, Math.round(W * 0.26)), right = Math.min(380, Math.round(W * 0.28))
-  const top = Math.min(90, Math.round(H * 0.14)), bottom = Math.min(130, Math.round(H * 0.18))
-  map.setBounds(b, top, right, bottom, left)
+  nextTick(() => {
+    if (!map || !el.value) return
+    const W = el.value.clientWidth, H = el.value.clientHeight
+    if (!W || !H) return
+    const b = new kakao.maps.LatLngBounds()
+    pts.forEach(p => b.extend(LL(p[0], p[1])))
+    const ins = coveredInsets()
+    // 여백은 카드 끝 + 24px. 카드가 화면의 2/3를 넘게 덮으면(좁은 창) 그 이상은 양보하지 않는다 - 지도가 우표만큼 남는 것보단 낫다
+    // 덮는 카드가 없으면(폰) 24px 만 - 전엔 카드가 없어도 폭의 26% 를 비워 390px 에서 한 단계 더 축소됐다(#60)
+    const left = Math.min(Math.round(W * 0.66), ins.left ? ins.left + 24 : 24)
+    const right = 56   // 오른쪽엔 줌 컨트롤뿐
+    const top = Math.min(90, Math.round(H * 0.14))
+    // 모바일 시트는 화면 2/3를 덮는다 - 남은 띠(최소 100px)에 맞추면 줌이 한두 단계 더 빠질 뿐, 시트 뒤에 핀을 숨기는 것보단 낫다
+    const bottom = Math.min(H - top - 100, Math.max(Math.min(130, Math.round(H * 0.18)), ins.bottom + 24))
+    map.setBounds(b, top, right, bottom, left)
+  })
 }
 
 function fitRegion() {
@@ -471,7 +506,14 @@ onMounted(async () => {
 
   Object.assign(mapBridge, {
     ready: true,
-    panTo: (lat, lng) => map.panTo(LL(lat, lng)),
+    // 카드(필터·상세·코스)가 덮지 않는 영역의 가운데로 옮긴다 - 화면 정중앙에 두면 1280px 폭에선 중앙(640)이 상세 패널
+    // 오른쪽 가장자리(664) 뒤라 선택 핀이 가려졌다. 상세 패널은 다음 틱에 그려지므로 한 틱 뒤에 잰다(2026-09-14)
+    panTo: (lat, lng) => nextTick(() => {
+      const ins = coveredInsets()
+      const proj = map.getProjection()
+      const p = proj.containerPointFromCoords(LL(lat, lng))
+      map.panTo(proj.coordsFromContainerPoint(new kakao.maps.Point(p.x - ins.left / 2, p.y + ins.bottom / 2)))
+    }),
     zoomTo: lv => { if (map.getLevel() > lv) map.setLevel(lv) },
     fitRegion, fitPoints,
     relayout: onResize,
@@ -494,7 +536,7 @@ onBeforeUnmount(() => {
 
 /* 상태가 바뀌면 다시 적용한다. 지도 자체는 새로 만들지 않는다 */
 watch(() => [state.di, state.sel, state.course, state.courseDay, state.F.reg, state.F.cat,
-  ...Object.values(state.L)], draw, { deep: true })
+  ...Object.values(state.L), state.favIds], draw, { deep: true })   // favIds: 찜/해제 즉시 핀 아이콘이 ♥ 로 바뀌게
 /* 레이어 배열 자체가 바뀔 때(진입·칩 재요청·재진입 재적재)도 본다 - 장소는 API로 비동기로 오므로 지도가 먼저 뜨고
    데이터가 나중에 도착한다. 이걸 빼면 첫 렌더 때 빈 배열로 그린 뒤 다시 그리지 않아 지도에 핀이 하나도 안 찍힌다.
    forecastVersion 도 함께 본다 - 예보는 장소보다 늦게 도착해 series 를 뒤늦게 채운다.

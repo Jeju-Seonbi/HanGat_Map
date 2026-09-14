@@ -41,8 +41,8 @@ public class PlaceService {
                 .orElseGet(placeRepository::findListAll);
     }
 
-    /** 검색 드롭다운은 상위만 보여준다 - 페이징을 소비할 화면이 없어 limit 고정. */
-    private static final int SEARCH_LIMIT = 20;
+    /** 검색 드롭다운은 상위만 보여준다 - 페이징을 소비할 화면이 없어 limit 고정. 20 → 30(2026-09-14, 프론트 로컬 매칭을 없애며 서버가 전부 책임) */
+    private static final int SEARCH_LIMIT = 30;
 
     /**
      * 2글자 미만은 빈 결과 - 한 글자는 수백 건이 걸려 드롭다운이 의미를 잃는다.

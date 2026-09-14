@@ -1,6 +1,8 @@
 package com.example.hangat.review.model;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import java.util.List;
 
 /**
@@ -17,7 +19,9 @@ public record MyReviewResponse(
         String content,
         List<String> imageUrls,
         LocalDateTime createdAt,
-        LocalDateTime updatedAt
+        LocalDateTime updatedAt,
+        LocalDateTime editedAt,
+        @JsonFormat(shape = JsonFormat.Shape.STRING) OffsetDateTime editableUntil
 ) {
 
     public static MyReviewResponse from(
@@ -34,7 +38,9 @@ public record MyReviewResponse(
                 review.getContent(),
                 images.stream().map(ReviewImage::getImageUrl).toList(),
                 review.getCreatedAt(),
-                review.getUpdatedAt()
+                review.getUpdatedAt(),
+                review.getEditedAt(),
+                review.editableUntil()
         );
     }
 }

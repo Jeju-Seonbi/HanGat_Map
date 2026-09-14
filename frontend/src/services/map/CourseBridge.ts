@@ -68,13 +68,24 @@ export interface MapCourseStop {
   alt: string[]
 }
 
-/** 핀·경로가 쓰는 최소 장소 모양. 적재 장소(MapPlace)와 매칭되면 그 객체를 그대로 쓴다 */
-type MapCourseSpot = MapPlace | { id: number | null, n: string, x: number, y: number }
+/** 핀·경로가 쓰는 최소 장소 모양. 적재 장소(MapPlace)와 매칭되면 그 객체를 그대로 쓴다.
+    매칭 안 된 대체 객체에도 업종(cat)은 싣는다 - 코스 패널이 식당·카페·숙소를 회색 '예보 없음' 점이 아니라 업종 핀으로 그린다 */
+type MapCourseSpot = MapPlace | { id: number | null, n: string, x: number, y: number, cat: string | null }
 
 const STORAGE_KEY = 'hangat_map_course'
 
 /** 식사류 카테고리 - 패널에서 식사 아이콘으로 표시 */
 const MEAL_CATEGORIES = ['음식점', '식당', '카페']
+
+/** 코스 응답의 category_name → 장소 업종 코드(MapPlace.cat 과 같은 값). 카카오 검색으로 넣은 곳은 "음식점 > 한식" 같은 긴 이름이라 포함 여부로 본다 */
+function catOf (name: string | null | undefined): string | null {
+  const n = name ?? ''
+  if (n.includes('카페')) return 'CAFE'                       // '음식점 > 카페'도 카페로 - 음식점보다 먼저 본다
+  if (n.includes('음식점') || n.includes('식당')) return 'FOOD'
+  if (n.includes('숙소') || n.includes('숙박') || n.includes('호텔') || n.includes('펜션')) return 'LODGING'
+  if (n.includes('관광')) return 'TOURIST'
+  return null
+}
 
 export function toMapCourse (
   result: AiCourseResult,
@@ -94,7 +105,7 @@ export function toMapCourse (
         d: it.day_no,
         t: (it.start_time ?? '').slice(0, 5) || '--:--',
         k: MEAL_CATEGORIES.some(m => (it.category_name ?? '').includes(m)) ? 'm' : 's',
-        o: matched ?? { id: it.place_id, n: it.place_name, x: it.longitude, y: it.latitude },
+        o: matched ?? { id: it.place_id, n: it.place_name, x: it.longitude, y: it.latitude, cat: catOf(it.category_name) },
         c: it.congestion_rate == null ? null : Math.round(it.congestion_rate),
         why: it.recommendation_reason ?? 'AI 추천 코스예요',
         cost: (it.costs ?? []).reduce((a, b) => a + (b.amount ?? 0), 0),
@@ -134,7 +145,7 @@ export function toMapCourseFromDetail (
         d: day.dayNo,
         t: (it.startTime ?? '').slice(0, 5) || '--:--',
         k: MEAL_CATEGORIES.some(m => (it.categoryName ?? '').includes(m)) ? 'm' : 's',
-        o: matched ?? { id: it.placeId, n: it.placeName, x: it.longitude, y: it.latitude },
+        o: matched ?? { id: it.placeId, n: it.placeName, x: it.longitude, y: it.latitude, cat: catOf(it.categoryName) },
         c: it.congestionRate == null ? null : Math.round(it.congestionRate),
         why: it.reason ?? '저장한 코스예요',
         cost: 0,   // 상세 응답엔 일정별 비용이 없다 - 지어내지 않고 0 (경비 footer는 bud=0이면 숨는다)

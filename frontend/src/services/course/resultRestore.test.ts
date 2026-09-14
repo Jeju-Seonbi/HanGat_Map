@@ -3,6 +3,7 @@ import { apiRequest } from '../../api/backendClient.js'
 import { ApiError } from '../../api/errors.js'
 import { RESTORE_KEY, readRestore, rememberResult, rememberEditing, clearRestore, fetchRestoredCourse, resultFromDetail, useResultRestore, validProof, singleFlight, useClaimRenewal, clearCourseProof } from './resultRestore'
 import { courseMockService } from '../courseMockService'
+import { syncConfirmedCourseCondition } from './accommodationSelection'
 import type { CourseDetail, RestoreState } from './resultRestore'
 import type { CourseCondition, CourseResult } from '../../assets/types/course'
 vi.mock('../../api/backendClient.js', () => ({ apiRequest: vi.fn() }))
@@ -65,6 +66,9 @@ describe('same-tab result restoration', () => {
     const d = structuredClone(detail); d.accommodation = null; delete d.days[0].items[0].recommendation_reason
     const c = resultFromDetail(d)
     expect(c.accommodation).toBeNull(); expect(c.days[0].items[0].recommendation_reason).toBeUndefined()
+    const restoredCondition = { ...condition, accommodation: detail.accommodation! }
+    syncConfirmedCourseCondition(restoredCondition, c)
+    expect(restoredCondition.accommodation).toBeUndefined()
   })
   it('reuses authenticated GET contract, not a new public permission', async () => {
     vi.mocked(apiRequest).mockResolvedValue({ ...detail, status: 'SAVED' })

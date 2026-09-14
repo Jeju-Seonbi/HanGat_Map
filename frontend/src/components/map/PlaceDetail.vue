@@ -1,6 +1,6 @@
 <script setup>
 /* MAP_007 장소 상세 — 상세 화면과 후기 화면을 한 패널 안에서 전환한다 */
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import StarIcon from './StarIcon.vue'
 import ReviewSection from './ReviewSection.vue'
 import ProfileAvatar from '../common/ProfileAvatar.vue'
@@ -27,7 +27,10 @@ const shareOpen = ref(false)
 /** 휴무일·입장료는 상세 API에만 있다. 못 받아오면 null - 해당 줄만 안 보인다 */
 const detail = ref(null)
 
-const s = computed(() => props.place)
+/* 코스 경유지가 관광지 레이어에 없으면(식당·카페·숙소 - 첫 진입엔 관광지만 받는다) CourseBridge 가 {id,n,x,y} 만 든 대체 객체를 넘긴다.
+   상세 응답은 목록 응답의 상위 집합이라 거기서 업종·권역·주소·태그를 채운다. 대체 객체의 표식은 c(업종)가 없는 것 -
+   레이어에서 온 장소는 c 가 항상 있다. 채워지기 전엔 아래 템플릿이 빈 칸·undefined 를 그리지 않게 각 줄을 방어한다(최종점검 #13) */
+const s = computed(() => (props.place.c === undefined && detail.value?.place) ? { ...detail.value.place, ...props.place } : props.place)
 const c = computed(() => crowd(s.value, state.di))
 const t = computed(() => tier(c.value))
 
@@ -61,7 +64,8 @@ const tipText = computed(() => {
 const week = computed(() => {
   const st = Math.max(0, Math.min(state.di - 1, 23))
   return Array.from({ length: 7 }, (_, j) => {
-    const k = st + j, d = at(k), w = wxOf(k, s.value.r), cc = crowd(s.value, k)
+    // 권역을 모르면 날씨를 비운다 - wxOf 는 권역이 없으면 북부로 대체하는데, 동부 식당에 북부 날씨를 보여주면 틀린 정보다
+    const k = st + j, d = at(k), w = s.value.r ? wxOf(k, s.value.r) : null, cc = crowd(s.value, k)
     return { k, d, w, cc, t: tier(cc), ko: tierKo(cc), label: `${d.getMonth() + 1}/${d.getDate()} ${'일월화수목금토'[d.getDay()]}` }
   })
 })
@@ -80,6 +84,7 @@ const hasWx = computed(() => week.value.some(w => w.w))
 /* 날씨는 이 장소 권역의 기상청 격자 값이다 - 어느 권역 기준이고 언제 발표된 예보인지 적는다 (MAP_006).
    발표 시각은 선택한 날짜 예보의 것(단기 05시·중기 18시가 섞인다). 적재분에만 있어 라이브 폴백이면 권역만 적는다 */
 const wxSource = computed(() => {
+  if (!s.value.r) return '출처: 기상청'          // 권역을 아직 모르면(대체 객체) 'undefined 기준'을 찍지 않는다
   const issued = wxIssuedAt(s.value.r, state.di)
   if (!issued) return `출처: 기상청 · ${s.value.r} 기준`
   const d = new Date(issued)
@@ -120,11 +125,16 @@ const ktoImages = computed(() => detail.value?.images ?? [])
 function onThumbError (e, p) {
   if (e.target.src !== p.url) e.target.src = p.url
 }
-/* 후기 요약은 상세 API(places.rating_avg 비정규화)가 준다 - localStorage 데모 아님 */
-const reviewCount = computed(() => detail.value?.reviewCount ?? 0)
+/* 후기 요약은 상세 API(places.rating_avg 비정규화)가 준다 - localStorage 데모 아님.
+   상세 API 가 죽었을 땐 후기 목록의 총 건수로 보완한다 - 둘 중 하나만 살아 있어도 "첫 후기를 남겨보세요"라고 거짓말하지 않게 */
+const reviewCount = computed(() => detail.value?.reviewCount ?? reviewPage.value?.totalElements ?? 0)
 const ratingAvg = computed(() => detail.value?.ratingAvg ?? null)
-/** 후기 첫 페이지 원본 - ReviewSection 에 그대로 넘겨 같은 요청을 두 번 보내지 않는다. null = 못 받음 */
+/** 후기 첫 페이지 원본 - ReviewSection 에 그대로 넘겨 같은 요청을 두 번 보내지 않는다. null = 아직 안 받았거나 실패 */
 const reviewPage = ref(null)
+/** 후기 목록 요청이 실패했다 - "아직 후기가 없어요"와 구분해 다시 시도를 보여준다(최종점검 #23) */
+const reviewFailed = ref(false)
+/** 상세·후기 둘 다 아직이면 칩에 건수도 "첫 후기" 문구도 내지 않는다(로딩 중 깜빡임·장애 중 거짓 빈 상태 방지) */
+const reviewsKnown = computed(() => detail.value != null || reviewPage.value != null)
 /** 하단 미리보기용 최근 3건 */
 const previewReviews = ref([])
 const rvDate = iso => { const d = new Date(iso); return `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}` }
@@ -153,13 +163,14 @@ async function fetchDetail() {
   const id = s.value.id
   const [d, rv] = await Promise.all([
     MapPlaceService.getDetail(id),
-    ReviewApiService.getReviews(id, 0).catch(() => null)
+    ReviewApiService.getReviews(id, 0).then(page => ({ page, failed: false }), () => ({ page: null, failed: true }))
   ])
   // 응답이 늦게 와도 그새 다른 장소를 열었으면 버린다
   if (s.value.id === id) {
     detail.value = d
-    reviewPage.value = rv
-    previewReviews.value = rv?.content.slice(0, 3) ?? []
+    reviewFailed.value = rv.failed
+    reviewPage.value = rv.page
+    previewReviews.value = rv.page?.content.slice(0, 3) ?? []
   }
 }
 
@@ -167,13 +178,22 @@ function jumpToBest() {
   if (best.value.k !== state.di) state.di = best.value.k
 }
 
+/* 찾기는 안내 문장을 먼저 보여주고 1초 뒤에 날짜를 옮긴다. 그 1초 안에 패널을 닫거나 다른 장소를 열면
+   예약된 이동이 그대로 실행돼 전역 날짜가 이유 없이 튀었다 - 타이머를 보관해 두고 언마운트(닫기·장소 전환) 때 취소한다(최종점검 #20) */
+let calmTimer = null
+function jumpLater(k) {
+  clearTimeout(calmTimer)
+  calmTimer = setTimeout(() => { state.di = k }, 1000)
+}
+onBeforeUnmount(() => clearTimeout(calmTimer))
+
 /** 한산한 날 찾기 — 앞으로 2주 안에서 */
 function findCalmDay() {
   if (c.value == null) {
     // 예보는 있는데 선택 날짜가 범위 밖이면 예보가 있는 날 중 최저일로 옮긴다 - '대상 아님'이라고 막지 않는다
     if (outOfRange.value && best.value.c != null) {
       hint.value = `<span style="color:var(--calm)">이 날짜는 아직 예보가 없어 예보가 있는 날 중에서 찾았어요 · <b>${fmtK(at(best.value.k))}</b>로 옮길게요.</span>`
-      setTimeout(() => { state.di = best.value.k }, 1000)
+      jumpLater(best.value.k)
       return
     }
     hint.value = forecastDown.value
@@ -195,7 +215,7 @@ function findCalmDay() {
   }
   const g = c.value - b.c, word = g >= 25 ? '훨씬' : g >= 12 ? '꽤' : '조금'
   hint.value = `<span style="color:var(--calm)"><b>${fmtK(at(b.k))}</b>로 옮기면 ${word} 한산해져요.</span>`
-  setTimeout(() => { state.di = b.k }, 1000)
+  jumpLater(b.k)
 }
 
 /** '오늘' 또는 '9월 22일' - 선택한 날이 오늘이 아닌데 '오늘'이라고 부르던 문구(#19)를 고친다 */
@@ -275,7 +295,7 @@ async function shareNative() {
       <div class="poh">
         <div style="flex:1">
           <h4>{{ s.n }}</h4>
-          <div class="sub">{{ s.c }} · {{ s.r }}</div>
+          <div class="sub">{{ [s.c, s.r].filter(Boolean).join(' · ') }}</div>
         </div>
         <!-- MAP_009 찜 -->
         <button class="fav" :class="{ on: isFav(s) }" :aria-pressed="isFav(s)" aria-label="찜하기" @click="toggleFav(s)">♥</button>
@@ -296,6 +316,10 @@ async function shareNative() {
             <StarIcon filled :size="15" /><span class="sc">{{ ratingAvg.toFixed(1) }}</span>
           </template>
           <span class="ct">후기 {{ reviewCount }}</span>
+        </template>
+        <template v-else-if="!reviewsKnown">
+          <StarIcon :size="15" />
+          <span class="ct" style="font-weight:700;color:var(--tx2)">후기</span>
         </template>
         <template v-else>
           <StarIcon :size="15" />
@@ -406,7 +430,8 @@ async function shareNative() {
 
       <!-- 주소(복사) · 운영시간(있을 때만 — 상시 개방은 줄 자체를 표시하지 않음) · 전화 -->
       <div class="pinfo">
-        <div class="pi">
+        <!-- 주소가 없으면(대체 객체·원천 결측) 빈 줄과 복사 버튼을 내지 않는다 - 누르면 'undefined'가 복사됐다 -->
+        <div v-if="s.addr" class="pi">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
             stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.1-7-11a7 7 0 0 1 14 0c0 4.9-7 11-7 11Z"/>
             <circle cx="12" cy="10" r="2.6"/></svg>
@@ -466,7 +491,7 @@ async function shareNative() {
             <div class="rv-h">
               <ProfileAvatar :src="r.profileImageUrl" :nickname="r.nickname" />
               <span class="rv-nm">{{ r.nickname ?? `여행자${r.userId}` }}</span>
-              <span class="rv-dt">{{ rvDate(r.createdAt) }} 작성</span>
+              <span class="rv-dt">{{ rvDate(r.createdAt) }} 작성 <span v-if="r.editedAt">(수정)</span></span>
             </div>
             <div class="rv-mt">
               <template v-if="r.rating"><StarIcon v-for="n in 5" :key="n" :filled="n <= r.rating" :size="12" /></template>
@@ -485,6 +510,10 @@ async function shareNative() {
             {{ reviewCount > 3 ? `후기 ${reviewCount}개 모두 보기 ›` : '후기 남기기 ›' }}
           </button>
         </template>
+        <template v-else-if="reviewFailed">
+          <div class="rv-none">후기를 불러오지 못했어요.</div>
+          <button class="rvp-more" @click="fetchDetail">다시 시도 ›</button>
+        </template>
         <template v-else>
           <div class="rv-none">아직 후기가 없어요.</div>
           <button class="rvp-more" @click="view = 'rv'">첫 후기 남기기 ›</button>
@@ -498,7 +527,7 @@ async function shareNative() {
         <div style="flex:1"><h4>{{ s.n }}</h4><div class="sub">방문 후기</div></div>
         <button class="pox" @click="emit('close')">×</button>
       </div>
-      <ReviewSection :place="s" :rating-avg="ratingAvg" :first-page="reviewPage"
+      <ReviewSection :place="s" :rating-avg="ratingAvg" :first-page="reviewPage" :first-page-failed="reviewFailed"
         @open-photo="p => emit('open-photo', p)" @changed="fetchDetail" />
     </div>
   </div>

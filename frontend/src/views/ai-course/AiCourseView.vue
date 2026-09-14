@@ -2,7 +2,8 @@
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { congestionLabel } from '../../utils/congestion'
 import { dayWeatherLabels } from '../../services/course/dailyWeather'
-import { useTransitRoute } from '../../services/course/transitRoute'
+import { expectedTransitEdges, transitTopologyMatches, useTransitRoute } from '../../services/course/transitRoute'
+import { useAccommodationSelection, syncConfirmedCourseCondition } from '../../services/course/accommodationSelection'
 import TransitDayRoute from '../../components/course/TransitDayRoute.vue'
 import TransitLegCard from '../../components/course/TransitLegCard.vue'
 import { todayKst, addCalendarDays, formatCalendarDate } from '../../utils/format.js'
@@ -20,7 +21,7 @@ import GenerationJobs from '../../components/course/GenerationJobs.vue'
 import { storePendingCourseClaim, takePendingCourseClaim } from '../../services/pendingCourseClaim'
 import { routeSummary, accessNotices } from '../../services/course/courseSummary'
 import { ApiError } from '../../api/errors.js'
-import { readRestore, rememberResult, rememberEditing, useResultRestore, validProof, singleFlight, useClaimRenewal, clearCourseProof } from '../../services/course/resultRestore'
+import { readRestore, rememberResult, rememberEditing, useResultRestore, validProof, singleFlight, useClaimRenewal, clearCourseProof, fetchRestoredCourse } from '../../services/course/resultRestore'
 import type { AccommodationInput, AccommodationRecommendation, AlternativePlace, CarDayRoute, CarRouteLeg, CourseCondition, CourseItem, CourseResult } from '../../assets/types/course'
 
 const today = todayKst()
@@ -74,15 +75,17 @@ if (typeof route.query.course === 'string' && /^[1-9]\d{0,14}$/.test(route.query
 if (restoringState.value) Object.assign(condition, restoringState.value.condition)
 const fetchRoute = singleFlight(courseMockService.getCarRoute)
 const transit = useTransitRoute()
+const accommodationSelection = useAccommodationSelection()
 const { data: transitData, loading: transitLoading, error: transitError } = transit
+const { saving: accommodationSaving, error: accommodationSaveError } = accommodationSelection
 const now = ref(Date.now())
 let clock: ReturnType<typeof setInterval> | undefined
 let viewEpoch = 0
 let routeEpoch = 0
-const canModify = computed(() => !!result.value && !renewing.value
+const canModify = computed(() => !!result.value && !renewing.value && !accommodationSaving.value && !swapping.value
   && (result.value.status === 'SAVED' ? auth.isAuthenticated : validProof(result.value, now.value)))
 // Swap remains governed by its existing independent API contract, not the claim lifetime.
-const canSwap = computed(() => !!result.value && result.value.swappable !== false)
+const canSwap = computed(() => !!result.value && !accommodationSaving.value && result.value.swappable !== false)
 function rememberCurrent() {
   if (result.value) {
     rememberResult(result.value, condition)
@@ -91,6 +94,7 @@ function rememberCurrent() {
 }
 function editConditions() {
   transit.cancel()
+  accommodationSelection.cancel()
   restoration.cancel(); renewal.cancel(); viewEpoch++; routeEpoch++
   if (result.value) clearCourseProof(result.value)
   restoringState.value = null; editing.value = true; loading.value = false; routeLoading.value = false
@@ -103,7 +107,8 @@ function editConditions() {
 watch(condition, () => { if (editing.value && !restoring.value) rememberEditing(condition) }, { deep: true })
 async function restoreResult() {
   if (!restoringState.value || restoringState.value.mode !== 'result') return
-  const ticket = viewEpoch
+  accommodationSelection.cancel()
+  const ticket = ++viewEpoch
   const loaded = await restoration.restore(restoringState.value, auth.isAuthenticated)
   if (!loaded || ticket !== viewEpoch) return
   result.value = loaded
@@ -111,11 +116,7 @@ async function restoreResult() {
     loaded.claim_token = restoringState.value.claim_token
     loaded.claim_expires_at = restoringState.value.claim_expires_at
   }
-  Object.assign(condition, {
-    start_date: loaded.start_date, end_date: loaded.end_date, people: loaded.people,
-    budget_total: loaded.budget_total ?? condition.budget_total, transport: loaded.transport,
-    accommodation: loaded.accommodation ?? undefined,
-  })
+  syncConfirmedCourseCondition(condition, loaded)
   editing.value = false; rememberCurrent()
   void loadCarRoute()
   if (loaded.status === 'READY' && validProof(loaded)) {
@@ -128,7 +129,7 @@ async function restoreResult() {
     }
   }
 }
-onUnmounted(() => { transit.cancel(); restoration.cancel(); renewal.cancel(); viewEpoch++; routeEpoch++; if (clock) clearInterval(clock) })
+onUnmounted(() => { transit.cancel(); accommodationSelection.cancel(); restoration.cancel(); renewal.cancel(); viewEpoch++; routeEpoch++; if (clock) clearInterval(clock) })
 watch(now, () => {
   if (result.value?.claim_token && !validProof(result.value, now.value)) { clearCourseProof(result.value); rememberCurrent() }
 })
@@ -144,7 +145,27 @@ async function viewOnMap() {
 }
 
 async function loadCarRoute() {
-  if (result.value?.transport === 'PUBLIC_TRANSIT') { await transit.load(result.value); return }
+  if (result.value?.transport === 'PUBLIC_TRANSIT') {
+    const course = result.value
+    const ticket = viewEpoch
+    const response = await transit.load(course)
+    if (!response || ticket !== viewEpoch || result.value?.id !== course.id || editing.value
+      || transitTopologyMatches(course, response)) return
+    try {
+      const confirmed = await fetchRestoredCourse({ mode: 'result', courseId: course.id, condition }, auth.isAuthenticated)
+      if (ticket !== viewEpoch || result.value?.id !== course.id || editing.value) return
+      if (confirmed.status === 'READY' && validProof(course)) {
+        confirmed.claim_token = course.claim_token
+        confirmed.claim_expires_at = course.claim_expires_at
+      }
+      result.value = confirmed
+      syncConfirmedCourseCondition(condition, confirmed)
+      rememberCurrent()
+    } catch {
+      if (ticket === viewEpoch) error.value = '서버의 최신 숙소와 일정을 확인하지 못했어요. 다시 불러와 주세요.'
+    }
+    return
+  }
   transit.cancel()
   if (!result.value || result.value.transport !== 'RENTAL_CAR') return
   const course = result.value
@@ -205,6 +226,7 @@ const estimatedCost = computed(() => {
 async function generate(next: CourseCondition, regenerate = false) {
   if (loading.value) return
   transit.cancel()
+  accommodationSelection.cancel()
   restoration.cancel(); renewal.cancel(); routeEpoch++
   const ticket = ++viewEpoch
   Object.assign(condition, JSON.parse(JSON.stringify(next)) as CourseCondition)
@@ -222,6 +244,7 @@ async function generate(next: CourseCondition, regenerate = false) {
       : await courseMockService.generateCourse(condition)
     if (ticket !== viewEpoch) return
     result.value = generated
+    syncConfirmedCourseCondition(condition, generated)
     recommendedAccommodations.value = []
     editing.value = false
     rememberCurrent()
@@ -248,33 +271,24 @@ async function generate(next: CourseCondition, regenerate = false) {
 }
 
 async function selectRecommendedAccommodation(accommodation: AccommodationInput) {
-  if (!result.value || !canModify.value) return
-  loading.value = true
-  error.value = ''
-  try {
-    const savedAccommodation = await courseMockService.updateAccommodation(
-      result.value,
-      accommodation,
-    )
-    condition.accommodation = { ...savedAccommodation }
-    result.value = courseMockService.applyAccommodationSelection(
-      result.value,
-      savedAccommodation,
-    )
-    delete result.value.car_route
-    void loadCarRoute()
+  if (!result.value || !canModify.value || accommodationSaving.value) return
+  const course = result.value
+  const ticket = viewEpoch
+  const outcome = await accommodationSelection.save(course, accommodation, condition, auth.isAuthenticated)
+  if (!outcome || ticket !== viewEpoch || result.value?.id !== course.id || editing.value) return
+  transit.cancel(); routeEpoch++
+  result.value = outcome.course
+  syncConfirmedCourseCondition(condition, outcome.course)
+  rememberCurrent()
+  void loadCarRoute()
+  if (outcome.selectedStored) {
     recommendedAccommodations.value = []
     accommodationPickerOpen.value = false
-    rememberCurrent()
-  } catch {
-    error.value = '숙소를 저장하지 못했어요. 기존 일정은 그대로 유지됩니다.'
-  } finally {
-    loading.value = false
   }
 }
 
 async function chooseAccommodation() {
-  if (!result.value || !canModify.value || accommodationLoading.value) return
+  if (!result.value || !canModify.value || accommodationLoading.value || accommodationSaving.value) return
   const course = result.value
   const ticket = viewEpoch
   accommodationPickerOpen.value = true
@@ -372,7 +386,7 @@ async function restoreJobResult () {
     return true
   }
   const ticket = ++viewEpoch
-  transit.cancel(); restoration.cancel(); renewal.cancel(); loading.value = true; jobResultError.value = ''
+  transit.cancel(); accommodationSelection.cancel(); restoration.cancel(); renewal.cancel(); loading.value = true; jobResultError.value = ''
   try {
     if (!/^[a-f\d]{8}(-[a-f\d]{4}){3}-[a-f\d]{12}$/i.test(id)) throw new Error('INVALID_JOB')
     const response = await getGenerationResult(id)
@@ -388,7 +402,8 @@ async function restoreJobResult () {
       current.claim_expires_at = response.course.claim_expires_at
     }
     result.value = current
-    Object.assign(condition, response.request, { accommodation: current.accommodation ?? undefined })
+    Object.assign(condition, response.request)
+    syncConfirmedCourseCondition(condition, current)
     editing.value = false; error.value = ''; rememberCurrent(); void loadCarRoute()
   } catch {
     if (ticket === viewEpoch) { jobResultError.value = '생성 결과를 불러오지 못했어요. 다시 조회하거나 작업 상태를 확인해 주세요.' }
@@ -396,12 +411,12 @@ async function restoreJobResult () {
   return true
 }
 watch(() => route.query.job, (id, previous) => {
-  transit.cancel(); viewEpoch++; routeEpoch++; jobResultError.value = ''
+  transit.cancel(); accommodationSelection.cancel(); viewEpoch++; routeEpoch++; jobResultError.value = ''
   if (id) void restoreJobResult()
   else if (previous) { loading.value = false; editing.value = true; result.value = undefined }
 })
 watch(() => (auth.user as { userId: number } | null)?.userId, () => {
-  transit.cancel(); viewEpoch++; routeEpoch++; restoration.cancel(); renewal.cancel()
+  transit.cancel(); accommodationSelection.cancel(); viewEpoch++; routeEpoch++; restoration.cancel(); renewal.cancel()
   if (route.query.job) { result.value = undefined; editing.value = true; loading.value = false; void restoreJobResult() }
 })
 onMounted(async () => {
@@ -415,6 +430,7 @@ onMounted(async () => {
     result.value = await courseMockService.saveCourse(pending.course, pending.title)
     renewal.cancel(); clearCourseProof(result.value)
     Object.assign(condition, pending.condition)
+    syncConfirmedCourseCondition(condition, result.value)
     editing.value = false
     rememberCurrent()
     void loadCarRoute()
@@ -494,7 +510,7 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
           <section v-for="day in result.days" :key="day.day_no" class="course-day">
             <header><b>DAY {{ day.day_no }}</b><span>{{ formatDate(day.visit_date) }}</span></header>
             <p v-for="weather in dayWeatherLabels(day.items)" :key="weather" class="daily-weather">{{ weather }}</p>
-            <TransitDayRoute v-if="result.transport === 'PUBLIC_TRANSIT'" :day="transitData?.days.find(d => d.day_no === day.day_no)" :loading="transitLoading" :error="transitError" />
+            <TransitDayRoute v-if="result.transport === 'PUBLIC_TRANSIT'" :day="transitData?.days.find(d => d.day_no === day.day_no)" :expected-edges="expectedTransitEdges(result, day.day_no)" :loading="transitLoading" :error="transitError" />
             <p v-if="result.transport === 'RENTAL_CAR'" class="route-summary">
               총 이동 {{ routeSummary([routeForDay(day.day_no) ?? {}], routeLoading) }}
             </p>
@@ -532,11 +548,14 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
               <dt>숙소</dt><dd>{{ result.accommodation?.place_name ?? '미정' }}</dd>
             </dl>
           </section>
-          <button v-if="canModify" class="btn" :disabled="accommodationLoading" @click="chooseAccommodation">{{ result.accommodation ? '숙소 변경' : '숙소 찾아보기' }}</button>
+          <button v-if="canModify" class="btn" :disabled="accommodationLoading || accommodationSaving" @click="chooseAccommodation">{{ result.accommodation ? '숙소 변경' : '숙소 찾아보기' }}</button>
+          <p v-if="accommodationSaving" class="route-status">숙소를 서버에 저장하고 확인하고 있어요.</p>
+          <p v-if="accommodationSaveError" role="alert" class="course-error">{{ accommodationSaveError }} <button class="text-link" @click="restoreResult">다시 불러오기</button></p>
           <AccommodationRecommendations
             v-if="canModify && (!result.accommodation || accommodationPickerOpen)"
             :items="recommendedAccommodations"
             :loading="accommodationLoading"
+            :saving="accommodationSaving"
             :error="accommodationError"
             @select="selectRecommendedAccommodation"
           />

@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -27,7 +28,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 
 /**
- * 후기 API - 비회원 목록 조회와 회원의 작성·삭제·사진 업로드를 제공한다.
+ * 후기 API - 비회원 목록 조회와 회원의 작성·수정·삭제·사진 업로드를 제공한다.
  * 작성자 ID는 요청 본문이 아닌 JWT 인증 정보에서 가져온다.
  */
 @Tag(name = "후기", description = "장소 방문 후기")
@@ -70,6 +71,14 @@ public class ReviewController {
                                                @RequestBody ReviewCreateRequest request,
                                                Authentication authentication) {
         return BaseResponse.success(reviewService.create(placeId, currentUserId(authentication), request));
+    }
+
+    /** 별점·제보·내용·유지할 사진 전체를 전달한다. 작성 후 7일 기한은 서버에서 검증한다. */
+    @PutMapping("/reviews/{reviewId}")
+    public BaseResponse<ReviewResponse> update(@PathVariable("reviewId") Long reviewId,
+                                               @RequestBody ReviewCreateRequest request,
+                                               Authentication authentication) {
+        return BaseResponse.success(reviewService.update(reviewId, currentUserId(authentication), request));
     }
 
     /** 삭제 요청자의 신원을 확인하고 본인 여부 검사는 서비스에서 수행한다. */

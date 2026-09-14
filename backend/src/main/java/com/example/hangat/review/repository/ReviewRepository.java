@@ -6,6 +6,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import jakarta.persistence.LockModeType;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -14,6 +17,11 @@ import org.springframework.data.repository.query.Param;
  * 공개 장소 목록과 본인 목록 모두 삭제된 후기를 제외한다.
  */
 public interface ReviewRepository extends JpaRepository<Review, Long> {
+
+    /** 같은 후기의 수정·삭제를 직렬화해 사진 연결과 상태 변경이 엇갈리지 않게 한다. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select r from Review r where r.id = :id")
+    Optional<Review> findForUpdate(@Param("id") Long id);
 
     Page<Review> findByPlaceIdAndStatusOrderByCreatedAtDesc(
             Long placeId, ReviewStatus status, Pageable pageable

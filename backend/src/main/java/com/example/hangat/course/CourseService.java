@@ -40,6 +40,12 @@ public class CourseService {
     private final CourseResponseAssembler courseResponseAssembler;
     private final java.util.Optional<CourseDbCandidateService> dbCandidateService;
     private final CourseDatePolicy courseDatePolicy;
+    private java.util.Optional<CourseAccommodationService> accommodationService = java.util.Optional.empty();
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setAccommodationService(CourseAccommodationService accommodationService) {
+        this.accommodationService = java.util.Optional.of(accommodationService);
+    }
 
     public CourseService(TourApiService tourApiService, CongestionApiService congestionApiService,
             CourseCandidateShortlistService courseCandidateShortlistService, CourseAiPreparationService courseAiPreparationService,
@@ -64,7 +70,14 @@ public class CourseService {
      * 비회원의 기존 동기 생성 경로.
      */
     public CourseResponseDto createCourse(CourseRequestDto request) {
-        return persistComputedCourse(request, computeCourse(request));
+        ComputedCourse computed = computeCourse(request);
+        if (request.getAccommodation() == null) {
+            return persistComputedCourse(request, computed);
+        }
+        CourseAccommodationService accommodations = accommodationService.orElseThrow(
+                () -> new IllegalStateException("숙소 검증 서비스를 사용할 수 없습니다."));
+        var verified = accommodations.verifyGeneratedAccommodation(request.getAccommodation(), computed);
+        return persistComputedCourse(request, computed, verified);
     }
     /**
      * 외부 조회 / AI 호출 / 방문 순서 최적화.
@@ -104,12 +117,28 @@ public class CourseService {
             CourseRequestDto request,
             ComputedCourse computed
     ) {
-        CoursePersistenceResult persistence = coursePersistenceService.persist(
+        return persistComputedCourse(request, computed, null);
+    }
+
+    private CourseResponseDto persistComputedCourse(
+            CourseRequestDto request,
+            ComputedCourse computed,
+            KakaoAccommodationProvider.VerifiedAccommodation accommodation
+    ) {
+        CoursePersistenceResult persistence = accommodation == null
+                ? coursePersistenceService.persist(
                 request,
                 computed.facts(),
                 computed.result(),
                 computed.metadata()
-        );
+                )
+                : coursePersistenceService.persist(
+                request,
+                computed.facts(),
+                computed.result(),
+                computed.metadata(),
+                accommodation
+                );
 
         CourseBudgetCalculation budget =
                 courseBudgetService.calculateAndCache(
@@ -120,7 +149,9 @@ public class CourseService {
                 computed.facts(),
                 computed.result(),
                 persistence,
-                request.getAccommodation(),
+                accommodation == null
+                        ? request.getAccommodation()
+                        : AccommodationDto.fromKakao(accommodation.place(), accommodation.region()),
                 budget
         );
     }

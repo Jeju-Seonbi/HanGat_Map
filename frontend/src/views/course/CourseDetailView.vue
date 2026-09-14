@@ -86,7 +86,8 @@ const distanceText = (meters: number) =>
  * 지도는 좌표·이름·등급만 읽는다. 상세 조회가 주지 않는 텍스트 필드는 빈 값으로 둔다 -
  * 없는 설명을 지어내지 않는다.
  */
-const toMapPlace = (name: string, id: number, lat: number | null, lng: number | null,
+const toMapPlace = (pin: { label: string; description: string }, name: string, id: number,
+                    lat: number | null, lng: number | null,
                     level: CongestionLevel | null, rate: number | null): Place => ({
   id: String(id),
   name,
@@ -95,6 +96,9 @@ const toMapPlace = (name: string, id: number, lat: number | null, lng: number | 
   address: '',
   description: '',
   score: rate ?? 0,
+  // 핀에는 일정 목록과 같은 순번을 단다 - 집중률 원값은 색(등급)으로만 남긴다
+  pinLabel: pin.label,
+  pinDescription: pin.description,
   level: level ?? 'QUIET',
   time: '',
   stay: '',
@@ -145,9 +149,14 @@ const fromLive = (course: CourseDetail): CourseView => {
     dayCount: course.days.length,
     placeCount: course.days.reduce((sum, day) => sum + day.items.length, 0),
     days,
-    mapPlaces: course.days.flatMap(day => day.items.map(item =>
-      toMapPlace(item.placeName, item.placeId, item.latitude, item.longitude,
-        item.congestionLevel, item.congestionRate))),
+    // 순번은 일차 안 position - 목록의 'N번째'와 같은 숫자다(백엔드 CourseItem 계약). 여러 날이면 '2-1'처럼 일차를 앞에 붙인다
+    mapPlaces: course.days.flatMap(day => day.items.map(item => toMapPlace(
+      {
+        label: course.days.length > 1 ? `${day.dayNo}-${item.position}` : String(item.position),
+        description: `DAY ${day.dayNo} ${item.position}번째 방문지`,
+      },
+      item.placeName, item.placeId, item.latitude, item.longitude,
+      item.congestionLevel, item.congestionRate))),
     forecastNote: gap >= 5
       ? `저장할 때 평균 ${Math.round(course.plannedAverageRate as number)}였는데 지금 예보는 ${Math.round(course.averageRate as number)}예요`
       : null,
@@ -473,16 +482,8 @@ async function applySwap (alternative: AlternativePlace) {
           show-route
         />
         <p class="route-note">
-          장소 간 추천 순서를 나타낸 선이며 실제 도로 경로와 다를 수 있습니다.
+          장소 간 추천 순서를 나타낸 선이며 실제 도로 경로와 다를 수 있습니다. 좌표가 없는 장소는 지도에 표시되지 않습니다.
         </p>
-        <div class="panel compact">
-          <h3>코스 정보</h3>
-          <dl>
-            <dt>일정</dt><dd>{{ view.dayCount }}일</dd>
-            <dt>장소</dt><dd>{{ view.placeCount }}곳</dd>
-            <dt>평균 혼잡도</dt><dd>{{ view.averageText }}</dd>
-          </dl>
-        </div>
       </aside>
     </div>
   </section>
@@ -536,6 +537,10 @@ async function applySwap (alternative: AlternativePlace) {
 
 <style scoped>
 .course-highlight{margin-top:8px}
+/* 전역 .metrics는 결과 화면(가운데 800px)용 - 여기서는 패널 폭에 맞추고, 칸 사이 선에 글자가 붙지 않게 좌우 여백을 준다 */
+.metrics.panel{max-width:none;margin:24px 0 0}
+.metrics>div{padding:0 24px}
+.metrics>div:first-child{padding-left:0}
 .rename-form{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0 10px}
 .rename-input{flex:1 1 240px;min-width:0;padding:10px 14px;border:1px solid var(--border);border-radius:12px;font-size:1.2rem;font-weight:700;background:transparent;color:inherit}
 .btn.danger{color:#c43c3c;border-color:#e6b4b4}
@@ -554,6 +559,8 @@ async function applySwap (alternative: AlternativePlace) {
 .course-not-found .panel{padding:64px 30px}
 .course-not-found .btn{margin-top:20px}
 @media(max-width:767px){
+  /* 모바일은 전역 규칙으로 2열·구분선 없음 - 칸 여백을 빼서 왼쪽 선을 맞춘다 */
+  .metrics>div{padding:0}
   /* 버튼 4개가 한 줄에 끼면 글자가 한 자씩 세로로 접힌다 - 두 개씩 두 줄 */
   .page-head .actions{flex-wrap:wrap;margin:18px 0 0}
   .page-head .actions .btn{flex:1 1 calc(50% - 6px);min-width:0;padding:12px 10px;white-space:nowrap;text-align:center}

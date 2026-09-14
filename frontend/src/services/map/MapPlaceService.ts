@@ -100,6 +100,8 @@ export interface PlaceDetail {
   overview: string | null
   /** 착한가격 명단 기준일(행안부 CSV 발행일, ISO 날짜). 착한가격이 아니거나 모르면 null - 가격표 밑 출처 줄이 쓴다 */
   goodPriceBaseDate: string | null
+  /** 같은 응답에서 뽑은 장소 기본 정보(업종·권역·주소…). 코스 경유지처럼 {id,n,x,y}만 든 대체 객체로 열렸을 때 빈 칸을 채운다(최종점검 #13) */
+  place: MapPlace
 }
 
 export interface PlaceImage {
@@ -109,7 +111,8 @@ export interface PlaceImage {
 }
 
 /** 백엔드 PlaceDetailResponse 중 이 화면이 쓰는 부분 */
-interface BackendPlaceDetail {
+/** 상세 응답은 목록 응답(BackendPlace)의 상위 집합이다 - 업종·권역·주소가 그대로 들어 있다 */
+interface BackendPlaceDetail extends BackendPlace {
   restDayText: string | null
   useFeeText: string | null
   free: boolean
@@ -187,7 +190,8 @@ export const MapPlaceService = {
   },
 
   /** 통합 검색 (MAP_002) - 이름·메뉴 부분 일치 상위 20건. 화면 필터(권역·업종) 범위를 함께 보낸다. 실패하면 빈 배열. */
-  async search (q: string, opts?: { region?: string | null, categories?: string[] }): Promise<MapPlace[]> {
+  /** 통합 검색 - 정렬·범위는 서버가 정한다(2026-09-14 단일화). 실패는 null - 빈 배열(0건)과 구분해 화면이 "연결 실패"를 보여준다(최종점검 #26) */
+  async search (q: string, opts?: { region?: string | null, categories?: string[] }): Promise<MapPlace[] | null> {
     try {
       const params = new URLSearchParams({ q })
       if (opts?.region) params.set('region', opts.region)
@@ -195,7 +199,7 @@ export const MapPlaceService = {
       const rows = await apiGet<BackendPlace[]>(`/places/search?${params}`)
       return withUnits(rows.map(toMapPlace))
     } catch {
-      return []
+      return null
     }
   },
 
@@ -220,7 +224,8 @@ export const MapPlaceService = {
         images,
         imageAttribution: row.images?.[0]?.attribution ?? null,
         overview: row.overview ?? null,
-        goodPriceBaseDate: row.goodPriceBaseDate ?? null
+        goodPriceBaseDate: row.goodPriceBaseDate ?? null,
+        place: toMapPlace(row)
       }
     } catch {
       return null

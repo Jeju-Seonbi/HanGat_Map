@@ -81,11 +81,17 @@
 .pn.calm{background:var(--pin-calm);box-shadow:0 0 0 2px #fff,0 0 0 6px rgba(0,184,148,.28),0 2px 6px rgba(0,0,0,.26)}
 .pn.mid{background:var(--pin-mid);box-shadow:0 0 0 2px #fff,0 0 0 6px rgba(255,149,0,.28),0 2px 6px rgba(0,0,0,.26)}
 .pn.busy{background:var(--pin-busy);box-shadow:0 0 0 2px #fff,0 0 0 7px rgba(244,54,76,.3),0 2px 7px rgba(0,0,0,.28)}
+/* 예보 없음(MAP_004 예외: 집중률 없음 = 회색, 한산 취급 금지). 전엔 파일 뒤쪽에 있어 선택 글로우(.pn.pick)·찜 분홍(.pn.fav)을 덮어썼다(최종점검 #35, 2026-09-14) */
+.pn.none{background:var(--pin-none);box-shadow:0 0 0 2px #fff,0 0 0 5px rgba(140,150,160,.22),0 1px 4px rgba(0,0,0,.2)}
 .tier-bg.calm{background:var(--pin-calm)}
 .tier-bg.mid{background:var(--pin-mid)}
 .tier-bg.busy{background:var(--pin-busy)}
 .tier-bg.none{background:var(--none)}
+/* 찜한 장소(MAP_009): 색까지 분홍 ♥ 로 통일 - 혼잡 색을 남기면 하트가 잘 안 띄어 "내가 찜한 곳"이 먼저 보이게 분홍(2026-09-14 사용자 결정).
+   관광지 핀은 혼잡 색 규칙(.pn.calm 등) 뒤, 선택 글로우(.pn.pick)도 분홍으로. 흐린 핀(.pn.dim)은 그대로 흐리다. 아이콘 ♥ 는 아래 핀 아이콘 블록 끝에 */
+.pn.fav{background:var(--pink);box-shadow:0 0 0 2px #fff,0 0 0 6px rgba(194,24,91,.28),0 2px 6px rgba(0,0,0,.26)}
 .pn.pick{box-shadow:0 0 0 2px #fff,0 0 0 9px rgba(0,184,163,.36),0 3px 11px rgba(0,0,0,.32)}
+.pn.pick.fav{box-shadow:0 0 0 2px #fff,0 0 0 9px rgba(194,24,91,.36),0 3px 11px rgba(0,0,0,.32)}
 .pn.dim{opacity:.42;box-shadow:none}
 .lb-t{background:var(--surf);border-radius:var(--rp);padding:3px 10px;font-size:11.5px;
   font-weight:800;color:var(--tx);box-shadow:0 2px 7px rgba(30,50,80,.18);white-space:nowrap}
@@ -98,6 +104,7 @@
 .mk-cvs{background:#2f7de1}
 .mk-stay{background:#5f7d95}
 .mk-mart{background:#c2571a}
+.poi-marker.fav{background:var(--pink)}   /* 찜한 업종 장소도 분홍 - 착한가격(.mk-food)과 색이 같지만 아이콘이 ♥ 라 구분된다 */
 /* 핀 아이콘 (2026-09-12 결정): 관광지는 산(기본) + 종류 묶음 6개, 업종은 필터 칩과 같은 아이콘(LayerIcon.vue 패스 그대로).
    노드를 늘리지 않고 ::after 마스크로 점 위에 그린다 - 핀 재사용(클래스 교체)과 호환, 줌 무관 항상 표시.
    inset:0 은 테두리 안쪽(패딩 박스) 기준이라 흰 링은 border 가 아니라 box-shadow 라 18px 핀 전체가 영역 - 72% 크기·선 1.8 아이콘(≈13px). 9px 흐린 핀엔 안 들어가 뺀다.
@@ -121,6 +128,8 @@
 .mk-stay{--ico:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='%23000'%20stroke-width='1.8'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpath%20d='M3%2019.5v-9M3%2014.2h18v5.3M21%2019.5v-5.3a2.6%202.6%200%200%200-2.6-2.6H10.4v2.6'/%3E%3Ccircle%20cx='7'%20cy='11.2'%20r='1.9'/%3E%3C/svg%3E")}
 .mk-mart{--ico:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='%23000'%20stroke-width='1.8'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Ccircle%20cx='9.6'%20cy='19.4'%20r='1.5'/%3E%3Ccircle%20cx='17.4'%20cy='19.4'%20r='1.5'/%3E%3Cpath%20d='M2.6%203.6h2.7l2.4%2011.5h11l1.9-7.7H6.5'/%3E%3C/svg%3E")}
 /* 핀 아이콘 끝 */
+/* 찜한 장소(MAP_009): 관광지·업종 핀 모두 안쪽 아이콘을 ♥ 로. 원 색(혼잡·업종)과 크기는 그대로 - 위 분류 아이콘(.ic-*, .mk-*)보다 뒤에 있어 이긴다 */
+.pn.fav,.poi-marker.fav{--ico:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='%23000'%3E%3Cpath%20d='M12%2021s-7.2-4.6-9.6-9.1C.6%208.5%202.4%204.6%206.2%204.1c2.2-.3%204.2.8%205.8%202.7%201.6-1.9%203.6-3%205.8-2.7%203.8.5%205.6%204.4%203.8%207.8C19.2%2016.4%2012%2021%2012%2021Z'/%3E%3C/svg%3E")}
 /* 착한가격 클릭 툴팁 (MAP_001: 상호·대표메뉴·가격) */
 .gp-tip{display:flex;flex-direction:column;gap:3px;background:var(--surf);border-radius:12px;
   padding:9px 13px;box-shadow:0 3px 14px rgba(30,50,80,.26);white-space:nowrap}
@@ -151,7 +160,7 @@
 
 /* ── 플로팅 공통 ── */
 .fl{position:absolute;background:var(--surf);border-radius:var(--r);box-shadow:var(--sh2)}
-.filter-fab,.mobile-filter-head{display:none}
+.filter-fab,.mobile-filter-head,.mdrop,.sect .cnt,.cond-dim,.pop-dim{display:none}   /* 폰 전용 요소 - 모바일 블록에서 켠다 */
 .cond{top:16px;left:16px;bottom:16px;width:292px;padding:16px;z-index:900;
   display:flex;flex-direction:column;overflow:hidden} /* 하단까지 꽉 채우는 고정 컬럼 */
 .seg{display:flex;background:var(--surf2);border-radius:12px;padding:3px;margin-bottom:13px}
@@ -252,6 +261,10 @@
 .stop .tm{font-size:11px;color:var(--tx3);padding-top:3px;font-weight:600}
 .stop .hd{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .stop .hd .rpin{margin:0}
+/* 목록(코스 패널·검색 결과)의 업종 점 - 지도 업종 핀(.poi-marker.mk-*) 그대로, 크기만 목록에 맞춰 18px.
+   will-change: 목록 행은 세로 위치가 소수점(185.69px 같은)이라 화면 배율 125~150%에서 원과 마스크 아이콘이 다른 픽셀에 붙어
+   그림이 오른쪽 아래로 치우쳐 보였다(실측). 자체 레이어로 올리면 둘이 같은 격자에 그려져 가운데 온다. 목록 몇 줄뿐이라 비용 없음 - 지도 핀엔 넣지 말 것(수천 개) */
+.cpin{width:18px;height:18px;flex-shrink:0;cursor:inherit;will-change:transform}
 .stop .nm{font-size:14px;font-weight:700}
 .stop .why{font-size:11.5px;color:var(--tx3);margin-top:3px;line-height:1.5}
 .stop .pr{font-size:11.5px;color:var(--tx2);margin-top:2px;font-weight:600}
@@ -322,7 +335,8 @@
 .wxrow{display:flex;gap:7px;overflow-x:auto;padding:2px 0 6px;margin-bottom:13px}
 .wxrow::-webkit-scrollbar{height:4px}
 .wxrow::-webkit-scrollbar-thumb{background:var(--line2);border-radius:3px}
-.wxc{flex:0 0 auto;width:var(--nav-h);padding:8px 0 8px;border-radius:13px;background:var(--surf2);
+/* 카드 폭 58px - 헤더 높이(--nav-h)와 무관한 값인데 통합 때 58px 일괄 치환에 휩쓸려 데스크톱 80px·폰 60px 로 흔들렸다(최종점검 #57) */
+.wxc{flex:0 0 auto;width:58px;padding:8px 0 8px;border-radius:13px;background:var(--surf2);
   text-align:center;cursor:pointer;border:2px solid transparent;transition:transform .12s,box-shadow .12s}
 .wxc:hover{transform:translateY(-2px);box-shadow:var(--sh)}
 .wxc.on{background:var(--ac-bg);border-color:var(--ac)}
@@ -512,8 +526,7 @@
   .stage.both .pop{left:16px}
   .stage.both .panel.push{left:296px}
   .stage.both .slid.s2{left:576px}}
-/* ── 결측 핀 (MAP_004 예외: 집중률 없음 = 회색, 한산 취급 금지) ── */
-.pn.none{background:#aeb8c2;box-shadow:0 0 0 2px #fff,0 0 0 5px rgba(140,150,160,.22),0 1px 4px rgba(0,0,0,.2)}   /* 흰 링 2px 은 다른 단계와 동일 */
+/* ── 결측 핀 (MAP_004 예외: 집중률 없음 = 회색, 한산 취급 금지). 지도 핀(.pn.none)은 위 혼잡 색 규칙 옆으로 옮겼다 - 여기(파일 뒤) 두면 선택·찜 규칙을 덮어썼다 ── */
 .rpin.none{background:#aeb8c2;box-shadow:0 0 0 3px rgba(140,150,160,.24),0 1px 4px rgba(0,0,0,.18)}
 /* ── 찜 (MAP_009) ── */
 .fav{font-size:16px;line-height:1;color:var(--tx3);padding:5px 9px;border-radius:var(--rp);background:var(--surf2)}
@@ -554,8 +567,11 @@
 .catsel:focus{border-color:var(--ac);background-color:var(--surf)}
 .catsel.on{background-color:var(--ac-bg);color:var(--ac-dk)}
 /* ── 코스 일차 전환 (MAP_006) ── */
-.days{display:flex;gap:5px;margin-left:auto}
-.days .chip{padding:4px 10px}
+/* 칩은 헤더 둘째 줄 전체 폭(flex-basis:100%) - 첫 줄(제목·×)과 한 줄에 두면 3일차부터 제목이 세로로 깨졌다(최종점검 #15). 일수가 많으면 칩끼리 줄바꿈 */
+.panel .ph{flex-wrap:wrap;row-gap:9px}
+.panel .ph h3{white-space:nowrap}
+.days{display:flex;flex-wrap:wrap;gap:5px;flex:1 0 100%}
+.days .chip{padding:4px 10px;white-space:nowrap}
 /* ── 토스트 ── */
 .toast{position:fixed;left:50%;bottom:34px;transform:translateX(-50%) translateY(14px);
   background:var(--tx);color:var(--surf);font-size:13px;font-weight:600;padding:11px 20px;
@@ -573,26 +589,84 @@
     transition:transform .15s,background .15s,color .15s}
   .filter-fab:hover,.filter-fab[aria-expanded="true"]{background:var(--ac);color:var(--on-ac)}
   .filter-fab:active{transform:scale(.94)}
-  .cond{left:0;right:0;width:auto;top:auto;bottom:0;max-height:min(70vh,620px);
-    padding:30px 16px calc(16px + env(safe-area-inset-bottom,0px));z-index:1050;
-    border-radius:22px 22px 0 0;opacity:0;pointer-events:none;
-    transform:translateY(calc(100% + 24px));
-    transition:transform .24s ease,opacity .18s ease}
-  .cond.mobile-open{opacity:1;pointer-events:auto;transform:translateY(0)}
-  .mobile-filter-head{display:flex;align-items:flex-start;gap:12px;margin:0 2px 14px;flex-shrink:0}
-  .mobile-filter-head>div{display:flex;flex:1;min-width:0;flex-direction:column;gap:1px}
-  .mobile-filter-head b{font-size:16px;font-weight:800;letter-spacing:-.03em;color:var(--tx)}
-  .mobile-filter-head span{font-size:10.5px;color:var(--tx3)}
-  .mobile-filter-close{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;
-    justify-content:center;background:var(--surf2);color:var(--tx3);font-size:20px;line-height:1}
+  /* 장소 찾기 = 가운데 모달(2026-09-14, 시안 B). 위아래 24px·좌우 14px 여백으로 높이가 확정되어 목록(.rows flex:1)이 남는 공간을 다 쓴다 -
+     바텀시트(max-height 70vh, 확정 높이 없음) 땐 목록이 min-height 88px 에 머물러 1.3줄만 보였다(최종점검 #58).
+     translateY 는 열림 애니메이션용 - 닫힘: 아래 16px 에서 살짝 작게, 열림: 제자리 */
+  .cond-dim{display:block;position:absolute;inset:0;z-index:1040;background:var(--dim);
+    -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:opacity .18s ease}
+  .cond-dim.on{opacity:1;pointer-events:auto}
+  .cond{top:24px;bottom:24px;left:14px;right:14px;width:auto;
+    padding:12px 14px 12px;z-index:1050;border-radius:20px;opacity:0;pointer-events:none;
+    transform:translateY(16px) scale(.98);
+    transition:transform .2s ease,opacity .18s ease}
+  .cond.mobile-open{opacity:1;pointer-events:auto;transform:translateY(0) scale(1)}
+  /* × 는 검색창 오른쪽 같은 줄 - 제목 줄을 없앤 만큼 목록이 한 줄 더 보인다 */
+  .mobile-filter-head{display:block;position:absolute;top:12px;right:14px;z-index:2}
+  .mobile-filter-close{width:41px;height:41px;border-radius:50%;display:flex;align-items:center;
+    justify-content:center;background:var(--surf2);color:var(--tx3);font-size:22px;line-height:1}
   .mobile-filter-close:hover{background:var(--line);color:var(--tx)}
-  .pop,.panel,.panel.push{top:auto;left:0;right:0;bottom:0;width:auto;max-height:68vh;
+  .cond .srch{margin-right:49px}
+  /* 조건 칩 4개(정렬·권역·업종·종류) - 글자가 현재 선택값. 누르면 아래에 그 조건만 펼친다(시안 A) */
+  .mdrop{display:flex;gap:6px;margin:0 -14px 10px;padding:0 14px;flex-shrink:0;overflow-x:auto;scrollbar-width:none}   /* 글자가 길면(업종 둘·종류 이름) 옆으로 밀어 본다 - 줄여 쓰면 못 읽는다 */
+  .mdrop::-webkit-scrollbar{display:none}
+  .mdrop button{flex:0 0 auto;display:inline-flex;align-items:center;gap:4px;max-width:170px;min-height:34px;padding:0 9px 0 11px;border-radius:var(--rp);
+    background:var(--surf2);color:var(--tx2);font-size:12.5px;font-weight:700;white-space:nowrap}
+  .mdrop button>span{overflow:hidden;text-overflow:ellipsis}
+  .mdrop button::after{content:'';flex-shrink:0;width:0;height:0;border:4px solid transparent;border-top:5px solid currentColor;
+    margin:5px 0 0 2px;opacity:.7;transition:transform .15s}
+  .mdrop button.open::after{transform:rotate(180deg);margin:0 0 5px 2px}
+  .mdrop button.set{background:var(--ac-bg);color:var(--ac-dk)}
+  .mdrop button.open{background:var(--ac);color:var(--on-ac)}
+  .mdrop .ic-sort{font-style:normal;font-size:13px;line-height:1;opacity:.8}
+  .mdrop .dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex-shrink:0}
+  /* 펼친 패널: 그 조건 하나만 보인다. 정렬은 세그먼트 그대로, 권역·업종은 회색 판 위에 칩 */
+  #cond-body :is(.seg,.chips,.ftr-wrap,.catsel){display:none}
+  #cond-body.open-sort .seg{display:flex}
+  #cond-body.open-reg .chips{display:flex}
+  #cond-body.open-layer .ftr-wrap{display:flex}
+  #cond-body.open-cat .catsel{display:block}
+  #cond-body :is(.chips,.ftr-wrap){background:var(--surf2);border-radius:14px;padding:10px;margin-bottom:12px}
+  .chips{gap:8px}
+  .chip{padding:8px 14px;font-size:12.5px;background:var(--surf)}
+  .seg{margin-bottom:12px}
+  /* 업종 7개를 알약으로 줄바꿈 - ‹ › 넘김(15px 화살표, 최종점검 #56)은 폰에서 안 쓴다 */
+  .ftr-nav{display:none}
+  .ftr{flex-wrap:wrap;gap:8px;width:auto;transition:none}
+  .ftr button{flex:0 0 auto;flex-direction:row;gap:7px;padding:4px 13px 4px 4px;border-radius:var(--rp);
+    background:var(--surf);font-size:12.5px;letter-spacing:-.02em;color:var(--tx2)}
+  .ftr .ico{width:28px;height:28px}
+  #cond-body .ftr button.on{background:var(--ac);color:var(--on-ac)}
+  #cond-body .ftr button.on .ico{background:var(--surf);color:var(--ac);box-shadow:none}
+  .sect{margin-bottom:8px}
+  .sect .cnt{display:inline;order:1;font-size:12px;font-weight:700;color:var(--tx3);letter-spacing:0}   /* order:1 - 구분선(::after) 뒤, 오른쪽 끝 */
+  .rows{min-height:0;margin:0;padding:0}
+  /* 코스 패널 = 아래 시트(손잡이 바). 상세는 아래 가운데 모달 */
+  .panel,.panel.push{top:auto;left:0;right:0;bottom:0;width:auto;max-height:68vh;
     border-radius:22px 22px 0 0;padding-top:30px;background:var(--surf);box-shadow:var(--sh2)}
-  .cond::before,.pop::before,.panel::before{content:'';position:absolute;top:9px;left:50%;
+  .panel::before{content:'';position:absolute;top:9px;left:50%;
     transform:translateX(-50%);width:42px;height:4px;border-radius:3px;background:var(--line2)}
+  /* 상세 = 장소 찾기와 같은 가운데 모달(2026-09-14). 아래 시트(68vh) 땐 사진·소개까지만 보이고 날씨·후기는 스크롤 뒤였다.
+     뒤 어두운 배경(.pop-dim)을 탭하면 닫힌다 - 시트 땐 위쪽 지도 빈 곳 탭이 그 역할이었는데 모달은 지도를 덮는다 */
+  .pop-dim{display:block;position:absolute;inset:0;z-index:1040;background:var(--dim);
+    -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);animation:dimin .18s ease}
+  .pop{top:24px;bottom:24px;left:14px;right:14px;width:auto;padding:16px 16px 18px;z-index:1050;border-radius:20px;
+    background:var(--surf);box-shadow:var(--sh2);animation:popin .2s ease}
+  @keyframes popin{from{opacity:0;transform:translateY(16px) scale(.98)}}
+  @keyframes dimin{from{opacity:0}}
   .slid{top:12px;bottom:auto;left:10px;right:10px;max-width:none;z-index:950}
   .slid.s1,.slid.s2{left:10px;right:10px}
   .datebtn{padding:10px 16px;background:var(--surf);border:1px solid var(--line)}
-  .stage.sheet-open .cond,.stage.sheet-open .filter-fab{display:none}
+  .stage.sheet-open .cond,.stage.sheet-open .cond-dim,.stage.sheet-open .filter-fab{display:none}
+  /* 토스트를 하단 탭바(--mobile-tabbar-h, iOS 홈 표시줄 포함)와 돋보기 버튼(bottom 20 + 56) 위로 - 전엔 bottom 34px 라 탭바 아이콘을 덮었다(최종점검 #53) */
+  .toast{bottom:calc(var(--mobile-tabbar-h) + 84px)}
+  /* 장소 데이터 배너를 날짜 버튼(top 12 + 높이 42) 아래 8px 로 - 폰에선 날짜 버튼이 위에 있어 배너 글자를 가렸다(최종점검 #55).
+     상세·코스 시트가 열리면 667px 폰에서 시트 위와 겹치므로 그동안은 숨긴다 */
+  .map-offline{top:62px}
+  .stage.sheet-open .map-offline{display:none}
+  /* 터치 타깃(최종점검 #56): 상세·코스 닫기 ×, '복사' 알약, '더보기' 링크는 겉모습·자리는 그대로 두고 누르는 영역만 32px 이상으로 넓힌다.
+     × 를 min-width 로 키우면 제목 칸이 12px 줄어 390px 에서 관광지 12곳 제목이 한 줄 더 꺾였다(검증 실측) */
+  .pox,.ph .x,.pi .cp,.intro-more{position:relative}
+  .pox::before,.ph .x::before{content:'';position:absolute;inset:-6px}
+  .pi .cp::before,.intro-more::before{content:'';position:absolute;inset:-8px -6px}
 }
 }

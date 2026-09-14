@@ -624,6 +624,12 @@ export function courseGenerationErrorMessage(error: unknown): string {
   if (error instanceof ApiError && error.status === 503) {
     return error.message || 'AI 코스 생성 서버가 일시적으로 혼잡합니다. 잠시 후 다시 시도해 주세요.'
   }
+  if (error instanceof ApiError && error.status === 400) {
+    const detail = error.detail && typeof error.detail === 'object'
+      ? Object.values(error.detail as Record<string, unknown>).find(value => typeof value === 'string')
+      : undefined
+    return typeof detail === 'string' ? detail : (error.message || '입력값을 확인해 주세요.')
+  }
   return '코스를 생성하지 못했어요. 다시 시도해 주세요.'
 }
 

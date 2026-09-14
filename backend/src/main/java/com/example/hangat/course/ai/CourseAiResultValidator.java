@@ -63,11 +63,35 @@ public class CourseAiResultValidator {
 
         validateRequired(input, candidatesById, scheduledByCandidate);
         validateCongestionPolicy(input, candidatesById, scheduledByCandidate);
+        validateSelectedStyleCoverage(input, candidatesById, scheduledByCandidate);
         if (input.trip().startDate().datesUntil(input.trip().endDate().plusDays(1))
                 .anyMatch(date -> !scheduledDates.contains(date))) {
             fail(CourseAiValidationCode.AI_RESULT_TRIP_DATE_MISSING,
                     "AI 코스 결과에 요청한 여행 날짜가 누락되었습니다.");
         }
+    }
+
+    /** 카페 선택은 카페만 방문한다는 뜻은 아니지만, 확인된 카페를 최소 한 곳 포함한다. */
+    private void validateSelectedStyleCoverage(CourseAiInputDto input,
+            Map<String, CandidateFactDto> candidates,
+            Map<String, ScheduledItem> scheduled) {
+        if (!input.preferences().selectedStyleCodes().contains("CAFE")) return;
+        boolean cafeAvailable = candidates.values().stream().anyMatch(this::isCafe);
+        boolean cafeScheduled = scheduled.keySet().stream()
+                .map(candidates::get).filter(java.util.Objects::nonNull).anyMatch(this::isCafe);
+        if (!cafeAvailable) {
+            fail(CourseAiValidationCode.AI_RESULT_SELECTED_STYLE_MISSING,
+                    "카페 스타일을 유지할 확인된 카페 후보가 부족합니다.");
+        }
+        if (!cafeScheduled) {
+            fail(CourseAiValidationCode.AI_RESULT_SELECTED_STYLE_MISSING,
+                    "카페 스타일을 선택했고 확인된 카페 후보가 있으므로 일정에 카페가 필요합니다.");
+        }
+    }
+
+    private boolean isCafe(CandidateFactDto candidate) {
+        return "CAFE".equals(candidate.internalCategoryCode())
+                || candidate.styleHintCodes().contains("CAFE");
     }
 
     private void validateCongestionPolicy(CourseAiInputDto input,

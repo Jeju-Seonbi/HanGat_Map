@@ -46,6 +46,24 @@ describe('상세 조회 사진 매핑', () => {
     expect(d?.imageAttribution).toBe('출처: 한국관광공사 국문 관광정보 서비스')
   })
 
+  it('같은 응답에서 장소 기본 정보(업종·권역·주소)도 뽑아 준다 - 코스 경유지 대체 객체({id,n,x,y})의 빈 칸을 채운다(#13)', async () => {
+    // 값은 2026-09-14 로컬 /places/378 (코스 8의 식당 경유지) 응답 모양
+    mockFetch({
+      ...REAL_DETAIL,
+      id: 378, name: '드르쿰다', regionCode: 'EAST', regionName: '동부', categoryCode: 'FOOD', categoryName: '음식점',
+      tagCode: null, tagName: null, roadAddress: '제주특별자치도 서귀포시 성산읍 삼달로 63', lotAddress: null,
+      latitude: 33.4444984, longitude: 126.9191262, phone: null, operatingHoursText: null,
+      parkingAvailable: null, toiletAvailable: null, businessStatus: 'OPEN', goodPrice: false, hiddenGem: false
+    })
+
+    const d = await MapPlaceService.getDetail(378)
+
+    expect(d?.place).toMatchObject({ id: 378, n: '드르쿰다', c: '음식점', r: '동부', cat: 'FOOD', addr: '제주특별자치도 서귀포시 성산읍 삼달로 63' })
+    // 대체 객체와 합치면 원래 네 칸은 그대로, 나머지가 채워진다
+    const stub = { id: 378, n: '드르쿰다', x: 126.9191262, y: 33.4444984 }
+    expect({ ...d!.place, ...stub }).toMatchObject({ ...stub, c: '음식점', r: '동부' })
+  })
+
   it('축소본 주소가 없거나 원본과 같으면 공사 규칙(_image3_)으로 축소본을 쓰고, 크게 보기용 url 은 원본 그대로다', async () => {
     mockFetch(REAL_DETAIL)
 
@@ -170,5 +188,25 @@ describe('폐업 장소', () => {
   it('getById 는 실패하면 null - 호출부가 "찾지 못했어요" 로 안내한다', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('down')))
     expect(await MapPlaceService.getById(1)).toBeNull()
+  })
+})
+
+describe('통합 검색 (2026-09-14 백엔드 단일화)', () => {
+  it('업종을 좁히지 않으면 categories 를 보내지 않고, 권역만 붙인다 - 결과는 목록과 같은 모양에 읍면(unit)이 붙는다', async () => {
+    mockFetch([{ ...ROW, roadAddress: '제주특별자치도 제주시 애월읍 애월로 1' }])
+    const rows = await MapPlaceService.search('스타벅스', { region: 'NORTH' })
+    const url = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string
+    expect(url).toContain('/places/search?q=')
+    expect(url).toContain('region=NORTH')
+    expect(url).not.toContain('categories=')
+    expect(rows).toHaveLength(1)
+    expect(rows![0]).toMatchObject({ c: '카페', unit: '애월읍' })
+  })
+
+  it('실패하면 null - 빈 배열(0건)과 구분해 화면이 "연결하지 못했어요"를 보여준다(#26)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('down')))
+    expect(await MapPlaceService.search('국수')).toBeNull()
+    mockFetch([])
+    expect(await MapPlaceService.search('없는이름')).toEqual([])
   })
 })

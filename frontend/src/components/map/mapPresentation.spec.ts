@@ -49,6 +49,14 @@ describe('mapPresentation', () => {
       expect(spotPinSpec('calm', false, true, 'sea').sig).not.toBe(spotPinSpec('calm', false, true, 'mt').sig)
     })
 
+    it('찜한 장소는 fav 클래스가 붙고(아이콘만 ♥, 색·크기는 그대로) 찜/해제가 서명에 반영된다 (MAP_009, 2026-09-14)', () => {
+      const fav = spotPinSpec('mid', false, true, 'mt', true), plain = spotPinSpec('mid', false, true, 'mt', false)
+      expect(fav.cls).toBe('pn mid ic-mt fav')
+      expect(fav).toMatchObject({ size: 18, z: 200 })          // 크기·층은 찜과 무관
+      expect(fav.sig).not.toBe(plain.sig)                       // 찜 토글 때 핀이 다시 그려지는 근거
+      expect(spotPinSpec('busy', true, true, 'sea', true).cls).toBe('pn busy ic-sea pick fav')
+    })
+
     it('혼잡 단계만 달라져도 서명이 달라진다 - 날짜 이동 때 색이 갱신되는 근거', () => {
       expect(spotPinSpec('calm', false, true).sig).not.toBe(spotPinSpec('busy', false, true).sig)
       expect(spotPinSpec('calm', false, true).sig).toBe(spotPinSpec('calm', false, true).sig)
@@ -102,15 +110,48 @@ describe('mapPresentation', () => {
     expect(mapCss).not.toContain('.pw:hover .poi-label')
   })
 
-  it('모바일 지도에서 캘린더는 위에 있고 검색 필터는 원형 버튼에서 하단 시트로 열린다', () => {
+  it('모바일 지도에서 캘린더는 위에 있고 장소 찾기는 원형 버튼에서 가운데 모달로 열린다 (2026-09-14)', () => {
     expect(declarations('.slid')).toContain('top:12px')
     expect(declarations('.slid')).toContain('bottom:auto')
-    expect(declarations('.cond')).toContain('top:auto')
-    expect(declarations('.cond')).toContain('bottom:0')
+    // 모달: 위아래·좌우 여백으로 높이가 확정돼야 목록(flex:1)이 남는 공간을 채운다 - max-height 만 있으면 88px 로 굳는다(#58)
+    expect(declarations('.cond')).toContain('top:24px')
+    expect(declarations('.cond')).toContain('bottom:24px')
+    expect(declarations('.cond')).toContain('left:14px')
+    expect(declarations('.cond')).not.toContain('max-height')
     expect(declarations('.cond')).toContain('translateY(')
     expect(declarations('.cond.mobile-open')).toContain('translateY(0)')
+    expect(declarations('.cond-dim')).toContain('backdrop-filter')
+    // 상세(.pop)도 같은 가운데 모달 + 뒤 배경(.pop-dim). 코스 패널(.panel)만 아래 시트(손잡이 바)
+    expect(declarations('.pop')).toContain('top:24px')
+    expect(declarations('.pop')).not.toContain('max-height')
+    expect(declarations('.pop-dim')).toContain('backdrop-filter')
+    expect(mobileCss).not.toContain('.pop::before')
+    expect(declarations('.panel::before')).toContain('width:42px')
+    expect(mapCss).toContain('.cond-dim,.pop-dim{display:none}')   // 데스크톱은 배경 없음
     expect(declarations('.filter-fab')).toContain('display:flex')
     expect(mobileCss).not.toContain('.stage.sheet-open .slid')
+  })
+
+  it('모바일 모달은 목록이 먼저 보이고 조건은 칩 4개를 눌러 하나씩 펼친다 (시안 A)', () => {
+    expect(filterPanelSource).toContain('class="mdrop" role="group"')
+    for (const k of ['sort', 'reg', 'layer', 'cat']) expect(filterPanelSource).toContain(`toggleDrop('${k}')`)
+    expect(filterPanelSource.indexOf('<SearchBox')).toBeLessThan(filterPanelSource.indexOf('class="mdrop"'))   // 검색창 → 칩 → 목록
+    expect(declarations('#cond-body :is(.seg,.chips,.ftr-wrap,.catsel)')).toContain('display:none')          // 펼치기 전엔 조건 UI 없음
+    expect(declarations('#cond-body.open-layer .ftr-wrap')).toContain('display:flex')
+    expect(declarations('#cond-body.open-cat .catsel')).toContain('display:block')
+    expect(mobileCss).not.toContain('.mtabs')                                                                  // 탭은 없다
+    expect(mapCss).toContain('.filter-fab,.mobile-filter-head,.mdrop,.sect .cnt,.cond-dim,.pop-dim{display:none}')      // 데스크톱에선 폰 전용 요소가 안 보인다
+  })
+
+  it('모바일에서 토스트·장소 데이터 배너·닫기 버튼이 탭바·날짜 버튼·손가락과 겹치지 않는다 (#53·#55·#56·#57)', () => {
+    expect(declarations('.toast')).toContain('bottom:calc(var(--mobile-tabbar-h) + 84px)')   // 탭바 + 돋보기 버튼 위
+    expect(declarations('.map-offline')).toContain('top:62px')                              // 날짜 버튼(12+42) 아래 8px
+    expect(declarations('.stage.sheet-open .map-offline')).toContain('display:none')
+    expect(declarations('.pox::before,.ph .x::before')).toContain('inset:-6px')                  // 20×21 → 32×33, 자리는 그대로
+    expect(declarations('.pi .cp::before,.intro-more::before')).toContain('inset:-8px -6px')
+    expect(mobileCss).not.toContain('.pox,.ph .x{min-width')                                     // 제목 칸을 줄이는 방식은 쓰지 않는다
+    expect(mapCss).toContain('.wxc{flex:0 0 auto;width:58px;')                              // 헤더 높이 토큰에 묶이지 않는다
+    expect(mapCss).not.toContain('width:var(--nav-h)')
   })
 
   it('모바일 검색 버튼과 바텀시트 닫기 버튼이 접근 가능한 상태를 알린다', () => {

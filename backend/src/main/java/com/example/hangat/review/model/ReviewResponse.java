@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Getter;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import java.util.List;
 import com.example.hangat.user.model.User;
 
@@ -31,6 +33,9 @@ public class ReviewResponse {
     private final String content;
     private final List<String> imageUrls;
     private final LocalDateTime createdAt;
+    private final LocalDateTime editedAt;
+    @JsonFormat(shape = JsonFormat.Shape.STRING)
+    private final OffsetDateTime editableUntil;
 
     // ────────────────────────── 응답 변환 ──────────────────────────
 
@@ -47,6 +52,8 @@ public class ReviewResponse {
                 .content(review.getContent())
                 .imageUrls(images.stream().map(ReviewImage::getImageUrl).toList())
                 .createdAt(review.getCreatedAt())
+                .editedAt(review.getEditedAt())
+                .editableUntil(review.editableUntil())
                 .build();
     }
 }

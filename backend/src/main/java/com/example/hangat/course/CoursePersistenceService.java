@@ -52,6 +52,17 @@ public class CoursePersistenceService {
             CourseAiResultDto result,
             CourseGenerationMetadata metadata
     ) {
+        return persist(request, facts, result, metadata, null);
+    }
+
+    @Transactional
+    public CoursePersistenceResult persist(
+            CourseRequestDto request,
+            CourseGenerationFacts facts,
+            CourseAiResultDto result,
+            CourseGenerationMetadata metadata,
+            KakaoAccommodationProvider.VerifiedAccommodation accommodation
+    ) {
         if (request == null || facts == null || result == null || metadata == null) {
             throw new IllegalArgumentException("저장할 코스 생성 결과가 필요합니다.");
         }
@@ -64,7 +75,7 @@ public class CoursePersistenceService {
         Map<String, CourseCandidate> candidatesById = indexCandidates(facts);
         validateSelectedCandidates(result, candidatesById);
 
-        Course course = courseRepository.save(Course.builder()
+        var courseBuilder = Course.builder()
                 .courseType(CourseType.USER)
                 .generationReason(com.example.hangat.course.model.enums.GenerationReason.valueOf(
                         metadata.generationReason().name()))
@@ -75,8 +86,12 @@ public class CoursePersistenceService {
                 .budgetTotal(request.getBudgetTotal())
                 .transport(com.example.hangat.course.model.enums.Transport.valueOf(
                         request.getTransport().name()))
-                .algorithmVersion(metadata.algorithmVersion())
-                .build());
+                .algorithmVersion(metadata.algorithmVersion());
+        if (accommodation != null) {
+            courseBuilder.accommodationSourceMapping(
+                    placeResolver.resolveVerifiedAccommodation(accommodation));
+        }
+        Course course = courseRepository.save(courseBuilder.build());
 
         Map<String, CourseItem> itemsByCandidateId = new LinkedHashMap<>();
         Map<String, String> categoryNamesByCandidateId = new LinkedHashMap<>();
