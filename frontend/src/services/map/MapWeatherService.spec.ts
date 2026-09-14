@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import WeatherService, { skyToKind } from './MapWeatherService'
+import WeatherService, { skyToKind, skyLabel, weatherBasis, MID_TERM_FROM } from './MapWeatherService'
 
 /** 값은 2026-08-30 실호출 응답에서 그대로 가져왔다. */
 const REAL = [
@@ -26,11 +26,12 @@ describe('하늘상태 → 아이콘 종류', () => {
     expect(skyToKind('흐림')).toBe('구름')
   })
 
-  it('조합형은 비가 이긴다', () => {
+  it('조합형은 강수가 이긴다 - 눈은 눈 아이콘(#41)', () => {
     // ★ 실측: 중기예보는 "흐리고 비"처럼 준다 - 포함 검사 순서가 바뀌면 구름이 된다
     expect(skyToKind('흐리고 비')).toBe('비')
     expect(skyToKind('구름많고 소나기')).toBe('비')
-    expect(skyToKind('흐리고 눈')).toBe('비')
+    expect(skyToKind('흐리고 눈')).toBe('눈')
+    expect(skyToKind('비/눈')).toBe('눈')
   })
 
   it('모르는 값은 구름으로 뭉갠다 - 맑다고 단정하지 않는다', () => {
@@ -39,13 +40,45 @@ describe('하늘상태 → 아이콘 종류', () => {
   })
 })
 
+describe('기준 지역 라벨 (최종점검 #42: 4일째부터는 제주 한 지점 중기예보라 권역 기준이 아니다)', () => {
+  it('3일째까지 권역, 4일째부터 제주', () => {
+    expect(MID_TERM_FROM).toBe(4)
+    expect(weatherBasis(0, '남부')).toBe('남부')
+    expect(weatherBasis(3, '남부')).toBe('남부')
+    expect(weatherBasis(4, '남부')).toBe('제주')
+    expect(weatherBasis(6, '북부')).toBe('제주')
+  })
+  it('권역을 모르면 단기 구간은 null(라벨 생략), 중기 구간은 제주', () => {
+    expect(weatherBasis(1, null)).toBeNull()
+    expect(weatherBasis(5, null)).toBe('제주')
+  })
+})
+
+describe('하늘상태 → 표시 글자 (최종점검 #41: 눈·소나기를 비라고 적지 않는다)', () => {
+  it('강수는 종류를 살린다 - 조합형은 강수 쪽', () => {
+    expect(skyLabel('눈')).toBe('눈')
+    expect(skyLabel('흐리고 눈')).toBe('눈')
+    expect(skyLabel('구름많고 소나기')).toBe('소나기')
+    expect(skyLabel('흐리고 비/눈')).toBe('비/눈')
+    expect(skyLabel('흐리고 비')).toBe('비')
+  })
+
+  it('흐림은 구름과 구분해 적고, 모르는 값은 원문 그대로', () => {
+    expect(skyLabel('흐림')).toBe('흐림')
+    expect(skyLabel('구름많음')).toBe('구름')
+    expect(skyLabel('맑음')).toBe('맑음')
+    expect(skyLabel('황사')).toBe('황사')
+    expect(skyLabel(null)).toBeNull()
+  })
+})
+
 describe('로드와 조회', () => {
   it('실응답 7일치가 날짜로 조회된다', async () => {
     mockFetch(REAL)
     expect(await WeatherService.load()).toBe(true)
 
-    expect(WeatherService.byDate('2026-08-30')).toEqual({ k: '구름', rain: 0, t: 31, tmin: 26, rp: 30, issued: null })
-    expect(WeatherService.byDate('2026-09-03')).toEqual({ k: '비', rain: 1, t: 31, tmin: 25, rp: 60, issued: null })
+    expect(WeatherService.byDate('2026-08-30')).toEqual({ k: '구름', label: '흐림', rain: 0, t: 31, tmin: 26, rp: 30, issued: null })   // 아이콘은 구름, 글자는 흐림(#41)
+    expect(WeatherService.byDate('2026-09-03')).toEqual({ k: '비', label: '비', rain: 1, t: 31, tmin: 25, rp: 60, issued: null })
   })
 
   it('예보 범위 밖은 null - 8일째부터 날씨 칸이 숨는 근거다', async () => {

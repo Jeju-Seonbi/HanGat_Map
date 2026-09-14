@@ -85,7 +85,8 @@ public class WeatherIngestService {
                                       String shortIssuedAtKst, String midIssuedAtKst) {
         /**
          * 빈 API 응답은 예외를 내지 않으므로 권역마다 D+0~2({@link #REQUIRED_SHORT_TERM_DAYS}) 행이 있는지 확인한다.
-         * 행 총수로 세면 한 권역이 이틀치만 받고 다른 권역이 나흘치를 받아도 합이 맞아 완전으로 오판한다.
+         * 총수 기준을 권역×3으로 낮추는 식으로 완화하면 한 권역이 이틀치만 받아도 다른 권역의 나흘치와 합이 맞아
+         * 완전으로 오판하므로, 총수가 아니라 권역별로 센다.
          */
         public boolean hasCompleteShortTermCoverage() {
             return regions > 0 && shortFailures == 0 && shortCoveredRegions == regions;
@@ -118,6 +119,7 @@ public class WeatherIngestService {
         List<WeatherForecast> shortRows = new ArrayList<>();
         int shortFailures = 0;
         int shortCoveredRegions = 0;
+        List<String> optionalGaps = new ArrayList<>();   // 필수가 아닌 날(D+3)의 결측 - 한 줄로 모아 경고한다
         for (Region region : regions) {
             try {
                 List<ShortTermItem> items = client.fetchShortTerm(
@@ -127,8 +129,11 @@ public class WeatherIngestService {
                     LocalDate day = today.plusDays(offset);
                     DailySummary summary = WeatherDailySummarizer.fromShortTerm(day, items);
                     if (summary.isEmpty()) {
-                        // 그날 자료가 없으면 행을 만들지 않는다. D+3이 비는 건 창 끝이라 있을 수 있고, D+0~2가 비면 아래 판정에 걸린다
-                        log.info("단기예보 D+{} 자료 없음 region={} issue={}", offset, region.getCode(), shortIssue.tmFc());
+                        // 그날 자료가 없으면 행을 만들지 않는다. D+0~2가 비면 아래 판정에 걸리고, D+3은 모아서 한 번 경고한다
+                        if (offset >= REQUIRED_SHORT_TERM_DAYS) {
+                            optionalGaps.add(region.getCode() + ":D+" + offset);
+                        }
+                        log.debug("단기예보 D+{} 자료 없음 region={} issue={}", offset, region.getCode(), shortIssue.tmFc());
                         continue;
                     }
                     if (offset < REQUIRED_SHORT_TERM_DAYS) {
@@ -147,6 +152,12 @@ public class WeatherIngestService {
                 log.warn("단기예보 수집 실패 region={} grid={}/{} issue={} - {}",
                         region.getCode(), region.getKmaGridX(), region.getKmaGridY(), shortIssue.tmFc(), e.getMessage());
             }
+        }
+
+        if (!optionalGaps.isEmpty()) {
+            // 중기는 D+4부터라 D+3은 아무도 덮지 않는다 - 매 회차 비면 단기예보 창(발표 시각 선택)을 의심할 것
+            log.warn("단기예보 창 끝 자료 없음 {}건 {} issue={} - 그날은 화면에 '정보 없음'으로 남는다",
+                    optionalGaps.size(), optionalGaps, shortIssue.tmFc());
         }
 
         // 중기: 제주도 단위 한 번 호출 → 전 권역 같은 값. 단기가 덮는 날짜(D+0~3)는 단기만 남긴다

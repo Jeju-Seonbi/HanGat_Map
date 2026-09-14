@@ -34,7 +34,8 @@ async function show() {
   cursor.value = new Date(d.getFullYear(), d.getMonth(), 1)
   open.value = true
   await nextTick()
-  dialog.value?.querySelector('.cd.on:not(:disabled), .cal-x')?.focus()
+  // 선택된 날짜에 포커스, 없으면 × - 쉼표 선택자 하나로 쓰면 문서 순서상 앞에 있는 × 가 항상 잡혔다(최종점검 #37)
+  ;(dialog.value?.querySelector('.cd.on:not(:disabled)') ?? dialog.value?.querySelector('.cal-x'))?.focus()
 }
 async function close() {
   if (!open.value) return
@@ -46,6 +47,24 @@ const shiftMonth = n => {
   cursor.value = new Date(cursor.value.getFullYear(), cursor.value.getMonth() + n, 1)
 }
 function pick(k) { state.di = k; close() }
+
+/** 방향키로 날짜 사이를 옮긴다(WAI-ARIA 달력 패턴) - ←→ 하루, ↑↓ 일주일, Home 오늘, End 마지막 날.
+    달을 넘어가면 그 달로 넘기고 그 날짜에 커서를 둔다. Tab 은 전처럼 다음 버튼으로(최종점검 #37) */
+const KEY_STEP = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }
+async function onGridKey(e) {
+  const from = +e.target.dataset?.k
+  if (!(e.key in KEY_STEP) && e.key !== 'Home' && e.key !== 'End') return
+  if (Number.isNaN(from)) return
+  e.preventDefault()
+  const to = e.key === 'Home' ? 0 : e.key === 'End' ? FORECAST_DAYS - 1 : from + KEY_STEP[e.key]
+  if (to < 0 || to >= FORECAST_DAYS) return   // 예보 범위 밖으로는 안 간다
+  const d = at(to)
+  if (monthKey(d) !== monthKey(cursor.value)) {
+    cursor.value = new Date(d.getFullYear(), d.getMonth(), 1)
+    await nextTick()
+  }
+  dialog.value?.querySelector(`.cd[data-k="${to}"]`)?.focus()
+}
 
 function trapFocus(e) {
   if (e.key !== 'Tab' || !dialog.value) return
@@ -89,10 +108,10 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKey))
           <span class="sun">일</span><span>월</span><span>화</span><span>수</span>
           <span>목</span><span>금</span><span class="sat">토</span>
         </div>
-        <div class="cal-grid">
+        <div class="cal-grid" @keydown="onGridKey">
           <template v-for="(c, i) in cells" :key="i">
             <span v-if="!c"></span>
-            <button v-else class="cd"
+            <button v-else class="cd" :data-k="c.k"
               :class="{ sun: c.w === 0, sat: c.w === 6, on: c.k === state.di }"
               :disabled="!c.ok" @click="pick(c.k)">{{ c.d }}</button>
           </template>

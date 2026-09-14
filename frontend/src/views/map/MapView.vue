@@ -53,7 +53,8 @@ function syncPlaceURL() {
   if (state.sel?.id != null) q.set('place', state.sel.id)
   else q.delete('place')
   const qs = q.toString()
-  history.replaceState(null, '', qs ? '?' + qs : location.pathname)
+  // history.state 를 그대로 넘긴다 - null 로 덮으면 Vue Router 가 넣어 둔 상태가 지워져 dev 콘솔 경고가 났다(최종점검 #65)
+  history.replaceState(history.state, '', qs ? '?' + qs : location.pathname)
 }
 watch(() => state.sel, syncPlaceURL)
 
@@ -63,7 +64,7 @@ function clearCourse() {
   state.course = null
   state.courseDay = 'all'
   state.coursePanel = true
-  history.replaceState(null, '', location.pathname)
+  history.replaceState(history.state, '', location.pathname)
   syncPlaceURL()   // 코스 URL을 지워도 열려 있는 장소는 남긴다
 }
 
@@ -178,7 +179,7 @@ const reload = () => location.reload()
     <div v-if="state.sel" class="pop-dim" @click="closeDetail"></div>
     <!-- :key 가 장소 식별자라 다른 장소를 열면 패널이 새로 만들어진다 - 탭·힌트·근처 대안·후기 목록이 이월되지 않는다 -->
     <PlaceDetail v-if="state.sel" :key="placeKey(state.sel)" :place="state.sel" @close="closeDetail"
-      @open-place="openPlace" @open-photo="p => lightbox.show(p.photos, p.index)" />
+      @open-place="openPlace" @open-photo="p => lightbox.show(p.photos, p.index, p)" />
 
     <!-- × 는 패널만 접는다 - 코스 핀·경로·URL 은 그대로. 지우려면 왼쪽 '코스 지우기' -->
     <CoursePanel @close="state.coursePanel = false" @open-place="openPlace" />

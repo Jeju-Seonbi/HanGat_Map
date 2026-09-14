@@ -9,6 +9,7 @@ import { state, toggleFav, isFav, toast, placeKey } from '@/stores/mapStore'
 import { crowd, tier, tierKo, rank30, bestDay, CROWD_KO } from '@/utils/crowd'
 import { at, fmtK } from '@/utils/date'
 import { wxOf, wxIcon, wxIssuedAt } from '@/utils/weather'
+import { weatherBasis } from '@/services/map/MapWeatherService'
 import { dist, won } from '@/utils/geo'
 import { copyText } from '@/utils/clipboard'
 import { shareToKakao, preloadKakao } from '@/composables/useKakaoShare'
@@ -84,12 +85,15 @@ const hasWx = computed(() => week.value.some(w => w.w))
 /* 날씨는 이 장소 권역의 기상청 격자 값이다 - 어느 권역 기준이고 언제 발표된 예보인지 적는다 (MAP_006).
    발표 시각은 선택한 날짜 예보의 것(단기 05시·중기 18시가 섞인다). 적재분에만 있어 라이브 폴백이면 권역만 적는다 */
 const wxSource = computed(() => {
-  if (!s.value.r) return '출처: 기상청'          // 권역을 아직 모르면(대체 객체) 'undefined 기준'을 찍지 않는다
+  // 4일째부터는 중기예보(제주 한 지점) - 권역 이름을 적으면 거짓이라 '제주 기준(중기예보)'(최종점검 #42)
+  const basis = weatherBasis(state.di, s.value.r)
+  if (!basis) return '출처: 기상청'          // 권역을 아직 모르면(대체 객체) 'undefined 기준'을 찍지 않는다
+  const where = basis === '제주' ? '제주 기준(중기예보)' : `${basis} 기준`
   const issued = wxIssuedAt(s.value.r, state.di)
-  if (!issued) return `출처: 기상청 · ${s.value.r} 기준`
+  if (!issued) return `출처: 기상청 · ${where}`
   const d = new Date(issued)
   const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-  return `출처: 기상청 · ${s.value.r} 기준 · ${d.getMonth() + 1}/${d.getDate()} ${hm} 발표`
+  return `출처: 기상청 · ${where} · ${d.getMonth() + 1}/${d.getDate()} ${hm} 발표`
 })
 
 /**
@@ -336,7 +340,8 @@ async function shareNative() {
           width="144" height="96" loading="lazy"
           title="클릭하면 크게 보기" style="cursor:zoom-in"
           @error="onThumbError($event, p)"
-          @click="emit('open-photo', { photos: ktoImages.map(x => x.url), index: i })">
+          @click="emit('open-photo', { photos: ktoImages.map(x => x.url), index: i,
+            alts: ktoImages.map((x, j) => x.caption || `${s.n} 사진 ${j + 1}`), source: detail?.imageAttribution ?? '' })">
       </div>
       <div v-if="ktoImages.length && detail?.imageAttribution" class="pimg-src">
         {{ detail.imageAttribution }}
@@ -392,7 +397,8 @@ async function shareNative() {
         <div v-for="w in week" :key="w.k" class="wxc" :class="{ on: w.k === state.di }"
           @click="state.di = w.k">
           <div class="wd">{{ w.label }}</div>
-          <div class="wi" v-html="w.w ? wxIcon(w.w.k, 27) : ''"></div>
+          <!-- 아이콘은 3종이라 눈·소나기·흐림은 글자(title·낭독기)로 보완한다(최종점검 #41) -->
+          <div class="wi" :title="w.w?.label" :aria-label="w.w?.label" v-html="w.w ? wxIcon(w.w.k, 27) : ''"></div>
           <!-- 날씨 없는 날은 고장이 아니라 원래 없는 것 - '-' 대신 명시적으로 말한다 -->
           <div v-if="w.w" class="wt">{{ w.w.t }}°</div>
           <div v-else class="wt pre">예보 전</div>
