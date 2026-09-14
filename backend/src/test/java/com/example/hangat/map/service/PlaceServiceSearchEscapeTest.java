@@ -44,7 +44,7 @@ class PlaceServiceSearchEscapeTest {
     void searchSendsTheEscapedPatternToTheRepository() {
         service.searchPlaces("50%할인", null, null);
 
-        verify(places).searchList(eq("50!%할인"), isNull(), eq(PageRequest.of(0, 20)));
+        verify(places).searchList(eq("50!%할인"), isNull(), eq(PageRequest.of(0, 30)));
     }
 
     @Test
@@ -58,6 +58,6 @@ class PlaceServiceSearchEscapeTest {
     void categoryScopedSearchIsEscapedToo() {
         service.searchPlaces("a_b", "WEST", List.of("FOOD"));
 
-        verify(places).searchListInCategories(eq("a!_b"), eq("WEST"), eq(List.of("FOOD")), eq(PageRequest.of(0, 20)));
+        verify(places).searchListInCategories(eq("a!_b"), eq("WEST"), eq(List.of("FOOD")), eq(PageRequest.of(0, 30)));
     }
 }
