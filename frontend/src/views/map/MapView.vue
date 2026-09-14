@@ -126,7 +126,10 @@ function loadFromURL() {
 async function openPlaceFromURL() {
   const raw = route.query.place ?? route.query.placeId
   if (!/^\d+$/.test(raw ?? '')) return
+  const before = state.sel
   const { place, error } = await findPlaceById(+raw)
+  // 기다리는 사이(지연 레이어를 받는 동안) 사용자가 다른 장소를 열었으면 링크가 그걸 덮어쓰지 않는다(최종점검 #48)
+  if (state.sel !== before) return
   if (place) openPlace(place)
   else if (error) toast('장소 정보를 불러오지 못했어요 — 새로고침해 주세요')
   else toast('공유받은 장소를 찾지 못했어요')

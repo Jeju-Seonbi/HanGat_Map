@@ -34,10 +34,62 @@ beforeEach(() => {
   // +09:00 문자열로 고정하면 UTC인 CI에서 자정 전후가 같은 날짜로 해석된다.
   vi.setSystemTime(new Date(2026, 8, 12, 10, 0))
   placeApi.getAll.mockReset().mockResolvedValue(ok())
+  placeApi.getLayer.mockReset()
+  placeApi.getById.mockReset()
   crowdApi.getForecast.mockReset().mockResolvedValue(forecast())
   weatherApi.load.mockReset().mockResolvedValue(true)
 })
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals() })
+
+describe('findPlaceById - 공유 링크 복원 (최종점검 #49)', () => {
+  const cafe = { id: 501, n: '카페', x: 126.5, y: 33.4, cat: 'CAFE', good: false }
+
+  it('없는 장소는 상세 한 건만 물어보고 바로 "없음" - 지연 레이어를 받지 않는다', async () => {
+    const s = await freshStore()
+    await s.loadPlaces()
+    placeApi.getById.mockResolvedValue({ place: null, missing: true })
+    expect(await s.findPlaceById(99999999)).toEqual({ place: null, error: false })
+    expect(placeApi.getLayer).not.toHaveBeenCalled()
+  })
+
+  it('카페 링크는 상세로 업종을 알아낸 뒤 카페 레이어 하나만 받고, 그 칩을 켠다', async () => {
+    const s = await freshStore()
+    await s.loadPlaces()
+    placeApi.getById.mockResolvedValue({ place: cafe, missing: false })
+    placeApi.getLayer.mockResolvedValue([cafe])
+    const r = await s.findPlaceById(501)
+    expect(placeApi.getLayer).toHaveBeenCalledTimes(1)
+    expect(placeApi.getLayer).toHaveBeenCalledWith('cafe')
+    expect(r.place.id).toBe(501)
+    expect(s.state.layers.cafe).toHaveLength(1)   // 카페 레이어가 채워졌다
+    expect(s.state.L.cafe).toBe(1)
+  })
+
+  it('레이어 목록에 없는 장소(폐업)는 상세 객체로 연다', async () => {
+    const s = await freshStore()
+    await s.loadPlaces()
+    placeApi.getById.mockResolvedValue({ place: { ...cafe, id: 502, closed: true }, missing: false })
+    placeApi.getLayer.mockResolvedValue([cafe])
+    const r = await s.findPlaceById(502)
+    expect(r).toMatchObject({ place: { id: 502 }, error: false })
+  })
+
+  it('상세를 못 받으면(연결 끊김) "못 불러왔어요" 쪽 - error', async () => {
+    const s = await freshStore()
+    await s.loadPlaces()
+    placeApi.getById.mockResolvedValue({ place: null, missing: false })
+    expect(await s.findPlaceById(777)).toEqual({ place: null, error: true })   // 777: 어느 레이어에도 없는 id
+    expect(placeApi.getLayer).not.toHaveBeenCalled()
+  })
+
+  it('layerOf - 관광지 spot, 착한가격 food, 식당 dine, 쇼핑은 없음', async () => {
+    const s = await freshStore()
+    expect(s.layerOf({ cat: 'TOURIST' })).toBe('spot')
+    expect(s.layerOf({ cat: 'FOOD', good: true })).toBe('food')
+    expect(s.layerOf({ cat: 'FOOD', good: false })).toBe('dine')
+    expect(s.layerOf({ cat: 'SHOPPING' })).toBeNull()
+  })
+})
 
 describe('placeKey - 장소 식별자는 이름이 아니라 id', () => {
   it('id 가 있으면 id, 없으면 이름 - 같은 이름의 다른 장소는 키가 다르고 목업(id 없음)은 이름으로 구분한다', async () => {
