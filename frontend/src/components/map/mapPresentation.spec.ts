@@ -110,15 +110,28 @@ describe('mapPresentation', () => {
     expect(mapCss).not.toContain('.pw:hover .poi-label')
   })
 
-  it('모바일 지도에서 캘린더는 위에 있고 검색 필터는 원형 버튼에서 하단 시트로 열린다', () => {
+  it('모바일 지도에서 캘린더는 위에 있고 장소 찾기는 원형 버튼에서 가운데 모달로 열린다 (2026-09-14 시안 B)', () => {
     expect(declarations('.slid')).toContain('top:12px')
     expect(declarations('.slid')).toContain('bottom:auto')
-    expect(declarations('.cond')).toContain('top:auto')
-    expect(declarations('.cond')).toContain('bottom:0')
+    // 모달: 위아래·좌우 여백으로 높이가 확정돼야 목록(flex:1)이 남는 공간을 채운다 - max-height 만 있으면 88px 로 굳는다(#58)
+    expect(declarations('.cond')).toContain('top:24px')
+    expect(declarations('.cond')).toContain('bottom:24px')
+    expect(declarations('.cond')).toContain('left:14px')
+    expect(declarations('.cond')).not.toContain('max-height')
     expect(declarations('.cond')).toContain('translateY(')
     expect(declarations('.cond.mobile-open')).toContain('translateY(0)')
+    expect(declarations('.cond-dim')).toContain('backdrop-filter')
     expect(declarations('.filter-fab')).toContain('display:flex')
     expect(mobileCss).not.toContain('.stage.sheet-open .slid')
+  })
+
+  it('모바일 모달은 [조건]·[목록] 탭이고 검색창은 두 탭 공통이다', () => {
+    expect(filterPanelSource).toContain('class="mtabs" role="tablist"')
+    expect(filterPanelSource).toContain('class="mapply"')
+    expect(filterPanelSource.indexOf('<SearchBox')).toBeLessThan(filterPanelSource.indexOf('class="mtabs"'))   // 검색창이 탭 위(공통)
+    expect(declarations('#cond-body.tab-list :is(.seg,.chips,.ftr-wrap,.catsel,.sect,.mapply)')).toContain('display:none')
+    expect(declarations('#cond-body.tab-cond :is(.rows,.sect,.msum)')).toContain('display:none')
+    expect(mapCss).toContain('.mtabs,.msum,.mapply,.cond-dim{display:none}')   // 데스크톱에선 폰 전용 요소가 안 보인다
   })
 
   it('모바일 검색 버튼과 바텀시트 닫기 버튼이 접근 가능한 상태를 알린다', () => {

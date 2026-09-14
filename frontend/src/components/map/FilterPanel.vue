@@ -1,6 +1,8 @@
 <script setup>
-/* MAP_001 좌측 카드 — 정렬 / 권역 / 업종(4개씩 넘김) / 종류 / 한산한 곳 목록 / 코스 버튼 / 범례 */
-import { computed, ref, watch } from 'vue'
+/* MAP_001 좌측 카드 — 정렬 / 권역 / 업종(4개씩 넘김) / 종류 / 한산한 곳 목록 / 코스 버튼 / 범례.
+   폰(≤768px)에서는 같은 마크업이 가운데 모달 + [조건]·[목록] 탭으로 열린다(2026-09-14 결정, 시안 B) -
+   바텀시트 때는 조건 UI가 시트의 85%를 먹어 목록이 1.3줄(88px)만 보였다(최종점검 #58) */
+import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import SearchBox from './SearchBox.vue'
 import LayerIcon from './LayerIcon.vue'
 import { state, rankedRows, CATEGORIES, REGIONS, LAYERS, FILTER_VISIBLE, toggleLayer, placeKey } from '@/stores/mapStore'
@@ -11,10 +13,29 @@ import { mapBridge } from '@/composables/mapBridge'
 const emit = defineEmits(['open-place', 'toggle-course'])
 const props = defineProps({ mobileSuppressed: { type: Boolean, default: false } })
 const mobileOpen = ref(false)
+/** 모달 탭. 목록이 주인공이라 기본은 목록, 조건은 한 탭 뒤 - 검색창은 두 탭 공통(가장 잦은 행동이라 탭 전환 없이) */
+const mtab = ref('list')
+
+/* 폰 폭 여부 - 업종 줄을 폰에선 7개 한 줄로 펼치고(‹ › 넘김 없음) 데스크톱에선 4개씩 넘긴다 */
+const mq = typeof matchMedia === 'function' ? matchMedia('(max-width:768px)') : null
+const isMobile = ref(!!mq?.matches)
+const onMq = e => { isMobile.value = e.matches }
+onMounted(() => mq?.addEventListener('change', onMq))
+onBeforeUnmount(() => mq?.removeEventListener('change', onMq))
 
 watch(() => props.mobileSuppressed, suppressed => {
   if (suppressed) mobileOpen.value = false
 })
+
+/* 목록 탭 위 조건 요약 한 줄 - 조건 탭을 안 열어도 무슨 기준의 목록인지 읽힌다 */
+const layerNames = computed(() => LAYERS.filter(l => state.L[l.k]).map(l => l.t))
+const summary = computed(() => [
+  fmtK(at(state.di)),
+  state.sort === 'calm' ? '한산한 순' : '혼잡한 순',
+  state.F.reg,
+  layerNames.value.length ? layerNames.value.join('·') : '업종 없음',
+  state.F.cat || '모든 종류',
+].join(' · '))
 
 const sectionTitle = computed(() =>
   `${fmtK(at(state.di))} ${state.sort === 'calm' ? '한산한' : '혼잡한'} 곳`)
@@ -78,7 +99,20 @@ function toggleCourse() {
 
     <SearchBox @pick-spot="openPlace" />
 
-    <div id="cond-body">
+    <!-- 폰 전용 탭. 데스크톱에선 CSS 로 숨긴다(.mtabs/.msum/.mapply display:none) -->
+    <div class="mtabs" role="tablist" aria-label="장소 찾기">
+      <button type="button" role="tab" :aria-selected="mtab === 'cond'" :class="{ on: mtab === 'cond' }"
+        @click="mtab = 'cond'">조건</button>
+      <button type="button" role="tab" :aria-selected="mtab === 'list'" :class="{ on: mtab === 'list' }"
+        @click="mtab = 'list'">목록 <span class="n">{{ rankedRows.length }}</span></button>
+    </div>
+
+    <div id="cond-body" :class="mtab === 'list' ? 'tab-list' : 'tab-cond'">
+      <div class="msum">
+        <span class="cur">{{ summary }}</span>
+        <button type="button" class="edit" @click="mtab = 'cond'">조건 바꾸기 ›</button>
+      </div>
+
       <div class="seg">
         <button :class="{ on: state.sort === 'calm' }" @click="state.sort = 'calm'">한산한 순</button>
         <button :class="{ on: state.sort === 'busy' }" @click="state.sort = 'busy'">혼잡한 순</button>
@@ -93,7 +127,7 @@ function toggleCourse() {
         <button class="ftr-nav" aria-label="이전 업종" :disabled="state.filterOffset <= 0"
           @click="moveFilter(-1)">‹</button>
         <div class="ftr-vp">
-          <div class="ftr" :style="{ transform: shift }">
+          <div class="ftr" :style="isMobile ? null : { transform: shift }">
             <button v-for="l in LAYERS" :key="l.k" :class="[l.k, { on: state.L[l.k] }]"
               @click="toggleLayer(l.k)">
               <span class="ico"><LayerIcon :name="l.k" /></span>{{ l.t }}
@@ -109,6 +143,9 @@ function toggleCourse() {
         <!-- 곳수를 함께 보여준다 - 110종 중 3분의 2가 5곳 미만이라 고르기 전에 규모를 알아야 한다 -->
         <option v-for="c in CATEGORIES" :key="c.name" :value="c.name">{{ c.name }} ({{ c.n }})</option>
       </select>
+
+      <!-- 조건 탭 끝: 결과 건수와 함께 목록 탭으로 -->
+      <button type="button" class="mapply" @click="mtab = 'list'">목록 {{ rankedRows.length }}곳 보기 ›</button>
 
       <div class="sect"><em>✦</em> <span>{{ sectionTitle }}</span></div>
 
@@ -149,4 +186,7 @@ function toggleCourse() {
       <p class="cta-src">{{ sources }}</p>
     </div>
   </div>
+
+  <!-- 폰 모달 뒤 어두운 배경 - 탭하면 닫힘. 데스크톱은 display:none -->
+  <div class="cond-dim" :class="{ on: mobileOpen }" @click="mobileOpen = false"></div>
 </template>
