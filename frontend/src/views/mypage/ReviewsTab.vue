@@ -7,6 +7,8 @@ import StateBlock from '../../components/common/StateBlock.vue'
 import SortSeg from '../../components/mypage/SortSeg.vue'
 import ConfirmDeleteDialog from '../../components/mypage/ConfirmDeleteDialog.vue'
 import PlaceImage from '../../components/common/PlaceImage.vue'
+import ReviewEditDialog from '../../components/review/ReviewEditDialog.vue'
+import { useReviewEditWindow } from '../../composables/useReviewEditWindow.js'
 import { listMyReviews, deleteMyReview, REVIEW_SORTS, mediaUrl, canHandleActivityError } from '../../api/myActivity.js'
 import { getBackendSessionVersion } from '../../api/backendClient.js'
 import { useAuthStore } from '../../stores/auth.js'
@@ -22,11 +24,20 @@ const toMessage = useApiError()
 const sort = ref('created_desc')
 const { items, total, loading, error, hasMore, load } = useMyPageRows(listMyReviews, sort, 10, toMessage)
 const deleting = ref(null)
+const editing = ref(null)
+const { canEdit } = useReviewEditWindow()
+async function onEdited() {
+  editing.value = null
+  ui.toast('리뷰를 저장했어요')
+  emit('reviews-changed')
+  await load(true)
+}
 const deleteBusy = ref(false)
 const CROWD_KO = { QUIET: '한산했어요', NORMAL: '보통이었어요', CROWDED: '혼잡했어요' }
 let alive = true
 let deleteVersion = 0
 watch(() => auth.user?.userId, () => { deleteVersion += 1; deleting.value = null; deleteBusy.value = false }, { flush: 'sync' })
+watch(() => auth.user?.userId, () => { editing.value = null }, { flush: 'sync' })
 onBeforeUnmount(() => { alive = false })
 
 async function confirmDelete() {
@@ -69,6 +80,7 @@ async function confirmDelete() {
       <li v-for="r in items" :key="r.reviewId">
         <article class="card">
           <div class="corner">
+            <button v-if="canEdit(r)" class="cbtn" type="button" :aria-label="`${r.placeName} 리뷰 수정`" @click="editing = r">수정</button>
             <RouterLink class="cbtn" :to="{ name: 'map', query: { place: r.placeId } }">장소 보기</RouterLink>
             <button class="x" type="button" :aria-label="`${r.placeName} 리뷰 삭제`" @click="deleting = r">×</button>
           </div>
@@ -93,7 +105,7 @@ async function confirmDelete() {
             </template>
           </div>
           <p class="dates note">
-            {{ fmtK(r.createdAt) }} 작성<template v-if="r.updatedAt && r.updatedAt !== r.createdAt"> · {{ fmtK(r.updatedAt) }} 수정</template>
+            {{ fmtK(r.createdAt) }} 작성 <span v-if="r.editedAt">(수정)</span>
           </p>
         </article>
       </li>
@@ -101,6 +113,7 @@ async function confirmDelete() {
     <button v-if="hasMore && !error" class="btn2 more-btn" :disabled="loading" @click="load()">
       {{ loading ? '불러오는 중…' : '더보기' }} <span class="tnum">({{ items.length }} / {{ total }})</span>
     </button>
+    <ReviewEditDialog v-if="editing" :key="editing.reviewId" :review="editing" @close="editing = null" @saved="onEdited" />
     <ConfirmDeleteDialog v-if="deleting" :key="deleting.reviewId" title="이 리뷰를 삭제할까요?"
       :subject="deleting.placeName" :detail="deleting.content || ''"
       :warning="deleting.imageUrls?.length ? `첨부한 사진 ${deleting.imageUrls.length}장도 함께 지워져요.` : ''"
@@ -120,7 +133,7 @@ async function confirmDelete() {
 .cbtn:hover { background: var(--ac-bg); color: var(--ac-dk); }
 .x { width: 36px; height: 36px; border-radius: 50%; color: var(--tx3); font-size: 22px; }
 .x:hover { background: var(--busy-bg); color: var(--busy); }
-.top { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; padding-right: 128px; }
+.top { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; padding-right: 180px; }
 .place { font-size: 15px; font-weight: 800; overflow-wrap: anywhere; }
 .place:hover { color: var(--ac-dk); }
 .bdg.QUIET { background: var(--calm-bg); color: var(--calm); }
