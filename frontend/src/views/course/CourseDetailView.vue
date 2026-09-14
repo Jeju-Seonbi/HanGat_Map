@@ -86,7 +86,7 @@ const distanceText = (meters: number) =>
  * 지도는 좌표·이름·등급만 읽는다. 상세 조회가 주지 않는 텍스트 필드는 빈 값으로 둔다 -
  * 없는 설명을 지어내지 않는다.
  */
-const toMapPlace = (name: string, id: number, lat: number | null, lng: number | null,
+const toMapPlace = (order: number, name: string, id: number, lat: number | null, lng: number | null,
                     level: CongestionLevel | null, rate: number | null): Place => ({
   id: String(id),
   name,
@@ -95,6 +95,9 @@ const toMapPlace = (name: string, id: number, lat: number | null, lng: number | 
   address: '',
   description: '',
   score: rate ?? 0,
+  // 핀에는 경로선과 같은 방문 순번을 단다 - 집중률 원값은 색(등급)으로만 남긴다
+  pinLabel: String(order),
+  pinDescription: `${order}번째 방문지`,
   level: level ?? 'QUIET',
   time: '',
   stay: '',
@@ -145,9 +148,9 @@ const fromLive = (course: CourseDetail): CourseView => {
     dayCount: course.days.length,
     placeCount: course.days.reduce((sum, day) => sum + day.items.length, 0),
     days,
-    mapPlaces: course.days.flatMap(day => day.items.map(item =>
-      toMapPlace(item.placeName, item.placeId, item.latitude, item.longitude,
-        item.congestionLevel, item.congestionRate))),
+    mapPlaces: course.days.flatMap(day => day.items).map((item, index) =>
+      toMapPlace(index + 1, item.placeName, item.placeId, item.latitude, item.longitude,
+        item.congestionLevel, item.congestionRate)),
     forecastNote: gap >= 5
       ? `저장할 때 평균 ${Math.round(course.plannedAverageRate as number)}였는데 지금 예보는 ${Math.round(course.averageRate as number)}예요`
       : null,

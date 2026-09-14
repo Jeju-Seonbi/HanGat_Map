@@ -46,11 +46,14 @@ function defaultContent (place: Place) {
   const content = document.createElement('button')
   content.type = 'button'
   content.className = `kakao-marker ${place.level.toLowerCase()}`
-  content.setAttribute('aria-label', `${place.name} 혼잡도 ${place.score}`)
+  content.setAttribute('aria-label', place.pinDescription
+    ? `${place.name} ${place.pinDescription}`
+    : `${place.name} 혼잡도 ${place.score}`)
 
-  const score = document.createElement('span')
-  score.textContent = String(place.score)
-  content.append(score, document.createTextNode(place.name))
+  // 코스 지도처럼 핀에 순번을 다는 화면은 pinLabel을 준다 - 집중률 원값(21.88)은 보는 사람이 뜻을 알 수 없다
+  const badge = document.createElement('span')
+  badge.textContent = place.pinLabel ?? String(place.score)
+  content.append(badge, document.createTextNode(place.name))
   return content
 }
 
