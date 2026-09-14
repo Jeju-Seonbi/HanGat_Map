@@ -8,5 +8,5 @@ export type CongestionLevel='QUIET'|'NORMAL'|'CROWDED'
     parkingAvailable / restroomAvailable  관광지 상세의 편의시설 줄
     goodPriceStore             착한가격업소 여부
 */
-export interface Place{id:string;contentId?:string;canonicalName?:string;searchKeyword?:string;aliases?:string[];name:string;region:string;regionCode?:string;category:string;categoryCode?:string;address:string;latitude?:number;longitude?:number;description:string;score:number;level:CongestionLevel;time:string;stay:string;cost:string;image:string;imageUrl?:string;images?:string[];imageSource?:'TOUR_API'|'MOCK';parkingAvailable?:boolean;restroomAvailable?:boolean;goodPriceStore?:boolean;tags:string[]}
+export interface Place{id:string;contentId?:string;canonicalName?:string;searchKeyword?:string;aliases?:string[];name:string;region:string;regionCode?:string;category:string;categoryCode?:string;address:string;latitude?:number;longitude?:number;description:string;score:number;pinLabel?:string;pinDescription?:string;level:CongestionLevel;time:string;stay:string;cost:string;image:string;imageUrl?:string;images?:string[];imageSource?:'TOUR_API'|'MOCK';parkingAvailable?:boolean;restroomAvailable?:boolean;goodPriceStore?:boolean;tags:string[]}
 export interface TravelCondition{startDate:string;endDate:string;people:number;budget:number;regions:string[];transportation:string;styles:string[];preference:string}
