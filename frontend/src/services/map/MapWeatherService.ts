@@ -38,6 +38,15 @@ interface BackendDaily {
   issuedAt?: string | null
 }
 
+/**
+ * 오늘로부터 며칠째부터 중기예보인가. 백엔드가 단기(D+0~3, 권역 격자별)와 중기(D+4~, 제주 한 지점 11G00201 을 네 권역에 복사)를
+ * 이어 붙이므로, 4일째부터는 "○부 기준"이 아니라 "제주 기준"이다(최종점검 #42). 권역별 중기(서귀포 지점)는 배치 쪽 후속
+ */
+export const MID_TERM_FROM = 4
+/** 날씨 카드·코스 일차 줄에 적는 기준 지역 - 중기 구간이면 권역 대신 '제주' */
+export const weatherBasis = (k: number, region: string | null | undefined): string | null =>
+  k >= MID_TERM_FROM ? '제주' : (region ?? null)
+
 /** 권역 표시명(장소의 r) → 백엔드 코드. 북부가 기존 /main/weather 기본값이라 권역을 모르면 북부를 쓴다 */
 export const REGION_CODE: Record<string, string> = { 북부: 'NORTH', 동부: 'EAST', 남부: 'SOUTH', 서부: 'WEST' }
 const DEFAULT_REGION = 'NORTH'

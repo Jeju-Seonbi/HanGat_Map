@@ -6,6 +6,7 @@ import { at, fmt, D0 } from '@/utils/date'
 import { tier } from '@/utils/crowd'
 import { won } from '@/utils/geo'
 import { wxOf, wxIcon } from '@/utils/weather'
+import { weatherBasis, MID_TERM_FROM } from '@/services/map/MapWeatherService'
 import { poiMarkerClass } from './mapPresentation'
 
 const emit = defineEmits(['close', 'open-place'])
@@ -89,8 +90,10 @@ const poiClass = poiMarkerClass
       <template v-for="(stops, d) in byDay" :key="d">
         <div class="dayh">
           {{ fmt(at(dayK(d))) }} · {{ d }}일차 <i></i>
-          <span v-if="dayWeather(d)" style="color:var(--tx3);font-weight:500" :title="`기상청 · ${dayRegion(d)} 기준`">
-            <span v-html="wxIcon(dayWeather(d).k, 15)"></span> {{ dayWeather(d).label }} · {{ dayRegion(d) }}
+          <!-- 4일째부터는 중기예보(제주 한 지점)라 권역 대신 '제주'(최종점검 #42) -->
+          <span v-if="dayWeather(d)" style="color:var(--tx3);font-weight:500"
+            :title="`기상청 · ${weatherBasis(dayK(d), dayRegion(d))} 기준${dayK(d) >= MID_TERM_FROM ? '(중기예보)' : ''}`">
+            <span v-html="wxIcon(dayWeather(d).k, 15)"></span> {{ dayWeather(d).label }} · {{ weatherBasis(dayK(d), dayRegion(d)) }}
           </span>
         </div>
         <template v-for="(s, i) in stops" :key="s.t + s.d">

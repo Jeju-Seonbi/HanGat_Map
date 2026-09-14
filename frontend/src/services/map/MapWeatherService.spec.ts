@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import WeatherService, { skyToKind, skyLabel } from './MapWeatherService'
+import WeatherService, { skyToKind, skyLabel, weatherBasis, MID_TERM_FROM } from './MapWeatherService'
 
 /** 값은 2026-08-30 실호출 응답에서 그대로 가져왔다. */
 const REAL = [
@@ -37,6 +37,20 @@ describe('하늘상태 → 아이콘 종류', () => {
   it('모르는 값은 구름으로 뭉갠다 - 맑다고 단정하지 않는다', () => {
     expect(skyToKind('황사')).toBe('구름')
     expect(skyToKind(null)).toBeNull()
+  })
+})
+
+describe('기준 지역 라벨 (최종점검 #42: 4일째부터는 제주 한 지점 중기예보라 권역 기준이 아니다)', () => {
+  it('3일째까지 권역, 4일째부터 제주', () => {
+    expect(MID_TERM_FROM).toBe(4)
+    expect(weatherBasis(0, '남부')).toBe('남부')
+    expect(weatherBasis(3, '남부')).toBe('남부')
+    expect(weatherBasis(4, '남부')).toBe('제주')
+    expect(weatherBasis(6, '북부')).toBe('제주')
+  })
+  it('권역을 모르면 단기 구간은 null(라벨 생략), 중기 구간은 제주', () => {
+    expect(weatherBasis(1, null)).toBeNull()
+    expect(weatherBasis(5, null)).toBe('제주')
   })
 })
 
