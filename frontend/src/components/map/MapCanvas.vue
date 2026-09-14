@@ -11,6 +11,7 @@ import { POI_MARKER_CLASS, POI_GROUPS, spotPinSpec, spotIconGroup, shouldShowMap
 import { clusterModeFor, hideDimFor, clusterByUnit, clusterPins, dominantTier, clusterSize } from '@/utils/cluster'
 import { JEJU_MAX_LEVEL, clampToJeju } from '@/utils/jejuBounds'
 import { goodPriceSourceLine } from '@/utils/dataSources'
+import { escapeHtml } from '@/utils/html'   // 오버레이에 넣는 장소명·메뉴·읍면 이름은 전부 이걸로 감싼다(최종점검 #32)
 
 const emit = defineEmits(['select', 'blank-click'])
 
@@ -73,7 +74,7 @@ async function showGoodPriceTip(f) {
   const node = document.createElement('div')
   node.className = 'gp-tip'
   const render = body => {
-    node.innerHTML = `<b>${f.n}</b>${body}<button class="gp-more">상세 보기</button>`
+    node.innerHTML = `<b>${escapeHtml(f.n)}</b>${body}<button class="gp-more">상세 보기</button>`
     node.querySelector('.gp-more').addEventListener('click', () => { closeTip(); emit('select', f) })
   }
   render('<span>메뉴 불러오는 중…</span>')
@@ -85,9 +86,11 @@ async function showGoodPriceTip(f) {
   tip = my
   const d = f.id != null ? await MapPlaceService.getDetail(f.id) : null
   if (tip !== my) return   // 기다리는 사이 닫혔거나 다른 핀으로 바뀜
+  // 응답이 아예 없으면(연결 끊김·서버 재시작·타임아웃) "메뉴가 없다"가 아니라 "못 받았다"고 말한다 - 다시 누르면 다시 받아온다(최종점검 #33)
   const menu = d?.overview
-    ? d.overview.replace(/^대표메뉴:\s*/, '').split(' · ').map(m => `<span>${m}</span>`).join('')
-    : '<span>메뉴 정보 없음</span>'
+    ? d.overview.replace(/^대표메뉴:\s*/, '').split(' · ').map(m => `<span>${escapeHtml(m)}</span>`).join('')
+    : d ? '<span>메뉴 정보 없음</span>'
+    : '<span>메뉴를 불러오지 못했어요 · 다시 눌러 주세요</span>'
   // 가격표 밑에 출처·기준일 - 상세 패널과 같은 문장 (MAP_003)
   render(menu + (f.good ? `<i class="gp-src">${goodPriceSourceLine(d?.goodPriceBaseDate)}</i>` : ''))
 }
@@ -180,7 +183,7 @@ function makeCluster(group, c, name) {
   node.className = cls
   const size = clusterSize(n)
   node.style.cssText = `left:${c.x}px;top:${c.y}px;width:${size}px;height:${size}px`
-  node.innerHTML = `<b>${n}</b>` + (name ? `<div class="lb-t">${name}</div>` : '')
+  node.innerHTML = `<b>${n}</b>` + (name ? `<div class="lb-t">${escapeHtml(name)}</div>` : '')
   const lat = c.members.reduce((a, e) => a + e.data.y, 0) / n
   const lng = c.members.reduce((a, e) => a + e.data.x, 0) / n
   node.addEventListener('click', ev => {
@@ -384,7 +387,7 @@ function drawExtras(di, sel, course, courseDay, L) {
     const pin = sp
       ? `<div class="${sp.cls}" style="width:${sp.size}px;height:${sp.size}px"></div>`
       : `<div class="poi-marker sel-pick ${sel.good ? 'mk-food' : (CAT_MARKER[sel.cat] ?? 'mk-dine')}${isFav(sel) ? ' fav' : ''}"></div>`
-    addPin('sel', sel.y, sel.x, `<div class="lb-t sel-on">${sel.n}</div>` + pin, () => emit('select', sel), 500)
+    addPin('sel', sel.y, sel.x, `<div class="lb-t sel-on">${escapeHtml(sel.n)}</div>` + pin, () => emit('select', sel), 500)
   }
 
   if (course) {
@@ -405,7 +408,7 @@ function drawExtras(di, sel, course, courseDay, L) {
       }
       // 코스 핀도 눌러서 이름·상세를 본다 - 코스가 화면의 주인공이라 이름표는 줌 무관 상시 표시
       if (on) g[d].forEach((stop, i) => addPin('num', stop.o.y, stop.o.x,
-        `<div class="lb-t sel-on">${stop.o.n}</div><div class="mk-num${sel === stop.o ? ' pick' : ''}">${i + 1}</div>`,
+        `<div class="lb-t sel-on">${escapeHtml(stop.o.n)}</div><div class="mk-num${sel === stop.o ? ' pick' : ''}">${i + 1}</div>`,
         () => emit('select', stop.o), 600))
     })
   }

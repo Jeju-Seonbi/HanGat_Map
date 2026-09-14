@@ -44,6 +44,12 @@ describe('mapPresentation', () => {
       expect(spotPinSpec('mid', false, false)).toMatchObject({ cls: 'pn mid ic-mt dim', size: 9, z: 100 })
     })
 
+    it('업종 묶음은 필터 안 관광지 핀(200)보다 아래, 흐린 관광지(100)·업종 낱개 핀(60)보다 위 - 겹치면 관광지 우선(MAP-04, #31)', () => {
+      const z = +(mapCss.match(/\.cl\.poi\{z-index:(\d+)/)?.[1] ?? 0)
+      expect(z).toBeLessThan(spotPinSpec('calm', false, true).z)
+      expect(z).toBeGreaterThan(spotPinSpec('mid', false, false).z)
+    })
+
     it('아이콘 묶음이 클래스에 들어가고 서명에도 반영된다', () => {
       expect(spotPinSpec('calm', false, true, 'sea').cls).toBe('pn calm ic-sea')
       expect(spotPinSpec('calm', false, true, 'sea').sig).not.toBe(spotPinSpec('calm', false, true, 'mt').sig)

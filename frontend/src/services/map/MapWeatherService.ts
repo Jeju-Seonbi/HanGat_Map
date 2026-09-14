@@ -11,8 +11,10 @@ import { apiGet } from '../apiClient'
 
 /** 화면이 쓰는 하루치. 기존 wxOf() 반환 모양과 같다 */
 export interface DayWeather {
-  /** 아이콘 종류 - 맑음 | 구름 | 비 (wxIcon 이 아는 3종) */
+  /** 아이콘 종류 - 맑음 | 구름 | 비 | 눈 (wxIcon 이 아는 4종. 눈은 2026-09-14 추가, 최종점검 #41) */
   k: string
+  /** 표시용 날씨 말 - 맑음 | 구름 | 흐림 | 비 | 눈 | 비/눈 | 소나기. 아이콘보다 잘게 - 소나기·흐림도 글자로는 살린다(최종점검 #41) */
+  label: string
   /** 비·눈 예보 여부. 코스 생성이 실내 가중치에 쓴다 */
   rain: number
   /** 최고기온 */
@@ -36,6 +38,15 @@ interface BackendDaily {
   issuedAt?: string | null
 }
 
+/**
+ * 오늘로부터 며칠째부터 중기예보인가. 백엔드가 단기(D+0~3, 권역 격자별)와 중기(D+4~, 제주 한 지점 11G00201 을 네 권역에 복사)를
+ * 이어 붙이므로, 4일째부터는 "○부 기준"이 아니라 "제주 기준"이다(최종점검 #42). 권역별 중기(서귀포 지점)는 배치 쪽 후속
+ */
+export const MID_TERM_FROM = 4
+/** 날씨 카드·코스 일차 줄에 적는 기준 지역 - 중기 구간이면 권역 대신 '제주' */
+export const weatherBasis = (k: number, region: string | null | undefined): string | null =>
+  k >= MID_TERM_FROM ? '제주' : (region ?? null)
+
 /** 권역 표시명(장소의 r) → 백엔드 코드. 북부가 기존 /main/weather 기본값이라 권역을 모르면 북부를 쓴다 */
 export const REGION_CODE: Record<string, string> = { 북부: 'NORTH', 동부: 'EAST', 남부: 'SOUTH', 서부: 'WEST' }
 const DEFAULT_REGION = 'NORTH'
@@ -47,15 +58,32 @@ let cache: Record<string, Record<string, DayWeather>> = {}
 let issued: Record<string, string | null> = {}
 
 /**
- * 기상청 하늘상태 → 아이콘 종류. 아이콘이 3종뿐이라 흐림은 구름으로 합친다.
- * "흐리고 비" 같은 조합형이 있어 포함 검사로 판정한다 - 비·눈이 먼저다.
+ * 기상청 하늘상태 → 아이콘 종류. 흐림은 구름으로, 소나기는 비로 합친다.
+ * "흐리고 비" 같은 조합형이 있어 포함 검사로 판정한다 - 눈 > 비 > 구름 순("비/눈"은 눈 아이콘).
  */
 export function skyToKind (sky: string | null): string | null {
   if (!sky) return null
-  if (sky.includes('비') || sky.includes('눈') || sky.includes('소나기')) return '비'
+  if (sky.includes('눈')) return '눈'
+  if (sky.includes('비') || sky.includes('소나기')) return '비'
   if (sky.includes('구름') || sky.includes('흐림')) return '구름'
   if (sky.includes('맑음')) return '맑음'
   return '구름'
+}
+
+/**
+ * 기상청 하늘상태 → 화면에 적는 짧은 말. "흐리고 눈" 처럼 조합형이면 강수 쪽이 이긴다(눈 > 소나기 > 비).
+ * 단기예보 배치는 이미 눈/비 한 글자로 저장하고, 중기예보는 기상청 문장 그대로 온다
+ */
+export function skyLabel (sky: string | null): string | null {
+  if (!sky) return null
+  if (sky.includes('소나기')) return '소나기'
+  if (sky.includes('비') && sky.includes('눈')) return '비/눈'
+  if (sky.includes('눈')) return '눈'
+  if (sky.includes('비')) return '비'
+  if (sky.includes('흐림')) return '흐림'
+  if (sky.includes('구름')) return '구름'
+  if (sky.includes('맑음')) return '맑음'
+  return sky
 }
 
 export const WeatherService = {
@@ -74,7 +102,7 @@ export const WeatherService = {
         const k = skyToKind(r.sky)
         // 기온이나 하늘이 빠진 날은 버린다 - 반쪽 정보로 그리면 NaN°가 뜬다
         if (k == null || r.maxTemp == null || r.minTemp == null) continue
-        days[r.date] = { k, rain: k === '비' ? 1 : 0, t: r.maxTemp, tmin: r.minTemp, rp: r.rainProb ?? null, issued: r.issuedAt ?? null }
+        days[r.date] = { k, label: skyLabel(r.sky) ?? k, rain: k === '비' || k === '눈' ? 1 : 0, t: r.maxTemp, tmin: r.minTemp, rp: r.rainProb ?? null, issued: r.issuedAt ?? null }
         if (r.issuedAt && (!latest || r.issuedAt > latest)) latest = r.issuedAt
       }
       nextCache[codes[i]] = days

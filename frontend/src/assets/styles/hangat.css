@@ -66,7 +66,7 @@
 .cl.mid{background:var(--pin-mid)}
 .cl.busy{background:var(--pin-busy)}
 .cl.none{background:var(--pin-none)}
-.cl.poi{z-index:250}
+.cl.poi{z-index:150}   /* 관광지 핀(200) 아래·흐린 관광지(100)·업종 낱개 핀(60) 위 - 겹치면 관광지 우선(MAP-04, 최종점검 #31). 전엔 250 이라 식당 묶음이 관광지를 덮었다 */
 .cl .lb-t{position:absolute;top:calc(100% + 5px);left:50%;transform:translateX(-50%);pointer-events:none;
   font-size:11px;font-weight:700;padding:2px 8px;box-shadow:0 1px 4px rgba(30,50,80,.14);z-index:1}
 
@@ -77,7 +77,8 @@
 .pn:hover{transform:scale(1.18)}
 /* 혼잡 단계 색의 단일 출처 - 핀·범례 점·상세 배지·주간 카드 막대가 전부 이 값을 쓴다.
    글자용 토큰(--mid 등)은 흰 배경 대비를 위해 어둡게 만든 값이라 면(배경)에 쓰면 색이 달라 보인다 */
-.stage{--pin-calm:#00b894;--pin-mid:#ff9500;--pin-busy:#f4364c;--pin-none:#aeb8c2}
+/* 예보 없음 회색은 토큰 --none(범례 점·상세 배지·주간 막대와 같은 값) - 전엔 핀만 #aeb8c2 로 밝아 범례와 안 맞았다(최종점검 #36) */
+.stage{--pin-calm:#00b894;--pin-mid:#ff9500;--pin-busy:#f4364c;--pin-none:var(--none)}
 .pn.calm{background:var(--pin-calm);box-shadow:0 0 0 2px #fff,0 0 0 6px rgba(0,184,148,.28),0 2px 6px rgba(0,0,0,.26)}
 .pn.mid{background:var(--pin-mid);box-shadow:0 0 0 2px #fff,0 0 0 6px rgba(255,149,0,.28),0 2px 6px rgba(0,0,0,.26)}
 .pn.busy{background:var(--pin-busy);box-shadow:0 0 0 2px #fff,0 0 0 7px rgba(244,54,76,.3),0 2px 7px rgba(0,0,0,.28)}
@@ -167,7 +168,7 @@
 .seg button{flex:1;padding:7px;border-radius:9px;font-size:12.5px;font-weight:600;color:var(--tx3)}
 .seg button.on{background:var(--ac);color:var(--on-ac);box-shadow:0 2px 8px rgba(0,184,163,.35)}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
-.chip{padding:5px 11px;border-radius:var(--rp);font-size:11.5px;font-weight:600;
+.chip{padding:5px 11px;border-radius:var(--rp);font-size:11.5px;font-weight:600;line-height:inherit;   /* button 은 line-height 를 안 물려받아 span 때보다 2px 낮아진다 - 부모(1.6) 그대로(#34) */
   background:var(--surf2);color:var(--tx2);cursor:pointer}
 .chip.on{background:var(--ac);color:var(--on-ac);box-shadow:0 2px 7px rgba(0,184,163,.3)}
 .sect{font-size:13px;font-weight:800;color:var(--tx);margin-bottom:10px;display:flex;align-items:center;gap:6px;letter-spacing:-.02em}
@@ -527,7 +528,7 @@
   .stage.both .panel.push{left:296px}
   .stage.both .slid.s2{left:576px}}
 /* ── 결측 핀 (MAP_004 예외: 집중률 없음 = 회색, 한산 취급 금지). 지도 핀(.pn.none)은 위 혼잡 색 규칙 옆으로 옮겼다 - 여기(파일 뒤) 두면 선택·찜 규칙을 덮어썼다 ── */
-.rpin.none{background:#aeb8c2;box-shadow:0 0 0 3px rgba(140,150,160,.24),0 1px 4px rgba(0,0,0,.18)}
+.rpin.none{background:var(--pin-none);box-shadow:0 0 0 3px rgba(140,150,160,.24),0 1px 4px rgba(0,0,0,.18)}
 /* ── 찜 (MAP_009) ── */
 .fav{font-size:16px;line-height:1;color:var(--tx3);padding:5px 9px;border-radius:var(--rp);background:var(--surf2)}
 .fav:hover{color:var(--pink)}
