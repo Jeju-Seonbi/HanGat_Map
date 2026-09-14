@@ -86,9 +86,11 @@ async function showGoodPriceTip(f) {
   tip = my
   const d = f.id != null ? await MapPlaceService.getDetail(f.id) : null
   if (tip !== my) return   // 기다리는 사이 닫혔거나 다른 핀으로 바뀜
+  // 응답이 아예 없으면(연결 끊김·서버 재시작·타임아웃) "메뉴가 없다"가 아니라 "못 받았다"고 말한다 - 다시 누르면 다시 받아온다(최종점검 #33)
   const menu = d?.overview
     ? d.overview.replace(/^대표메뉴:\s*/, '').split(' · ').map(m => `<span>${escapeHtml(m)}</span>`).join('')
-    : '<span>메뉴 정보 없음</span>'
+    : d ? '<span>메뉴 정보 없음</span>'
+    : '<span>메뉴를 불러오지 못했어요 · 다시 눌러 주세요</span>'
   // 가격표 밑에 출처·기준일 - 상세 패널과 같은 문장 (MAP_003)
   render(menu + (f.good ? `<i class="gp-src">${goodPriceSourceLine(d?.goodPriceBaseDate)}</i>` : ''))
 }
