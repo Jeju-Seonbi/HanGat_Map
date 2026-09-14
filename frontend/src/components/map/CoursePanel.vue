@@ -96,7 +96,8 @@ const poiClass = poiMarkerClass
             <span v-html="wxIcon(dayWeather(d).k, 15)"></span> {{ dayWeather(d).label }} · {{ weatherBasis(dayK(d), dayRegion(d)) }}
           </span>
         </div>
-        <template v-for="(s, i) in stops" :key="s.t + s.d">
+        <!-- key 는 일차-장소-순번. 전엔 방문시각+일차였는데 저장 코스 대부분이 방문시각이 비어 같은 일차 정류지가 전부 같은 key 였다(최종점검 #64) -->
+        <template v-for="(s, i) in stops" :key="`${s.d}-${s.o?.id ?? s.o?.n ?? s.f?.n ?? ''}-${i}`">
           <div v-if="i > 0 && s.mv" class="mv">↓ 차로 {{ s.mv }}분</div>
           <div class="stop" @click="emit('open-place', s.o ?? s.f.n)">
             <div class="tm">{{ s.t }}</div>

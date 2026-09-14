@@ -53,7 +53,8 @@ function syncPlaceURL() {
   if (state.sel?.id != null) q.set('place', state.sel.id)
   else q.delete('place')
   const qs = q.toString()
-  history.replaceState(null, '', qs ? '?' + qs : location.pathname)
+  // history.state 를 그대로 넘긴다 - null 로 덮으면 Vue Router 가 넣어 둔 상태가 지워져 dev 콘솔 경고가 났다(최종점검 #65)
+  history.replaceState(history.state, '', qs ? '?' + qs : location.pathname)
 }
 watch(() => state.sel, syncPlaceURL)
 
@@ -63,7 +64,7 @@ function clearCourse() {
   state.course = null
   state.courseDay = 'all'
   state.coursePanel = true
-  history.replaceState(null, '', location.pathname)
+  history.replaceState(history.state, '', location.pathname)
   syncPlaceURL()   // 코스 URL을 지워도 열려 있는 장소는 남긴다
 }
 
