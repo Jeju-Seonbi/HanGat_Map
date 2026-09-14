@@ -21,9 +21,10 @@ import ReviewApiService, { type ReviewItem, absUrl } from '../../services/map/Re
 import { useAuthStore } from '../../stores/auth.js'
 import PlaceImage from '../../components/common/PlaceImage.vue'
 import CongestionBadge from '../../components/common/CongestionBadge.vue'
-import { congestionLabel, levelOf } from '../../utils/congestion'
+import { congestionLabel } from '../../utils/congestion'
 import { levelLabel } from '../../data/data'
-import { addCalendarDays, fmt, todayKst } from '../../utils/format.js'
+import { fmt, todayKst } from '../../utils/format.js'
+import { buildForecastSeries } from './forecastSeries'
 
 const route = useRoute()
 const router = useRouter()
@@ -44,16 +45,11 @@ const submitting = ref(false)
 const auth = useAuthStore()
 const today = todayKst()
 
-/** 예보 30일. 발표 기준일이 오늘보다 앞설 수 있어 날짜는 from 기준으로 만든다 */
-const series = computed(() => {
-  const rows = forecast.value
-  if (!rows) return []
-  // 백엔드는 날짜 슬롯을 만들고 값이 있는 날만 채운다 - 빈 칸을 0으로 바꾸면 '정보 없음'이 '한산'이 된다
-  return rows.rates.map((rate, index) => {
-    const date = addCalendarDays(rows.from, index)
-    return { date, rate: rate ?? null, level: levelOf(rate), label: fmt(date) }
-  })
-})
+/** 예보 창을 오늘부터 편다. 배치가 밀려 from이 오늘보다 앞서면 지난 날짜는 그리지 않는다 (forecastSeries 참고) */
+const series = computed(() => buildForecastSeries(forecast.value, today))
+/** 받아 둔 예보분이 오늘 이전에 시작했다 - 그 뒤로 새 발표분이 안 들어온 상태라 화면에 밝힌다 */
+const forecastStale = computed(() => forecast.value != null && forecast.value.from < today)
+const forecastFromLabel = computed(() => (forecast.value ? fmt(forecast.value.from) : ''))
 
 const todayCell = computed(() => series.value.find(day => day.date === today && day.rate != null) ?? null)
 
@@ -375,7 +371,16 @@ watch(placeId, load)
             앞으로는 {{ calmestDay.date === today ? '오늘' : calmestDay.label }}이 가장 한산해요.
           </p>
           <p class="muted source-note">
-            {{ series[0].label }}부터 {{ series.length }}일 · 날짜 단위(시간대 아님) · 한국관광공사 집중률 예보
+            {{ series[0].label }}부터 {{ series.length }}일 · 날짜 단위(시간대 아님) · 한국관광공사 집중률 예보<template v-if="forecastStale"> · {{ forecastFromLabel }} 예보분 · 갱신 대기</template>
+          </p>
+        </div>
+        <div
+          v-else-if="forecast"
+          class="panel place-card muted-card"
+        >
+          <h2>혼잡 예보 갱신 대기</h2>
+          <p class="muted">
+            받아 둔 예보가 {{ forecastFromLabel }} 예보분이라 오늘 이후 날짜가 없어요. 다음 적재 뒤에 다시 보여드릴게요.
           </p>
         </div>
         <div
