@@ -475,7 +475,7 @@ watch(placeId, load)
                   v-if="review.congestionReport"
                   class="chip"
                 >{{ levelLabel[review.congestionReport] }} 제보</span>
-                <small class="muted">{{ review.createdAt.slice(0, 10) }}</small>
+                <small class="muted">{{ review.createdAt.slice(0, 10) }} <span v-if="review.editedAt">(수정)</span></small>
               </div>
               <p v-if="review.content">
                 {{ review.content }}

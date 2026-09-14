@@ -496,7 +496,7 @@ async function shareNative() {
             <div class="rv-h">
               <ProfileAvatar :src="r.profileImageUrl" :nickname="r.nickname" />
               <span class="rv-nm">{{ r.nickname ?? `여행자${r.userId}` }}</span>
-              <span class="rv-dt">{{ rvDate(r.createdAt) }} 작성</span>
+              <span class="rv-dt">{{ rvDate(r.createdAt) }} 작성 <span v-if="r.editedAt">(수정)</span></span>
             </div>
             <div class="rv-mt">
               <template v-if="r.rating"><StarIcon v-for="n in 5" :key="n" :filled="n <= r.rating" :size="12" /></template>
