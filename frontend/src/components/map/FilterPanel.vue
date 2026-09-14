@@ -1,8 +1,8 @@
 <script setup>
 /* MAP_001 좌측 카드 — 정렬 / 권역 / 업종(4개씩 넘김) / 종류 / 한산한 곳 목록 / 코스 버튼 / 범례.
-   폰(≤768px)에서는 같은 마크업이 가운데 모달 + [조건]·[목록] 탭으로 열린다(2026-09-14 결정, 시안 B) -
-   바텀시트 때는 조건 UI가 시트의 85%를 먹어 목록이 1.3줄(88px)만 보였다(최종점검 #58) */
-import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
+   폰(≤768px)에서는 같은 마크업이 가운데 모달로 열리고, 목록이 먼저 보이며 조건은 칩 4개(정렬·권역·업종·종류)를 눌러
+   그 조건만 펼친다(2026-09-14 결정, 시안 A) - 바텀시트 때는 조건 UI가 시트의 85%를 먹어 목록이 1.3줄(88px)만 보였다(최종점검 #58) */
+import { computed, ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import SearchBox from './SearchBox.vue'
 import LayerIcon from './LayerIcon.vue'
 import { state, rankedRows, CATEGORIES, REGIONS, LAYERS, FILTER_VISIBLE, toggleLayer, placeKey } from '@/stores/mapStore'
@@ -13,8 +13,9 @@ import { mapBridge } from '@/composables/mapBridge'
 const emit = defineEmits(['open-place', 'toggle-course'])
 const props = defineProps({ mobileSuppressed: { type: Boolean, default: false } })
 const mobileOpen = ref(false)
-/** 모달 탭. 목록이 주인공이라 기본은 목록, 조건은 한 탭 뒤 - 검색창은 두 탭 공통(가장 잦은 행동이라 탭 전환 없이) */
-const mtab = ref('list')
+/** 폰에서 펼친 조건: null | 'sort' | 'reg' | 'layer' | 'cat'. 한 번에 하나만 - 목록이 주인공이라 조건은 필요할 때만 자리를 차지한다 */
+const mdrop = ref(null)
+const catSel = ref(null)
 
 /* 폰 폭 여부 - 업종 줄을 폰에선 7개 한 줄로 펼치고(‹ › 넘김 없음) 데스크톱에선 4개씩 넘긴다 */
 const mq = typeof matchMedia === 'function' ? matchMedia('(max-width:768px)') : null
@@ -26,16 +27,23 @@ onBeforeUnmount(() => mq?.removeEventListener('change', onMq))
 watch(() => props.mobileSuppressed, suppressed => {
   if (suppressed) mobileOpen.value = false
 })
+watch(mobileOpen, open => { if (!open) mdrop.value = null })   // 닫았다 다시 열면 목록부터
 
-/* 목록 탭 위 조건 요약 한 줄 - 조건 탭을 안 열어도 무슨 기준의 목록인지 읽힌다 */
+/* 조건 칩 글자 = 현재 선택값 - 펼치지 않아도 무슨 기준의 목록인지 읽힌다 */
 const layerNames = computed(() => LAYERS.filter(l => state.L[l.k]).map(l => l.t))
-const summary = computed(() => [
-  fmtK(at(state.di)),
-  state.sort === 'calm' ? '한산한 순' : '혼잡한 순',
-  state.F.reg,
-  layerNames.value.length ? layerNames.value.join('·') : '업종 없음',
-  state.F.cat || '모든 종류',
-].join(' · '))
+const sortLabel = computed(() => state.sort === 'calm' ? '한산한 순' : '혼잡한 순')
+const regLabel = computed(() => state.F.reg === '전체' ? '권역' : state.F.reg)
+const layerLabel = computed(() => {
+  const n = layerNames.value
+  return !n.length ? '업종' : n.length <= 2 ? n.join('·') : `${n[0]} 외 ${n.length - 1}`
+})
+const catLabel = computed(() => state.F.cat || '종류')
+
+/** 같은 칩을 다시 누르면 접힌다. 종류는 펼치면서 바로 선택창을 연다(지원 브라우저) - 아니면 패널의 선택 상자를 한 번 더 누른다 */
+function toggleDrop(k) {
+  mdrop.value = mdrop.value === k ? null : k
+  if (mdrop.value === 'cat') nextTick(() => { try { catSel.value?.showPicker?.() } catch { /* 지원 안 함 - 선택 상자가 보이니 된다 */ } })
+}
 
 const sectionTitle = computed(() =>
   `${fmtK(at(state.di))} ${state.sort === 'calm' ? '한산한' : '혼잡한'} 곳`)
@@ -57,7 +65,13 @@ function moveFilter(d) {
 
 function setRegion(r) {
   state.F.reg = r
+  mdrop.value = null   // 하나만 고르는 조건은 고르면 접힌다(업종은 여러 개 켜므로 열린 채)
   mapBridge.fitRegion()
+}
+
+function setSort(s) {
+  state.sort = s
+  mdrop.value = null
 }
 
 function openPlace(place) {   // 장소 객체(목록 행·검색 결과) - 이름이 아니라 id 로 열려야 동명 장소가 구분된다
@@ -88,34 +102,30 @@ function toggleCourse() {
   </button>
 
   <div id="mobile-map-filter-sheet" class="fl cond" :class="{ 'mobile-open': mobileOpen }">
+    <!-- 폰: × 는 검색창 오른쪽 같은 줄(CSS absolute). 데스크톱은 display:none -->
     <div class="mobile-filter-head">
-      <div>
-        <b>장소 찾기</b>
-        <span>한산한 제주를 조건별로 찾아보세요</span>
-      </div>
       <button type="button" class="mobile-filter-close" aria-label="장소 검색 닫기"
         @click="mobileOpen = false">×</button>
     </div>
 
     <SearchBox @pick-spot="openPlace" />
 
-    <!-- 폰 전용 탭. 데스크톱에선 CSS 로 숨긴다(.mtabs/.msum/.mapply display:none) -->
-    <div class="mtabs" role="tablist" aria-label="장소 찾기">
-      <button type="button" role="tab" :aria-selected="mtab === 'cond'" :class="{ on: mtab === 'cond' }"
-        @click="mtab = 'cond'">조건</button>
-      <button type="button" role="tab" :aria-selected="mtab === 'list'" :class="{ on: mtab === 'list' }"
-        @click="mtab = 'list'">목록 <span class="n">{{ rankedRows.length }}</span></button>
+    <!-- 폰 전용 조건 칩 4개 - 누르면 아래 회색 패널에 그 조건만 펼친다. 데스크톱에선 CSS 로 숨긴다(.mdrop display:none) -->
+    <div class="mdrop" role="group" aria-label="목록 조건">
+      <button type="button" :class="{ open: mdrop === 'sort' }" :aria-expanded="mdrop === 'sort'"
+        @click="toggleDrop('sort')"><i class="ic-sort">↕</i><span>{{ sortLabel }}</span></button>
+      <button type="button" :class="{ open: mdrop === 'reg', set: state.F.reg !== '전체' }" :aria-expanded="mdrop === 'reg'"
+        @click="toggleDrop('reg')"><span>{{ regLabel }}</span></button>
+      <button type="button" :class="{ open: mdrop === 'layer', set: layerNames.length > 0 }" :aria-expanded="mdrop === 'layer'"
+        @click="toggleDrop('layer')"><i v-if="layerNames.length" class="dot"></i><span>{{ layerLabel }}</span></button>
+      <button type="button" :class="{ open: mdrop === 'cat', set: !!state.F.cat }" :aria-expanded="mdrop === 'cat'"
+        @click="toggleDrop('cat')"><span>{{ catLabel }}</span></button>
     </div>
 
-    <div id="cond-body" :class="mtab === 'list' ? 'tab-list' : 'tab-cond'">
-      <div class="msum">
-        <span class="cur">{{ summary }}</span>
-        <button type="button" class="edit" @click="mtab = 'cond'">조건 바꾸기 ›</button>
-      </div>
-
+    <div id="cond-body" :class="mdrop ? 'open-' + mdrop : null">
       <div class="seg">
-        <button :class="{ on: state.sort === 'calm' }" @click="state.sort = 'calm'">한산한 순</button>
-        <button :class="{ on: state.sort === 'busy' }" @click="state.sort = 'busy'">혼잡한 순</button>
+        <button :class="{ on: state.sort === 'calm' }" @click="setSort('calm')">한산한 순</button>
+        <button :class="{ on: state.sort === 'busy' }" @click="setSort('busy')">혼잡한 순</button>
       </div>
 
       <div class="chips">
@@ -138,16 +148,14 @@ function toggleCourse() {
           @click="moveFilter(1)">›</button>
       </div>
 
-      <select class="catsel" :class="{ on: state.F.cat }" v-model="state.F.cat">
+      <select ref="catSel" class="catsel" :class="{ on: state.F.cat }" v-model="state.F.cat" @change="mdrop = null">
         <option value="">모든 종류의 관광지</option>
         <!-- 곳수를 함께 보여준다 - 110종 중 3분의 2가 5곳 미만이라 고르기 전에 규모를 알아야 한다 -->
         <option v-for="c in CATEGORIES" :key="c.name" :value="c.name">{{ c.name }} ({{ c.n }})</option>
       </select>
 
-      <!-- 조건 탭 끝: 결과 건수와 함께 목록 탭으로 -->
-      <button type="button" class="mapply" @click="mtab = 'list'">목록 {{ rankedRows.length }}곳 보기 ›</button>
-
-      <div class="sect"><em>✦</em> <span>{{ sectionTitle }}</span></div>
+      <!-- 곳수(.cnt)는 폰에서만 보인다 - 데스크톱은 목록이 길게 보여 필요 없다 -->
+      <div class="sect"><em>✦</em> <span>{{ sectionTitle }}</span><span class="cnt">{{ rankedRows.length }}곳</span></div>
 
       <div class="rows">
         <div v-if="state.loading" class="empty">장소를 불러오는 중이에요…</div>

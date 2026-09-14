@@ -160,7 +160,7 @@
 
 /* ── 플로팅 공통 ── */
 .fl{position:absolute;background:var(--surf);border-radius:var(--r);box-shadow:var(--sh2)}
-.filter-fab,.mobile-filter-head,.mtabs,.msum,.mapply,.cond-dim{display:none}   /* 폰 전용 요소 - 모바일 블록에서 켠다 */
+.filter-fab,.mobile-filter-head,.mdrop,.sect .cnt,.cond-dim{display:none}   /* 폰 전용 요소 - 모바일 블록에서 켠다 */
 .cond{top:16px;left:16px;bottom:16px;width:292px;padding:16px;z-index:900;
   display:flex;flex-direction:column;overflow:hidden} /* 하단까지 꽉 채우는 고정 컬럼 */
 .seg{display:flex;background:var(--surf2);border-radius:12px;padding:3px;margin-bottom:13px}
@@ -600,38 +600,46 @@
     transform:translateY(16px) scale(.98);
     transition:transform .2s ease,opacity .18s ease}
   .cond.mobile-open{opacity:1;pointer-events:auto;transform:translateY(0) scale(1)}
-  /* 탭 [조건] [목록 N] */
-  .mtabs{display:flex;border-bottom:1px solid var(--line);margin:0 0 8px;flex-shrink:0}
-  .mtabs button{flex:1;min-height:38px;position:relative;display:flex;align-items:center;justify-content:center;gap:6px;
-    font-size:13.5px;font-weight:700;color:var(--tx3)}
-  .mtabs button.on{color:var(--ac)}
-  .mtabs button.on::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--ac);border-radius:2px}
-  .mtabs .n{font-size:10.5px;font-weight:800;background:var(--surf2);color:var(--tx3);padding:1px 6px;border-radius:var(--rp)}
-  .mtabs button.on .n{background:var(--ac-bg);color:var(--ac-dk)}
-  /* 목록 탭: 조건 요약 한 줄 + 목록. 조건 UI 는 숨긴다 */
-  .msum{display:flex;align-items:center;gap:6px;min-height:32px;margin:0 0 6px;font-size:11.5px;color:var(--tx3);flex-shrink:0}
-  .msum .cur{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;color:var(--tx2)}
-  .msum .edit{min-height:32px;padding:0 8px;border-radius:var(--r-df);color:var(--ac);font-weight:700;white-space:nowrap}
-  #cond-body.tab-list :is(.seg,.chips,.ftr-wrap,.catsel,.sect,.mapply){display:none}
-  /* 조건 탭: 조건 전부 + '목록 N곳 보기'. 작은 폰(667)에선 조건 영역이 스크롤된다 */
-  #cond-body.tab-cond :is(.rows,.sect,.msum){display:none}
-  #cond-body.tab-cond{overflow:hidden auto}
-  .mapply{display:block;width:100%;min-height:40px;border-radius:12px;background:var(--ac-bg);color:var(--ac-dk);
-    font-size:13px;font-weight:800;margin:2px 0 12px;flex-shrink:0}
-  /* 업종 7개를 한 줄에 - 폰 모달은 폭이 넉넉해 ‹ › 넘김(15px 화살표, 최종점검 #56)이 필요 없다 */
-  .ftr-nav{display:none}
-  .ftr button{flex:0 0 calc(100% / 7);padding:8px 0 7px;font-size:10px;letter-spacing:-.04em}
-  .rows{min-height:0;margin:0;padding:0}
-  .mobile-filter-head{margin:0 2px 8px}
-  .mobile-filter-head span{display:none}          /* 부제는 요약 줄이 대신한다 - 그만큼 목록 한 줄 더 */
-  #cond-body.tab-cond .cta{margin-top:auto}         /* 조건 탭에선 목록이 없어 CTA·범례·출처를 모달 바닥에 붙인다 */
-  .mobile-filter-head{display:flex;align-items:flex-start;gap:12px;margin:0 2px 14px;flex-shrink:0}
-  .mobile-filter-head>div{display:flex;flex:1;min-width:0;flex-direction:column;gap:1px}
-  .mobile-filter-head b{font-size:16px;font-weight:800;letter-spacing:-.03em;color:var(--tx)}
-  .mobile-filter-head span{font-size:10.5px;color:var(--tx3)}
-  .mobile-filter-close{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;
-    justify-content:center;background:var(--surf2);color:var(--tx3);font-size:20px;line-height:1}
+  /* × 는 검색창 오른쪽 같은 줄 - 제목 줄을 없앤 만큼 목록이 한 줄 더 보인다 */
+  .mobile-filter-head{display:block;position:absolute;top:12px;right:14px;z-index:2}
+  .mobile-filter-close{width:41px;height:41px;border-radius:50%;display:flex;align-items:center;
+    justify-content:center;background:var(--surf2);color:var(--tx3);font-size:22px;line-height:1}
   .mobile-filter-close:hover{background:var(--line);color:var(--tx)}
+  .cond .srch{margin-right:49px}
+  /* 조건 칩 4개(정렬·권역·업종·종류) - 글자가 현재 선택값. 누르면 아래에 그 조건만 펼친다(시안 A) */
+  .mdrop{display:flex;gap:6px;margin:0 -14px 10px;padding:0 14px;flex-shrink:0;overflow-x:auto;scrollbar-width:none}   /* 글자가 길면(업종 둘·종류 이름) 옆으로 밀어 본다 - 줄여 쓰면 못 읽는다 */
+  .mdrop::-webkit-scrollbar{display:none}
+  .mdrop button{flex:0 0 auto;display:inline-flex;align-items:center;gap:4px;max-width:170px;min-height:34px;padding:0 9px 0 11px;border-radius:var(--rp);
+    background:var(--surf2);color:var(--tx2);font-size:12.5px;font-weight:700;white-space:nowrap}
+  .mdrop button>span{overflow:hidden;text-overflow:ellipsis}
+  .mdrop button::after{content:'';flex-shrink:0;width:0;height:0;border:4px solid transparent;border-top:5px solid currentColor;
+    margin:5px 0 0 2px;opacity:.7;transition:transform .15s}
+  .mdrop button.open::after{transform:rotate(180deg);margin:0 0 5px 2px}
+  .mdrop button.set{background:var(--ac-bg);color:var(--ac-dk)}
+  .mdrop button.open{background:var(--ac);color:var(--on-ac)}
+  .mdrop .ic-sort{font-style:normal;font-size:13px;line-height:1;opacity:.8}
+  .mdrop .dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex-shrink:0}
+  /* 펼친 패널: 그 조건 하나만 보인다. 정렬은 세그먼트 그대로, 권역·업종은 회색 판 위에 칩 */
+  #cond-body :is(.seg,.chips,.ftr-wrap,.catsel){display:none}
+  #cond-body.open-sort .seg{display:flex}
+  #cond-body.open-reg .chips{display:flex}
+  #cond-body.open-layer .ftr-wrap{display:flex}
+  #cond-body.open-cat .catsel{display:block}
+  #cond-body :is(.chips,.ftr-wrap){background:var(--surf2);border-radius:14px;padding:10px;margin-bottom:12px}
+  .chips{gap:8px}
+  .chip{padding:8px 14px;font-size:12.5px;background:var(--surf)}
+  .seg{margin-bottom:12px}
+  /* 업종 7개를 알약으로 줄바꿈 - ‹ › 넘김(15px 화살표, 최종점검 #56)은 폰에서 안 쓴다 */
+  .ftr-nav{display:none}
+  .ftr{flex-wrap:wrap;gap:8px;width:auto;transition:none}
+  .ftr button{flex:0 0 auto;flex-direction:row;gap:7px;padding:4px 13px 4px 4px;border-radius:var(--rp);
+    background:var(--surf);font-size:12.5px;letter-spacing:-.02em;color:var(--tx2)}
+  .ftr .ico{width:28px;height:28px}
+  #cond-body .ftr button.on{background:var(--ac);color:var(--on-ac)}
+  #cond-body .ftr button.on .ico{background:var(--surf);color:var(--ac);box-shadow:none}
+  .sect{margin-bottom:8px}
+  .sect .cnt{display:inline;order:1;font-size:12px;font-weight:700;color:var(--tx3);letter-spacing:0}   /* order:1 - 구분선(::after) 뒤, 오른쪽 끝 */
+  .rows{min-height:0;margin:0;padding:0}
   .pop,.panel,.panel.push{top:auto;left:0;right:0;bottom:0;width:auto;max-height:68vh;
     border-radius:22px 22px 0 0;padding-top:30px;background:var(--surf);box-shadow:var(--sh2)}
   .pop::before,.panel::before{content:'';position:absolute;top:9px;left:50%;

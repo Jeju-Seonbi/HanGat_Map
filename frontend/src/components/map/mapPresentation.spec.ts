@@ -110,7 +110,7 @@ describe('mapPresentation', () => {
     expect(mapCss).not.toContain('.pw:hover .poi-label')
   })
 
-  it('모바일 지도에서 캘린더는 위에 있고 장소 찾기는 원형 버튼에서 가운데 모달로 열린다 (2026-09-14 시안 B)', () => {
+  it('모바일 지도에서 캘린더는 위에 있고 장소 찾기는 원형 버튼에서 가운데 모달로 열린다 (2026-09-14)', () => {
     expect(declarations('.slid')).toContain('top:12px')
     expect(declarations('.slid')).toContain('bottom:auto')
     // 모달: 위아래·좌우 여백으로 높이가 확정돼야 목록(flex:1)이 남는 공간을 채운다 - max-height 만 있으면 88px 로 굳는다(#58)
@@ -125,13 +125,15 @@ describe('mapPresentation', () => {
     expect(mobileCss).not.toContain('.stage.sheet-open .slid')
   })
 
-  it('모바일 모달은 [조건]·[목록] 탭이고 검색창은 두 탭 공통이다', () => {
-    expect(filterPanelSource).toContain('class="mtabs" role="tablist"')
-    expect(filterPanelSource).toContain('class="mapply"')
-    expect(filterPanelSource.indexOf('<SearchBox')).toBeLessThan(filterPanelSource.indexOf('class="mtabs"'))   // 검색창이 탭 위(공통)
-    expect(declarations('#cond-body.tab-list :is(.seg,.chips,.ftr-wrap,.catsel,.sect,.mapply)')).toContain('display:none')
-    expect(declarations('#cond-body.tab-cond :is(.rows,.sect,.msum)')).toContain('display:none')
-    expect(mapCss).toContain('.mtabs,.msum,.mapply,.cond-dim{display:none}')   // 데스크톱에선 폰 전용 요소가 안 보인다
+  it('모바일 모달은 목록이 먼저 보이고 조건은 칩 4개를 눌러 하나씩 펼친다 (시안 A)', () => {
+    expect(filterPanelSource).toContain('class="mdrop" role="group"')
+    for (const k of ['sort', 'reg', 'layer', 'cat']) expect(filterPanelSource).toContain(`toggleDrop('${k}')`)
+    expect(filterPanelSource.indexOf('<SearchBox')).toBeLessThan(filterPanelSource.indexOf('class="mdrop"'))   // 검색창 → 칩 → 목록
+    expect(declarations('#cond-body :is(.seg,.chips,.ftr-wrap,.catsel)')).toContain('display:none')          // 펼치기 전엔 조건 UI 없음
+    expect(declarations('#cond-body.open-layer .ftr-wrap')).toContain('display:flex')
+    expect(declarations('#cond-body.open-cat .catsel')).toContain('display:block')
+    expect(mobileCss).not.toContain('.mtabs')                                                                  // 탭은 없다
+    expect(mapCss).toContain('.filter-fab,.mobile-filter-head,.mdrop,.sect .cnt,.cond-dim{display:none}')      // 데스크톱에선 폰 전용 요소가 안 보인다
   })
 
   it('모바일에서 토스트·장소 데이터 배너·닫기 버튼이 탭바·날짜 버튼·손가락과 겹치지 않는다 (#53·#55·#56·#57)', () => {
