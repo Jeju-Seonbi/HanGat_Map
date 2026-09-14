@@ -6,7 +6,7 @@ import ReviewSection from './ReviewSection.vue'
 import ProfileAvatar from '../common/ProfileAvatar.vue'
 import { state, toggleFav, isFav, toast, placeKey } from '@/stores/mapStore'
 
-import { crowd, tier, tierKo, rank30, bestDay, CROWD_KO } from '@/utils/crowd'
+import { crowd, tier, tierKo, forecastDays, bestDay, CROWD_KO } from '@/utils/crowd'
 import { at, fmtK } from '@/utils/date'
 import { wxOf, wxIcon, wxIssuedAt } from '@/utils/weather'
 import { weatherBasis } from '@/services/map/MapWeatherService'
@@ -48,10 +48,11 @@ const outOfRange = computed(() => hasForecast.value && c.value == null)
 const untilText = computed(() => (state.forecastUntil >= 0 ? fmtK(at(state.forecastUntil)) : null))
 
 /* 리드 문장은 그 장소의 30일 예보 안에서의 순위만 말한다 — 다른 장소와 비교하지 않는다 */
-const rankText = computed(() => {
-  const r = rank30(s.value, state.di)
-  return r <= 8 ? '한산한 편' : r >= 23 ? '혼잡한 편' : null
-})
+/* 리드 문장 = 선택한 날의 혼잡 단계를 쉬운 말로("9월 15일 예보는 혼잡한 편이에요"). 전엔 그 장소의 예보 안 순위를 말했는데
+   ("이곳의 21일 예보 중에선 한산한 편") 읽기 어려웠다(2026-09-15 후경). "언제가 더 한산한가"는 아래 팁 박스가 말한다 */
+const tierText = computed(() => ({ calm: '한산한 편', mid: '보통', busy: '혼잡한 편' })[t.value] ?? '')
+/** 팁 박스의 'N일 중' - 실제로 예보가 있는 날 수(21~22일). '30일'로 적으면 사실과 다르다(#18) */
+const forecastLen = computed(() => forecastDays(s.value))
 const best = computed(() => bestDay(s.value, 0, 30))
 const tipText = computed(() => {
   if (c.value == null) return ''
@@ -388,16 +389,14 @@ async function shareNative() {
         </template>
         <template v-else>
           <span class="bdg tier-bg" :class="t" style="color:#fff">{{ tierKo(c) }}</span>
-          &nbsp;{{ fmtK(at(state.di)) }} · 이곳의 30일 예보 중에선
-          <template v-if="rankText"><b>{{ rankText }}</b>이에요.</template>
-          <template v-else>중간쯤이에요.</template>
+          &nbsp;{{ fmtK(at(state.di)) }} 예보는 <b>{{ tierText }}</b>이에요.
         </template>
       </div>
 
       <!-- 범위 밖 날짜여도 이 장소의 예보가 있으면 팁은 살린다 - 예보가 있는 날로 돌아갈 길 -->
       <div v-if="(c != null || outOfRange) && best.c != null && !s.closed" class="tipbox" @click="jumpToBest">
         <template v-if="outOfRange">🕐 예보가 있는 날 중엔 <b>{{ fmtK(at(best.k)) }}</b>이 가장 한산해요. 눌러서 옮겨보세요.</template>
-        <template v-else-if="!tipText">✓ 30일 중 <b>{{ dayWord(state.di) }}이 가장 한산</b>해요.</template>
+        <template v-else-if="!tipText">✓ {{ forecastLen }}일 중 <b>{{ dayWord(state.di) }}이 가장 한산</b>해요.</template>
         <template v-else>🕐 <b>{{ fmtK(at(best.k)) }}</b>로 가면 <b>{{ tipText }}</b> 날이에요. 눌러서 옮겨보세요.</template>
       </div>
 
