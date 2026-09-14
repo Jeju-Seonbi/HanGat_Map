@@ -189,7 +189,7 @@ function toggleCourse() {
         <span style="color:var(--calm)"><i class="dot tier-bg calm"></i>한산</span>
         <span style="color:var(--mid)"><i class="dot tier-bg mid"></i>보통</span>
         <span style="color:var(--busy)"><i class="dot tier-bg busy"></i>혼잡</span>
-        <span style="color:var(--tx3)" title="관광공사 혼잡 예측 대상이 아닌 장소"><i class="dot" style="background:var(--tx3)"></i>예보 없음</span>
+        <span style="color:var(--tx3)" title="관광공사 혼잡 예측 대상이 아닌 장소"><i class="dot" style="background:var(--none)"></i>예보 없음</span>
       </div>
       <p v-if="forecastDown" class="cta-note">혼잡 예보를 불러오지 못했어요 · 새로고침해 주세요</p>
       <p class="cta-src">{{ sources }}</p>
