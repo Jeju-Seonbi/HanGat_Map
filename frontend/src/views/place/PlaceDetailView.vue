@@ -25,6 +25,7 @@ import { congestionLabel } from '../../utils/congestion'
 import { levelLabel } from '../../data/data'
 import { fmt, todayKst } from '../../utils/format.js'
 import { buildForecastSeries } from './forecastSeries'
+import { isWideInfo, parseInfoText } from './infoText'
 
 const route = useRoute()
 const router = useRouter()
@@ -83,6 +84,29 @@ const feeText = computed(() => {
   if (!row) return '정보 없음'
   if (row.useFeeText) return row.useFeeText
   return row.free ? '무료' : '정보 없음'
+})
+
+/**
+ * 운영시간·휴무·요금 칸. 원문을 항목·소제목·비고로 펴서(infoText) 그리고, 묶음이 둘 이상이면 한 줄을 통째로 쓴다.
+ * 값이 없는 칸은 '정보 없음'을 흐리게 - 없는 값을 지어내지 않는다.
+ */
+const facts = computed(() => {
+  const row = place.value
+  if (!row) return []
+  const items = [
+    { key: 'hours', label: '운영시간', source: row.operatingHoursText },
+    { key: 'rest', label: '휴무', source: row.restDayText },
+    { key: 'fee', label: row.goodPrice ? '가격(검증가)' : '이용요금', source: feeText.value === '정보 없음' ? null : feeText.value },
+    { key: 'phone', label: '전화', source: row.phone },
+  ]
+  return items
+    .filter(item => item.key !== 'phone' || item.source)
+    .map(item => {
+      const info = parseInfoText(item.source)
+      // '※ 연중무휴'처럼 비고만 있는 값도 정보다 - 본문이 없다고 '정보 없음'으로 덮지 않는다
+      const empty = info.blocks.length === 0 && info.notes.length === 0
+      return { key: item.key, label: item.label, info, empty, wide: isWideInfo(info) }
+    })
 })
 
 /** 추천 근거 - 백엔드 MainService·AlternativeService 와 같은 우선순위를 화면에도 그대로 공개한다 */
@@ -309,21 +333,41 @@ watch(placeId, load)
           </div>
 
           <dl class="fact-grid">
-            <div>
-              <dt>운영시간</dt>
-              <dd>{{ place.operatingHoursText ?? '정보 없음' }}</dd>
-            </div>
-            <div>
-              <dt>휴무</dt>
-              <dd>{{ place.restDayText ?? '정보 없음' }}</dd>
-            </div>
-            <div>
-              <dt>{{ place.goodPrice ? '가격(검증가)' : '이용요금' }}</dt>
-              <dd>{{ feeText }}</dd>
-            </div>
-            <div v-if="place.phone">
-              <dt>전화</dt>
-              <dd>{{ place.phone }}</dd>
+            <div
+              v-for="fact in facts"
+              :key="fact.key"
+              :class="{ wide: fact.wide }"
+            >
+              <dt>{{ fact.label }}</dt>
+              <dd
+                v-if="fact.empty"
+                class="muted"
+              >
+                정보 없음
+              </dd>
+              <dd v-else>
+                <div class="info-blocks">
+                  <div
+                    v-for="(block, i) in fact.info.blocks"
+                    :key="i"
+                    class="info-block"
+                  >
+                    <strong v-if="block.title">{{ block.title }}</strong>
+                    <ul class="info-lines">
+                      <li
+                        v-for="(line, j) in block.lines"
+                        :key="j"
+                        :class="{ bullet: line.bullet }"
+                      >{{ line.text }}</li>
+                    </ul>
+                  </div>
+                </div>
+                <p
+                  v-for="(note, i) in fact.info.notes"
+                  :key="`note-${i}`"
+                  class="info-note"
+                >※ {{ note }}</p>
+              </dd>
             </div>
           </dl>
         </div>
@@ -573,9 +617,19 @@ watch(placeId, load)
 .chip-row{display:flex;flex-wrap:wrap;gap:6px}
 .chip{padding:4px 10px;border:1px solid var(--border);border-radius:999px;font-size:12px;color:var(--sub)}
 .chip.good{border-color:var(--primary);color:var(--primary)}
-.fact-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;width:100%;margin:6px 0 0}
-.fact-grid dt{font-size:12px;color:var(--sub);margin-bottom:3px}
-.fact-grid dd{margin:0;font-weight:600;line-height:1.45}
+.fact-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px 18px;width:100%;margin:6px 0 0}
+.fact-grid>div{min-width:0}
+/* 요금처럼 묶음이 둘 이상이면 한 줄을 통째로 - 세 칸에 끼우면 글자가 세로로 길게 늘어진다 */
+.fact-grid>div.wide{grid-column:1/-1}
+.fact-grid dt{font-size:12px;color:var(--sub);margin-bottom:4px}
+.fact-grid dd{margin:0;font-weight:500;font-size:14px;line-height:1.55}
+.info-blocks{display:flex;flex-wrap:wrap;gap:6px 28px}
+.info-block{min-width:0}
+.info-block strong{display:block;font-size:12px;font-weight:700;color:var(--primary);margin-bottom:2px}
+.info-lines{list-style:none;margin:0;padding:0}
+.info-lines li.bullet{position:relative;padding-left:12px}
+.info-lines li.bullet::before{content:'';position:absolute;left:0;top:.62em;width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.45}
+.info-note{margin:6px 0 0;font-size:12px;color:var(--sub);line-height:1.5}
 .overview{line-height:1.7;white-space:pre-line;margin:0}
 .card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%}
 .muted-card{background:var(--muted)}
