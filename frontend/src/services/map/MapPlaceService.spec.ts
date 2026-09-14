@@ -181,13 +181,19 @@ describe('폐업 장소', () => {
 
   it('getById 는 상세 응답을 목록과 같은 모양으로 돌려준다', async () => {
     mockFetch({ ...CLOSED_ROW, overview: '소개', images: [] })
-    const p = await MapPlaceService.getById(77)
-    expect(p).toMatchObject({ id: 77, n: '문닫은집', x: 126.3, y: 33.4, cat: 'FOOD', closed: true })
+    const { place, missing } = await MapPlaceService.getById(77)
+    expect(place).toMatchObject({ id: 77, n: '문닫은집', x: 126.3, y: 33.4, cat: 'FOOD', closed: true })
+    expect(missing).toBe(false)
   })
 
-  it('getById 는 실패하면 null - 호출부가 "찾지 못했어요" 로 안내한다', async () => {
+  it('getById 는 없는 장소(400/3201)면 missing - 호출부가 "찾지 못했어요" 로 바로 안내한다(#49)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 400, json: () => Promise.resolve({ success: false, code: 3201, message: '존재하지 않는 장소입니다.', result: null }) }))
+    expect(await MapPlaceService.getById(99999999)).toEqual({ place: null, missing: true })
+  })
+
+  it('getById 는 연결 실패면 place null + missing false - "못 불러왔어요" 로 구분한다', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('down')))
-    expect(await MapPlaceService.getById(1)).toBeNull()
+    expect(await MapPlaceService.getById(1)).toEqual({ place: null, missing: false })
   })
 })
 

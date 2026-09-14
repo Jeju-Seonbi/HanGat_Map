@@ -10,7 +10,7 @@ import PhotoLightbox from '@/components/map/PhotoLightbox.vue'
 import { state, toast, loadPlaces, findPlaceById, loadFavorites, placeKey } from '@/stores/mapStore'
 import { useAuthStore } from '@/stores/auth'
 
-import { at, iso, D0, FORECAST_DAYS } from '@/utils/date'
+import { at, iso, today, FORECAST_DAYS } from '@/utils/date'
 import { useRouter, useRoute } from 'vue-router'
 import { popAiCourse, toMapCourse, toMapCourseFromDetail } from '@/services/map/CourseBridge'
 import { hasCoords } from '@/services/map/MapPlaceService'
@@ -87,7 +87,7 @@ function applyCourse(course) {
   state.course = course
   state.courseDay = 'all'
   state.coursePanel = true
-  const k = Math.round((new Date(course.startDate + 'T00:00:00') - D0) / 864e5)
+  const k = Math.round((new Date(course.startDate + 'T00:00:00') - today()) / 864e5)
   if (k >= 0 && k < FORECAST_DAYS) state.di = k
   const pts = course.stops.map(s => [s.o.y, s.o.x])
   if (pts.length > 1) mapBridge.fitPoints(pts, 12)
@@ -114,7 +114,7 @@ function loadFromURL() {
   const dp = p.get('d')
   /* 지난 날짜이거나 예보 범위 밖이면 무시하고 오늘로 둔다 */
   if (dp) {
-    const k = Math.round((new Date(dp + 'T00:00:00') - D0) / 864e5)
+    const k = Math.round((new Date(dp + 'T00:00:00') - today()) / 864e5)
     if (k >= 0 && k < FORECAST_DAYS) state.di = k
   }
   const r = p.get('r')
@@ -126,7 +126,10 @@ function loadFromURL() {
 async function openPlaceFromURL() {
   const raw = route.query.place ?? route.query.placeId
   if (!/^\d+$/.test(raw ?? '')) return
+  const before = state.sel
   const { place, error } = await findPlaceById(+raw)
+  // 기다리는 사이(지연 레이어를 받는 동안) 사용자가 다른 장소를 열었으면 링크가 그걸 덮어쓰지 않는다(최종점검 #48)
+  if (state.sel !== before) return
   if (place) openPlace(place)
   else if (error) toast('장소 정보를 불러오지 못했어요 — 새로고침해 주세요')
   else toast('공유받은 장소를 찾지 못했어요')

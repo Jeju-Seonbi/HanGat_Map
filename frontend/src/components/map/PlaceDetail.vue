@@ -6,7 +6,7 @@ import ReviewSection from './ReviewSection.vue'
 import ProfileAvatar from '../common/ProfileAvatar.vue'
 import { state, toggleFav, isFav, toast, placeKey } from '@/stores/mapStore'
 
-import { crowd, tier, tierKo, rank30, bestDay, CROWD_KO } from '@/utils/crowd'
+import { crowd, tier, tierKo, forecastDays, bestDay, CROWD_KO } from '@/utils/crowd'
 import { at, fmtK } from '@/utils/date'
 import { wxOf, wxIcon, wxIssuedAt } from '@/utils/weather'
 import { weatherBasis } from '@/services/map/MapWeatherService'
@@ -48,10 +48,11 @@ const outOfRange = computed(() => hasForecast.value && c.value == null)
 const untilText = computed(() => (state.forecastUntil >= 0 ? fmtK(at(state.forecastUntil)) : null))
 
 /* 리드 문장은 그 장소의 30일 예보 안에서의 순위만 말한다 — 다른 장소와 비교하지 않는다 */
-const rankText = computed(() => {
-  const r = rank30(s.value, state.di)
-  return r <= 8 ? '한산한 편' : r >= 23 ? '혼잡한 편' : null
-})
+/* 리드 문장 = 선택한 날의 혼잡 단계를 쉬운 말로("9월 15일 예보는 혼잡한 편이에요"). 전엔 그 장소의 예보 안 순위를 말했는데
+   ("이곳의 21일 예보 중에선 한산한 편") 읽기 어려웠다(2026-09-15 후경). "언제가 더 한산한가"는 아래 팁 박스가 말한다 */
+const tierText = computed(() => ({ calm: '한산한 편', mid: '보통', busy: '혼잡한 편' })[t.value] ?? '')
+/** 팁 박스의 'N일 중' - 실제로 예보가 있는 날 수(21~22일). '30일'로 적으면 사실과 다르다(#18) */
+const forecastLen = computed(() => forecastDays(s.value))
 const best = computed(() => bestDay(s.value, 0, 30))
 const tipText = computed(() => {
   if (c.value == null) return ''
@@ -304,11 +305,22 @@ async function shareNative() {
         <!-- MAP_009 찜 -->
         <button class="fav" :class="{ on: isFav(s) }" :aria-pressed="isFav(s)" aria-label="찜하기" @click="toggleFav(s)">♥</button>
         <div class="share-wrap">
-          <button class="share" :aria-expanded="shareOpen" @click="toggleShare">공유하기</button>
+          <!-- 글자 대신 공유 아이콘(점 셋을 잇는 모양) - 낭독기·마우스 툴팁은 '공유하기'(2026-09-15 후경) -->
+          <button class="share" :aria-expanded="shareOpen" aria-label="공유하기" title="공유하기" @click="toggleShare">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
+              <path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4" />
+            </svg>
+          </button>
           <div v-if="shareOpen" class="share-sheet">
-            <button @click="shareKakao"><i class="si ka"></i>카카오톡</button>
-            <button @click="copyLink"><i class="si cp"></i>링크 복사</button>
-            <button v-if="canNative" @click="shareNative"><i class="si nt"></i>더보기</button>
+            <!-- 항목 아이콘: 카카오톡 말풍선(노랑 바탕) · 링크 사슬 · OS 공유(상자+화살표). 색 상자만 있던 것을 그림으로(2026-09-15 후경) -->
+            <button @click="shareKakao"><i class="si ka"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
+              <path fill="#191919" d="M12 3C6.5 3 2 6.6 2 11c0 2.8 1.8 5.2 4.6 6.6L5.7 21c-.1.3.3.6.6.4l4.2-2.8c.5.1 1 .1 1.5.1 5.5 0 10-3.6 10-8S17.5 3 12 3Z"/></svg></i>카카오톡</button>
+            <button @click="copyLink"><i class="si cp"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10 13a5 5 0 0 0 7.1 0l2.8-2.8a5 5 0 0 0-7.1-7.1L11.5 4.4"/><path d="M14 11a5 5 0 0 0-7.1 0l-2.8 2.8a5 5 0 0 0 7.1 7.1l1.3-1.3"/></svg></i>링크 복사</button>
+            <button v-if="canNative" @click="shareNative"><i class="si nt"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v13"/></svg></i>더보기</button>
           </div>
         </div>
         <button class="pox" @click="emit('close')">×</button>
@@ -377,16 +389,14 @@ async function shareNative() {
         </template>
         <template v-else>
           <span class="bdg tier-bg" :class="t" style="color:#fff">{{ tierKo(c) }}</span>
-          &nbsp;{{ fmtK(at(state.di)) }} · 이곳의 30일 예보 중에선
-          <template v-if="rankText"><b>{{ rankText }}</b>이에요.</template>
-          <template v-else>중간쯤이에요.</template>
+          &nbsp;{{ fmtK(at(state.di)) }} 예보는 <b>{{ tierText }}</b>이에요.
         </template>
       </div>
 
       <!-- 범위 밖 날짜여도 이 장소의 예보가 있으면 팁은 살린다 - 예보가 있는 날로 돌아갈 길 -->
       <div v-if="(c != null || outOfRange) && best.c != null && !s.closed" class="tipbox" @click="jumpToBest">
         <template v-if="outOfRange">🕐 예보가 있는 날 중엔 <b>{{ fmtK(at(best.k)) }}</b>이 가장 한산해요. 눌러서 옮겨보세요.</template>
-        <template v-else-if="!tipText">✓ 30일 중 <b>{{ dayWord(state.di) }}이 가장 한산</b>해요.</template>
+        <template v-else-if="!tipText">✓ {{ forecastLen }}일 중 <b>{{ dayWord(state.di) }}이 가장 한산</b>해요.</template>
         <template v-else>🕐 <b>{{ fmtK(at(best.k)) }}</b>로 가면 <b>{{ tipText }}</b> 날이에요. 눌러서 옮겨보세요.</template>
       </div>
 
