@@ -86,7 +86,8 @@ const distanceText = (meters: number) =>
  * 지도는 좌표·이름·등급만 읽는다. 상세 조회가 주지 않는 텍스트 필드는 빈 값으로 둔다 -
  * 없는 설명을 지어내지 않는다.
  */
-const toMapPlace = (order: number, name: string, id: number, lat: number | null, lng: number | null,
+const toMapPlace = (pin: { label: string; description: string }, name: string, id: number,
+                    lat: number | null, lng: number | null,
                     level: CongestionLevel | null, rate: number | null): Place => ({
   id: String(id),
   name,
@@ -95,9 +96,9 @@ const toMapPlace = (order: number, name: string, id: number, lat: number | null,
   address: '',
   description: '',
   score: rate ?? 0,
-  // 핀에는 경로선과 같은 방문 순번을 단다 - 집중률 원값은 색(등급)으로만 남긴다
-  pinLabel: String(order),
-  pinDescription: `${order}번째 방문지`,
+  // 핀에는 일정 목록과 같은 순번을 단다 - 집중률 원값은 색(등급)으로만 남긴다
+  pinLabel: pin.label,
+  pinDescription: pin.description,
   level: level ?? 'QUIET',
   time: '',
   stay: '',
@@ -148,9 +149,14 @@ const fromLive = (course: CourseDetail): CourseView => {
     dayCount: course.days.length,
     placeCount: course.days.reduce((sum, day) => sum + day.items.length, 0),
     days,
-    mapPlaces: course.days.flatMap(day => day.items).map((item, index) =>
-      toMapPlace(index + 1, item.placeName, item.placeId, item.latitude, item.longitude,
-        item.congestionLevel, item.congestionRate)),
+    // 순번은 일차 안 position - 목록의 'N번째'와 같은 숫자다(백엔드 CourseItem 계약). 여러 날이면 '2-1'처럼 일차를 앞에 붙인다
+    mapPlaces: course.days.flatMap(day => day.items.map(item => toMapPlace(
+      {
+        label: course.days.length > 1 ? `${day.dayNo}-${item.position}` : String(item.position),
+        description: `DAY ${day.dayNo} ${item.position}번째 방문지`,
+      },
+      item.placeName, item.placeId, item.latitude, item.longitude,
+      item.congestionLevel, item.congestionRate))),
     forecastNote: gap >= 5
       ? `저장할 때 평균 ${Math.round(course.plannedAverageRate as number)}였는데 지금 예보는 ${Math.round(course.averageRate as number)}예요`
       : null,
@@ -476,7 +482,7 @@ async function applySwap (alternative: AlternativePlace) {
           show-route
         />
         <p class="route-note">
-          장소 간 추천 순서를 나타낸 선이며 실제 도로 경로와 다를 수 있습니다.
+          장소 간 추천 순서를 나타낸 선이며 실제 도로 경로와 다를 수 있습니다. 좌표가 없는 장소는 지도에 표시되지 않습니다.
         </p>
       </aside>
     </div>
