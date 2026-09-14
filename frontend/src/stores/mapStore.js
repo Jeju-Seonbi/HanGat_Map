@@ -129,28 +129,35 @@ export async function findPlaceById (id) {
     const p = rows.find(x => x.id === id)
     if (p) { state.L[k] = 1; return { place: p, error: false } }
   }
-  // 장소를 하나도 못 받은 상태(백엔드 다운)면 더 두드리지 않는다 -
-  // 레이어 7개를 5초씩 순서대로 재시도하면 안내가 40초 뒤에 뜬다(실측)
+  // 장소를 하나도 못 받은 상태(백엔드 다운)면 더 두드리지 않는다
   if (!state.live) return { place: null, error: true }
-  // 못 불러온 레이어(첫 진입 실패분 + 지연 레이어)를 하나씩 받아 보며 찾는다.
-  // 어느 하나라도 못 받았으면 error - "없는 장소"가 아니라 "못 불러온 것"으로 안내해야 한다
-  let error = false
-  const candidates = [...new Set([...state.loadFailed, ...LAZY_LAYERS])]
-  for (const k of candidates) {
-    if (state.layers[k].length || layerLoading.has(k)) continue
+  // 상세 한 건으로 있는 장소인지·어느 업종인지 먼저 본다. 전엔 지연 레이어 6개(3MB)를 순서대로 다 받은 뒤에야
+  // "없는 장소"를 알았고, 카페 링크 하나에 식당·숙소까지 받았다(최종점검 #49)
+  const { place: single, missing } = await MapPlaceService.getById(id)
+  if (missing) return { place: null, error: false }
+  if (!single) return { place: null, error: true }
+  // 그 업종 레이어 하나만 받아 목록의 같은 객체로 연다 - 핀·찜·예보가 목록 객체에 붙어 있다
+  const k = layerOf(single)
+  if (k && !state.layers[k].length && !layerLoading.has(k)) {
     layerLoading.add(k)
     const rows = await MapPlaceService.getLayer(k)
     layerLoading.delete(k)
-    if (!rows) { error = true; continue }
-    state.layers[k] = rows
-    state.loadFailed = state.loadFailed.filter(x => x !== k)
-    const p = rows.find(x => x.id === id)
-    if (p) { state.L[k] = 1; return { place: p, error: false } }
+    if (rows) {
+      state.layers[k] = rows
+      state.loadFailed = state.loadFailed.filter(x => x !== k)
+      const p = rows.find(x => x.id === id)
+      if (p) { state.L[k] = 1; return { place: p, error: false } }
+    }
   }
-  // 어느 레이어에도 없는 장소 - 폐업(CLOSED)은 목록에서 빠지지만 찜·공유 링크로는 들어온다. 상세를 직접 받아 연다
-  const single = await MapPlaceService.getById(id)
-  if (single) return { place: single, error: false }
-  return { place: null, error }
+  // 목록에 없는 장소(폐업 등)는 상세 객체로 연다 - 선택 핀은 레이어 밖이라도 뜬다
+  return { place: single, error: false }
+}
+
+/** 장소의 업종 → 그 장소가 들어 있는 레이어. 착한가격은 업종과 무관하게 food, 쇼핑 등은 어느 레이어에도 없다(null) */
+export function layerOf (p) {
+  if (p.cat === 'TOURIST') return 'spot'
+  if (p.good) return 'food'
+  return { FOOD: 'dine', CAFE: 'cafe', LODGING: 'stay', CONVENIENCE: 'cvs', MART: 'mart' }[p.cat] ?? null
 }
 
 /* ── 재진입 재사용 ──

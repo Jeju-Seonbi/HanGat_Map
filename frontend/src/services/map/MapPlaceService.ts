@@ -238,11 +238,15 @@ export const MapPlaceService = {
    * 목록에 없는 장소를 id 로 받는다 - 폐업(CLOSED) 장소는 목록·검색에서 빠지지만 찜·공유 링크로는 들어온다.
    * 상세 응답은 목록 응답의 상위 집합이라 같은 변환을 쓴다. 없거나 실패하면 null.
    */
-  async getById (id: number): Promise<MapPlace | null> {
+  /**
+   * 상세 한 건. missing = 백엔드가 "없는 장소"라고 답함(4xx) / place null + missing false = 못 받음(연결·서버).
+   * 공유 링크 복원이 지연 레이어 6개(3MB)를 다 받기 전에 이 한 건으로 먼저 확인한다(최종점검 #49)
+   */
+  async getById (id: number): Promise<{ place: MapPlace | null, missing: boolean }> {
     try {
-      return toMapPlace(await apiGet<BackendPlace>(`/places/${id}`))
-    } catch {
-      return null
+      return { place: toMapPlace(await apiGet<BackendPlace>(`/places/${id}`)), missing: false }
+    } catch (e) {
+      return { place: null, missing: /^HTTP 4\d\d$/.test((e as Error)?.message ?? '') }
     }
   }
 }
