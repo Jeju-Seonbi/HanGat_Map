@@ -239,7 +239,7 @@ class WeatherIngestServiceTest {
     @Test
     @DisplayName("한 권역이라도 D+0~2가 빠지면 불완전 - 행 총수가 아니라 권역별로 본다")
     void missingRequiredDayInOneRegionIsIncomplete() {
-        // 동부(ny 37)만 이틀치, 나머지 세 권역은 나흘치 → 총 14행. 총수만 세면 3일×4권역=12를 넘어 완전으로 오판한다
+        // 동부(ny 37)만 이틀치, 나머지 세 권역은 나흘치 → 총 14행. 총수를 권역×3(=12) 기준으로 완화했다면 넘어서 완전으로 오판한다
         given(client.fetchShortTerm(eq("20260910"), eq("0500"), anyInt(), eq(37)))
                 .willAnswer(inv -> shortItems(37, TODAY, 2));
 
