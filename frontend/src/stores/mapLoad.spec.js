@@ -178,6 +178,21 @@ describe('loadPlaces 재진입 재사용 (성능 B 커밋 1)', () => {
     expect(s.state.L.cafe).toBe(1)
   })
 
+  it('날짜가 바뀐 재진입은 오늘 기준을 옮기고 선택 날짜를 오늘로 되돌린다 (최종점검 #16)', async () => {
+    const s = await freshStore()
+    const { today, at, iso } = await import('../utils/date')
+    await s.loadPlaces()
+    s.state.di = 3
+    expect(iso(today())).toBe('2026-09-12')
+    vi.setSystemTime(new Date(2026, 8, 13, 10, 0))
+    await s.loadPlaces()
+    expect(iso(today())).toBe('2026-09-13')       // 글자·달력의 오늘
+    expect(iso(at(0))).toBe('2026-09-13')
+    expect(s.state.di).toBe(0)                     // 선택 날짜는 오늘로
+    const { attachSeries } = await import('../services/map/CrowdService')
+    expect(attachSeries).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), '2026-09-13')   // 데이터도 같은 날 기준
+  })
+
   it('레이어 하나라도 못 받았으면 기록하지 않아 다음 진입에 전부 다시 받는다(재시도)', async () => {
     placeApi.getAll.mockResolvedValueOnce(ok(['stay']))
     const s = await freshStore()

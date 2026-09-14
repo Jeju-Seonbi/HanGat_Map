@@ -2,17 +2,17 @@
 /* MAP_004 날짜 선택 — 버튼을 누르면 달력이 열리고, 오늘부터 30일까지만 고를 수 있다 */
 import { ref, computed, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { state } from '@/stores/mapStore'
-import { D0, at, fmt, monthKey, FORECAST_DAYS } from '@/utils/date'
+import { today, at, fmt, monthKey, FORECAST_DAYS } from '@/utils/date'
 
 const open = ref(false)
-const cursor = ref(new Date(D0.getFullYear(), D0.getMonth(), 1))
+const cursor = ref(new Date(today().getFullYear(), today().getMonth(), 1))
 const trigger = ref(null)
 const dialog = ref(null)
 
 const label = computed(() => fmt(at(state.di)))
 const title = computed(() => `${cursor.value.getFullYear()}년 ${cursor.value.getMonth() + 1}월`)
 const lastDay = computed(() => at(FORECAST_DAYS - 1))
-const canPrev = computed(() => monthKey(cursor.value) > monthKey(D0))
+const canPrev = computed(() => monthKey(cursor.value) > monthKey(today()))
 const canNext = computed(() => monthKey(cursor.value) < monthKey(lastDay.value))
 
 /** 달력 한 판 — 앞의 빈칸(lead) + 날짜들 */
@@ -23,7 +23,7 @@ const cells = computed(() => {
   const out = Array.from({ length: lead }, () => null)
   for (let d = 1; d <= days; d++) {
     const dt = new Date(y, m, d)
-    const k = Math.round((dt - D0) / 864e5)
+    const k = Math.round((dt - today()) / 864e5)
     out.push({ d, k, w: dt.getDay(), ok: k >= 0 && k < FORECAST_DAYS })
   }
   return out

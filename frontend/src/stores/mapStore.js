@@ -1,7 +1,7 @@
 import { reactive, computed, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { crowd, tier } from '@/utils/crowd'
-import { iso, D0 } from '@/utils/date'
+import { iso, today, refreshToday } from '@/utils/date'
 import MapPlaceService, { LAZY_LAYERS } from '@/services/map/MapPlaceService'
 import CrowdService, { attachSeries } from '@/services/map/CrowdService'
 import WeatherService from '@/services/map/MapWeatherService'
@@ -182,6 +182,8 @@ export function canReuse (now = new Date()) {
  */
 export async function loadPlaces () {
   if (canReuse()) return
+  // 자정을 넘긴 탭의 재진입: 오늘 기준을 옮기고 선택 날짜를 오늘로 되돌린다 - 글자·달력·날씨가 새로 받는 데이터와 같은 날을 가리키게(최종점검 #16)
+  if (refreshToday()) state.di = 0
   state.loading = true
   const { live, layers, fetched, failed } = await MapPlaceService.getAll()
   // 받으려고 한 레이어만 갈아끼운다. 전엔 통째로 교체해서 칩으로 받아 둔 지연 레이어(카페·식당…)가 빈 배열이 됐고,
@@ -199,7 +201,7 @@ export async function loadPlaces () {
 
   const [forecast] = await Promise.all([CrowdService.getForecast(), WeatherService.load()])
   state.forecastDays = forecast.days
-  attachSeries(state.layers.spot, forecast, iso(new Date()))
+  attachSeries(state.layers.spot, forecast, iso(today()))
   state.forecastUntil = forecastUntilOf(state.layers.spot)
   state.forecastVersion++
   // 전부 제대로 받았을 때만 기록한다. 레이어 하나라도 못 받았거나 예보가 비어 왔으면 기록하지 않아
@@ -300,4 +302,4 @@ export async function toggleFav (place) {
   }
 }
 
-export { D0 }
+export { today }
