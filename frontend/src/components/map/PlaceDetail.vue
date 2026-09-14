@@ -304,7 +304,14 @@ async function shareNative() {
         <!-- MAP_009 찜 -->
         <button class="fav" :class="{ on: isFav(s) }" :aria-pressed="isFav(s)" aria-label="찜하기" @click="toggleFav(s)">♥</button>
         <div class="share-wrap">
-          <button class="share" :aria-expanded="shareOpen" @click="toggleShare">공유하기</button>
+          <!-- 글자 대신 공유 아이콘(점 셋을 잇는 모양) - 낭독기·마우스 툴팁은 '공유하기'(2026-09-15 후경) -->
+          <button class="share" :aria-expanded="shareOpen" aria-label="공유하기" title="공유하기" @click="toggleShare">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
+              <path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4" />
+            </svg>
+          </button>
           <div v-if="shareOpen" class="share-sheet">
             <button @click="shareKakao"><i class="si ka"></i>카카오톡</button>
             <button @click="copyLink"><i class="si cp"></i>링크 복사</button>

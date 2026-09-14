@@ -7,6 +7,7 @@ const mapCss = readFileSync(new URL('../../assets/styles/hangat.css', import.met
 const sharedCss = readFileSync(new URL('../../assets/styles.css', import.meta.url), 'utf8')
 const filterPanelSource = readFileSync(new URL('./FilterPanel.vue', import.meta.url), 'utf8')
 const kakaoMapSource = readFileSync(new URL('./KakaoMap.vue', import.meta.url), 'utf8')
+const placeDetailSource = readFileSync(new URL('./PlaceDetail.vue', import.meta.url), 'utf8')
 
 const mobileCss = mapCss.slice(mapCss.lastIndexOf('@media(max-width:768px)'))
 
@@ -158,6 +159,12 @@ describe('mapPresentation', () => {
     expect(mobileCss).not.toContain('.pox,.ph .x{min-width')                                     // 제목 칸을 줄이는 방식은 쓰지 않는다
     expect(mapCss).toContain('.wxc{flex:0 0 auto;width:58px;')                              // 헤더 높이 토큰에 묶이지 않는다
     expect(mapCss).not.toContain('width:var(--nav-h)')
+  })
+
+  it('상세 공유 버튼은 아이콘이지만 낭독기·툴팁엔 "공유하기"로 읽힌다 (2026-09-15)', () => {
+    expect(placeDetailSource).toContain('class="share" :aria-expanded="shareOpen" aria-label="공유하기" title="공유하기"')
+    expect(placeDetailSource).not.toMatch(/toggleShare">공유하기</)
+    expect(mapCss).toContain('.share{display:inline-flex')
   })
 
   it('모바일 검색 버튼과 바텀시트 닫기 버튼이 접근 가능한 상태를 알린다', () => {
