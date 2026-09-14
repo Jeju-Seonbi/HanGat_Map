@@ -340,7 +340,8 @@ async function shareNative() {
           width="144" height="96" loading="lazy"
           title="클릭하면 크게 보기" style="cursor:zoom-in"
           @error="onThumbError($event, p)"
-          @click="emit('open-photo', { photos: ktoImages.map(x => x.url), index: i, source: detail?.imageAttribution ?? '' })">
+          @click="emit('open-photo', { photos: ktoImages.map(x => x.url), index: i,
+            alts: ktoImages.map((x, j) => x.caption || `${s.n} 사진 ${j + 1}`), source: detail?.imageAttribution ?? '' })">
       </div>
       <div v-if="ktoImages.length && detail?.imageAttribution" class="pimg-src">
         {{ detail.imageAttribution }}
