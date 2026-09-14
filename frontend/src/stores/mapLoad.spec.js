@@ -11,7 +11,7 @@ vi.mock('../services/map/MapWeatherService', () => ({ default: weatherApi, Weath
 vi.mock('../services/map/FavoriteApiService', () => ({ default: favApi, FavoriteApiService: favApi }))
 
 const layers = () => ({ spot: [{ id: 1, n: '성산일출봉', x: 126.94, y: 33.46 }], food: [], dine: [], cafe: [], cvs: [], stay: [], mart: [] })
-const ok = (failed = []) => ({ live: true, layers: layers(), failed })
+const ok = (failed = []) => ({ live: true, layers: layers(), fetched: ['spot'], failed })
 const forecast = (live = true) => ({ live, from: '2026-09-12', days: live ? 3 : 0, values: {} })
 
 /** Storage 흉내 - 탭 하나의 sessionStorage/localStorage */
@@ -108,6 +108,22 @@ describe('loadPlaces 재진입 재사용 (성능 B 커밋 1)', () => {
     expect(placeApi.getAll).toHaveBeenCalledTimes(2)
     expect(crowdApi.getForecast).toHaveBeenCalledTimes(2)
     expect(weatherApi.load).toHaveBeenCalledTimes(2)
+  })
+
+  it('날짜가 바뀌어 다시 받을 때 칩으로 받아 둔 지연 레이어(카페)는 지우지 않는다 (최종점검 #28)', async () => {
+    const s = await freshStore()
+    placeApi.getAll.mockImplementation(async () => ok())   // 호출마다 새 배열 - 같은 객체를 두 번 주면 교체 여부를 못 본다
+    await s.loadPlaces()
+    // 사용자가 카페 칩을 켜서 받아 둔 상태
+    s.state.L.cafe = 1
+    s.state.layers.cafe = [{ id: 9, n: '카페', x: 126.5, y: 33.4 }]
+    const spotBefore = s.state.layers.spot
+    vi.setSystemTime(new Date(2026, 8, 13, 10, 0))
+    await s.loadPlaces()
+    expect(placeApi.getAll).toHaveBeenCalledTimes(2)
+    expect(s.state.layers.spot).not.toBe(spotBefore)      // 받은 관광지는 새 배열
+    expect(s.state.layers.cafe).toHaveLength(1)           // 지연 레이어는 그대로 - 칩만 켜진 채 핀이 사라지지 않는다
+    expect(s.state.L.cafe).toBe(1)
   })
 
   it('레이어 하나라도 못 받았으면 기록하지 않아 다음 진입에 전부 다시 받는다(재시도)', async () => {

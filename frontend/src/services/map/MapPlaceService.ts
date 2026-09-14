@@ -146,6 +146,8 @@ export interface MapPlaces {
   /** true = 첫 진입 레이어(관광지)를 받았다. false = 못 받았다(백엔드 다운) - 화면이 '새로고침' 안내를 띄운다 */
   live: boolean
   layers: Record<LayerKey, MapPlace[]>
+  /** 이번 진입에서 받으려고 한 레이어(성공·실패 포함). loadPlaces 는 이것만 갈아끼우고 나머지(칩으로 받아 둔 지연 레이어)는 둔다(최종점검 #28) */
+  fetched: LayerKey[]
   /** 이번 진입에서 못 받아온 레이어. 화면이 안내하고, 칩을 다시 켜면 그 레이어만 재시도한다 */
   failed: LayerKey[]
 }
@@ -176,7 +178,7 @@ export const MapPlaceService = {
       if (r.status === 'fulfilled') layers[keys[i]] = withUnits(r.value.map(toMapPlace))
       else failed.push(keys[i])
     })
-    return { live: failed.length < keys.length, layers, failed }
+    return { live: failed.length < keys.length, layers, fetched: keys, failed }
   },
 
   /** 칩을 처음 켤 때 한 레이어만 받아온다. 실패하면 null - 호출부가 토스트로 알린다. */

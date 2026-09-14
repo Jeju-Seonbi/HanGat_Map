@@ -176,8 +176,11 @@ export function canReuse (now = new Date()) {
 export async function loadPlaces () {
   if (canReuse()) return
   state.loading = true
-  const { live, layers, failed } = await MapPlaceService.getAll()
-  state.layers = layers
+  const { live, layers, fetched, failed } = await MapPlaceService.getAll()
+  // 받으려고 한 레이어만 갈아끼운다. 전엔 통째로 교체해서 칩으로 받아 둔 지연 레이어(카페·식당…)가 빈 배열이 됐고,
+  // 칩은 켜진 채 핀만 사라져 두 번 눌러야 돌아왔다(최종점검 #28 - 9/12 재사용 커밋이 만든 회귀). 지연 레이어도 하루 한두 번
+  // 갱신되는 데이터라 재진입 때 묵은 채 두는 게 12시간 재사용 규칙과 같다
+  for (const k of fetched) state.layers[k] = layers[k]
   state.live = live
   state.loadFailed = failed
   state.loading = false
