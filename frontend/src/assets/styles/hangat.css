@@ -301,10 +301,10 @@
 .share-sheet button{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;
   font-size:12.5px;font-weight:700;color:var(--tx2);text-align:left;white-space:nowrap}
 .share-sheet button:hover{background:var(--surf2)}
-.share-sheet .si{width:18px;height:18px;border-radius:6px;flex-shrink:0}
-.share-sheet .si.ka{background:#fee500}
-.share-sheet .si.cp{background:var(--ac-bg)}
-.share-sheet .si.nt{background:var(--surf2);border:1px solid var(--line2)}
+.share-sheet .si{width:18px;height:18px;border-radius:6px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;line-height:0}
+.share-sheet .si.ka{background:#fee500}                         /* 카카오 노랑 + 검정 말풍선 */
+.share-sheet .si.cp{background:var(--ac-bg);color:var(--ac-dk)}  /* 사슬 */
+.share-sheet .si.nt{background:var(--surf2);border:1px solid var(--line2);color:var(--tx2)}   /* 상자+화살표 */
 /* 장소를 하나도 못 받았을 때 지도 위 안내 - 목업으로 채우지 않는다 (2026-09-07) */
 .map-offline{position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:60;
   display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:12px;

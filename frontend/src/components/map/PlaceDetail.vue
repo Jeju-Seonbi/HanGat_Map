@@ -313,9 +313,13 @@ async function shareNative() {
             </svg>
           </button>
           <div v-if="shareOpen" class="share-sheet">
-            <button @click="shareKakao"><i class="si ka"></i>카카오톡</button>
-            <button @click="copyLink"><i class="si cp"></i>링크 복사</button>
-            <button v-if="canNative" @click="shareNative"><i class="si nt"></i>더보기</button>
+            <!-- 항목 아이콘: 카카오톡 말풍선(노랑 바탕) · 링크 사슬 · OS 공유(상자+화살표). 색 상자만 있던 것을 그림으로(2026-09-15 후경) -->
+            <button @click="shareKakao"><i class="si ka"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
+              <path fill="#191919" d="M12 3C6.5 3 2 6.6 2 11c0 2.8 1.8 5.2 4.6 6.6L5.7 21c-.1.3.3.6.6.4l4.2-2.8c.5.1 1 .1 1.5.1 5.5 0 10-3.6 10-8S17.5 3 12 3Z"/></svg></i>카카오톡</button>
+            <button @click="copyLink"><i class="si cp"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10 13a5 5 0 0 0 7.1 0l2.8-2.8a5 5 0 0 0-7.1-7.1L11.5 4.4"/><path d="M14 11a5 5 0 0 0-7.1 0l-2.8 2.8a5 5 0 0 0 7.1 7.1l1.3-1.3"/></svg></i>링크 복사</button>
+            <button v-if="canNative" @click="shareNative"><i class="si nt"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v13"/></svg></i>더보기</button>
           </div>
         </div>
         <button class="pox" @click="emit('close')">×</button>
