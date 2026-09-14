@@ -108,9 +108,12 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateArrows))
     </section>
     <!-- ② 퀵스타트 -->
     <section class="quick section">
-      <div>
-        <span class="eyebrow">QUICK START</span>
-        <h2>이번 제주는 어떻게 떠날까요?</h2>
+      <!-- 다른 섹션과 같은 머리 간격(section-head) - 제목이 조건 카드에 붙어 보이던 것 -->
+      <div class="section-head">
+        <div>
+          <span class="eyebrow">QUICK START</span>
+          <h2>이번 제주는 어떻게 떠날까요?</h2>
+        </div>
       </div>
       <div class="quick-grid">
         <div><small>여행 일정</small><b>{{ fmtDate(store.condition.startDate) }} ~ {{ fmtDate(store.condition.endDate) }}</b></div>
