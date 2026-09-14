@@ -90,7 +90,7 @@ const poiClass = poiMarkerClass
         <div class="dayh">
           {{ fmt(at(dayK(d))) }} · {{ d }}일차 <i></i>
           <span v-if="dayWeather(d)" style="color:var(--tx3);font-weight:500" :title="`기상청 · ${dayRegion(d)} 기준`">
-            <span v-html="wxIcon(dayWeather(d).k, 15)"></span> {{ dayWeather(d).k }} · {{ dayRegion(d) }}
+            <span v-html="wxIcon(dayWeather(d).k, 15)"></span> {{ dayWeather(d).label }} · {{ dayRegion(d) }}
           </span>
         </div>
         <template v-for="(s, i) in stops" :key="s.t + s.d">

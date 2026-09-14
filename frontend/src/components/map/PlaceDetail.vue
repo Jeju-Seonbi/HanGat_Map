@@ -392,7 +392,8 @@ async function shareNative() {
         <div v-for="w in week" :key="w.k" class="wxc" :class="{ on: w.k === state.di }"
           @click="state.di = w.k">
           <div class="wd">{{ w.label }}</div>
-          <div class="wi" v-html="w.w ? wxIcon(w.w.k, 27) : ''"></div>
+          <!-- 아이콘은 3종이라 눈·소나기·흐림은 글자(title·낭독기)로 보완한다(최종점검 #41) -->
+          <div class="wi" :title="w.w?.label" :aria-label="w.w?.label" v-html="w.w ? wxIcon(w.w.k, 27) : ''"></div>
           <!-- 날씨 없는 날은 고장이 아니라 원래 없는 것 - '-' 대신 명시적으로 말한다 -->
           <div v-if="w.w" class="wt">{{ w.w.t }}°</div>
           <div v-else class="wt pre">예보 전</div>

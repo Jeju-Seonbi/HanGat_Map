@@ -13,11 +13,18 @@ describe('wxIcon 그라데이션 id', () => {
   })
 
   it('맑음·구름·비 전부 자기 <defs> 안의 id 만 참조한다', () => {
-    for (const k of ['맑음', '구름', '비']) {
+    for (const k of ['맑음', '구름', '비']) {   // 눈 결정은 단색이라 그라데이션을 안 쓴다
       const svg = wxIcon(k)
       const own = ids(svg)
       expect(refs(svg).length).toBeGreaterThan(0)
       for (const r of refs(svg)) expect(own).toContain(r)
     }
+  })
+
+  it('눈은 구름·빗방울 없이 눈 결정 하나를 그린다', () => {
+    expect(wxIcon('눈')).toContain('M12 20L12 4M12 6.7L9.9 5.5')   // 결정 세로 팔 + 잔가지
+    expect(wxIcon('눈')).not.toContain('M8 16.4c.9 1.3')           // 빗방울 path
+    expect(wxIcon('눈')).not.toContain('M6.4 18.4h11.1')          // 구름 path
+    expect(wxIcon('비')).toContain('M8 16.4c.9 1.3')
   })
 })
