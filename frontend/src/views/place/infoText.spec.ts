@@ -45,6 +45,30 @@ describe('parseInfoText - 운영시간·휴무·이용요금 원문 정리', () 
     expect(info.notes).toEqual(['월요일이 공휴일(대체공휴일 포함)인 경우에는 그 다음의 첫 번째 비공휴일'])
   })
 
+  it('비고 안의 대시는 항목으로 자르지 않는다 - 무료 대상이 요금 항목으로 들어가면 거짓 정보다', () => {
+    const info = parseInfoText('[개인]- 어른 2,000원※ 무료 - 국가유공자 및 동반 1인')
+
+    expect(info.blocks[0].lines.map(l => l.text)).toEqual(['어른 2,000원'])
+    expect(info.notes).toEqual(['무료 - 국가유공자 및 동반 1인'])
+  })
+
+  it('앞에 공백이 있는 대시는 부연이라 한 줄로 둔다', () => {
+    expect(parseInfoText('연중무휴 - 단, 명절 휴무').blocks[0].lines).toEqual([{ text: '연중무휴 - 단, 명절 휴무', bullet: false }])
+  })
+
+  it('문장 속 대괄호는 소제목이 아니다', () => {
+    const info = parseInfoText('예약은 [네이버 예약] 에서 가능합니다')
+
+    expect(info.blocks).toEqual([{ title: null, lines: [{ text: '예약은 [네이버 예약] 에서 가능합니다', bullet: false }] }])
+  })
+
+  it('비고만 있는 값은 비어 있지 않다', () => {
+    const info = parseInfoText('※ 연중무휴')
+
+    expect(info.blocks).toEqual([])
+    expect(info.notes).toEqual(['연중무휴'])
+  })
+
   it('빈 값과 <br> 태그를 처리한다', () => {
     expect(parseInfoText(null)).toEqual({ blocks: [], notes: [] })
     expect(parseInfoText('  ')).toEqual({ blocks: [], notes: [] })

@@ -23,23 +23,29 @@ export interface InfoText {
   notes: string[]
 }
 
-const EMPTY: InfoText = { blocks: [], notes: [] }
-
+/** 대괄호 묶음 뒤에 항목('- ')·비고·줄 끝이 오면 소제목이다. '[네이버 예약] 에서'처럼 문장 속 괄호는 그대로 둔다 */
+const HEADING = /\s*(\[[^\]]+\])(?=\s*(?:-\s|※|\n|$))/g
 /**
- * 붙어 버린 표식 앞에 줄바꿈을 넣는다.
- * '- ' 뒤가 숫자면 자르지 않는다 - '10:00 - 18:00' 같은 범위와 '※ 무료 - 6세 이하' 같은 부연은 한 줄이다.
+ * 앞 글자에 바로 붙은 '- '(태그가 벗겨진 자리) 뒤에 숫자가 아닌 글자가 오면 항목 표식이다.
+ * '10:00 - 18:00'(양쪽 공백)과 '연중무휴 - 단, 명절 휴무'(앞에 공백)는 한 줄로 둔다.
+ * lookbehind는 Safari 16.3 이하가 모듈 로드부터 실패하므로 캡처로 쓴다.
  */
+const GLUED_BULLET = /(\S)-\s+(?=[^\d\s])/g
+
+/** 붙어 버린 표식 앞에 줄바꿈을 넣는다. 비고(※) 줄은 자르지 않는다 - '※ 무료 - 국가유공자'의 '-'는 항목이 아니다 */
 function restoreBreaks (raw: string): string {
   return raw
     .replace(/\r/g, '')
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/\s*※/g, '\n※')
-    .replace(/\s*\[(?=[^\]]+\])/g, '\n[')
-    .replace(/(?<=\S)\s*-\s+(?=[^\d\s])/g, '\n- ')
+    .replace(HEADING, '\n$1')
+    .split('\n')
+    .map(line => (line.trimStart().startsWith('※') ? line : line.replace(GLUED_BULLET, '$1\n- ')))
+    .join('\n')
 }
 
 export function parseInfoText (raw: string | null | undefined): InfoText {
-  if (!raw || !raw.trim()) return EMPTY
+  if (!raw || !raw.trim()) return { blocks: [], notes: [] }
   const blocks: InfoBlock[] = []
   const notes: string[] = []
   let current: InfoBlock | null = null

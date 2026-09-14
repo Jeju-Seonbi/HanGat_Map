@@ -103,7 +103,9 @@ const facts = computed(() => {
     .filter(item => item.key !== 'phone' || item.source)
     .map(item => {
       const info = parseInfoText(item.source)
-      return { key: item.key, label: item.label, info, empty: info.blocks.length === 0, wide: isWideInfo(info) }
+      // '※ 연중무휴'처럼 비고만 있는 값도 정보다 - 본문이 없다고 '정보 없음'으로 덮지 않는다
+      const empty = info.blocks.length === 0 && info.notes.length === 0
+      return { key: item.key, label: item.label, info, empty, wide: isWideInfo(info) }
     })
 })
 
