@@ -160,7 +160,7 @@
 
 /* ── 플로팅 공통 ── */
 .fl{position:absolute;background:var(--surf);border-radius:var(--r);box-shadow:var(--sh2)}
-.filter-fab,.mobile-filter-head,.mdrop,.sect .cnt,.cond-dim{display:none}   /* 폰 전용 요소 - 모바일 블록에서 켠다 */
+.filter-fab,.mobile-filter-head,.mdrop,.sect .cnt,.cond-dim,.pop-dim{display:none}   /* 폰 전용 요소 - 모바일 블록에서 켠다 */
 .cond{top:16px;left:16px;bottom:16px;width:292px;padding:16px;z-index:900;
   display:flex;flex-direction:column;overflow:hidden} /* 하단까지 꽉 채우는 고정 컬럼 */
 .seg{display:flex;background:var(--surf2);border-radius:12px;padding:3px;margin-bottom:13px}
@@ -640,10 +640,19 @@
   .sect{margin-bottom:8px}
   .sect .cnt{display:inline;order:1;font-size:12px;font-weight:700;color:var(--tx3);letter-spacing:0}   /* order:1 - 구분선(::after) 뒤, 오른쪽 끝 */
   .rows{min-height:0;margin:0;padding:0}
-  .pop,.panel,.panel.push{top:auto;left:0;right:0;bottom:0;width:auto;max-height:68vh;
+  /* 코스 패널 = 아래 시트(손잡이 바). 상세는 아래 가운데 모달 */
+  .panel,.panel.push{top:auto;left:0;right:0;bottom:0;width:auto;max-height:68vh;
     border-radius:22px 22px 0 0;padding-top:30px;background:var(--surf);box-shadow:var(--sh2)}
-  .pop::before,.panel::before{content:'';position:absolute;top:9px;left:50%;
+  .panel::before{content:'';position:absolute;top:9px;left:50%;
     transform:translateX(-50%);width:42px;height:4px;border-radius:3px;background:var(--line2)}
+  /* 상세 = 장소 찾기와 같은 가운데 모달(2026-09-14). 아래 시트(68vh) 땐 사진·소개까지만 보이고 날씨·후기는 스크롤 뒤였다.
+     뒤 어두운 배경(.pop-dim)을 탭하면 닫힌다 - 시트 땐 위쪽 지도 빈 곳 탭이 그 역할이었는데 모달은 지도를 덮는다 */
+  .pop-dim{display:block;position:absolute;inset:0;z-index:1040;background:var(--dim);
+    -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);animation:dimin .18s ease}
+  .pop{top:24px;bottom:24px;left:14px;right:14px;width:auto;padding:16px 16px 18px;z-index:1050;border-radius:20px;
+    background:var(--surf);box-shadow:var(--sh2);animation:popin .2s ease}
+  @keyframes popin{from{opacity:0;transform:translateY(16px) scale(.98)}}
+  @keyframes dimin{from{opacity:0}}
   .slid{top:12px;bottom:auto;left:10px;right:10px;max-width:none;z-index:950}
   .slid.s1,.slid.s2{left:10px;right:10px}
   .datebtn{padding:10px 16px;background:var(--surf);border:1px solid var(--line)}

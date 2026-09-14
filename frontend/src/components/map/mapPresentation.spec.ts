@@ -121,6 +121,13 @@ describe('mapPresentation', () => {
     expect(declarations('.cond')).toContain('translateY(')
     expect(declarations('.cond.mobile-open')).toContain('translateY(0)')
     expect(declarations('.cond-dim')).toContain('backdrop-filter')
+    // 상세(.pop)도 같은 가운데 모달 + 뒤 배경(.pop-dim). 코스 패널(.panel)만 아래 시트(손잡이 바)
+    expect(declarations('.pop')).toContain('top:24px')
+    expect(declarations('.pop')).not.toContain('max-height')
+    expect(declarations('.pop-dim')).toContain('backdrop-filter')
+    expect(mobileCss).not.toContain('.pop::before')
+    expect(declarations('.panel::before')).toContain('width:42px')
+    expect(mapCss).toContain('.cond-dim,.pop-dim{display:none}')   // 데스크톱은 배경 없음
     expect(declarations('.filter-fab')).toContain('display:flex')
     expect(mobileCss).not.toContain('.stage.sheet-open .slid')
   })
@@ -133,7 +140,7 @@ describe('mapPresentation', () => {
     expect(declarations('#cond-body.open-layer .ftr-wrap')).toContain('display:flex')
     expect(declarations('#cond-body.open-cat .catsel')).toContain('display:block')
     expect(mobileCss).not.toContain('.mtabs')                                                                  // 탭은 없다
-    expect(mapCss).toContain('.filter-fab,.mobile-filter-head,.mdrop,.sect .cnt,.cond-dim{display:none}')      // 데스크톱에선 폰 전용 요소가 안 보인다
+    expect(mapCss).toContain('.filter-fab,.mobile-filter-head,.mdrop,.sect .cnt,.cond-dim,.pop-dim{display:none}')      // 데스크톱에선 폰 전용 요소가 안 보인다
   })
 
   it('모바일에서 토스트·장소 데이터 배너·닫기 버튼이 탭바·날짜 버튼·손가락과 겹치지 않는다 (#53·#55·#56·#57)', () => {

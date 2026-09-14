@@ -419,10 +419,12 @@ function coveredInsets() {
   for (const c of document.querySelectorAll('.cond, .pop, .panel')) {
     const r = c.getBoundingClientRect()
     if (!r.width || !r.height) continue
-    // 폰의 장소 찾기(.cond)는 닫혀 있으면 pointer-events:none 인 채 자리만 차지하고, 열려 있으면 가운데 모달이라 지도를 통째로 덮는다 -
-    // 둘 다 덮는 카드로 세지 않는다. 닫힌 시트를 세면 권역 복원 때 남부가 상단 100px 띠에 몰렸고(최종점검 #60),
-    // 모달을 세면 맞출 자리가 없다. 모달 안에서 권역을 고르면 전체 화면 기준으로 맞추고 모달을 닫으면 그 화면이 보인다
-    if (c.classList.contains('cond') && (getComputedStyle(c).pointerEvents === 'none' || c.classList.contains('mobile-open'))) continue
+    // 폰의 닫힌 장소 찾기(.cond)는 pointer-events:none 인 채 자리만 차지하고, 가운데 모달(장소 찾기·상세 = 화면 폭에 위 24px 부터)은
+    // 지도를 통째로 덮는다 - 둘 다 덮는 카드로 세지 않는다. 닫힌 시트를 세면 권역 복원 때 남부가 상단 100px 띠에 몰렸고(최종점검 #60),
+    // 모달을 세면 맞출 자리가 없다. 모달 안에서 고르면 전체 화면 기준으로 맞추고, 모달을 닫으면 그 화면(핀은 가운데)이 보인다
+    if (getComputedStyle(c).pointerEvents === 'none') continue
+    // offsetTop/offsetWidth: 열림 애니메이션(translateY 16px·scale .98) 중이라 getBoundingClientRect 는 아래로 밀려 있다 - 레이아웃 값으로 본다
+    if (c.offsetWidth >= box.width * 0.9 && c.offsetTop < 40) continue
     if (r.width >= box.width * 0.9) {
       // 화면 폭을 다 쓰는 아래 시트(모바일). 사진·소개가 늦게 도착하면 시트가 max-height(68vh)까지 자라므로 지금 높이가 아니라 최대 높이로 잡는다 -
       // 처음 잰 높이로 맞추면 잠시 뒤 시트가 커져 핀을 덮었다
