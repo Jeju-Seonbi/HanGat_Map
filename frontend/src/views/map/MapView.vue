@@ -143,7 +143,12 @@ onMounted(async () => {
     console.error('코스 링크 복원 실패', e)
     toast('링크의 코스를 그리지 못했어요')
   }
-  if (!courseDrawn) loadFromURL()
+  if (!courseDrawn) {
+    loadFromURL()
+    // 권역 복원(?r=·탭 기억) - MapCanvas 의 첫 fitRegion 은 장소 도착 전이라 빈 배열로 되돌아간다(최종점검 #60).
+    // SDK 가 아직이면 mapBridge.fitRegion 은 빈 함수라 무해하고, 그땐 MapCanvas onMounted 의 fitRegion 이 맡는다
+    if (state.F.reg !== '전체') mapBridge.fitRegion()
+  }
   // 코스와 장소가 함께 온 링크도 있다(코스를 보다 장소를 열고 공유) - 코스를 그린 뒤 장소를 연다
   try {
     await openPlaceFromURL()
@@ -169,6 +174,8 @@ const reload = () => location.reload()
     <FilterPanel :mobile-suppressed="openCount > 0"
       @open-place="openPlace" @toggle-course="toggleCourse" />
 
+    <!-- 폰 상세 모달 뒤 어두운 배경 - 탭하면 닫힘. 데스크톱은 display:none -->
+    <div v-if="state.sel" class="pop-dim" @click="closeDetail"></div>
     <!-- :key 가 장소 식별자라 다른 장소를 열면 패널이 새로 만들어진다 - 탭·힌트·근처 대안·후기 목록이 이월되지 않는다 -->
     <PlaceDetail v-if="state.sel" :key="placeKey(state.sel)" :place="state.sel" @close="closeDetail"
       @open-place="openPlace" @open-photo="p => lightbox.show(p.photos, p.index)" />
