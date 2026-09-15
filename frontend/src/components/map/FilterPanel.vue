@@ -45,8 +45,8 @@ function toggleDrop(k) {
   if (mdrop.value === 'cat') nextTick(() => { try { catSel.value?.showPicker?.() } catch { /* 지원 안 함 - 선택 상자가 보이니 된다 */ } })
 }
 
-const sectionTitle = computed(() =>
-  `${fmtK(at(state.di))} ${state.sort === 'calm' ? '한산한' : '혼잡한'} 곳`)
+/* 목록은 '이런 곳만 모은' 게 아니라 '이 순서로 정렬한' 것이라 제목도 정렬 칩과 같은 글자를 쓴다("한산한 순") */
+const sectionTitle = computed(() => `${fmtK(at(state.di))} ${sortLabel.value}`)
 
 /* 예보를 못 받은 날만 범례 아래에 알린다 - 그날은 지도 전체가 회색이라 "원래 예보 없는 곳"과 구분해야 한다.
    평소 회색 핀의 뜻은 범례 라벨('예보 없음')과 상세 문장이 말한다 */

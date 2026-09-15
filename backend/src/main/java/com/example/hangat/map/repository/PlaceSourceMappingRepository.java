@@ -31,8 +31,8 @@ public interface PlaceSourceMappingRepository extends JpaRepository<PlaceSourceM
     @Query("select m from PlaceSourceMapping m join fetch m.place where m.source.code = :sourceCode")
     List<PlaceSourceMapping> findAllBySourceCodeWithPlace(@Param("sourceCode") String sourceCode);
 
-    /** 출석 체크용 (매핑 id, 출처 ID, 활성 여부). 원문 payload(TEXT)까지 읽지 않으려고 엔티티 대신 컬럼만 뽑는다. */
-    @Query("select m.id, m.sourcePlaceId, m.isActive from PlaceSourceMapping m where m.source.code = :sourceCode")
+    /** 출석 체크용 (매핑 id, 출처 ID, 활성 여부, 갱신 시각). 원문 payload(TEXT)까지 읽지 않으려고 엔티티 대신 컬럼만 뽑는다. */
+    @Query("select m.id, m.sourcePlaceId, m.isActive, m.updatedAt from PlaceSourceMapping m where m.source.code = :sourceCode")
     List<Object[]> findPresenceRows(@Param("sourceCode") String sourceCode);
 
     @Query("select m from PlaceSourceMapping m join fetch m.place where m.id in :ids")
