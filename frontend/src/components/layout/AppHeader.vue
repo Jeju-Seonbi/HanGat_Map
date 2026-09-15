@@ -17,7 +17,7 @@ import { LEFT_TABS, NAV_TABS, RIGHT_TABS, isTabActive } from '../../config/navTa
 import ThemeToggle from './ThemeToggle.vue'
 import NotificationBell from './NotificationBell.vue'
 import ProfileAvatar from '../common/ProfileAvatar.vue'
-import { publicProfileImageUrl } from '../../utils/profileImage.js'
+import { currentProfileImagePath } from '../../utils/profileImage.js'
 
 defineProps({ compact: { type: Boolean, default: false } })
 
@@ -34,13 +34,7 @@ watch(() => route.fullPath, () => { mobileMenuOpen.value = false })
 
 const activeOf = computed(() => tab => isTabActive(tab, route.path))
 // 내 정보는 이전 프론트 호환용 /me 주소이므로 로그인한 사용자의 공개 경로로 변환한다.
-const profileImagePath = computed(() => {
-  const id = String(auth.user?.userId ?? '')
-  const path = auth.user?.profileImageUrl
-  if (!/^[1-9][0-9]*$/.test(id) || typeof path !== 'string') return null
-  const publicPath = path.replace(/^\/users\/me\/profile-image\//, `/users/${id}/profile-image/`)
-  return publicPath.startsWith(`/users/${id}/profile-image/`) && publicProfileImageUrl(publicPath) ? publicPath : null
-})
+const profileImagePath = computed(() => currentProfileImagePath(auth.user))
 
 function openMobilePreview () {
   const href = router.resolve(route.fullPath).href

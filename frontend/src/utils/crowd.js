@@ -124,6 +124,13 @@ export function crowd (s, i) {
 export const CROWD_KO = { calm: '한산', mid: '보통', busy: '혼잡' }
 
 /** 그 장소의 30일 예보 중 i일이 몇 번째로 한산한가 (1 = 가장 한산). 예보 없는 날은 순위에서 뺀다 */
+/** 그 장소에 예보가 있는 날 수(30일 창 안). 실측은 21~22일 - 팁 박스의 'N일 중'에 쓴다. '30일'로 적으면 사실과 다르다(최종점검 #18) */
+export function forecastDays (s) {
+  let n = 0
+  for (let k = 0; k < 30; k++) if (crowd(s, k) != null) n++
+  return n
+}
+
 export function rank30 (s, i) {
   const c = crowd(s, i)
   if (c == null) return null

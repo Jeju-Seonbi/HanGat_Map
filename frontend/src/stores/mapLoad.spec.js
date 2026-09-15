@@ -11,7 +11,7 @@ vi.mock('../services/map/MapWeatherService', () => ({ default: weatherApi, Weath
 vi.mock('../services/map/FavoriteApiService', () => ({ default: favApi, FavoriteApiService: favApi }))
 
 const layers = () => ({ spot: [{ id: 1, n: '성산일출봉', x: 126.94, y: 33.46 }], food: [], dine: [], cafe: [], cvs: [], stay: [], mart: [] })
-const ok = (failed = []) => ({ live: true, layers: layers(), failed })
+const ok = (failed = []) => ({ live: true, layers: layers(), fetched: ['spot'], failed })
 const forecast = (live = true) => ({ live, from: '2026-09-12', days: live ? 3 : 0, values: {} })
 
 /** Storage 흉내 - 탭 하나의 sessionStorage/localStorage */
@@ -34,10 +34,62 @@ beforeEach(() => {
   // +09:00 문자열로 고정하면 UTC인 CI에서 자정 전후가 같은 날짜로 해석된다.
   vi.setSystemTime(new Date(2026, 8, 12, 10, 0))
   placeApi.getAll.mockReset().mockResolvedValue(ok())
+  placeApi.getLayer.mockReset()
+  placeApi.getById.mockReset()
   crowdApi.getForecast.mockReset().mockResolvedValue(forecast())
   weatherApi.load.mockReset().mockResolvedValue(true)
 })
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals() })
+
+describe('findPlaceById - 공유 링크 복원 (최종점검 #49)', () => {
+  const cafe = { id: 501, n: '카페', x: 126.5, y: 33.4, cat: 'CAFE', good: false }
+
+  it('없는 장소는 상세 한 건만 물어보고 바로 "없음" - 지연 레이어를 받지 않는다', async () => {
+    const s = await freshStore()
+    await s.loadPlaces()
+    placeApi.getById.mockResolvedValue({ place: null, missing: true })
+    expect(await s.findPlaceById(99999999)).toEqual({ place: null, error: false })
+    expect(placeApi.getLayer).not.toHaveBeenCalled()
+  })
+
+  it('카페 링크는 상세로 업종을 알아낸 뒤 카페 레이어 하나만 받고, 그 칩을 켠다', async () => {
+    const s = await freshStore()
+    await s.loadPlaces()
+    placeApi.getById.mockResolvedValue({ place: cafe, missing: false })
+    placeApi.getLayer.mockResolvedValue([cafe])
+    const r = await s.findPlaceById(501)
+    expect(placeApi.getLayer).toHaveBeenCalledTimes(1)
+    expect(placeApi.getLayer).toHaveBeenCalledWith('cafe')
+    expect(r.place.id).toBe(501)
+    expect(s.state.layers.cafe).toHaveLength(1)   // 카페 레이어가 채워졌다
+    expect(s.state.L.cafe).toBe(1)
+  })
+
+  it('레이어 목록에 없는 장소(폐업)는 상세 객체로 연다', async () => {
+    const s = await freshStore()
+    await s.loadPlaces()
+    placeApi.getById.mockResolvedValue({ place: { ...cafe, id: 502, closed: true }, missing: false })
+    placeApi.getLayer.mockResolvedValue([cafe])
+    const r = await s.findPlaceById(502)
+    expect(r).toMatchObject({ place: { id: 502 }, error: false })
+  })
+
+  it('상세를 못 받으면(연결 끊김) "못 불러왔어요" 쪽 - error', async () => {
+    const s = await freshStore()
+    await s.loadPlaces()
+    placeApi.getById.mockResolvedValue({ place: null, missing: false })
+    expect(await s.findPlaceById(777)).toEqual({ place: null, error: true })   // 777: 어느 레이어에도 없는 id
+    expect(placeApi.getLayer).not.toHaveBeenCalled()
+  })
+
+  it('layerOf - 관광지 spot, 착한가격 food, 식당 dine, 쇼핑은 없음', async () => {
+    const s = await freshStore()
+    expect(s.layerOf({ cat: 'TOURIST' })).toBe('spot')
+    expect(s.layerOf({ cat: 'FOOD', good: true })).toBe('food')
+    expect(s.layerOf({ cat: 'FOOD', good: false })).toBe('dine')
+    expect(s.layerOf({ cat: 'SHOPPING' })).toBeNull()
+  })
+})
 
 describe('placeKey - 장소 식별자는 이름이 아니라 id', () => {
   it('id 가 있으면 id, 없으면 이름 - 같은 이름의 다른 장소는 키가 다르고 목업(id 없음)은 이름으로 구분한다', async () => {
@@ -108,6 +160,37 @@ describe('loadPlaces 재진입 재사용 (성능 B 커밋 1)', () => {
     expect(placeApi.getAll).toHaveBeenCalledTimes(2)
     expect(crowdApi.getForecast).toHaveBeenCalledTimes(2)
     expect(weatherApi.load).toHaveBeenCalledTimes(2)
+  })
+
+  it('날짜가 바뀌어 다시 받을 때 칩으로 받아 둔 지연 레이어(카페)는 지우지 않는다 (최종점검 #28)', async () => {
+    const s = await freshStore()
+    placeApi.getAll.mockImplementation(async () => ok())   // 호출마다 새 배열 - 같은 객체를 두 번 주면 교체 여부를 못 본다
+    await s.loadPlaces()
+    // 사용자가 카페 칩을 켜서 받아 둔 상태
+    s.state.L.cafe = 1
+    s.state.layers.cafe = [{ id: 9, n: '카페', x: 126.5, y: 33.4 }]
+    const spotBefore = s.state.layers.spot
+    vi.setSystemTime(new Date(2026, 8, 13, 10, 0))
+    await s.loadPlaces()
+    expect(placeApi.getAll).toHaveBeenCalledTimes(2)
+    expect(s.state.layers.spot).not.toBe(spotBefore)      // 받은 관광지는 새 배열
+    expect(s.state.layers.cafe).toHaveLength(1)           // 지연 레이어는 그대로 - 칩만 켜진 채 핀이 사라지지 않는다
+    expect(s.state.L.cafe).toBe(1)
+  })
+
+  it('날짜가 바뀐 재진입은 오늘 기준을 옮기고 선택 날짜를 오늘로 되돌린다 (최종점검 #16)', async () => {
+    const s = await freshStore()
+    const { today, at, iso } = await import('../utils/date')
+    await s.loadPlaces()
+    s.state.di = 3
+    expect(iso(today())).toBe('2026-09-12')
+    vi.setSystemTime(new Date(2026, 8, 13, 10, 0))
+    await s.loadPlaces()
+    expect(iso(today())).toBe('2026-09-13')       // 글자·달력의 오늘
+    expect(iso(at(0))).toBe('2026-09-13')
+    expect(s.state.di).toBe(0)                     // 선택 날짜는 오늘로
+    const { attachSeries } = await import('../services/map/CrowdService')
+    expect(attachSeries).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), '2026-09-13')   // 데이터도 같은 날 기준
   })
 
   it('레이어 하나라도 못 받았으면 기록하지 않아 다음 진입에 전부 다시 받는다(재시도)', async () => {

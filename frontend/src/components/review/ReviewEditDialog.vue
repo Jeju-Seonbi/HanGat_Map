@@ -2,6 +2,7 @@
 /** 마이페이지·지도 공통 후기 편집. 기존 사진은 URL을 유지하고 새 사진만 업로드한다. */
 import { computed, ref, onBeforeUnmount } from 'vue'
 import BaseModal from '../common/BaseModal.vue'
+import StarIcon from '../map/StarIcon.vue'
 import ReviewApiService, { absUrl } from '@/services/map/ReviewApiService'
 import { useReviewEditWindow, isReviewEditable } from '@/composables/useReviewEditWindow.js'
 import { getBackendSessionVersion } from '@/api/backendClient.js'
@@ -12,6 +13,12 @@ const rating = ref(props.review.rating ?? '')
 const report = ref(props.review.congestionReport ?? '')
 const content = ref(props.review.content ?? '')
 const photos = ref((props.review.imageUrls ?? []).map(url => ({ url, preview: absUrl(url) })))
+const fileInput = ref(null)
+const crowdOptions = [
+  { value: 'QUIET', label: '한산', tone: 'calm' },
+  { value: 'NORMAL', label: '보통', tone: 'mid' },
+  { value: 'CROWDED', label: '혼잡', tone: 'busy' },
+]
 const busy = ref(false)
 const sessionExpired = ref(false)
 const error = ref('')
@@ -52,7 +59,7 @@ function choosePhotos(event) {
 }
 function trapFocus(event) {
   if (event.key !== 'Tab') return
-  const nodes = [...event.currentTarget.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled)')]
+  const nodes = [...event.currentTarget.querySelectorAll('button:not(:disabled), input:not(:disabled):not([hidden]), textarea:not(:disabled)')]
   const first = nodes[0], last = nodes.at(-1)
   if (event.shiftKey && (document.activeElement === first || !nodes.includes(document.activeElement))) { event.preventDefault(); last?.focus() }
   else if (!event.shiftKey && (document.activeElement === last || !nodes.includes(document.activeElement))) { event.preventDefault(); first?.focus() }
@@ -100,25 +107,37 @@ async function save() {
         <p class="hint">작성 후 7일 이내에 수정할 수 있어요. 수정해도 기한은 늘어나지 않아요.</p>
         <p v-if="!editable" class="error" role="status">수정 기한이 지났어요. 리뷰는 삭제만 할 수 있어요.</p>
         <fieldset :disabled="busy || !editable">
-          <div class="choices">
-            <label>별점
-              <select v-model="rating"><option value="">선택 안 함</option><option v-for="n in 5" :key="n" :value="n">{{ n }}점</option></select>
-            </label>
-            <label>방문 당시 혼잡도
-              <select v-model="report"><option value="">선택 안 함</option><option value="QUIET">한산했어요</option><option value="NORMAL">보통이었어요</option><option value="CROWDED">혼잡했어요</option></select>
-            </label>
+          <div class="rating-field">
+            <span id="review-rating-label" class="field-label">별점</span>
+            <div class="stars" role="group" aria-labelledby="review-rating-label">
+              <button v-for="n in 5" :key="n" type="button" :aria-label="`${n}점`"
+                :aria-pressed="rating === n" @click="rating = n">
+                <StarIcon :filled="n <= rating" :size="26" />
+              </button>
+            </div>
+            <button v-if="rating" type="button" class="clear-rating" @click="rating = ''">별점 선택 해제</button>
           </div>
-          <label>한 줄 후기 <span class="hint">{{ content.length }}/60</span>
-            <textarea v-model="content" maxlength="60" rows="3" placeholder="방문 경험을 남겨주세요 (선택)"></textarea>
-          </label>
+          <div class="crowd-field">
+            <span id="review-crowd-label" class="field-label">방문 당시 혼잡도</span>
+            <div class="crowd-choices" role="group" aria-labelledby="review-crowd-label">
+              <button v-for="option in crowdOptions" :key="option.value" type="button"
+                :class="[option.tone, { on: report === option.value }]" :aria-pressed="report === option.value"
+                @click="report = report === option.value ? '' : option.value">{{ option.label }}</button>
+            </div>
+          </div>
+          <div class="photo-label"><span class="field-label">사진 <span class="hint">(선택)</span></span><span class="hint">{{ photos.length }}/5 · 한 장당 최대 5MB</span></div>
           <div class="photos">
             <div v-for="(photo, index) in photos" :key="photo.preview" class="photo">
               <img :src="photo.preview" :alt="`첨부 사진 ${index + 1}`">
               <button type="button" :aria-label="`사진 ${index + 1} 제거`" @click="removePhoto(index)">×</button>
             </div>
+            <button v-if="photos.length < 5" type="button" class="photo-add" aria-label="사진 추가" @click="fileInput.click()">
+              <span>사진</span><span>{{ photos.length }}/5</span>
+            </button>
+            <input ref="fileInput" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden @change="choosePhotos">
           </div>
-          <label v-if="photos.length < 5">사진 추가 <span class="hint">{{ photos.length }}/5 · 한 장당 최대 5MB</span>
-            <input type="file" accept="image/jpeg,image/png,image/webp" multiple @change="choosePhotos">
+          <label class="content-label">한 줄 후기 <span class="hint">{{ content.length }}/60</span>
+            <input v-model="content" type="text" maxlength="60" placeholder="한 줄 남기기 (선택)">
           </label>
         </fieldset>
         <p v-if="error" class="error" role="alert">{{ error }}</p>
@@ -135,14 +154,25 @@ async function save() {
 .review-edit { color: var(--tx); max-height: 70dvh; overflow-y: auto; }
 .hint { color: var(--tx3); font-size: 12px; line-height: 1.65; font-weight: 400; }
 fieldset { border: 0; padding: 0; margin: 18px 0; min-width: 0; }
-label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 16px; }
-.choices { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-select, textarea, input { display: block; width: 100%; box-sizing: border-box; margin-top: 7px; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--surf2); color: var(--tx); font: inherit; }
-textarea { resize: vertical; }
-input { font-size: 12px; }
+label, .field-label { display: block; font-size: 13px; font-weight: 700; }
+.rating-field { position: relative; text-align: center; margin-bottom: 18px; }
+.stars { display: flex; justify-content: center; gap: 3px; margin-top: 7px; }
+.stars button { width: 36px; height: 36px; display: grid; place-items: center; padding: 0; background: transparent; border: 0; border-radius: 8px; }
+.clear-rating { padding: 4px 8px; margin-top: 2px; font-size: 11px; color: var(--tx3); background: transparent; border: 0; border-radius: 6px; }
+.crowd-field { margin-bottom: 18px; }
+.crowd-choices { display: flex; gap: 5px; margin-top: 8px; }
+.crowd-choices button { flex: 1; min-height: 38px; padding: 8px 0; border: 0; border-radius: 9px; font-size: 12px; font-weight: 700; background: var(--surf2); color: var(--tx3); }
+.crowd-choices .on.calm { background: var(--calm-bg); color: var(--calm); }
+.crowd-choices .on.mid { background: var(--mid-bg); color: var(--mid); }
+.crowd-choices .on.busy { background: var(--busy-bg); color: var(--busy); }
+.photo-label { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 10px; margin-bottom: 10px; }
+.content-label input { display: block; width: 100%; box-sizing: border-box; margin-top: 7px; padding: 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--surf2); color: var(--tx); font: inherit; font-size: 12.5px; font-weight: 400; }
+.content-label input::placeholder { color: var(--tx3); }
 .photos { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
 .photo { position: relative; }
-.photo img { display: block; width: 72px; height: 72px; object-fit: cover; border-radius: 10px; }
+.photo img { display: block; width: 64px; height: 64px; object-fit: cover; border-radius: 10px; }
+.photo-add { width: 64px; height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border: 1.5px dashed var(--line2); border-radius: 10px; background: transparent; color: var(--tx3); font-size: 11px; font-weight: 700; }
+.photo-add:hover { border-color: var(--ac); color: var(--ac); }
 .photo button { position: absolute; right: -5px; top: -5px; width: 28px; height: 28px; border-radius: 50%; background: var(--surf); color: var(--tx); border: 1px solid var(--line); }
 .error { color: var(--busy); font-size: 13px; line-height: 1.6; }
 .actions { display: flex; justify-content: flex-end; gap: 10px; padding-top: 8px; }
@@ -150,5 +180,5 @@ input { font-size: 12px; }
 .cancel { background: var(--surf2); color: var(--tx2); }
 .save { background: var(--ac); color: var(--on-ac); }
 button:disabled { opacity: .5; cursor: not-allowed; }
-button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--ac); outline-offset: 2px; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--ac); outline-offset: 2px; }
 </style>

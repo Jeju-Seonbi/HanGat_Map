@@ -2,7 +2,7 @@
 /* MAP_006 코스 표시 — 생성은 AI 코스 페이지 담당, 지도는 결과 표시와 일차 전환만 맡는다 */
 import { computed } from 'vue'
 import { state } from '@/stores/mapStore'
-import { at, fmt, D0 } from '@/utils/date'
+import { at, fmt, today } from '@/utils/date'
 import { tier } from '@/utils/crowd'
 import { won } from '@/utils/geo'
 import { wxOf, wxIcon } from '@/utils/weather'
@@ -35,7 +35,7 @@ const rest = computed(() => course.value.bud - course.value.spent)
 /* 일차 날짜·날씨는 코스의 여행일 기준. 전엔 위 날짜 선택기(state.di)를 따라가서 선택기를 옮기면 1일차 날짜까지 밀렸다(최종점검 #2).
    날씨 권역은 그 일차 첫 경유지의 권역 - 전엔 권역을 안 넘겨 항상 북부 값이었다(#38). 권역을 모르는 날(대체 객체뿐)은 북부로 때우지 않고 비운다 */
 const startK = computed(() => {
-  const k = Math.round((new Date(course.value.startDate + 'T00:00:00') - D0) / 864e5)
+  const k = Math.round((new Date(course.value.startDate + 'T00:00:00') - today()) / 864e5)
   return Number.isFinite(k) ? k : state.di   // 시작일이 없는 코스(구형 저장분)는 선택기 날짜로
 })
 const dayK = d => startK.value + +d - 1

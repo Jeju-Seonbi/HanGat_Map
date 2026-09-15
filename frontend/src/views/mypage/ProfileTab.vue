@@ -2,7 +2,7 @@
 /**
  * 설정 (요구사항 정의서 MY_009 · MY_010 · MY_011) + 보안 · 표시 설정.
  */
-import { computed, onMounted, onBeforeUnmount, reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import BaseModal from '../../components/common/BaseModal.vue'
 import FieldText from '../../components/auth/FieldText.vue'
@@ -13,7 +13,6 @@ import { useAuthStore } from '../../stores/auth.js'
 import { useUiStore } from '../../stores/ui.js'
 import { useApiError } from '../../composables/useApiError.js'
 import { fmtFull, fmtDateTime } from '../../utils/format.js'
-import { readRecentLogins, clearRecentLogins } from '../../api/auth.js'
 import { resetPassword, sendResetCode, verifyResetCode } from '../../api/userAuth.js'
 import { checkPassword, normalizePassword } from '../../components/security/passwordPolicy.js'
 import { checkBirthDate, todayISODate, BIRTH_MIN_YEAR, checkNickname } from '../../utils/validators.js'
@@ -205,26 +204,6 @@ async function submitPasswordReset () {
   }
 }
 
-/* ── 로그인 기록 ── */
-const recent = ref([])
-onMounted(() => { recent.value = readRecentLogins() })
-function wipeRecent () {
-  recent.value = clearRecentLogins()
-  ui.toast('이 기기의 로그인 기록을 지웠어요')
-}
-
-/* ── 세션 ── */
-const remainSec = ref(auth.accessTokenRemainSeconds())
-let timer = null
-onMounted(() => { timer = setInterval(() => { remainSec.value = auth.accessTokenRemainSeconds() }, 1000) })
-onBeforeUnmount(() => clearInterval(timer))
-
-const remainText = computed(() => {
-  const s = remainSec.value
-  if (s <= 0) return '만료됨 · 다음 요청에서 자동 재발급'
-  return `${Math.floor(s / 60)}분 ${String(s % 60).padStart(2, '0')}초 남음`
-})
-
 /* ── MY_010 로그아웃 ── */
 async function onLogout () {
   await auth.logout()
@@ -295,38 +274,12 @@ async function onLogout () {
         </div>
         <div><dt>가입일</dt><dd>{{ user?.createdAt ? fmtFull(user.createdAt) : '-' }}</dd></div>
         <div><dt>마지막 로그인</dt><dd>{{ user?.lastLoginAt ? fmtDateTime(user.lastLoginAt) : '-' }}</dd></div>
-        <div><dt>액세스 토큰</dt><dd class="tnum">{{ remainText }}</dd></div>
       </dl>
-
-      <p class="note">
-        액세스 토큰은 <b>메모리에만</b> 두고 저장소에 남기지 않아요.
-        만료되면 리프레시 토큰으로 자동 재발급하고, 재발급마다 토큰을 교체해요.
-        같은 토큰이 두 번 쓰이면 탈취로 보고 모든 기기를 로그아웃시켜요.
-      </p>
 
       <div class="acts">
         <button class="btn2 primary" :disabled="pwBusy" @click="openPasswordReset">
           비밀번호 변경
         </button>
-      </div>
-    </section>
-
-    <!-- 로그인 기록 -->
-    <section v-if="recent.length" class="blk">
-      <h2 class="sect">이 기기의 로그인 기록</h2>
-      <ul class="rows-hair">
-        <li v-for="r in recent" :key="r.maskedEmail">
-          <span class="nm">{{ r.nickname }}</span>
-          <span class="ml">{{ r.maskedEmail }}</span>
-          <span v-if="r.email" class="tag">이메일 저장됨</span>
-        </li>
-      </ul>
-      <p class="note">
-        마스킹된 주소만 남겨요. 로그인 화면에서 “이 기기에 이메일 기억하기”를 켠 경우에만
-        원문 주소를 함께 저장해요.
-      </p>
-      <div class="acts">
-        <button class="btn2" @click="wipeRecent">기록 지우기</button>
       </div>
     </section>
 
@@ -486,14 +439,6 @@ async function onLogout () {
 
 .note { margin-top: 4px; }
 .note b { color: var(--tx2); font-weight: 700; }
-
-.rows-hair li { display: flex; align-items: center; gap: 10px; padding: 10px 0; }
-.rows-hair .nm { font-size: 13px; font-weight: 700; }
-.rows-hair .ml { font-size: 12px; color: var(--tx3); }
-.tag {
-  margin-left: auto; font-size: 10.5px; font-weight: 700;
-  color: var(--mid); background: var(--mid-bg); border-radius: var(--rp); padding: 2px 9px;
-}
 
 .acts { display: flex; gap: 8px; margin-top: 14px; }
 .dev { opacity: .85; }

@@ -33,6 +33,15 @@ const authenticated = { auth: true, sessionBound: true, timeoutMs: 15000 }
 export const listNotifications = (cursor = null) => apiRequest(`/users/me/notifications?size=30${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`, authenticated)
 export const readNotification = id => apiRequest(`/users/me/notifications/${encodeURIComponent(id)}/read`, { ...authenticated, method: 'PUT' })
 export const readAllNotifications = () => apiRequest('/users/me/notifications/read-all', { ...authenticated, method: 'PUT' })
+export const deleteNotification = id => apiRequest(`/users/me/notifications/${encodeURIComponent(id)}`, { ...authenticated, method: 'DELETE' })
+export const deleteAllNotifications = () => apiRequest('/users/me/notifications', { ...authenticated, method: 'DELETE' })
+export const listNotificationPage = (page = 0, category = 'ALL') => apiRequest(
+  `/users/me/notifications/page?${new URLSearchParams({ page: String(page), category })}`, authenticated)
+
+export const NOTIFICATION_FILTERS = Object.freeze([
+  { value: 'ALL', label: '전체' }, { value: 'LOGIN', label: '로그인' },
+  { value: 'COURSE', label: '코스 생성' }, { value: 'TRIP', label: '여행 일정' }, { value: 'OTHER', label: '기타' }
+])
 
 /** 서버가 보낸 임의 URL로 이동하지 않고, 앱에서 허용한 목적지만 해석한다. */
 export function notificationDestination (item) {

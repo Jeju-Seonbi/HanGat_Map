@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
+import { isAuthPath, safeLoginReturnTo } from '../utils/loginReturn.js'
 
 /*
   통합 라우트 (2026-08-17).
@@ -17,7 +18,7 @@ import { useAuthStore } from '../stores/auth.js'
     compactHeader DefaultLayout → AppHeader 로 넘어가는 축약 플래그 (공유 화면용)
     requiresAuth  로그인 필요. **없으면 공개**가 기본이다 (요구사항 USER_001:
                   비회원도 지도·코스 생성이 가능해야 한다)
-    guestOnly     로그인 상태로 들어오면 마이페이지로 보낸다
+    guestOnly     로그인 상태로 들어오면 이전 화면 또는 메인으로 보낸다
     title         document.title 접두사
 */
 export const routes = [
@@ -88,16 +89,25 @@ const router = createRouter({
  * 보호 라우트 가드 (요구사항 정의서 USER_001 / 명세서 COM_004).
  * 비로그인으로 마이페이지에 들어오면 **원래 요청을 잃지 않도록** returnTo 를 남기고 로그인으로 보낸다.
  */
-router.beforeEach(async to => {
+router.beforeEach(async (to, from) => {
   const auth = useAuthStore()
   if (!auth.ready) await auth.restore()
 
   if (to.meta.requiresAuth && !auth.isLoggedIn) {
-    auth.returnTo = to.fullPath
-    return { name: 'login', query: { redirect: to.fullPath } }
+    auth.returnTo = safeLoginReturnTo(to.fullPath)
+    return { name: 'login', query: { redirect: auth.returnTo } }
+  }
+  if (to.name === 'login') {
+    // 보호 화면의 명시적 목적지가 우선이다. 인증 화면을 왕복할 때는 기존 목적지를 보존한다.
+    const previous = from.matched.length
+      ? (isAuthPath(from.path) ? auth.returnTo : from.fullPath)
+      : '/'
+    auth.returnTo = safeLoginReturnTo(to.query.redirect ?? previous)
   }
   if (to.meta.guestOnly && auth.isLoggedIn) {
-    return { name: 'my-reviews' }
+    const destination = safeLoginReturnTo(to.query.redirect ?? auth.returnTo)
+    auth.returnTo = null
+    return destination
   }
   /*
     임시 비밀번호로 들어온 상태면 비밀번호를 바꾸기 전까지 다른 화면을 막는다.

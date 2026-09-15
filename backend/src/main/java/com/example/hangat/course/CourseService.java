@@ -42,7 +42,8 @@ public class CourseService {
     private final CourseDatePolicy courseDatePolicy;
     private java.util.Optional<CourseAccommodationService> accommodationService = java.util.Optional.empty();
 
-    @org.springframework.beans.factory.annotation.Autowired
+    // batch에서는 API 전용 숙소 서비스를 제외한다. API 실행 시에는 기존대로 주입한다.
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
     void setAccommodationService(CourseAccommodationService accommodationService) {
         this.accommodationService = java.util.Optional.of(accommodationService);
     }

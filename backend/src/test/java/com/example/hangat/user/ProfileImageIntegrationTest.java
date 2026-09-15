@@ -205,8 +205,9 @@ class ProfileImageIntegrationTest {
         assertThat(privatePath).startsWith("/users/me/profile-image/");
         String path = privatePath.replace("/users/me/", "/users/" + owner.getId() + "/");
         mvc.perform(get(path)).andExpect(status().isOk()).andExpect(content().bytes(png))
-                .andExpect(header().string("Cache-Control", "no-store"));
-        mvc.perform(head(path)).andExpect(status().isOk()).andExpect(content().bytes(new byte[0]));
+                .andExpect(header().string("Cache-Control", "max-age=300, private"));
+        mvc.perform(head(path)).andExpect(status().isOk()).andExpect(content().bytes(new byte[0]))
+                .andExpect(header().string("Cache-Control", "max-age=300, private"));
         var other = user();
         mvc.perform(get(path).header("Authorization", token(other))).andExpect(content().bytes(png));
         mvc.perform(get(path.replace("/users/" + owner.getId() + "/", "/users/" + other.getId() + "/")))

@@ -1,8 +1,8 @@
 <script setup>
 /** 내 프로필 사진 선택·미리보기·저장. 변경은 본인만 가능하고 등록한 사진은 리뷰에도 공개된다. */
-import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useAuthStore } from '../../stores/auth.js'
-import { readProfileImage } from '../../api/userAuth.js'
+import { currentProfileImagePath, publicProfileImageUrl } from '../../utils/profileImage.js'
 import { useApiError } from '../../composables/useApiError.js'
 import BaseModal from '../common/BaseModal.vue'
 import ProfilePhotoCropper from './ProfilePhotoCropper.vue'
@@ -11,7 +11,9 @@ const auth = useAuthStore()
 const toMessage = useApiError()
 const input = ref(null)
 const changeButton = ref(null)
-const currentUrl = ref('')
+const currentUrl = computed(() => publicProfileImageUrl(currentProfileImagePath(auth.user)))
+const imageFailed = ref(false)
+const imageAttempt = ref(0)
 const previewUrl = ref('')
 const selected = ref(null)
 const cropper = ref(null)
@@ -20,7 +22,6 @@ const saving = ref(false)
 const loading = ref(false)
 const error = ref('')
 const notice = ref('')
-let loadVersion = 0
 let disposed = false
 
 // Blob URL은 교체·닫기·화면 이탈 시 해제해 원문 이미지가 메모리에 누적되지 않게 한다.
@@ -50,29 +51,20 @@ function trapFocus (event) {
   buttons[next]?.focus()
 }
 
-async function loadPhoto () {
-  const version = ++loadVersion
-  const path = auth.user?.profileImageUrl
-  loading.value = !!path
-  if (!path) return
-  try {
-    const blob = await readProfileImage(path)
-    if (disposed || version !== loadVersion) return
-    revoke(currentUrl.value)
-    currentUrl.value = URL.createObjectURL(blob)
-  } catch (e) {
-    if (disposed || version !== loadVersion) return
-    error.value = e?.code === 'SESSION_CHANGED' ? e.message
-      : e?.status === 404 ? '사진을 찾지 못했어요. 새 사진을 등록해 주세요.' : (toMessage(e) || '')
-  } finally {
-    if (version === loadVersion) loading.value = false
-  }
+function loadPhoto () {
+  imageFailed.value = false
+  imageAttempt.value += 1
+  loading.value = !!currentUrl.value
+}
+
+function photoFailed () {
+  imageFailed.value = true
+  loading.value = false
+  error.value = '사진을 불러오지 못했어요. 다시 시도하거나 새 사진을 등록해 주세요.'
 }
 
 watch(() => [auth.user?.userId, auth.user?.profileImageUrl], () => {
   // 계정 변경이나 사진 교체 때 이전 계정의 이미지가 잠깐이라도 남지 않게 비운다.
-  revoke(currentUrl.value)
-  currentUrl.value = ''
   clearSelection()
   error.value = ''
   loadPhoto()
@@ -118,8 +110,6 @@ async function save () {
 
 onBeforeUnmount(() => {
   disposed = true
-  loadVersion += 1
-  revoke(currentUrl.value)
   clearSelection()
 })
 </script>
@@ -127,7 +117,8 @@ onBeforeUnmount(() => {
 <template>
   <div class="profile-photo" :aria-busy="saving || loading">
     <span class="photo-ring">
-      <img v-if="currentUrl" class="avatar" :src="currentUrl" alt="내 프로필 사진" />
+      <img v-if="currentUrl && !imageFailed" :key="`${currentUrl}:${imageAttempt}`" class="avatar" :src="currentUrl" alt="내 프로필 사진"
+        referrerpolicy="no-referrer" @load="loading = false" @error="photoFailed" />
       <span v-else class="avatar initial" aria-label="기본 프로필">{{ auth.initial }}</span>
     </span>
     <button ref="changeButton" class="photo-button" type="button" :disabled="saving" @click="input?.click()">사진 변경</button>
