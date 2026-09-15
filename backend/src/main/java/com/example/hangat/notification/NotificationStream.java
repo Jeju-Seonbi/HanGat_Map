@@ -10,6 +10,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import org.springframework.transaction.event.TransactionalEventListener;
+import com.example.hangat.notification.model.Notification.InboxChanged;
 
 import java.io.IOException;
 import java.util.List;
@@ -70,7 +72,7 @@ public class NotificationStream {
         });
         emitter.onError(error -> cleanup.run());
 
-        send(userId, emitter);
+        send(userId, emitter, "invalidate");
         return emitter;
     }
 
@@ -90,13 +92,17 @@ public class NotificationStream {
     }
 
     /**
-     * 연결 유지와 다른 탭의 읽음 변경 동기화.
+     * 연결 유지만 수행한다. heartbeat마다 알림 목록을 다시 받지 않는다.
      * 사용자 정보나 알림 본문을 이 신호에 넣지 않는다.
      */
     @Scheduled(fixedDelay = 15000, scheduler = "alarmScheduler")
     public void heartbeat() {
-        connections.keySet().forEach(this::invalidate);
+        connections.forEach((userId, emitters) -> emitters.forEach(emitter -> send(userId, emitter, "heartbeat")));
     }
+
+    /** 읽음·삭제가 DB에 커밋된 다음 다른 탭에도 변경을 알린다. */
+    @TransactionalEventListener
+    public void inboxChanged(InboxChanged event) { invalidate(event.userId()); }
 
     private void invalidate(Long userId) {
         Set<SseEmitter> emitters = connections.get(userId);
@@ -105,15 +111,15 @@ public class NotificationStream {
         }
 
         for (SseEmitter emitter : emitters) {
-            send(userId, emitter);
+            send(userId, emitter, "invalidate");
         }
     }
 
-    private void send(Long userId, SseEmitter emitter) {
+    private void send(Long userId, SseEmitter emitter, String event) {
         try {
             emitter.send(
                     SseEmitter.event()
-                            .name("invalidate")
+                            .name(event)
                             .data("{}")
             );
         } catch (IOException | IllegalStateException disconnected) {
