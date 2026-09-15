@@ -8,6 +8,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -18,14 +20,17 @@ import java.util.Set;
  * 출석 체크 - 적재가 끝난 뒤 "지난번엔 있었는데 이번 목록엔 없는" 장소를 찾는다.
  *
  * <p>공공 API는 폐업을 알려주지 않고 목록에서 빼기만 한다. 그래서 이번 적재에서 안 보인 매핑을
- * 비활성으로 두고(1회), 다음 적재에서도 안 보이면(2회 연속) 장소를 CLOSED로 바꾼다.
+ * 비활성으로 두고(1회), 다른 날의 적재에서도 안 보이면(2회 연속) 장소를 CLOSED로 바꾼다.
  * 한 번에 폐업 처리하지 않는 이유: API가 하루 흔들려 몇 건 빠지면 멀쩡한 장소가 지도에서 사라진다.
  * CLOSED가 되면 목록·검색·코스 후보 쿼리가 알아서 거른다({@code PlaceRepository.LIST_SELECT}).
  * 행은 지우지 않는다 - 찜·후기·코스가 참조하고, 다시 나타나면 되살린다.
  *
  * <p>수신 건수가 활성 매핑의 {@link #MIN_COVERAGE} 미만이면 그날은 판정하지 않는다 -
  * 반쯤 실패한 응답으로 수천 곳에 한꺼번에 스트라이크를 주는 사고를 막는다.
- * "연속"은 실행 회차 기준이다 - 매일 1회(02:20) 돌므로 두 번째 결석은 자연히 하루 뒤 확인이 된다.
+ * "연속"은 날짜 기준이다 - 비활성이 된 날(매핑 updated_at)이 오늘이면 두 번째 결석으로 치지 않고 보류한다.
+ * 실행 회차 기준으로 세면 같은 새벽에 Job이 뒷단계(SBIZ·착한가격)에서 실패해 재시도될 때
+ * 하루 유예 없이 폐업이 됐다(최종점검 #62). 비활성 매핑은 되살아나기 전까지 아무도 갱신하지 않으므로
+ * updated_at 이 곧 비활성이 된 시각이다.
  */
 @Component
 public class PlacePresenceReconciler {
@@ -42,10 +47,13 @@ public class PlacePresenceReconciler {
         this.mappingRepository = mappingRepository;
     }
 
-    /** skipped=true 면 수신이 부족해 판정하지 않은 것 - 배치는 이 경우를 실패로 기록한다. */
-    public record Result(int seen, int revived, int struck, int closed, boolean skipped) {
+    /**
+     * skipped=true 면 수신이 부족해 판정하지 않은 것 - 배치는 이 경우를 실패로 기록한다.
+     * deferred 는 안 보였지만 오늘 비활성이 된 매핑(같은 날 재실행) - 폐업을 다음 날로 미룬 수.
+     */
+    public record Result(int seen, int revived, int struck, int closed, int deferred, boolean skipped) {
         static Result skipped(int seen) {
-            return new Result(seen, 0, 0, 0, true);
+            return new Result(seen, 0, 0, 0, 0, true);
         }
     }
 
@@ -63,9 +71,11 @@ public class PlacePresenceReconciler {
             return Result.skipped(seenSourceIds.size());
         }
 
+        LocalDate today = LocalDate.now();
         List<Long> revive = new ArrayList<>();      // 보임 + 비활성
         List<Long> firstMiss = new ArrayList<>();   // 안 보임 + 활성
-        List<Long> secondMiss = new ArrayList<>();  // 안 보임 + 이미 비활성
+        List<Long> secondMiss = new ArrayList<>();  // 안 보임 + 어제 이전에 비활성
+        int deferred = 0;                           // 안 보임 + 오늘 비활성(같은 날 재실행) - 보류
         for (Object[] r : rows) {
             boolean seen = seenSourceIds.contains((String) r[1]);
             boolean isActive = (Boolean) r[2];
@@ -74,7 +84,12 @@ public class PlacePresenceReconciler {
             } else if (!seen && isActive) {
                 firstMiss.add((Long) r[0]);
             } else if (!seen) {
-                secondMiss.add((Long) r[0]);
+                LocalDate struckOn = ((LocalDateTime) r[3]).toLocalDate();
+                if (struckOn.isBefore(today)) {
+                    secondMiss.add((Long) r[0]);
+                } else {
+                    deferred++;
+                }
             }
         }
 
@@ -100,7 +115,7 @@ public class PlacePresenceReconciler {
             closed++;
         }
 
-        Result result = new Result(seenSourceIds.size(), revive.size(), firstMiss.size(), closed, false);
+        Result result = new Result(seenSourceIds.size(), revive.size(), firstMiss.size(), closed, deferred, false);
         log.info("{} 출석 체크 {}", sourceCode, result);
         return result;
     }

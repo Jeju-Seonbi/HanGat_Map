@@ -17,11 +17,12 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.time.LocalDateTime;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** 출석 체크 - 1회 미출현은 비활성만, 2회 연속이면 폐업, 재출현이면 복귀, 수신 부족이면 판정 보류 */
+/** 출석 체크 - 1회 미출현은 비활성만, 다른 날 2회 연속이면 폐업(같은 날 재실행은 보류), 재출현이면 복귀, 수신 부족이면 판정 보류 */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ActiveProfiles("test")
@@ -71,6 +72,17 @@ class PlacePresenceReconcilerTest {
         em.clear();
     }
 
+    /** 지난 적재(어제)에서 비활성이 된 것으로 되돌린다 - @PreUpdate 를 타지 않는 벌크 갱신, 저장이 끝난 뒤 불러야 한다 */
+    private void struckYesterday(PlaceSourceMapping m) {
+        em.flush();
+        em.getEntityManager()
+                .createQuery("update PlaceSourceMapping m set m.updatedAt = :t where m.id = :id")
+                .setParameter("t", LocalDateTime.now().minusDays(1))
+                .setParameter("id", m.getId())
+                .executeUpdate();
+        em.clear();
+    }
+
     @Test
     void 처음_안_보이면_매핑만_비활성이고_장소는_그대로다() {
         Place a = place("A");
@@ -92,19 +104,45 @@ class PlacePresenceReconcilerTest {
     }
 
     @Test
-    void 두_번_연속_안_보이면_폐업이다() {
+    void 어제_비활성이_된_장소가_오늘도_안_보이면_폐업이다() {
         Place a = place("A");
-        mapping(a, kto, "1", false);   // 지난 적재에서 이미 스트라이크
+        PlaceSourceMapping m = mapping(a, kto, "1", false);   // 지난 적재에서 이미 스트라이크
         Place b = place("B");
         mapping(b, kto, "2", true);
         reload();
+        struckYesterday(m);
 
         PlacePresenceReconciler.Result r = reconciler.reconcile("KTO", Set.of("2"));
         reload();
 
         assertThat(r.closed()).isEqualTo(1);
+        assertThat(r.deferred()).isZero();
         assertThat(placeRepository.findById(a.getId()).orElseThrow().getBusinessStatus())
                 .isEqualTo(BusinessStatus.CLOSED);
+    }
+
+    @Test
+    void 같은_날_두_번_돌아도_폐업하지_않는다_최종점검_62() {
+        Place a = place("A");
+        PlaceSourceMapping m = mapping(a, kto, "1", true);
+        for (int i = 2; i <= 5; i++) {
+            mapping(place("P" + i), kto, String.valueOf(i), true);
+        }
+        reload();
+
+        // 02:20 회차에서 A 결석 → 비활성. 같은 새벽 Job 이 뒷단계에서 실패해 재시도되면 한 번 더 돈다
+        PlacePresenceReconciler.Result first = reconciler.reconcile("KTO", Set.of("2", "3", "4", "5"));
+        reload();
+        PlacePresenceReconciler.Result retry = reconciler.reconcile("KTO", Set.of("2", "3", "4", "5"));
+        reload();
+
+        assertThat(first.struck()).isEqualTo(1);
+        assertThat(retry.struck()).isZero();
+        assertThat(retry.closed()).isZero();
+        assertThat(retry.deferred()).isEqualTo(1);   // 오늘 비활성이 된 것은 다음 날로 미룬다
+        assertThat(mappingRepository.findById(m.getId()).orElseThrow().isActive()).isFalse();
+        assertThat(placeRepository.findById(a.getId()).orElseThrow().getBusinessStatus())
+                .isEqualTo(BusinessStatus.UNKNOWN);
     }
 
     @Test
@@ -127,16 +165,18 @@ class PlacePresenceReconcilerTest {
     @Test
     void 다른_출처가_아직_보고_있으면_폐업하지_않는다() {
         Place a = place("A");
-        mapping(a, kto, "1", false);
+        PlaceSourceMapping m = mapping(a, kto, "1", false);
         mapping(a, sbiz, "s-1", true);
         Place b = place("B");
         mapping(b, kto, "2", true);
         reload();
+        struckYesterday(m);
 
         PlacePresenceReconciler.Result r = reconciler.reconcile("KTO", Set.of("2"));
         reload();
 
         assertThat(r.closed()).isZero();
+        assertThat(r.deferred()).isZero();   // 보류가 아니라 다른 출처 보호로 남은 것
         assertThat(placeRepository.findById(a.getId()).orElseThrow().getBusinessStatus())
                 .isEqualTo(BusinessStatus.UNKNOWN);
     }
@@ -161,10 +201,11 @@ class PlacePresenceReconcilerTest {
     void 이미_폐업한_장소는_다시_세지_않는다() {
         Place a = place("A");
         a.markClosed();
-        mapping(a, kto, "1", false);
+        PlaceSourceMapping m = mapping(a, kto, "1", false);
         Place b = place("B");
         mapping(b, kto, "2", true);
         reload();
+        struckYesterday(m);
 
         PlacePresenceReconciler.Result r = reconciler.reconcile("KTO", Set.of("2"));
 
@@ -175,12 +216,13 @@ class PlacePresenceReconcilerTest {
     @Test
     void 착한가격_매핑은_존재_근거로_치지_않는다() {
         Place a = place("A");
-        mapping(a, kto, "1", false);
+        PlaceSourceMapping m = mapping(a, kto, "1", false);
         DataSource mois = em.persist(source("MOIS_GOODPRICE", "행안부"));
         mapping(a, mois, "g-1", true);
         Place b = place("B");
         mapping(b, kto, "2", true);
         reload();
+        struckYesterday(m);
 
         PlacePresenceReconciler.Result r = reconciler.reconcile("KTO", Set.of("2"));
         reload();
