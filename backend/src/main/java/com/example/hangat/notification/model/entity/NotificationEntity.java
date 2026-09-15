@@ -60,4 +60,8 @@ public class NotificationEntity {
 
     @Column(name = "read_at", columnDefinition = "DATETIME(6)")
     private LocalDateTime readAt;
+
+    /** 사용자 알림함에서 삭제한 시각. 원래 이벤트의 중복 방지 키는 유지한다. */
+    @Column(name = "deleted_at", columnDefinition = "DATETIME(6)")
+    private LocalDateTime deletedAt;
 }

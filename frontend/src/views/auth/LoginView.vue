@@ -25,6 +25,7 @@ import { isValidEmail, checkEmail, EMAIL_INPUT_FILTER, EMAIL_INPUT_MESSAGE } fro
 import { putHandoff } from '../../utils/handoff.js'
 import { ApiError } from '../../api/errors.js'
 import { AUTH_HERO_IMAGES } from '../../data/authHeroImages.js'
+import { safeLoginReturnTo } from '../../utils/loginReturn.js'
 
 const SOCIALS = [
   { key: 'kakao', label: '카카오로 시작하기' },
@@ -62,12 +63,7 @@ const canSubmit = computed(() =>
   isValidEmail(email.value) && !!password.value && !auth.loading
 )
 
-const redirectTo = computed(() => {
-  const candidate = route.query.redirect || auth.returnTo
-  return typeof candidate === 'string' && candidate.startsWith('/') && !candidate.startsWith('//')
-    ? candidate
-    : '/mypage/reviews'
-})
+const redirectTo = computed(() => safeLoginReturnTo(route.query.redirect ?? auth.returnTo))
 
 async function submit () {
   touched.value.email = true

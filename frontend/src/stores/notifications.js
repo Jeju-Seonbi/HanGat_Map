@@ -1,89 +1,115 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { getBackendSessionVersion } from '../api/backendClient.js'
-import { NOTIFICATIONS_ENABLED, listNotifications, readNotification, readAllNotifications, streamNotifications } from '../api/notifications.js'
+import { NOTIFICATIONS_ENABLED, listNotifications, readNotification, readAllNotifications,
+  deleteNotification, deleteAllNotifications, streamNotifications } from '../api/notifications.js'
 
-/** 앱 전체에서 알림함과 SSE 연결 하나를 공유한다. 알림 내용은 DB 조회 결과가 기준이다. */
+/** 헤더 요약과 SSE는 앱 전체에서 공유한다. 마이페이지의 필터·페이지와 섞지 않는다. */
 export const useNotificationStore = defineStore('notifications', () => {
   const items = ref([])
   const unread = ref(0)
-  const nextCursor = ref(null)
   const loading = ref(false)
   const connected = ref(false)
   const error = ref('')
+  const revision = ref(0)
+  const busy = ref(false)
   let lifecycle = 0; let request = 0; let controller; let timer; let watchdog; let active = false
-  let expanded = false
+  let pending = null; let refreshAgain = false
 
-  async function refresh (more = false) {
-    if (!NOTIFICATIONS_ENABLED || !active || (more && !nextCursor.value)) return
+  function refresh () {
+    if (!NOTIFICATIONS_ENABLED || !active) return Promise.resolve()
+    if (pending || busy.value) { refreshAgain = true; return pending ?? Promise.resolve() }
     const ticket = ++request
     const life = lifecycle
     const epoch = getBackendSessionVersion()
-    loading.value = true
+    loading.value = !items.value.length
+    const operation = (async () => {
+      try {
+        const page = await listNotifications()
+        if (life !== lifecycle || epoch !== getBackendSessionVersion() || ticket !== request) return
+        if (!Array.isArray(page?.items) || !Number.isFinite(page.unreadCount)) throw new Error('알림 응답 형식을 확인해 주세요.')
+        items.value = page.items
+        unread.value = page.unreadCount
+        error.value = ''
+        revision.value++
+      } catch (failure) {
+        if (life === lifecycle && ticket === request) error.value = failure.message || '알림을 불러오지 못했어요.'
+      } finally {
+        if (life === lifecycle) loading.value = false
+      }
+    })()
+    pending = operation
+    void operation.finally(() => {
+      if (pending !== operation) return
+      pending = null
+      if (refreshAgain && life === lifecycle && !busy.value) {
+        refreshAgain = false
+        void refresh()
+      }
+    })
+    return operation
+  }
+
+  /** 서버 성공 후 해당 항목만 갱신한다. 오래된 조회가 읽음·삭제를 되돌리지 못하게 한다. */
+  async function mutate (send, apply) {
+    if (busy.value) throw new Error('알림을 처리하고 있어요. 잠시 후 다시 시도해 주세요.')
+    const life = lifecycle
+    const epoch = getBackendSessionVersion()
+    busy.value = true
+    request++
     try {
-      const page = await listNotifications(more ? nextCursor.value : null)
-      if (life !== lifecycle || epoch !== getBackendSessionVersion() || ticket !== request) return
-      if (!Array.isArray(page?.items) || !Number.isFinite(page.unreadCount)) throw new Error('알림 응답 형식을 확인해 주세요.')
-      const overlaps = page.items.some(item => items.value.some(old => String(old.id) === String(item.id)))
-      if (more || expanded) {
-        const merged = new Map(items.value.map(item => [String(item.id), item]))
-        page.items.forEach(item => merged.set(String(item.id), item))
-        items.value = [...merged.values()].sort((a, b) => {
-          const left = BigInt(a.id); const right = BigInt(b.id)
-          return left > right ? -1 : left < right ? 1 : 0
-        })
-      } else items.value = page.items
-      // 새 알림이 한 페이지를 넘으면 그 사이도 조회할 수 있도록 새 커서를 사용한다.
-      if (more || !expanded || !overlaps || page.nextCursor == null) nextCursor.value = page.nextCursor ?? null
-      if (more) expanded = true
-      unread.value = page.unreadCount
-      error.value = ''
-    } catch (failure) {
-      if (life === lifecycle && ticket === request) error.value = failure.message || '알림을 불러오지 못했어요.'
+      const result = await send()
+      if (life !== lifecycle || epoch !== getBackendSessionVersion()) return
+      request++
+      apply()
+      if (Number.isFinite(result?.unreadCount)) unread.value = result.unreadCount
+      revision.value++
     } finally {
-      if (life === lifecycle && ticket === request) loading.value = false
+      if (life === lifecycle) {
+        busy.value = false
+        if (refreshAgain && !pending) { refreshAgain = false; void refresh() }
+      }
     }
   }
-  async function markRead (id) {
-    const life = lifecycle
-    await readNotification(id)
-    if (life === lifecycle) await refresh()
-  }
-  async function markAllRead () {
-    const life = lifecycle
-    await readAllNotifications()
-    if (life === lifecycle) {
-      items.value = items.value.map(item => ({ ...item, readAt: item.readAt ?? new Date().toISOString() }))
-      await refresh()
-    }
-  }
+  const markRead = id => mutate(() => readNotification(id), () => {
+    items.value = items.value.map(item => String(item.id) === String(id)
+      ? { ...item, readAt: item.readAt ?? new Date().toISOString() } : item)
+  })
+  const markAllRead = () => mutate(readAllNotifications, () => {
+    items.value = items.value.map(item => ({ ...item, readAt: item.readAt ?? new Date().toISOString() }))
+  })
+  const remove = id => mutate(() => deleteNotification(id), () => {
+    items.value = items.value.filter(item => String(item.id) !== String(id))
+  })
+  const removeAll = () => mutate(deleteAllNotifications, () => { items.value = [] })
+
   function stop () {
-    active = false; expanded = false; lifecycle++; request++
+    active = false; lifecycle++; request++; pending = null; refreshAgain = false
     controller?.abort(); clearTimeout(timer); clearTimeout(watchdog)
     document.removeEventListener('visibilitychange', onVisibility)
     window.removeEventListener('online', onVisibility)
-    connected.value = false; loading.value = false
-    items.value = []; unread.value = 0; nextCursor.value = null; error.value = ''
+    connected.value = false; loading.value = false; busy.value = false
+    items.value = []; unread.value = 0; error.value = ''; revision.value++
   }
   function onVisibility () {
     if (!active) return
     clearTimeout(timer); clearTimeout(watchdog); controller?.abort(); controller = undefined
     connected.value = false
-    if (!document.hidden) { void refresh(); timer = setTimeout(connect, 100) }
+    if (!document.hidden) timer = setTimeout(connect, 100)
   }
   async function connect () {
     if (!active || document.hidden) return
     const life = lifecycle
     const connection = new AbortController()
     controller = connection
-    // 서버는 15초 heartbeat 대신 invalidate 이벤트를 보내도 된다. 90초마다 재접속하여 JWT도 검증한다.
     watchdog = setTimeout(() => connection.abort(), 90000)
     try {
       await streamNotifications({ signal: connection.signal,
-        onOpen: () => { if (life === lifecycle) { connected.value = true; void refresh() } },
+        onOpen: () => { if (life === lifecycle) connected.value = true },
+        // 최초 연결·실제 알림 변경만 동기화하고 연결 유지용 heartbeat는 무시한다.
         onEvent: ({ event }) => { if (event === 'invalidate' && life === lifecycle) void refresh() }
       })
-    } catch { /* 지속 실패 시 REST 조회 오류를 화면에 표시하고, 제한된 간격으로 재연결한다. */ }
+    } catch { /* 재연결을 기다리는 동안에도 기존 목록을 유지한다. */ }
     finally {
       if (life === lifecycle && controller === connection) {
         clearTimeout(watchdog); connected.value = false
@@ -99,5 +125,5 @@ export const useNotificationStore = defineStore('notifications', () => {
     window.addEventListener('online', onVisibility)
     void refresh(); void connect()
   }
-  return { items, unread, nextCursor, loading, connected, error, refresh, markRead, markAllRead, start, stop }
+  return { items, unread, loading, connected, error, revision, busy, refresh, markRead, markAllRead, remove, removeAll, start, stop }
 })

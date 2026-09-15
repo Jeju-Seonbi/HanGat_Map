@@ -86,7 +86,7 @@ onBeforeUnmount(() => {
       <div class="hero-copy">
         <h2>Discover the<br>unseen paths.</h2>
         <p>붐비는 시간을 비껴가는 코스로, 제주를 <span class="keep-together">한갓지게 걷습니다.</span></p>
-        <a v-if="hasHeroCarousel" class="photo-credit" href="https://unsplash.com/" target="_blank" rel="noopener noreferrer">출처 : Unsplash</a>
+        <span v-if="hasHeroCarousel" class="photo-credit">출처 : Unsplash</span>
       </div>
     </aside>
 
@@ -173,7 +173,6 @@ onBeforeUnmount(() => {
 .photo-credit {
   display: inline-block; margin-top: 4px;
   font-size: 12px; line-height: 1.75; color: rgba(255, 255, 255, .9);
-  text-decoration: underline; text-underline-offset: 3px;
   text-shadow: 0 1px 8px rgba(0, 0, 0, .4);
 }
 
@@ -196,7 +195,7 @@ onBeforeUnmount(() => {
   color: var(--ac); border-radius: var(--rp);
 }
 .back-link:hover { background: var(--ac-bg); }
-.back-link:focus-visible, .photo-credit:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+.back-link:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
 .brand {
   display: flex; align-items: center; gap: var(--sp-sm);
   font-family: var(--font-head);

@@ -4,6 +4,13 @@ import com.example.hangat.notification.service.trip.TripNotificationService;
 
 import com.example.hangat.notification.model.Notification.NotificationDto;
 import com.example.hangat.notification.model.Notification.NotificationPage;
+import com.example.hangat.notification.model.Notification.InboxPage;
+import com.example.hangat.notification.model.Notification.InboxResult;
+import com.example.hangat.notification.model.Notification.InboxChanged;
+import com.example.hangat.notification.model.NotificationCategory;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import com.example.hangat.notification.repository.inbox.NotificationCommandRepository;
 import com.example.hangat.notification.repository.inbox.NotificationRepository;
 import com.example.hangat.notification.repository.inbox.NotificationRepository.NotificationView;
@@ -32,6 +39,7 @@ public class NotificationService {
     private final NotificationRepository notifications;
     private final NotificationCommandRepository commands;
     private final TripNotificationService tripAlerts;
+    private final ApplicationEventPublisher events;
 
     @Value("${hangat.notifications.enabled:false}")
     private boolean enabled;
@@ -171,14 +179,38 @@ public class NotificationService {
 
     // ────────────────────────── 읽음 처리 ──────────────────────────
 
-    @Transactional
-    public void read(Long userId, Long notificationId) {
-        notifications.markRead(userId, notificationId, utcNow());
+    /** 본인 알림을 유형별로 일곱 개씩 조회한다. 과도한 OFFSET 요청은 거부한다. */
+    public InboxPage inbox(Long userId, int page, NotificationCategory category) {
+        if (page < 0 || page > 100000) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "페이지 번호를 확인하세요.");
+        var result = notifications.findInbox(userId, category == NotificationCategory.ALL,
+                category == NotificationCategory.OTHER, category.queryTypes(), PageRequest.of(page, 7));
+        return new InboxPage(result.getContent().stream().map(this::mapNotification).toList(),
+                result.getNumber(), result.getTotalPages(), result.getTotalElements(), notifications.countUnread(userId));
     }
 
     @Transactional
-    public void readAll(Long userId) {
-        notifications.markAllRead(userId, utcNow());
+    public InboxResult read(Long userId, Long notificationId) {
+        if (notifications.markRead(userId, notificationId, utcNow()) > 0) events.publishEvent(new InboxChanged(userId));
+        return new InboxResult(notifications.countUnread(userId));
+    }
+
+    @Transactional
+    public InboxResult readAll(Long userId) {
+        if (notifications.markAllRead(userId, utcNow()) > 0) events.publishEvent(new InboxChanged(userId));
+        return new InboxResult(notifications.countUnread(userId));
+    }
+
+    /** 개별 삭제와 전체 삭제 모두 사용자의 알림함에만 영향을 준다. */
+    @Transactional
+    public InboxResult delete(Long userId, Long notificationId) {
+        if (notifications.hide(userId, notificationId, utcNow()) > 0) events.publishEvent(new InboxChanged(userId));
+        return new InboxResult(notifications.countUnread(userId));
+    }
+
+    @Transactional
+    public InboxResult deleteAll(Long userId) {
+        if (notifications.hideAll(userId, utcNow()) > 0) events.publishEvent(new InboxChanged(userId));
+        return new InboxResult(notifications.countUnread(userId));
     }
 
     /** UTC로 저장한 시각과 숫자 ID를 기존 응답 형식으로 변환한다. */
