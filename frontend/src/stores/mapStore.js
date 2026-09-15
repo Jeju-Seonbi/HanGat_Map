@@ -185,6 +185,11 @@ export async function loadPlaces () {
   // 자정을 넘긴 탭의 재진입: 오늘 기준을 옮기고 선택 날짜를 오늘로 되돌린다 - 글자·달력·날씨가 새로 받는 데이터와 같은 날을 가리키게(최종점검 #16)
   if (refreshToday()) state.di = 0
   state.loading = true
+  // 예보·날씨는 장소 목록과 무관하니 목록과 같이 출발시킨다. 전엔 목록을 다 받은 뒤에야 예보를 요청하고 날씨까지 온 다음
+  // 색을 칠해서, 지도를 열면 핀이 전부 회색이었다가 1~2초 뒤 색이 바뀌었다(운영 실측 목록 0.6초 + 예보 0.4초·날씨 0.5초,
+  // 날씨 DB가 비면 기상청 실시간 호출로 더). 둘 다 실패를 안에서 잡아 값으로 돌려주므로 미리 시작해도 처리 안 된 오류는 없다
+  const forecastP = CrowdService.getForecast()
+  const weatherP = WeatherService.load()
   const { live, layers, fetched, failed } = await MapPlaceService.getAll()
   // 받으려고 한 레이어만 갈아끼운다. 전엔 통째로 교체해서 칩으로 받아 둔 지연 레이어(카페·식당…)가 빈 배열이 됐고,
   // 칩은 켜진 채 핀만 사라져 두 번 눌러야 돌아왔다(최종점검 #28 - 9/12 재사용 커밋이 만든 회귀). 지연 레이어도 하루 한두 번
@@ -199,7 +204,8 @@ export async function loadPlaces () {
     toast(`${names} 데이터를 불러오지 못했어요 — 칩을 다시 켜면 재시도해요`)
   }
 
-  const [forecast] = await Promise.all([CrowdService.getForecast(), WeatherService.load()])
+  // 핀 색은 예보만 오면 바로 칠한다 - 날씨는 핀 색과 무관하다
+  const forecast = await forecastP
   state.forecastDays = forecast.days
   attachSeries(state.layers.spot, forecast, iso(today()))
   state.forecastUntil = forecastUntilOf(state.layers.spot)
@@ -210,6 +216,8 @@ export async function loadPlaces () {
     loadedAt = Date.now()
     loadedDate = iso(new Date())
   }
+  // 날씨까지 받은 뒤 끝낸다 - 호출부(MapView)가 기다리는 시점은 전과 같다
+  await weatherP
 }
 
 /** 오늘 기준 예보가 있는 마지막 날 인덱스. attachSeries 뒤의 series 는 0 = 오늘이라 값이 있는 가장 뒤 칸이 답이다.
