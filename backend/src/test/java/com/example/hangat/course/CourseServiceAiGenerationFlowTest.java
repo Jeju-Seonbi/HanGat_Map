@@ -23,6 +23,7 @@ import com.example.hangat.course.travel.StraightLineDistanceCalculator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 import java.util.List;
 import java.util.Optional;
@@ -58,7 +59,6 @@ class CourseServiceAiGenerationFlowTest {
                 new CourseAiPreparationService(new CourseAiInputAssembler(),
                         new CourseTravelService(new StraightLineDistanceCalculator()), Optional.empty()),
                 mock(CourseAiGenerationService.class), persistence, budget, assembler));
-        service.setAccommodationService(accommodations);
         CourseRequestDto request = objectMapper.readValue("""
                 {"start_date":"2026-08-27","end_date":"2026-08-27","people":2,
                  "budget_total":500000,"transport":"PUBLIC_TRANSIT","course_regions":[],
@@ -83,7 +83,14 @@ class CourseServiceAiGenerationFlowTest {
         when(persistence.persist(request, computed.facts(), computed.result(), computed.metadata(), verified)).thenReturn(stored);
         when(budget.calculateAndCache(101L)).thenReturn(CourseBudgetCalculation.noData(500000));
 
-        service.createCourse(request);
+        // API 컨텍스트에 숙소 서비스가 있으면 선택적 주입 후 실제 검증 경로를 사용해야 한다.
+        new ApplicationContextRunner()
+                .withBean(CourseService.class, () -> service)
+                .withBean(CourseAccommodationService.class, () -> accommodations)
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    context.getBean(CourseService.class).createCourse(request);
+                });
 
         verify(accommodations).verifyGeneratedAccommodation(request.getAccommodation(), computed);
         verify(persistence).persist(request, computed.facts(), computed.result(), computed.metadata(), verified);
