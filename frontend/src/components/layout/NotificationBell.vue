@@ -4,18 +4,17 @@
  * SSE 수신 내용은 이동 권한이 아니다. 실제 코스와 작업 API에서 소유권을 검사한다.
  */
 import { computed, onBeforeUnmount, onMounted, ref, watch, nextTick, useId } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { useAuthStore } from '../../stores/auth.js'
 import { useUiStore } from '../../stores/ui.js'
 import { useNotificationStore } from '../../stores/notifications.js'
-import { NOTIFICATIONS_ENABLED, notificationDestination } from '../../api/notifications.js'
+import { NOTIFICATIONS_ENABLED } from '../../api/notifications.js'
 import { fmtRelative } from '../../utils/format.js'
 import AppIcon from '../common/AppIcon.vue'
 
 const auth = useAuthStore()
 const ui = useUiStore()
 const route = useRoute()
-const router = useRouter()
 
 const uid = useId()
 const panelId = computed(() => `bell-${uid}`)
@@ -31,18 +30,12 @@ const rootEl = ref(null)
 const PREVIEW_MAX = 4
 const preview = computed(() => items.value.slice(0, PREVIEW_MAX))
 
-async function load () {
-  if (auth.isLoggedIn) await notifications.refresh()
-}
-
-
 // 로그아웃하거나 화면을 옮기면 열린 패널을 닫는다
 watch(() => [auth.isLoggedIn, route.fullPath], () => { open.value = false })
 
 async function toggle () {
   open.value = !open.value
   if (open.value) {
-    await load()
     await nextTick()
     rootEl.value?.querySelector('.panel')?.focus()
   }
@@ -69,13 +62,11 @@ onBeforeUnmount(() => {
 })
 
 async function openAlert (a) {
-  open.value = false
   if (!a.readAt) {
     try {
       await notifications.markRead(a.id)
-    } catch { /* 읽음 처리 실패는 이동을 막지 않는다 */ }
+    } catch { ui.toast('읽음 처리를 하지 못했어요. 다시 눌러 주세요.') }
   }
-  router.push(notificationDestination(a))
 }
 
 async function readAll () {
@@ -116,17 +107,17 @@ const label = computed(() =>
     <div v-if="open" :id="panelId" class="panel" tabindex="-1" role="dialog" aria-label="알림">
       <div class="ph">
         <b>알림</b>
-        <button v-if="unread" class="sw" type="button" @click="readAll">모두 읽음</button>
+        <button v-if="unread" class="sw" type="button" :disabled="notifications.busy" @click="readAll">모두 읽음</button>
       </div>
 
       <p v-if="!NOTIFICATIONS_ENABLED" class="pmsg">알림 서비스 준비 중이에요.</p>
-      <p v-else-if="notifications.error" class="pmsg" role="alert">{{ notifications.error }}</p>
-      <p v-else-if="loading" class="pmsg">불러오는 중…</p>
+      <p v-else-if="notifications.error && !items.length" class="pmsg" role="alert">{{ notifications.error }}</p>
+      <p v-else-if="loading && !items.length" class="pmsg">불러오는 중…</p>
       <p v-else-if="!items.length" class="pmsg">새 알림이 없어요.</p>
 
       <ul v-else class="plist">
         <li v-for="a in preview" :key="a.id">
-          <button class="prow" type="button" :class="{ unread: !a.readAt }" @click="openAlert(a)">
+          <button class="prow" type="button" :disabled="notifications.busy" :class="{ unread: !a.readAt }" @click="openAlert(a)">
             <span class="sev" aria-hidden="true" />
             <span class="ptx">
               <span class="pt">{{ a.title }}</span>
