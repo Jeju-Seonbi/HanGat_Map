@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import java.io.InputStream;
 import java.io.IOException;
+import java.time.Duration;
 
 /**
  * 프로필 사진 API - 변경은 로그인한 본인만, 현재 사진 조회는 비회원도 가능하다.
@@ -25,6 +26,8 @@ import java.io.IOException;
 @RequestMapping("/users")
 @Tag(name = "User")
 public class UserProfileImageController {
+    // UUID마다 별도 URL이다. 교체·탈퇴 이전 사진은 브라우저에 최대 5분 남을 수 있다.
+    private static final CacheControl PUBLIC_IMAGE_CACHE = CacheControl.maxAge(Duration.ofMinutes(5)).cachePrivate();
     private final UserProfileImageService images;
 
     /** multipart의 file 한 개만 받고 사용자 ID는 요청값이 아닌 인증 정보에서 읽는다. */
@@ -40,32 +43,32 @@ public class UserProfileImageController {
     @Operation(summary = "내 프로필 사진 조회")
     public ResponseEntity<InputStreamResource> read(@AuthenticationPrincipal Long userId,
                                                     @PathVariable String filename) {
-        return imageResponse(images.open(userId, filename), filename);
+        return imageResponse(images.open(userId, filename), filename, CacheControl.noStore());
     }
 
     /** 다른 회원과 비회원도 리뷰 작성자의 현재 사진을 볼 수 있다. 사용자 정보는 반환하지 않는다. */
     @GetMapping("/{userId:[1-9][0-9]*}/profile-image/{filename}")
     @Operation(summary = "공개 프로필 사진 조회", description = "현재 사진만 공개하며 탈퇴·정지·미등록·교체 전 사진은 404")
     public ResponseEntity<InputStreamResource> readPublic(@PathVariable Long userId, @PathVariable String filename) {
-        return imageResponse(images.openPublic(userId, filename), filename);
+        return imageResponse(images.openPublic(userId, filename), filename, PUBLIC_IMAGE_CACHE);
     }
 
     /** HEAD는 존재·권한과 헤더만 확인하고 파일 스트림을 읽지 않은 채 닫는다. */
     @RequestMapping(value = "/{userId:[1-9][0-9]*}/profile-image/{filename}", method = RequestMethod.HEAD)
     public ResponseEntity<Void> headPublic(@PathVariable Long userId, @PathVariable String filename) throws IOException {
         try (var stream = images.openPublic(userId, filename)) {
-            return imageHeaders(filename).build();
+            return imageHeaders(filename, PUBLIC_IMAGE_CACHE).build();
         }
     }
 
-    /** 교체·탈퇴 후 낡은 사진이 캐시에 남지 않도록 저장하지 않는다. 스트림은 응답 완료 시 닫힌다. */
-    private ResponseEntity<InputStreamResource> imageResponse(InputStream stream, String filename) {
-        return imageHeaders(filename).body(new InputStreamResource(stream));
+    /** 공개 UUID 주소는 브라우저 캐시만 허용한다. 스트림은 응답 완료 시 닫힌다. */
+    private ResponseEntity<InputStreamResource> imageResponse(InputStream stream, String filename, CacheControl cacheControl) {
+        return imageHeaders(filename, cacheControl).body(new InputStreamResource(stream));
     }
 
-    private ResponseEntity.BodyBuilder imageHeaders(String filename) {
+    private ResponseEntity.BodyBuilder imageHeaders(String filename, CacheControl cacheControl) {
         String extension = filename.substring(filename.lastIndexOf('.') + 1);
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+        return ResponseEntity.ok().cacheControl(cacheControl)
                 .header("X-Content-Type-Options", "nosniff")
                 .contentType(MediaType.parseMediaType(extension.equals("jpg") ? "image/jpeg" : "image/" + extension));
     }
