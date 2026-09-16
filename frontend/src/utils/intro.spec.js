@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { introOf, needsMore } from './intro'
+import { introOf, paragraphsOf } from './intro'
 
 describe('introOf (MAP_008)', () => {
   it('returns the KTO overview text trimmed', () => {
@@ -15,8 +15,24 @@ describe('introOf (MAP_008)', () => {
     expect(introOf('   ')).toBeNull()
   })
 
-  it('asks for a 더보기 button only when two lines are not enough', () => {
-    expect(needsMore('짧은 소개')).toBe(false)
-    expect(needsMore('가'.repeat(71))).toBe(true)
+  it('splits into paragraphs of three sentences without changing a single character', () => {
+    const t = '첫째다. 둘째요. 셋째! 넷째? 다섯째다. 여섯째다. 일곱째다.'
+    const p = paragraphsOf(t)
+    expect(p).toEqual(['첫째다. 둘째요. 셋째!', '넷째? 다섯째다. 여섯째다.', '일곱째다.'])
+    expect(p.join(' ')).toBe(t)
+  })
+
+  it('does not cut inside a word that merely ends with 다 or 요', () => {
+    expect(paragraphsOf('아름다운 바다 위의 요트가 보인다. 끝.')).toEqual(['아름다운 바다 위의 요트가 보인다. 끝.'])
+  })
+
+  it('keeps the original line breaks as paragraph boundaries', () => {
+    expect(paragraphsOf('축제는 3월에 열린다.\n둘째 줄이다. 셋째다. 넷째다.')).toEqual(['축제는 3월에 열린다.', '둘째 줄이다. 셋째다. 넷째다.'])
+  })
+
+  it('is one paragraph when there is no sentence end, and empty for nothing', () => {
+    expect(paragraphsOf('문장 끝이 없는 글')).toEqual(['문장 끝이 없는 글'])
+    expect(paragraphsOf('')).toEqual([])
+    expect(paragraphsOf(null)).toEqual([])
   })
 })
