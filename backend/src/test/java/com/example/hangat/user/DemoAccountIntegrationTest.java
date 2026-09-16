@@ -20,10 +20,12 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 import static org.assertj.core.api.Assertions.*;
 
-@SpringBootTest
+@SpringBootTest(properties = "app.demo-login.enabled=true")
+@org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Transactional
 class DemoAccountIntegrationTest {
+    @Autowired org.springframework.test.web.servlet.MockMvc mvc;
     private static final String PASSWORD = "SampleOnly!4826";
     @Autowired AuthService auth;
     @Autowired PasswordHasher hasher;
@@ -41,6 +43,22 @@ class DemoAccountIntegrationTest {
     }
     private String login(User user) {
         return auth.login(new AuthDto.LoginRequest(user.getEmail(), PASSWORD)).rawRefreshToken();
+    }
+
+    @Test void publicDemoLoginOnlyIssuesDemoSession() throws Exception {
+        seed("demo@hangatjeju.com");
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/auth/demo-login")
+                        .contentType("application/json").content("{\"email\":\"ordinary@example.com\"}"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.result.user.email").value("demo@hangatjeju.com"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.result.tokens.accessToken").isString())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Set-Cookie", org.hamcrest.Matchers.containsString("HttpOnly")));
+    }
+    @Test void missingDemoAccountIsNotAutomaticallyCreated() throws Exception {
+        long before = users.count();
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/auth/demo-login"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isServiceUnavailable());
+        assertThat(users.count()).isEqualTo(before);
     }
 
     @Test void demoDevicesKeepIndependentSessions() {
