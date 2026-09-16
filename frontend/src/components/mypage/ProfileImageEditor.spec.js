@@ -18,6 +18,13 @@ async function renderEditor (user) {
 }
 
 describe('current profile image browser cache', () => {
+  it('demo account renders its fixed photo without upload controls', async () => {
+    const html = await renderEditor({ userId: 7, nickname: '한갓지도 데모계정', demoAccount: true, profileImageUrl: `/users/7/profile-image/${filename}` })
+    expect(html).toContain(`src="${BACKEND_BASE_URL}/users/7/profile-image/${filename}"`)
+    expect(html).toContain('데모 계정의 프로필 사진은 변경할 수 없어요.')
+    expect(html).not.toContain('type="file"')
+    expect(html).not.toMatch(/<button[^>]*>사진 변경<\/button>/)
+  })
   it.each([`/users/me/profile-image/${filename}`, `/users/7/profile-image/${filename}`])
   ('renders the shared public image URL directly on each visit: %s', async profileImageUrl => {
     const html = await renderEditor({ userId: 7, nickname: '사진', profileImageUrl })

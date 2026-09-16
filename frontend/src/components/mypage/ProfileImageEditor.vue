@@ -60,7 +60,7 @@ function loadPhoto () {
 function photoFailed () {
   imageFailed.value = true
   loading.value = false
-  error.value = '사진을 불러오지 못했어요. 다시 시도하거나 새 사진을 등록해 주세요.'
+  error.value = auth.user?.demoAccount ? '사진을 불러오지 못했어요. 다시 시도해 주세요.' : '사진을 불러오지 못했어요. 다시 시도하거나 새 사진을 등록해 주세요.'
 }
 
 watch(() => [auth.user?.userId, auth.user?.profileImageUrl], () => {
@@ -73,7 +73,7 @@ watch(() => [auth.user?.userId, auth.user?.profileImageUrl], () => {
 function choose (event) {
   const file = event.target.files?.[0]
   event.target.value = '' // 같은 파일을 다시 선택해도 change가 발생한다.
-  if (!file || saving.value) return
+  if (!file || saving.value || auth.user?.demoAccount) return
   error.value = ''
   notice.value = ''
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || !file.size || file.size > 5 * 1024 * 1024) {
@@ -86,7 +86,7 @@ function choose (event) {
 }
 
 async function save () {
-  if (!selected.value || saving.value || !cropReady.value) return
+  if (!selected.value || saving.value || !cropReady.value || auth.user?.demoAccount) return
   const original = selected.value
   const userId = auth.user?.userId
   saving.value = true
@@ -121,8 +121,11 @@ onBeforeUnmount(() => {
         referrerpolicy="no-referrer" @load="loading = false" @error="photoFailed" />
       <span v-else class="avatar initial" aria-label="기본 프로필">{{ auth.initial }}</span>
     </span>
-    <button ref="changeButton" class="photo-button" type="button" :disabled="saving" @click="input?.click()">사진 변경</button>
-    <input ref="input" hidden type="file" accept="image/jpeg,image/png,image/webp" aria-label="프로필 사진 선택" @change="choose" />
+    <p v-if="auth.user?.demoAccount" class="photo-note">데모 계정의 프로필 사진은 변경할 수 없어요.</p>
+    <template v-else>
+      <button ref="changeButton" class="photo-button" type="button" :disabled="saving" @click="input?.click()">사진 변경</button>
+      <input ref="input" hidden type="file" accept="image/jpeg,image/png,image/webp" aria-label="프로필 사진 선택" @change="choose" />
+    </template>
     <p v-if="loading" class="photo-note" role="status">사진을 불러오는 중이에요.</p>
     <p v-if="notice" class="photo-note" role="status">{{ notice }}</p>
     <div v-if="error && !selected" class="photo-error" role="alert">
