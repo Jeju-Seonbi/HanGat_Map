@@ -78,7 +78,8 @@ function htmlCspPlugin () {
           "form-action 'self' https://sharer.kakao.com https://accounts.kakao.com",
           "base-uri 'none'",
           "object-src 'none'",
-          "frame-src 'none'",
+          // 카카오내비 SDK의 일부 Android 브라우저용 앱 실행 폴백만 허용한다.
+          "frame-src kakaonavi-sdk:",
           "manifest-src 'self'",
           ...(dev ? [] : ['upgrade-insecure-requests'])
         ]
