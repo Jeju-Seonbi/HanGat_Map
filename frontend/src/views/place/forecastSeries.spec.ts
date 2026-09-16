@@ -29,17 +29,30 @@ describe('buildForecastSeries - 장소 상세 혼잡 예보 창', () => {
 })
 
 describe('isForecastStale - 갱신 대기 판정', () => {
+  /** 적재 배치는 제주 03시에 돈다. 그 전후로 판정이 달라지므로 시각을 못 박는다 */
+  const 낮 = new Date('2026-09-16T14:00:00+09:00')
+  const 배치_전_새벽 = new Date('2026-09-16T01:00:00+09:00')
+
   it('오늘 발표분이면 창이 어제부터 시작해도 묵은 것이 아니다', () => {
     // 새벽 3시 적재가 받는 창은 늘 어제부터다. 창으로 판정하면 정상 적재에도 매일 갱신 대기가 뜬다
-    expect(isForecastStale(forecast('2026-09-15', [10, 20], '2026-09-16'), '2026-09-16')).toBe(false)
+    expect(isForecastStale(forecast('2026-09-15', [10, 20], '2026-09-16'), '2026-09-16', 낮)).toBe(false)
   })
 
-  it('어제 발표분이면 묵은 것이다', () => {
-    expect(isForecastStale(forecast('2026-09-14', [10, 20], '2026-09-15'), '2026-09-16')).toBe(true)
+  it('배치 시각이 지났는데 어제 발표분이면 묵은 것이다', () => {
+    expect(isForecastStale(forecast('2026-09-14', [10, 20], '2026-09-15'), '2026-09-16', 낮)).toBe(true)
+  })
+
+  it('배치 시각 전에는 어제 발표분이 최신이라 경고하지 않는다', () => {
+    // 자정부터 03시까지는 오늘 발표분이 아직 없는 게 정상이다 - 매일 새벽 3시간씩 갱신 대기가 뜨면 안 된다
+    expect(isForecastStale(forecast('2026-09-14', [10, 20], '2026-09-15'), '2026-09-16', 배치_전_새벽)).toBe(false)
+  })
+
+  it('배치 시각 전이라도 그저께 발표분이면 묵은 것이다', () => {
+    expect(isForecastStale(forecast('2026-09-13', [10, 20], '2026-09-14'), '2026-09-16', 배치_전_새벽)).toBe(true)
   })
 
   it('발표일을 모르는 응답과 예보 없음은 경고하지 않는다', () => {
-    expect(isForecastStale(forecast('2026-09-15', [10], null), '2026-09-16')).toBe(false)
-    expect(isForecastStale(null, '2026-09-16')).toBe(false)
+    expect(isForecastStale(forecast('2026-09-15', [10], null), '2026-09-16', 낮)).toBe(false)
+    expect(isForecastStale(null, '2026-09-16', 낮)).toBe(false)
   })
 })

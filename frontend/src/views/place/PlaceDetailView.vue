@@ -48,14 +48,30 @@ const today = todayKst()
 
 /** 예보 창을 오늘부터 편다. 배치가 밀려 from이 오늘보다 앞서면 지난 날짜는 그리지 않는다 (forecastSeries 참고) */
 const series = computed(() => buildForecastSeries(forecast.value, today))
-/** 받아 둔 예보분이 오늘 이전에 시작했다 - 그 뒤로 새 발표분이 안 들어온 상태라 화면에 밝힌다 */
-/** 오늘 발표분을 못 받았는지. 창 시작일이 아니라 발표일로 본다 - 창은 정상 적재에도 어제부터다(forecastSeries 참고) */
+/** 받았어야 할 발표분을 못 받았는지. 창 시작일이 아니라 발표일로 본다 - 창은 정상 적재에도 어제부터다(forecastSeries 참고) */
 const forecastStale = computed(() => isForecastStale(forecast.value, today))
 const baseDateLabel = computed(() => (forecast.value?.baseDate ? fmt(forecast.value.baseDate) : ''))
-/** 창이 통째로 과거일 때 안내. 발표일을 모르는 응답이면 날짜를 지어내지 않는다 */
-const staleNotice = computed(() => (baseDateLabel.value
-  ? `받아 둔 예보가 ${baseDateLabel.value} 발표분이라 오늘 이후 날짜가 없어요. 다음 적재 뒤에 다시 보여드릴게요.`
-  : '받아 둔 예보에 오늘 이후 날짜가 없어요. 다음 적재 뒤에 다시 보여드릴게요.'))
+/**
+ * 오늘 이후 칸이 하나도 없을 때 안내. 발표분이 묵어서인지, 최신 발표분에 이 장소 날짜가 없어서인지 가른다 -
+ * 장소마다 예보가 있는 날이 달라 오늘 발표분에도 오늘 이후가 비는 곳이 있다. 둘을 같은 말로 덮으면 거짓이 된다.
+ */
+const emptyWindowNotice = computed(() => {
+  const label = baseDateLabel.value
+  if (forecastStale.value) {
+    return {
+      title: '혼잡 예보 갱신 대기',
+      body: label
+        ? `받아 둔 예보가 ${label} 발표분이라 오늘 이후 날짜가 없어요. 다음 적재 뒤에 다시 보여드릴게요.`
+        : '받아 둔 예보에 오늘 이후 날짜가 없어요. 다음 적재 뒤에 다시 보여드릴게요.',
+    }
+  }
+  return {
+    title: '오늘 이후 예보 없음',
+    body: label
+      ? `${label} 발표분에는 이 장소의 오늘 이후 날짜가 없어요.`
+      : '받아 둔 예보에는 이 장소의 오늘 이후 날짜가 없어요.',
+  }
+})
 /** 축 눈금은 처음·가운데·끝 - 창이 1~2일로 짧으면 같은 날짜를 세 번 찍지 않는다 */
 const axisLabels = computed(() => {
   const rows = series.value
@@ -123,8 +139,10 @@ const reasonChips = computed(() => {
   if (row.hiddenGem) chips.push({ text: '덜 알려진 숨은 명소' })
   const rate = todayCell.value?.rate
   if (rate != null) chips.push({ text: `오늘 집중률 ${Math.round(rate)} · ${congestionLabel(rate)}` })
-  // 예보는 있는데 묵어서 오늘 칸이 없는 것과, 애초에 예보 대상이 아닌 것은 다른 말이다
-  else chips.push({ text: series.value.length ? '오늘은 예보 창 밖' : forecast.value ? '예보 갱신 대기' : '집중률 예보 대상 아님' })
+  // 예보가 묵은 것, 최신 발표분에 이 장소 날짜가 없는 것, 애초에 예보 대상이 아닌 것은 다 다른 말이다
+  else if (series.value.length) chips.push({ text: '오늘은 예보 창 밖' })
+  else if (!forecast.value) chips.push({ text: '집중률 예보 대상 아님' })
+  else chips.push({ text: forecastStale.value ? '예보 갱신 대기' : '오늘 이후 예보 없음' })
   if (row.regionName) chips.push({ text: `${row.regionName} 권역` })
   return chips
 })
@@ -318,7 +336,7 @@ watch(placeId, load)
             <span
               v-else
               class="chip"
-            >{{ series.length ? '오늘은 예보 창 밖' : forecast ? '예보 갱신 대기' : '오늘 예보 없음' }}</span>
+            >{{ series.length ? '오늘은 예보 창 밖' : forecast && forecastStale ? '예보 갱신 대기' : '오늘 예보 없음' }}</span>
             <span
               v-if="place.goodPrice"
               class="chip good"
@@ -436,9 +454,9 @@ watch(placeId, load)
           v-else-if="forecast"
           class="panel place-card muted-card"
         >
-          <h2>혼잡 예보 갱신 대기</h2>
+          <h2>{{ emptyWindowNotice.title }}</h2>
           <p class="muted">
-            {{ staleNotice }}
+            {{ emptyWindowNotice.body }}
           </p>
         </div>
         <div
