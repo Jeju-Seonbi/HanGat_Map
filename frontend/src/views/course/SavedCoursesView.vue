@@ -7,6 +7,17 @@ import { useSavedCourseExplorer, sheetHeight } from '../../composables/useSavedC
 import { preloadKakao } from '../../composables/useKakaoShare.js'
 import { hasNaviCoordinates, isNaviMobile, startNavi, type NaviSdk } from '../../services/kakaoNavi'
 import type { Place } from '../../assets/types'
+import { useCourseTabs } from '../../composables/useCourseTabs'
+import PlaceDetailService, { type PlaceDetail } from '../../services/PlaceDetailService'
+import { stayDuration } from '../../services/course/stayDuration'
+import AppIcon from '../../components/common/AppIcon.vue'
+import CourseShareDialog from '../../components/course/CourseShareDialog.vue'
+const sharing = ref<{ id: string; title: string } | null>(null)
+
+const { opened, active, open, close, showList } = useCourseTabs()
+const placeDetails = ref<Record<number, PlaceDetail | null>>({})
+const pendingPlaces = new Set<number>()
+const transportLabel = computed(() => ({ RENTAL_CAR: '차량', TAXI: '택시', PUBLIC_TRANSIT: '대중교통', WALK_BIKE: '도보·자전거' }[course.value?.transport ?? ''] ?? ''))
 
 const cards = ref<CourseCard[]>([])
 const loading = ref(true)
@@ -51,23 +62,32 @@ watch(course, value => {
   selectedStop.value = String(value?.days[0]?.items[0]?.id ?? '')
 })
 watch(activeDay, () => { selectedStop.value = String(currentDay.value?.items[0]?.id ?? '') })
+watch(active, id => {
+  notice.value = ''
+  reset()
+  if (id) { panelHeight.value = 55; void select(id) }
+})
+watch(currentDay, day => {
+  for (const item of day?.items ?? []) {
+    if (item.placeId in placeDetails.value || pendingPlaces.has(item.placeId)) continue
+    pendingPlaces.add(item.placeId)
+    void PlaceDetailService.getDetail(item.placeId).then(result => {
+      if (alive) placeDetails.value[item.placeId] = result
+    }).finally(() => pendingPlaces.delete(item.placeId))
+  }
+})
 
 async function load(target: number) {
   const request = ++listSequence
-  reset()
   loading.value = true
   try {
-    const result = await CourseService.getSavedCourses(target - 1, 10)
+    const result = await CourseService.getSavedCourses(target - 1, 5)
     if (!alive || request !== listSequence) return
     cards.value = result.cards
     ok.value = result.ok
     totalPages.value = result.totalPages
     totalElements.value = result.totalElements
     page.value = target
-    if (result.ok && result.cards[0]) {
-      panelHeight.value = 55
-      void select(result.cards[0].id)
-    }
   } catch {
     if (alive && request === listSequence) { ok.value = false; cards.value = [] }
   } finally {
@@ -75,10 +95,8 @@ async function load(target: number) {
   }
 }
 async function choose(id: string) {
-  notice.value = ''
-  const pending = select(id)
-  panelHeight.value = expanded.value ? 55 : 18
-  await pending
+  const card = cards.value.find(item => item.id === id)
+  open({ id, title: card?.title || opened.value.find(item => item.id === id)?.title || '코스 상세' })
 }
 function togglePanel() {
   if (suppressClick) { suppressClick = false; return }
@@ -123,24 +141,18 @@ function navigate() {
   const sdk = (window as Window & { Kakao?: NaviSdk }).Kakao
   if (!startNavi(destination.value, mobile.value, sdk)) notice.value = '카카오내비를 열지 못했어요. 잠시 후 다시 시도해 주세요.'
 }
-async function removeCourse() {
-  const target = course.value
-  if (!target?.manageable || deleting.value || !window.confirm('이 코스를 삭제할까요? 삭제한 코스는 복구할 수 없어요.')) return
+async function removeCourse(id: string) {
+  if (deleting.value || !window.confirm('이 코스를 삭제할까요? 삭제한 코스는 복구할 수 없어요.')) return
   deleting.value = true
   try {
-    await CourseService.deleteCourse(target.id)
+    const target = await CourseService.getCourseDetail(id)
+    if (!target?.manageable) { notice.value = '삭제 권한을 확인하지 못했어요. 다시 시도해 주세요.'; return }
+    await CourseService.deleteCourse(id)
+    close(id)
     await load(cards.value.length === 1 && page.value > 1 ? page.value - 1 : page.value)
     notice.value = '코스를 삭제했어요.'
   } catch { notice.value = '삭제하지 못했어요. 다시 시도해 주세요.' }
   finally { deleting.value = false }
-}
-async function copyAddress() {
-  if (!course.value) return
-  const owned = course.value.manageable
-  try {
-    await navigator.clipboard.writeText(new URL(`/courses/${course.value.id}`, location.origin).href)
-    notice.value = owned ? '주소를 복사했어요. 내 저장 코스는 본인만 열 수 있어요.' : '코스 주소를 복사했어요.'
-  } catch { notice.value = '주소를 복사하지 못했어요. 코스 상세 화면에서 주소를 확인해 주세요.' }
 }
 onMounted(() => {
   browserObserver = new ResizeObserver(entries => {
@@ -158,24 +170,42 @@ onBeforeUnmount(() => { alive = false; listSequence++; browserObserver?.disconne
   <section ref="workspace" class="saved-workspace" :style="{ '--sheet-height': panelHeight + '%', '--browser-height': browserHeight + 'px', '--map-bottom': selectedId ? panelHeight + '%' : '0px' }" aria-label="저장한 코스">
     <aside class="course-sidebar">
       <div ref="courseBrowser" class="course-browser">
-        <div class="course-heading">
-          <div><span class="saved-eyebrow">SAVED ITINERARY</span><h1>저장한 코스 일정</h1></div>
-          <RouterLink class="new-course" to="/ai-course">새 코스 +</RouterLink>
+        <nav class="browser-tabs" aria-label="저장 코스 탭">
+          <button type="button" class="browser-tab fixed-tab" :class="{ active: !active }" :aria-current="!active ? 'page' : undefined" @click="showList">저장 코스</button>
+          <div v-for="tab in opened" :key="tab.id" class="browser-tab" :class="{ active: active === tab.id }">
+            <button type="button" :aria-current="active === tab.id ? 'page' : undefined" @click="choose(tab.id)">{{ tab.title }}</button>
+            <button type="button" class="close-tab" :aria-label="`${tab.title} 탭 닫기`" @click="close(tab.id)">×</button>
+          </div>
+        </nav>
+        <div class="tab-toolbar">
+          <RouterLink v-if="!active" class="new-course" to="/ai-course">새 코스 +</RouterLink>
+          <template v-else>
+            <RouterLink v-if="course?.swappable || course?.manageable" class="toolbar-edit icon-button" :to="`/courses/${active}`" aria-label="코스 편집" title="코스 편집"><AppIcon name="edit" /></RouterLink>
+            <button v-else type="button" disabled aria-label="코스 편집"><AppIcon name="edit" /></button>
+            <button type="button" :disabled="!course?.manageable || deleting" aria-label="코스 공유" title="코스 공유" @click="sharing = { id: active, title: course?.title || '여행 코스' }"><AppIcon name="share" /></button>
+          </template>
         </div>
+      </div>
+      <div v-show="!active" class="course-library">
         <p v-if="loading" role="status">저장한 코스를 불러오는 중이에요.</p>
         <div v-else-if="!ok" role="alert">코스를 불러오지 못했어요. <button type="button" @click="load(page)">다시 시도</button></div>
         <p v-else-if="!cards.length">아직 저장한 코스가 없어요. 새 코스를 만들어 보세요.</p>
         <template v-else>
-          <div class="course-tabs" aria-label="저장 코스 선택">
-            <button v-for="card in cards" :key="card.id" type="button" class="course-tab"
-              :class="{ active: selectedId === card.id }" :aria-expanded="selectedId === card.id && expanded"
-              aria-controls="saved-itinerary" :disabled="deleting" @click="choose(card.id)">
-              <span class="course-tab-title">{{ card.title }}<span aria-hidden="true">{{ selectedId === card.id && expanded ? '∧' : '∨' }}</span></span>
-              <strong>{{ card.stops || card.conditionLabel }}</strong>
+          <div class="library-list" aria-label="저장 코스 목록">
+            <article v-for="card in cards" :key="card.id" class="library-card">
+            <button type="button" class="course-tab"
+              :disabled="deleting" @click="choose(card.id)">
+              <span class="course-tab-title">{{ card.title }}</span>
+              <strong>{{ card.stops || card.conditionLabel }}</strong><small>{{ card.conditionLabel }}</small>
             </button>
+            <div class="library-actions">
+              <button type="button" :disabled="deleting" :aria-label="`${card.title} 공유`" title="코스 공유" @click="sharing = { id: card.id, title: card.title }"><AppIcon name="share" :size="17" /></button>
+              <button type="button" :disabled="deleting" :aria-label="`${card.title} 삭제`" title="코스 삭제" @click="removeCourse(card.id)"><AppIcon name="trash" :size="18" /></button>
+            </div>
+            </article>
           </div>
+          <small class="library-count">총 {{ totalElements }}개</small>
           <nav class="saved-pagination" aria-label="저장 코스 페이지">
-            <small>총 {{ totalElements }}개</small>
             <template v-if="totalPages > 1">
               <button type="button" :disabled="page <= 1 || loading || deleting" aria-label="이전 페이지" @click="load(page - 1)">‹</button>
               <span>{{ page }} / {{ totalPages }}</span>
@@ -183,6 +213,7 @@ onBeforeUnmount(() => { alive = false; listSequence++; browserObserver?.disconne
             </template>
           </nav>
         </template>
+        <p v-if="notice" class="saved-notice" role="status">{{ notice }}</p>
       </div>
       <section v-if="selectedId" id="saved-itinerary" class="itinerary-sheet" :class="{ collapsed: !expanded }" aria-label="선택한 코스 일정">
         <button class="sheet-handle" type="button" :aria-expanded="expanded" aria-label="일정 패널 펼치기 또는 접기. 위아래 방향키로 높이 조절"
@@ -197,9 +228,7 @@ onBeforeUnmount(() => { alive = false; listSequence++; browserObserver?.disconne
           </div>
           <div v-show="expanded" class="sheet-body">
             <div class="course-actions">
-              <RouterLink :to="`/courses/${course.id}`">{{ course.swappable ? '상세 · 일정 편집' : '코스 상세' }}</RouterLink>
-              <button type="button" @click="copyAddress">주소 복사</button>
-              <button v-if="course.manageable" type="button" :disabled="deleting" aria-label="선택한 코스 삭제" @click="removeCourse">{{ deleting ? '삭제 중…' : '삭제' }}</button>
+              <strong>{{ course.title }}</strong>
             </div>
             <p v-if="!course.days.length" class="sheet-message">등록된 일정이 없어요.</p>
             <section v-for="day in course.days" :key="day.dayNo" class="itinerary-day">
@@ -208,18 +237,23 @@ onBeforeUnmount(() => { alive = false; listSequence++; browserObserver?.disconne
               </button>
               <ol v-if="activeDay === day.dayNo" :id="`day-${day.dayNo}`" class="stop-list">
                 <li v-for="item in day.items" :key="item.id">
-                  <p v-if="item.inboundTravelMinutes != null || item.inboundDistanceM != null" class="travel-step">
-                    <span v-if="item.inboundTravelMinutes != null">이동 약 {{ item.inboundTravelMinutes }}분</span>
-                    <span v-if="item.inboundDistanceM != null"> · {{ (item.inboundDistanceM / 1000).toFixed(1) }}km</span>
-                  </p>
                   <span class="stop-number">{{ item.position }}</span>
+                  <article class="place-stop" :class="{ selected: selectedStop === String(item.id) }">
                   <button type="button" class="stop-card" :class="{ selected: selectedStop === String(item.id) }" :aria-pressed="selectedStop === String(item.id)" @click="selectedStop = String(item.id)">
-                    <img v-if="item.imageUrl" :src="item.imageUrl" alt="" loading="lazy" @error="($event.target as HTMLImageElement).hidden = true">
+                    <span class="stop-photo"><AppIcon name="album" :size="24" /><img v-if="item.imageUrl" :src="item.imageUrl" alt="" loading="lazy" @error="($event.target as HTMLImageElement).hidden = true"></span>
                     <span class="stop-copy"><span class="stop-time">{{ item.startTime?.slice(0, 5) || `${item.position}번째 방문` }}</span><strong>{{ item.placeName }}</strong><span v-if="item.reason" class="stop-description">{{ item.reason }}</span>
-                      <CongestionBadge v-if="item.congestionLevel" :level="item.congestionLevel" /><small v-else>혼잡 정보 없음</small>
+                      <span class="stop-facts"><span v-if="item.congestionLevel" class="crowd-pill" :class="item.congestionLevel.toLowerCase()">{{ item.congestionLabel || ({ QUIET: '한산', NORMAL: '보통', CROWDED: '혼잡' }[item.congestionLevel]) }}</span><small v-else>예보 없음</small></span>
+                      <span v-if="placeDetails[item.placeId]?.goodPrice" class="price-pill">착한가격업소 · {{ placeDetails[item.placeId]?.useFeeText || '가격 확인 필요' }}</span>
+                      <small v-if="stayDuration(item.startTime, item.endTime)">체류 {{ stayDuration(item.startTime, item.endTime) }}</small>
+                      <small v-if="item.congestionRate != null" class="concentration">집중률 {{ item.congestionRate.toFixed(1) }}%</small>
                     </span>
                   </button>
-                  <RouterLink class="place-detail" :to="`/places/${item.placeId}`">장소 상세</RouterLink>
+                  <div class="stop-footer">
+                    <span v-if="item.inboundTravelMinutes != null || item.inboundDistanceM != null">{{ transportLabel }} <template v-if="item.inboundTravelMinutes != null">약 {{ item.inboundTravelMinutes }}분 </template><template v-if="item.inboundDistanceM != null">({{ (item.inboundDistanceM / 1000).toFixed(1) }}km) </template>이동 · 이전 장소에서</span>
+                    <span v-else>이동 정보 없음</span>
+                    <RouterLink class="place-detail" :to="`/places/${item.placeId}`">상세 보기</RouterLink>
+                  </div>
+                  </article>
                 </li>
               </ol>
             </section>
@@ -239,6 +273,7 @@ onBeforeUnmount(() => { alive = false; listSequence++; browserObserver?.disconne
       <div v-if="!mapFailed" class="map-caption">{{ currentDay ? `DAY ${currentDay.dayNo} 방문 순서` : '제주 여행 지도' }}<small>연결선은 실제 도로 경로가 아니에요.</small></div>
     </div>
   </section>
+  <CourseShareDialog v-if="sharing" :key="sharing.id" :course-id="sharing.id" :title="sharing.title" @close="sharing = null" />
 </template>
 
 <style scoped src="./savedCourses.css"></style>
