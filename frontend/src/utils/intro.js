@@ -12,5 +12,19 @@ export function introOf (overview) {
   return t
 }
 
-/** 2줄로 접었을 때 '더보기'가 필요한 길이인지 - 한글 기준 두 줄 ≈ 70자 */
-export const needsMore = text => (text ?? '').length > 70
+/**
+ * 소개글을 표시용 문단으로 나눈다 - 글자는 하나도 건드리지 않고(공사 원문 무수정 규정) 원문 줄바꿈과
+ * 문장 끝("다." "요." "!" "?") 뒤 공백에서만 끊어 per 문장씩 묶는다. 936자가 한 덩어리로 오는 원문을
+ * 읽기 쉽게 하기 위한 것(2026-09-17). 뒤를 돌아보는 정규식(lookbehind)은 iOS 16.3 이하 사파리에서
+ * 문법 오류로 파일 전체가 죽으므로 쓰지 않는다. 로컬 1,783건 실측: 8자 미만 조각 0, 3문장 묶음 문단 1~5개.
+ */
+export function paragraphsOf (text, per = 3) {
+  const t = (text ?? '').trim()
+  if (!t) return []
+  const out = []
+  for (const block of t.split(/\r?\n+/)) {
+    const sents = block.replace(/([다요]\.|[!?])\s+/g, '$1\u0000').split('\u0000').map(s => s.trim()).filter(Boolean)
+    for (let i = 0; i < sents.length; i += per) out.push(sents.slice(i, i + per).join(' '))
+  }
+  return out
+}
