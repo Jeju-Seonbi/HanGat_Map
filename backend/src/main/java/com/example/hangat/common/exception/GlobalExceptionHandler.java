@@ -103,6 +103,9 @@ public class GlobalExceptionHandler {
 
     /** 3000번대 → 400, 5000번대 → 500 */
     private int httpStatusOf(int errorCode) {
+        if (errorCode == BaseResponseStatus.COURSE_SHARE_UNAVAILABLE.getCode()) {
+            return HttpStatus.NOT_FOUND.value();
+        }
         if (errorCode == BaseResponseStatus.COURSE_EXPIRED.getCode()) {
             return HttpStatus.GONE.value();
         }

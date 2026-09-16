@@ -135,6 +135,7 @@ public class SecurityConfig {
 
                 // 비회원 공개 API
                 .requestMatchers("/main/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/shared-courses/*").permitAll()
                 .requestMatchers("/auth/**").permitAll()
                 .requestMatchers(
                         HttpMethod.GET,
