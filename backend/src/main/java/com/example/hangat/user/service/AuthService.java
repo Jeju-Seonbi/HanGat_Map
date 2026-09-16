@@ -67,13 +67,13 @@ public class AuthService {
         return completeLogin(user);
     }
     /**
-     * 기존 refresh 세션을 폐기하고
-     * 새로운 access·refresh 토큰을 발급한다.
+     * 일반 회원의 기존 refresh 세션을 폐기하고 새 토큰을 발급한다.
+     * 심사용 공용 계정만 기기별 세션을 보존하며 재사용 탐지 정책은 동일하게 유지한다.
      */
     private AuthInternalDto.LoginResult completeLogin(
             User user) {
 
-        revokeAll(
+        if (!user.isDemoAccount()) revokeAll(
                 user.getId(),
                 RefreshRevokeReason.ROTATED
         );

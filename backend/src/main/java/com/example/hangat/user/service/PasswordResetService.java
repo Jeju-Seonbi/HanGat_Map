@@ -44,6 +44,9 @@ public class PasswordResetService {
         }
 
         User user = reset.getUser();
+        if (user.isDemoAccount()) {
+            throw new BaseException(BaseResponseStatus.DEMO_PASSWORD_LOCKED);
+        }
 
         String encodedPassword = passwordHasher.encodeNew(
                 request.password(),

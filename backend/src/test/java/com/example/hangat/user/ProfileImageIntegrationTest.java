@@ -75,6 +75,32 @@ class ProfileImageIntegrationTest {
 
     private String token(User user) { return "Bearer " + jwt.createAccessToken(user.getId()); }
 
+    @Test void 데모_사진은_배포_이미지로_고정되고_직접_업로드도_막힌다() throws Exception {
+        User demo = users.saveAndFlush(User.signUpWithSocial("demo@hangatjeju.com", "한갓지도 데모계정"));
+        try {
+            String publicPath = demo.publicProfileImageUrl();
+            assertThat(publicPath).isNotNull();
+            byte[] expected;
+            try (var stream = new org.springframework.core.io.ClassPathResource("images/demo-profile-v1.png").getInputStream()) {
+                expected = stream.readAllBytes();
+            }
+            mvc.perform(get("/users/me").header("Authorization", token(demo)))
+                    .andExpect(jsonPath("$.result.profileImageUrl").value(publicPath));
+            mvc.perform(get(publicPath)).andExpect(status().isOk()).andExpect(content().bytes(expected))
+                    .andExpect(header().string("Cache-Control", "max-age=300, private"));
+            mvc.perform(multipart("/users/me/profile-image")
+                            .file(new MockMultipartFile("file", "replacement.png", "image/png", png))
+                            .with(r -> { r.setMethod("PUT"); return r; }).header("Authorization", token(demo)))
+                    .andExpect(status().isForbidden());
+            verify(storage, never()).put(anyString(), any(), anyString());
+            verify(storage, never()).open(anyString());
+            assertThatThrownBy(() -> demo.updateProfileImage(null)).isInstanceOf(RuntimeException.class);
+            mvc.perform(get(publicPath)).andExpect(content().bytes(expected));
+            mvc.perform(get("/users/" + owner.getId() + "/profile-image/" + publicPath.substring(publicPath.lastIndexOf('/') + 1)))
+                    .andExpect(status().isNotFound());
+        } finally { users.deleteById(demo.getId()); }
+    }
+
     private String upload() throws Exception {
         var result = mvc.perform(multipart("/users/me/profile-image")
                         .file(new MockMultipartFile("file", "photo.png", "image/png", png))
