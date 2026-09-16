@@ -55,6 +55,10 @@ export async function login ({ email, password }) {
   return normalizeLogin(result)
 }
 
+export async function loginDemo () {
+  return normalizeLogin(await apiRequest('/auth/demo-login', { method: 'POST' }))
+}
+
 export async function restoreSession () {
   await reissueAccessToken()
   const user = normalizeUser(await apiRequest('/users/me', {
