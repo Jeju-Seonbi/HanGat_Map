@@ -11,6 +11,8 @@ import { useCourseTabs } from '../../composables/useCourseTabs'
 import PlaceDetailService, { type PlaceDetail } from '../../services/PlaceDetailService'
 import { stayDuration } from '../../services/course/stayDuration'
 import AppIcon from '../../components/common/AppIcon.vue'
+import CourseShareDialog from '../../components/course/CourseShareDialog.vue'
+const sharing = ref<{ id: string; title: string } | null>(null)
 
 const { opened, active, open, close, showList } = useCourseTabs()
 const placeDetails = ref<Record<number, PlaceDetail | null>>({})
@@ -180,7 +182,7 @@ onBeforeUnmount(() => { alive = false; listSequence++; browserObserver?.disconne
           <template v-else>
             <RouterLink v-if="course?.swappable || course?.manageable" class="toolbar-edit icon-button" :to="`/courses/${active}`" aria-label="코스 편집" title="코스 편집"><AppIcon name="edit" /></RouterLink>
             <button v-else type="button" disabled aria-label="코스 편집"><AppIcon name="edit" /></button>
-            <button type="button" disabled aria-label="공유 준비 중" title="공유 준비 중"><AppIcon name="share" /></button>
+            <button type="button" :disabled="!course?.manageable || deleting" aria-label="코스 공유" title="코스 공유" @click="sharing = { id: active, title: course?.title || '여행 코스' }"><AppIcon name="share" /></button>
           </template>
         </div>
       </div>
@@ -197,7 +199,7 @@ onBeforeUnmount(() => { alive = false; listSequence++; browserObserver?.disconne
               <strong>{{ card.stops || card.conditionLabel }}</strong><small>{{ card.conditionLabel }}</small>
             </button>
             <div class="library-actions">
-              <button type="button" disabled :aria-label="`${card.title} 공유 준비 중`" title="공유 준비 중"><AppIcon name="share" :size="17" /></button>
+              <button type="button" :disabled="deleting" :aria-label="`${card.title} 공유`" title="코스 공유" @click="sharing = { id: card.id, title: card.title }"><AppIcon name="share" :size="17" /></button>
               <button type="button" :disabled="deleting" :aria-label="`${card.title} 삭제`" title="코스 삭제" @click="removeCourse(card.id)"><AppIcon name="trash" :size="18" /></button>
             </div>
             </article>
@@ -271,6 +273,7 @@ onBeforeUnmount(() => { alive = false; listSequence++; browserObserver?.disconne
       <div v-if="!mapFailed" class="map-caption">{{ currentDay ? `DAY ${currentDay.dayNo} 방문 순서` : '제주 여행 지도' }}<small>연결선은 실제 도로 경로가 아니에요.</small></div>
     </div>
   </section>
+  <CourseShareDialog v-if="sharing" :key="sharing.id" :course-id="sharing.id" :title="sharing.title" @close="sharing = null" />
 </template>
 
 <style scoped src="./savedCourses.css"></style>

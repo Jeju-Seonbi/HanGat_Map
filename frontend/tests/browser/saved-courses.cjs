@@ -19,7 +19,7 @@ const url=(process.env.SAVED_COURSES_TEST_URL || 'http://127.0.0.1:5208')+'/test
  await page.screenshot({path:join(tmpdir(),'saved-list-tabs.png')});
  await page.locator('.library-list .course-tab').first().click();
  await page.locator('.stop-card').first().waitFor();
- assert.equal(await page.getByRole('button',{name:'공유 준비 중',exact:true}).isDisabled(),true);
+ assert.equal(await page.getByRole('button',{name:'코스 공유',exact:true}).isDisabled(),false);
  assert.equal(await page.locator('.course-actions button').count(),0);
  assert.equal(await page.locator('.stop-card .stop-photo').count(),3);
  assert.equal(await page.locator('.place-stop .stop-footer').count(),3);
