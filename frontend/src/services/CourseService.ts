@@ -78,6 +78,7 @@ interface BackendPage<T> {
 
 /** 백엔드 CourseDetailResponse 의 일정 한 칸 */
 export interface CourseDetailItem {
+  endTime?: string | null
   id: number
   placeId: number
   placeName: string
@@ -108,6 +109,7 @@ export interface CourseDetailDay {
 }
 
 export interface CourseDetail {
+  transport?: string | null
   id: string
   status?: string
   title: string | null
@@ -130,6 +132,7 @@ export interface CourseDetail {
 }
 
 interface BackendCourseDetail {
+  transport?: string | null
   id: number
   status?: string
   title: string | null
@@ -160,6 +163,7 @@ interface BackendCourseDetail {
       longitude: number | null
       position: number
       start_time: string | null
+      end_time?: string | null
       congestion_rate: number | null
       congestion_level: CongestionLevel | null
       congestion_label: string | null
@@ -326,6 +330,7 @@ export const CourseService = {
       const row = await apiRequest(`/courses/${id}`, { auth: getBackendUserId() != null }) as BackendCourseDetail
       return {
         id: String(row.id),
+        transport: row.transport,
         title: row.title,
         conditionLabel: conditionLabelOf(
           row.days[0]?.items[0]?.region_name ?? null, row.duration_text, row.people),
@@ -355,6 +360,7 @@ export const CourseService = {
             longitude: item.longitude,
             position: item.position,
             startTime: item.start_time,
+            endTime: item.end_time,
             congestionRate: item.congestion_rate,
             congestionLevel: item.congestion_level,
             congestionLabel: item.congestion_label,
