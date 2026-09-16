@@ -276,7 +276,8 @@ async function onLogout () {
         <div><dt>마지막 로그인</dt><dd>{{ user?.lastLoginAt ? fmtDateTime(user.lastLoginAt) : '-' }}</dd></div>
       </dl>
 
-      <div class="acts">
+      <p v-if="user?.demoAccount" class="note">데모 계정의 비밀번호는 변경할 수 없어요.</p>
+      <div v-else class="acts">
         <button class="btn2 primary" :disabled="pwBusy" @click="openPasswordReset">
           비밀번호 변경
         </button>

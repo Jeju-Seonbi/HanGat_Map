@@ -20,6 +20,7 @@ export function normalizeUser (user) {
     status: user.status,
     statusCode: user.status,
     emailVerified: !!user.emailVerified,
+    demoAccount: user.demoAccount === true,
     lastLoginAt: user.lastLoginAt ?? null,
     createdAt: user.createdAt ?? null,
     profileImageUrl: user.profileImageUrl ?? null
