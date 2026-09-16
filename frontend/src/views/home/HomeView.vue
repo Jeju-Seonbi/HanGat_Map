@@ -569,12 +569,14 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateArrows))
 .poster-stats .lv.crowded {
   color: var(--crowded);
 }
+/* 흰 배경을 박아 두면 다크 모드에서 흰 글자가 흰 알약에 묻힌다 - 배경도 테마를 따라간다 */
 .poster-cta {
   display: inline-flex;
   padding: 11px 26px;
   border-radius: 99px;
-  background: #fff;
-  border: 1px solid #e5e8eb;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
   font-weight: 700;
   font-size: 0.9rem;
 }
