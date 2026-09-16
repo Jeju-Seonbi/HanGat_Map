@@ -11,6 +11,8 @@ const weather = {
 } as const
 const travelMode = { RENTAL_CAR: '차량', PUBLIC_TRANSIT: '대중교통', TAXI: '택시', WALK_BIKE: '도보·자전거' }
 const distance = (metres?: number) => metres ? metres >= 1000 ? `${(metres / 1000).toFixed(1)}km` : `${metres}m` : ''
+/** 백엔드는 "10:00:00"으로 준다. 초까지 보여 줄 이유가 없고 좁은 화면에서 시간 칸을 넘친다 */
+const hhmm = (time?: string | null) => (time ? time.slice(0, 5) : '')
 const gapDuration = (minutes: number) => minutes % 60
   ? `약 ${Math.floor(minutes / 60)}시간 ${minutes % 60}분`
   : `약 ${minutes / 60}시간`
@@ -32,7 +34,7 @@ const costLabel = (cost: CourseItem['costs'][number]) => {
     <span>↓</span> 추정 {{ travelMode[props.transport] }} {{ item.inbound_travel_minutes }}분 · 직선거리 {{ distance(item.inbound_distance_m) }}
   </div>
   <article class="course-item">
-    <div class="item-time"><b>{{ item.start_time || '시간 미정' }}</b><small v-if="item.end_time">~ {{ item.end_time }}</small></div>
+    <div class="item-time"><b>{{ hhmm(item.start_time) || '시간 미정' }}</b><small v-if="item.end_time">~ {{ hhmm(item.end_time) }}</small></div>
     <img :src="item.image_url || '/images/placeholder.svg'" :alt="item.place_name">
     <div class="item-copy">
       <div class="item-head">
@@ -60,5 +62,16 @@ const costLabel = (cost: CourseItem['costs'][number]) => {
 
 <style scoped>
 .badges .closed-badge{background:rgba(244,54,76,.12);color:var(--busy,#c0392b)}
-.alternative-button{margin-right:6px;white-space:nowrap}.item-weather{margin:7px 0 0;color:var(--course-text-2);font-size:.7rem;font-weight:700}@media(max-width:767px){.alternative-button{width:100%;max-width:100%;margin-right:0;white-space:nowrap}}
+.alternative-button{margin-right:6px;white-space:nowrap}.item-weather{margin:7px 0 0;color:var(--course-text-2);font-size:.7rem;font-weight:700}
+@media(max-width:767px){
+  /* 전역 모바일 규칙(styles.css)은 시간·사진·본문 3열이라 375px에서 시간이 잘리고 본문이 한 자씩 접힌다.
+     저장 코스 일정 카드와 같은 모양으로 - 사진은 왼쪽에 두고 시간과 본문은 오른쪽에 쌓는다 */
+  .course-item{grid-template-columns:72px minmax(0,1fr);column-gap:12px;row-gap:5px;padding:14px 0}
+  .course-item img{grid-column:1;grid-row:1/span 2;width:72px;height:76px;border-radius:11px}
+  .item-time{grid-column:2;grid-row:1;display:flex;align-items:baseline;gap:5px;padding-top:0}
+  .item-time b{font-size:.82rem}
+  .item-time small{font-size:.68rem}
+  .item-copy{grid-column:2;grid-row:2}
+  .alternative-button{width:100%;max-width:100%;margin-right:0;white-space:nowrap}
+}
 </style>
