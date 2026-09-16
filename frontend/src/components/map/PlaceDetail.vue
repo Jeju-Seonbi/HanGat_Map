@@ -385,7 +385,7 @@ async function shareNative() {
         </template>
         <template v-else-if="c == null">
           <span class="bdg" style="background:var(--none);color:#fff">예보 없음</span>
-          &nbsp;관광공사 혼잡 예측 대상이 아니라 이 장소는 예보가 없어요.
+          &nbsp;관광공사 혼잡 예측 대상이 아니에요.
         </template>
         <template v-else>
           <span class="bdg tier-bg" :class="t" style="color:#fff">{{ tierKo(c) }}</span>
@@ -395,17 +395,17 @@ async function shareNative() {
 
       <!-- 범위 밖 날짜여도 이 장소의 예보가 있으면 팁은 살린다 - 예보가 있는 날로 돌아갈 길 -->
       <div v-if="(c != null || outOfRange) && best.c != null && !s.closed" class="tipbox" @click="jumpToBest">
-        <template v-if="outOfRange">🕐 예보가 있는 날 중엔 <b>{{ fmtK(at(best.k)) }}</b>이 가장 한산해요. 눌러서 옮겨보세요.</template>
+        <template v-if="outOfRange">🕐 예보가 있는 날 중엔 <b>{{ fmtK(at(best.k)) }}</b>이 가장 한산해요.</template>
         <template v-else-if="!tipText">✓ {{ forecastLen }}일 중 <b>{{ dayWord(state.di) }}이 가장 한산</b>해요.</template>
-        <template v-else>🕐 <b>{{ fmtK(at(best.k)) }}</b>로 가면 <b>{{ tipText }}</b> 날이에요. 눌러서 옮겨보세요.</template>
+        <template v-else>🕐 <b>{{ fmtK(at(best.k)) }}</b>로 가면 <b>{{ tipText }}</b> 날이에요.</template>
       </div>
 
       <!-- 폐업 장소는 날씨·혼잡 줄을 그리지 않는다 - 갈 수 없는 곳의 예보다 -->
       <template v-if="!s.closed">
       <div class="spark" style="margin-bottom:6px"><div class="st"><i></i>{{ crowdUi ? '날짜별 날씨와 혼잡' : '날짜별 날씨' }}</div></div>
       <div class="wxrow">
-        <div v-for="w in week" :key="w.k" class="wxc" :class="{ on: w.k === state.di }"
-          @click="state.di = w.k">
+        <!-- 날짜는 달력에서만 바꾼다 - 카드는 보기 전용, 달력에서 고른 날만 강조(2026-09-16 사용자 결정) -->
+        <div v-for="w in week" :key="w.k" class="wxc" :class="{ on: w.k === state.di }">
           <div class="wd">{{ w.label }}</div>
           <!-- 아이콘은 3종이라 눈·소나기·흐림은 글자(title·낭독기)로 보완한다(최종점검 #41) -->
           <div class="wi" :title="w.w?.label" :aria-label="w.w?.label" v-html="w.w ? wxIcon(w.w.k, 27) : ''"></div>
