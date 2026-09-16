@@ -20,6 +20,7 @@ export function normalizeUser (user) {
     status: user.status,
     statusCode: user.status,
     emailVerified: !!user.emailVerified,
+    demoAccount: user.demoAccount === true,
     lastLoginAt: user.lastLoginAt ?? null,
     createdAt: user.createdAt ?? null,
     profileImageUrl: user.profileImageUrl ?? null
@@ -52,6 +53,10 @@ export async function login ({ email, password }) {
     body: { email, password }
   })
   return normalizeLogin(result)
+}
+
+export async function loginDemo () {
+  return normalizeLogin(await apiRequest('/auth/demo-login', { method: 'POST' }))
 }
 
 export async function restoreSession () {

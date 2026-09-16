@@ -341,8 +341,7 @@
 .wxrow::-webkit-scrollbar-thumb{background:var(--line2);border-radius:3px}
 /* 카드 폭 58px - 헤더 높이(--nav-h)와 무관한 값인데 통합 때 58px 일괄 치환에 휩쓸려 데스크톱 80px·폰 60px 로 흔들렸다(최종점검 #57) */
 .wxc{flex:0 0 auto;width:58px;padding:8px 0 8px;border-radius:13px;background:var(--surf2);
-  text-align:center;cursor:pointer;border:2px solid transparent;transition:transform .12s,box-shadow .12s}
-.wxc:hover{transform:translateY(-2px);box-shadow:var(--sh)}
+  text-align:center;border:2px solid transparent}
 .wxc.on{background:var(--ac-bg);border-color:var(--ac)}
 .wxc .wd{font-size:10.5px;font-weight:700;color:var(--tx3);letter-spacing:-.02em}
 .wxc.on .wd{color:var(--ac-dk)}

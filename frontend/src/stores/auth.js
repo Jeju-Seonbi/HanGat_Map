@@ -38,6 +38,16 @@ export const useAuthStore = defineStore('auth', {
   },
 
   actions: {
+    async loginDemo () {
+      if (this.loading) return
+      this.loading = true
+      try {
+        const res = await authApi.loginDemo()
+        this.user = res.user
+        this.endedReason = null
+        return res
+      } finally { this.loading = false }
+    },
     /** 앱 시작 시 리프레시 쿠키로 세션 복구 */
     async restore () {
       if (this.ready) return
