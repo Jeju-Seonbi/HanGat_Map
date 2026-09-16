@@ -27,6 +27,7 @@ import java.time.ZoneId;
 @Slf4j
 @Component
 @Profile("batch")
+@org.springframework.boot.autoconfigure.condition.ConditionalOnExpression("'${hangat.batch.job:}' != 'media-cleanup'")
 public class BatchJobRunner implements ApplicationRunner {
     private final String job;
     private final CongestionIngestService congestion;
