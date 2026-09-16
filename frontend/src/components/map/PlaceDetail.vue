@@ -395,9 +395,9 @@ async function shareNative() {
 
       <!-- 범위 밖 날짜여도 이 장소의 예보가 있으면 팁은 살린다 - 예보가 있는 날로 돌아갈 길 -->
       <div v-if="(c != null || outOfRange) && best.c != null && !s.closed" class="tipbox" @click="jumpToBest">
-        <template v-if="outOfRange">🕐 예보가 있는 날 중엔 <b>{{ fmtK(at(best.k)) }}</b>이 가장 한산해요. 눌러서 옮겨보세요.</template>
+        <template v-if="outOfRange">🕐 예보가 있는 날 중엔 <b>{{ fmtK(at(best.k)) }}</b>이 가장 한산해요.</template>
         <template v-else-if="!tipText">✓ {{ forecastLen }}일 중 <b>{{ dayWord(state.di) }}이 가장 한산</b>해요.</template>
-        <template v-else>🕐 <b>{{ fmtK(at(best.k)) }}</b>로 가면 <b>{{ tipText }}</b> 날이에요. 눌러서 옮겨보세요.</template>
+        <template v-else>🕐 <b>{{ fmtK(at(best.k)) }}</b>로 가면 <b>{{ tipText }}</b> 날이에요.</template>
       </div>
 
       <!-- 폐업 장소는 날씨·혼잡 줄을 그리지 않는다 - 갈 수 없는 곳의 예보다 -->
