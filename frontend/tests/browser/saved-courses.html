@@ -1,0 +1,23 @@
+<!doctype html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="app"></div><script type="module">
+import { createApp, h } from 'vue';
+import { createPinia } from 'pinia';
+import { createRouter, createMemoryHistory } from 'vue-router';
+// Local browser regression fixture only. Vite's production entry remains index.html.
+import Saved from '/src/views/course/SavedCoursesView.vue';
+import Header from '/src/components/layout/AppHeader.vue';
+import CourseService from '/src/services/CourseService';
+import '/src/assets/styles/fonts.css';
+import '/src/assets/styles/tokens.css';
+import '/src/assets/styles/base.css';
+import '/src/assets/styles.css';
+const names=['금오름','새미은총의동산','성이시돌목장'];
+CourseService.getSavedCourses=async(page)=>({ok:true,totalPages:2,totalElements:12,cards:[1,2,3].map(id=>({id:String(id+page*10),title:['서부 힐링 코스','북부 오름 투어','제주시 미식 산책'][id-1],stops:'금오름 → 성이시돌목장',conditionLabel:'서부 2박 3일 · 2인'}))});
+CourseService.getCourseDetail=async(id)=>({id,title:'서부 힐링 코스',conditionLabel:'서부 2박 3일 · 2인',budgetLabel:'요금 확인 필요',level:'QUIET',swappable:true,manageable:true,days:[1,2,3].map(dayNo=>({dayNo,visitDate:`2026-09-${16+dayNo}`,items:names.map((placeName,i)=>({id:dayNo*10+i,placeId:i+1,placeName,position:i+1,startTime:`${10+i*2}:00`,latitude:33.35+i*.02,longitude:126.3+i*.01,congestionLevel:i===2?null:'QUIET',congestionRate:i===2?null:24,reason:'제주의 숲과 들판에서 여유롭게 산책할 수 있는 장소예요.',inboundTravelMinutes:i?12:null,inboundDistanceM:i?7400:null,imageUrl:null}))}))});
+window.qaMap={relayouts:0};
+const maps={load:fn=>fn(),LatLng:class{constructor(lat,lng){this.lat=lat;this.lng=lng}},LatLngBounds:class{extend(){}},Map:class{constructor(el){this.el=el;el.style.background='#cfe8df'}setCenter(){}panTo(){}setBounds(){}setLevel(){}relayout(){window.qaMap.relayouts++}},CustomOverlay:class{constructor(o){this.content=o.content;this.map=o.map;o.content.style.position='relative';o.content.style.margin='20px';o.map.el.append(o.content)}setMap(m){if(!m)this.content.remove()}},Polyline:class{setMap(){}}};
+window.kakao={maps};
+window.Kakao={Share:{},isInitialized:()=>true,Navi:{start:x=>window.qaNavi=x}};
+const router=createRouter({history:createMemoryHistory(),routes:[{path:'/:pathMatch(.*)*',component:Saved}]});
+await router.push('/courses');
+createApp({render:()=>h('div',[h(Header),h(Saved)])}).use(createPinia()).use(router).mount('#app');
+</script></body></html>
