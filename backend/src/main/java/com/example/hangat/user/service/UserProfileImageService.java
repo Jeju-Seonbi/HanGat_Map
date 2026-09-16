@@ -1,6 +1,10 @@
 package com.example.hangat.user.service;
 
 import com.example.hangat.common.storage.FileStorage;
+import com.example.hangat.common.exception.BaseException;
+import com.example.hangat.common.model.BaseResponseStatus;
+import com.example.hangat.user.model.User;
+import org.springframework.core.io.ClassPathResource;
 import com.example.hangat.common.storage.ImageValidator;
 import com.example.hangat.user.model.UserStatus;
 import com.example.hangat.user.model.dto.UserDto.UserResponse;
@@ -50,6 +54,9 @@ public class UserProfileImageService {
     /** 새 파일 저장 → 회원 행 잠금 및 키 교체 → 커밋 성공 후 이전 파일 정리 순서다. */
     public UserResponse upload(Long userId, MultipartFile file) {
         requireActive(userId);
+        if (users.findById(userId).orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED)).isDemoAccount()) {
+            throw new BaseException(BaseResponseStatus.DEMO_PROFILE_IMAGE_LOCKED);
+        }
         var image = validator.validate(file);
         String key = "profiles/" + userId + "/" + UUID.randomUUID() + "." + image.extension();
         Saved saved;
@@ -96,6 +103,16 @@ public class UserProfileImageService {
         if (!FILENAME.matcher(filename).matches()) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         String key = "profiles/" + userId + "/" + filename;
         var user = users.findById(userId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (user.isDemoAccount()) {
+            if (user.getStatus() != UserStatus.ACTIVE || !User.DEMO_PROFILE_FILENAME.equals(filename)) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+            }
+            try {
+                return new ClassPathResource("images/demo-profile-v1.png").getInputStream();
+            } catch (java.io.IOException error) {
+                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "데모 프로필 이미지를 읽지 못했습니다.", error);
+            }
+        }
         if (user.getStatus() != UserStatus.ACTIVE || !key.equals(user.getProfileImageKey())) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }

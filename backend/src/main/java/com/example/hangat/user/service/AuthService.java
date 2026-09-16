@@ -29,6 +29,20 @@ import java.time.LocalDateTime;
 @Service
 @RequiredArgsConstructor
 public class AuthService {
+    @org.springframework.beans.factory.annotation.Value("${app.demo-login.enabled:false}")
+    private boolean demoLoginEnabled;
+
+    /** 계정은 운영자가 미리 준비하며 외부 입력으로 로그인 대상을 선택할 수 없다. */
+    @Transactional
+    public AuthInternalDto.LoginResult loginDemo() {
+        if (!demoLoginEnabled) throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE, "데모 체험이 준비 중입니다.");
+        User user = userRepository.findByEmail("demo@hangatjeju.com")
+                .filter(User::canLogin).filter(User::isEmailVerified)
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE, "데모 체험이 준비 중입니다."));
+        return completeLogin(user);
+    }
 
     /**
      * 계정이 없을 때도 BCrypt를 한 번 돌리기 위한 더미 해시
@@ -67,13 +81,13 @@ public class AuthService {
         return completeLogin(user);
     }
     /**
-     * 기존 refresh 세션을 폐기하고
-     * 새로운 access·refresh 토큰을 발급한다.
+     * 일반 회원의 기존 refresh 세션을 폐기하고 새 토큰을 발급한다.
+     * 심사용 공용 계정만 기기별 세션을 보존하며 재사용 탐지 정책은 동일하게 유지한다.
      */
     private AuthInternalDto.LoginResult completeLogin(
             User user) {
 
-        revokeAll(
+        if (!user.isDemoAccount()) revokeAll(
                 user.getId(),
                 RefreshRevokeReason.ROTATED
         );

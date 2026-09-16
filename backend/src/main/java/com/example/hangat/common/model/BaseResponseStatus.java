@@ -32,6 +32,8 @@ public enum BaseResponseStatus {
     PASSWORD_TOO_SHORT(false, 3109, "비밀번호는 12자 이상이어야 합니다."),
     PASSWORD_TOO_LONG(false, 3110, "비밀번호가 너무 깁니다. 한글은 24자까지 가능합니다."),
     PASSWORD_CONFIRM_MISMATCH(false, 3111, "비밀번호가 일치하지 않습니다."),
+    DEMO_PASSWORD_LOCKED(false, 3112, "데모 계정의 비밀번호는 변경할 수 없어요."),
+    DEMO_PROFILE_IMAGE_LOCKED(false, 3113, "데모 계정의 프로필 사진은 변경할 수 없어요."),
 
     // 3150번대 OAuth·인증 보안
     OAUTH_LOGIN_FAILED(false, 3150, "소셜 로그인에 실패했습니다."),
