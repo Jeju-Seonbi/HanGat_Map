@@ -385,7 +385,7 @@ async function shareNative() {
         </template>
         <template v-else-if="c == null">
           <span class="bdg" style="background:var(--none);color:#fff">예보 없음</span>
-          &nbsp;관광공사 혼잡 예측 대상이 아니라 이 장소는 예보가 없어요.
+          &nbsp;관광공사 혼잡 예측 대상이 아니에요.
         </template>
         <template v-else>
           <span class="bdg tier-bg" :class="t" style="color:#fff">{{ tierKo(c) }}</span>
