@@ -3,7 +3,7 @@
 {{- fail "CronJob 활성화 전 backend.scheduling.enabled=false로 API 예약 작업을 중단하세요." }}
 {{- end }}
 {{- range $name, $job := .Values.batch.jobs }}
-{{- if not (has $name (list "places" "congestion" "weather" "trip-weather" "sample-courses" "trip-reminders")) }}
+{{- if not (has $name (list "places" "congestion" "weather" "trip-weather" "sample-courses" "trip-reminders" "media-cleanup")) }}
 {{- fail (printf "지원하지 않는 batch.jobs 작업입니다: %s" $name) }}
 {{- end }}
 ---
@@ -66,12 +66,20 @@ spec:
                 - "--spring.jpa.hibernate.ddl-auto=validate"
                 - "--hangat.scheduling.enabled=false"
                 - {{ printf "--hangat.batch.job=%s" $name | quote }}
+                {{- if eq $name "media-cleanup" }}
+                - {{ printf "--hangat.media-cleanup.dry-run=%t" $.Values.batch.mediaCleanupDryRun | quote }}
+                {{- end }}
               # 배치에 필요한 값만 선별한 전용 리소스. API 인증·메일·MinIO 비밀값은 주입하지 않는다.
               envFrom:
                 - configMapRef:
                     name: {{ include "hangat.fullname" $ }}-batch-config
                 - secretRef:
                     name: {{ include "hangat.fullname" $ }}-batch-secret
+                {{- if eq $name "media-cleanup" }}
+                # 정리 작업에만 MinIO 값 4개를 제공한다. API 인증·메일 비밀값은 포함하지 않는다.
+                - secretRef:
+                    name: {{ include "hangat.fullname" $ }}-media-cleanup-secret
+                {{- end }}
               securityContext:
                 {{- toYaml $.Values.backend.containerSecurityContext | nindent 16 }}
               resources:

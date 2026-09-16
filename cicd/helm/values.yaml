@@ -189,6 +189,9 @@ batch:
   successfulJobsHistoryLimit: 1
   failedJobsHistoryLimit: 3
 
+  # 최초 배포는 파일을 삭제하지 않고 DB 후보와 로그만 기록한다.
+  mediaCleanupDryRun: true
+
   resources:
     requests:
       cpu: 100m
@@ -219,6 +222,9 @@ batch:
 
     trip-reminders:
       schedule: "10 * * * *"
+
+    media-cleanup:
+      schedule: "20 5 * * *"
 
 # ────────────────────────── 프론트엔드 ──────────────────────────
 
