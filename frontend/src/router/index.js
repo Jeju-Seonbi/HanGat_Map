@@ -68,7 +68,7 @@ export const routes = [
   },
 
   /* ── 공유 코스 (MY_003) — 비로그인 조회 가능 ── */
-  { path: '/share/:token', name: 'share', component: () => import('../views/share/ShareCourseView.vue'), meta: { compactHeader: true, title: '공유된 코스' } },
+  { path: '/share/:token', name: 'share', component: () => import('../views/share/ShareCourseView.vue'), meta: { compactHeader: true, styleScope: 'content', title: '공유된 코스' } },
 
   /* ── 옛 경로 — 지우지 않고 새 경로로 보낸다 ── */
   { path: '/home', redirect: '/' },
