@@ -4,6 +4,9 @@ backend:
   replicaCount: 1
 
   configEnv:
+    # 운영 DB에 준비된 심사용 계정으로 버튼 로그인을 허용한다.
+    # 중단할 때는 Jenkins private values에서 false로 덮어쓸 수 있다.
+    APP_DEMO_LOGIN_ENABLED: "true"
     DB_URL: "jdbc:mariadb://mariadb.fileinnout.svc.cluster.local:3306/hangat"
 
     FRONTEND_URL: "https://hangatjeju.com"

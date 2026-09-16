@@ -61,6 +61,15 @@ class DemoAccountIntegrationTest {
         assertThat(users.count()).isEqualTo(before);
     }
 
+    @Test void passwordlessDemoAccountCanUseButtonButNotPasswordLogin() {
+        User user = User.signUpWithSocial("demo@hangatjeju.com", "한갓지도 데모계정");
+        users.saveAndFlush(user);
+        assertThat(user.getPassword()).isNull();
+        assertThat(auth.loginDemo().rawRefreshToken()).isNotBlank();
+        assertThatThrownBy(() -> auth.login(new AuthDto.LoginRequest(user.getEmail(), PASSWORD)))
+                .isInstanceOf(BaseException.class);
+    }
+
     @Test void demoDevicesKeepIndependentSessions() {
         User user = seed("demo@hangatjeju.com");
         String first = login(user), second = login(user);
