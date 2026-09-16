@@ -24,13 +24,22 @@ describe('장소 상세 조회 (MAP_008, 담당 정동현)', () => {
 
   it('예보는 최신 발표분에서 이 장소 것만 꺼낸다', async () => {
     vi.mocked(apiGet).mockResolvedValue({
-      from: '2026-09-08', days: 3, values: { '1613': [10.2, 22, 71], '1518': [40, 41, 42] },
+      from: '2026-09-08', baseDate: '2026-09-09', days: 3,
+      values: { '1613': [10.2, 22, 71], '1518': [40, 41, 42] },
     })
 
     const forecast = await PlaceDetailService.getForecast(1613)
 
     expect(apiGet).toHaveBeenCalledWith('/crowd/forecast', 15000)
-    expect(forecast).toEqual({ from: '2026-09-08', rates: [10.2, 22, 71] })
+    // 발표일은 창 시작일과 다르다 - 새벽 적재가 받는 창은 하루 앞에서 시작한다
+    expect(forecast).toEqual({ from: '2026-09-08', baseDate: '2026-09-09', rates: [10.2, 22, 71] })
+  })
+
+  it('발표일이 없는 옛 응답도 읽는다 - baseDate는 null로 둔다', async () => {
+    vi.mocked(apiGet).mockResolvedValue({ from: '2026-09-08', days: 3, values: { '1613': [10.2, 22, 71] } })
+
+    expect(await PlaceDetailService.getForecast(1613)).toEqual(
+      { from: '2026-09-08', baseDate: null, rates: [10.2, 22, 71] })
   })
 
   it('예보 대상이 아닌 장소는 null - 0으로 채우면 "정보 없음"이 "한산"으로 둔갑한다', async () => {

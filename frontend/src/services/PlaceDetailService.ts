@@ -52,8 +52,10 @@ export interface PlaceDetail {
 
 /** 이 장소의 날짜별 집중률. 예보 대상(345곳)이 아니면 비어 있다 - 0으로 채우지 않는다 */
 export interface PlaceForecast {
-  /** 예보 첫 날 (YYYY-MM-DD) */
+  /** 예보 첫 날 (YYYY-MM-DD). 새벽 적재분은 늘 어제부터 시작한다 - 묵음 판정에 쓰지 말 것 */
   from: string
+  /** 발표분을 받아 온 날 (YYYY-MM-DD). 예보가 묵었는지는 이 값으로 본다. 옛 응답이면 null */
+  baseDate: string | null
   /** from 부터 하루씩. 백엔드가 값 없는 날짜를 null로 남기므로 그대로 받는다 - 0으로 바꾸지 않는다 */
   rates: Array<number | null>
 }
@@ -69,6 +71,7 @@ export interface DayWeather {
 
 interface BackendForecast {
   from: string
+  baseDate?: string | null
   days: number
   values: Record<string, Array<number | null>>
 }
@@ -91,7 +94,7 @@ export const PlaceDetailService = {
     try {
       const res = await apiGet<BackendForecast>('/crowd/forecast', 15000)
       const rates = res.values?.[String(placeId)]
-      return rates?.length ? { from: res.from, rates } : null
+      return rates?.length ? { from: res.from, baseDate: res.baseDate ?? null, rates } : null
     } catch {
       return null
     }

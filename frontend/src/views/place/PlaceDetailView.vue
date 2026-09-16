@@ -24,7 +24,7 @@ import CongestionBadge from '../../components/common/CongestionBadge.vue'
 import { congestionLabel } from '../../utils/congestion'
 import { levelLabel } from '../../data/data'
 import { fmt, todayKst } from '../../utils/format.js'
-import { buildForecastSeries } from './forecastSeries'
+import { buildForecastSeries, isForecastStale } from './forecastSeries'
 import { isWideInfo, parseInfoText } from './infoText'
 
 const route = useRoute()
@@ -49,8 +49,13 @@ const today = todayKst()
 /** 예보 창을 오늘부터 편다. 배치가 밀려 from이 오늘보다 앞서면 지난 날짜는 그리지 않는다 (forecastSeries 참고) */
 const series = computed(() => buildForecastSeries(forecast.value, today))
 /** 받아 둔 예보분이 오늘 이전에 시작했다 - 그 뒤로 새 발표분이 안 들어온 상태라 화면에 밝힌다 */
-const forecastStale = computed(() => forecast.value != null && forecast.value.from < today)
-const forecastFromLabel = computed(() => (forecast.value ? fmt(forecast.value.from) : ''))
+/** 오늘 발표분을 못 받았는지. 창 시작일이 아니라 발표일로 본다 - 창은 정상 적재에도 어제부터다(forecastSeries 참고) */
+const forecastStale = computed(() => isForecastStale(forecast.value, today))
+const baseDateLabel = computed(() => (forecast.value?.baseDate ? fmt(forecast.value.baseDate) : ''))
+/** 창이 통째로 과거일 때 안내. 발표일을 모르는 응답이면 날짜를 지어내지 않는다 */
+const staleNotice = computed(() => (baseDateLabel.value
+  ? `받아 둔 예보가 ${baseDateLabel.value} 발표분이라 오늘 이후 날짜가 없어요. 다음 적재 뒤에 다시 보여드릴게요.`
+  : '받아 둔 예보에 오늘 이후 날짜가 없어요. 다음 적재 뒤에 다시 보여드릴게요.'))
 /** 축 눈금은 처음·가운데·끝 - 창이 1~2일로 짧으면 같은 날짜를 세 번 찍지 않는다 */
 const axisLabels = computed(() => {
   const rows = series.value
@@ -424,7 +429,7 @@ watch(placeId, load)
             앞으로는 {{ calmestDay.date === today ? '오늘' : calmestDay.label }}이 가장 한산해요.
           </p>
           <p class="muted source-note">
-            {{ series[0].label }}부터 {{ series.length }}일 · 날짜 단위(시간대 아님) · 한국관광공사 집중률 예보<template v-if="forecastStale"> · {{ forecastFromLabel }} 예보분 · 갱신 대기</template>
+            {{ series[0].label }}부터 {{ series.length }}일 · 날짜 단위(시간대 아님) · 한국관광공사 집중률 예보<template v-if="baseDateLabel"> · {{ baseDateLabel }} 발표분<template v-if="forecastStale"> · 갱신 대기</template></template>
           </p>
         </div>
         <div
@@ -433,7 +438,7 @@ watch(placeId, load)
         >
           <h2>혼잡 예보 갱신 대기</h2>
           <p class="muted">
-            받아 둔 예보가 {{ forecastFromLabel }} 예보분이라 오늘 이후 날짜가 없어요. 다음 적재 뒤에 다시 보여드릴게요.
+            {{ staleNotice }}
           </p>
         </div>
         <div
