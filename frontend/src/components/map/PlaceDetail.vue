@@ -404,8 +404,8 @@ async function shareNative() {
       <template v-if="!s.closed">
       <div class="spark" style="margin-bottom:6px"><div class="st"><i></i>{{ crowdUi ? '날짜별 날씨와 혼잡' : '날짜별 날씨' }}</div></div>
       <div class="wxrow">
-        <div v-for="w in week" :key="w.k" class="wxc" :class="{ on: w.k === state.di }"
-          @click="state.di = w.k">
+        <!-- 날짜는 달력에서만 바꾼다 - 카드는 보기 전용, 달력에서 고른 날만 강조(2026-09-16 사용자 결정) -->
+        <div v-for="w in week" :key="w.k" class="wxc" :class="{ on: w.k === state.di }">
           <div class="wd">{{ w.label }}</div>
           <!-- 아이콘은 3종이라 눈·소나기·흐림은 글자(title·낭독기)로 보완한다(최종점검 #41) -->
           <div class="wi" :title="w.w?.label" :aria-label="w.w?.label" v-html="w.w ? wxIcon(w.w.k, 27) : ''"></div>
