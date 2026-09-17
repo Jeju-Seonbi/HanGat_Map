@@ -151,6 +151,11 @@ async function drawMap () {
   }
 }
 
+const reportOptions = [
+  { value: 'QUIET' as const, label: levelLabel.QUIET },
+  { value: 'NORMAL' as const, label: levelLabel.NORMAL },
+  { value: 'CROWDED' as const, label: levelLabel.CROWDED },
+]
 /* ───────── 탭 · 이동 ───────── */
 const TABS = [{ key: 'photos', label: '사진보기' }, { key: 'info', label: '상세정보' }, { key: 'reviews', label: '후기' }]
 const headerH = ref(80)
@@ -171,11 +176,6 @@ async function share () {
 }
 
 /* ───────── 후기 (이전 판 그대로) ───────── */
-const reportOptions = [
-  { value: 'QUIET' as const, label: levelLabel.QUIET },
-  { value: 'NORMAL' as const, label: levelLabel.NORMAL },
-  { value: 'CROWDED' as const, label: levelLabel.CROWDED },
-]
 /** 사진 후기 띠 재료 - 최근 두 페이지(20건)의 후기 사진. 목록엔 5건만 보여도 사진은 더 모은다 */
 const photoPool = ref<ReviewItem[]>([])
 const reviewPhotos = computed(() => photoPool.value.flatMap(r => r.imageUrls.map(u => ({ url: absUrl(u), who: r.nickname ?? `여행자${r.userId}`, when: r.createdAt.slice(0, 10) }))))
@@ -405,7 +405,7 @@ watch(() => (auth as any).user?.userId ?? null, id => loadFavorites(id), { immed
           <div class="review-head">
             <b>{{ review.nickname ?? `여행자${review.userId}` }}</b>
             <span v-if="review.rating != null" class="stars">{{ '★'.repeat(review.rating) }}</span>
-            <span v-if="review.congestionReport" class="chip">{{ levelLabel[review.congestionReport] }} 제보</span>
+            <!-- 혼잡 제보 칩('한산 제보')은 목록에서 안 보여준다(2026-09-18 사용자 결정). 제보 자체는 폼에서 계속 받는다 -->
             <small class="muted">{{ review.createdAt.slice(0, 10) }} <span v-if="review.editedAt">(수정)</span></small>
           </div>
           <p v-if="review.content">{{ review.content }}</p>
@@ -476,9 +476,6 @@ watch(() => (auth as any).user?.userId ?? null, id => loadFavorites(id), { immed
 .act.primary{background:var(--ac);border-color:var(--ac);color:var(--on-ac)}
 .act.primary:hover{filter:brightness(.95);color:var(--on-ac)}
 .act:focus-visible,.jump:focus-visible,.nav:focus-visible,.main:focus-visible,.thumbs button:focus-visible,.copy:focus-visible,.more:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
-
-/* 작은 칩 - 후기 제보 */
-.chip{padding:4px 10px;border:1px solid var(--line);border-radius:999px;font-size:12px;color:var(--tx2)}
 
 /* 구간 이동 탭 (제자리, 따라오지 않음) */
 .jumpbar{display:flex;gap:2px;padding:6px 0;border-bottom:1px solid var(--line)}
