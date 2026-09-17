@@ -23,7 +23,6 @@ import ReviewApiService, { type ReviewItem, absUrl } from '../../services/map/Re
 import { useAuthStore } from '../../stores/auth.js'
 import { isFav, loadFavorites, toggleFav, toast, state as mapState } from '../../stores/mapStore'
 import PhotoLightbox from '../../components/map/PhotoLightbox.vue'
-import { levelLabel } from '../../data/data'
 import { paragraphsOf } from '../../utils/intro.js'
 import { displayName } from '../../config/themes.js'
 import { loadKakaoMap } from '../../composables/useKakaoLoader.js'
@@ -40,7 +39,6 @@ const reviews = ref<ReviewItem[]>([])
 const reviewTotal = ref(0)
 const reviewNotice = ref('')
 const draftStars = ref(0)
-const draftReport = ref<'' | 'QUIET' | 'NORMAL' | 'CROWDED'>('')
 const draftText = ref('')
 const submitting = ref(false)
 
@@ -151,11 +149,6 @@ async function drawMap () {
   }
 }
 
-const reportOptions = [
-  { value: 'QUIET' as const, label: levelLabel.QUIET },
-  { value: 'NORMAL' as const, label: levelLabel.NORMAL },
-  { value: 'CROWDED' as const, label: levelLabel.CROWDED },
-]
 /* ───────── 탭 · 이동 ───────── */
 const TABS = [{ key: 'photos', label: '사진보기' }, { key: 'info', label: '상세정보' }, { key: 'reviews', label: '후기' }]
 const headerH = ref(80)
@@ -244,15 +237,15 @@ function goLogin () {
 
 async function submitReview () {
   if (!auth.isLoggedIn) { goLogin(); return }
-  // 백엔드 계약(ReviewService): 별점 또는 혼잡 제보 중 하나는 있어야 한다. 한줄평만으로는 안 된다
-  if (!draftStars.value && !draftReport.value) { reviewNotice.value = '별점이나 혼잡 제보 중 하나는 남겨 주세요.'; return }
+  // 백엔드 계약(ReviewService): 별점 또는 혼잡 제보 중 하나는 있어야 한다. 혼잡 제보 입력은 뺐으므로(2026-09-18 사용자 결정, 지도 패널과 같음) 별점이 필수
+  if (!draftStars.value) { reviewNotice.value = '별점을 골라 주세요.'; return }
   const id = placeId.value
   submitting.value = true
   reviewNotice.value = ''
   try {
     const imageUrls = attach.value.length ? await ReviewApiService.uploadPhotos(attach.value.map(p => p.file)) : []
-    await ReviewApiService.create(id, { rating: draftStars.value || null, congestionReport: draftReport.value || null, content: draftText.value.trim() || null, imageUrls })
-    draftStars.value = 0; draftReport.value = ''; draftText.value = ''
+    await ReviewApiService.create(id, { rating: draftStars.value || null, congestionReport: null, content: draftText.value.trim() || null, imageUrls })
+    draftStars.value = 0; draftText.value = ''
     attach.value.forEach(p => URL.revokeObjectURL(p.preview)); attach.value = []
     await loadReviews(id)
     reviewNotice.value = imageUrls.length ? `사진 ${imageUrls.length}장과 함께 후기를 남겼어요.` : '후기를 남겼어요.'
@@ -430,11 +423,6 @@ watch(() => (auth as any).user?.userId ?? null, id => loadFavorites(id), { immed
           <button v-for="n in 5" :key="n" type="button" class="star-btn" :class="{ on: n <= draftStars }" :aria-label="`별점 ${n}점`" @click="draftStars = n">★</button>
           <small class="muted">{{ draftStars ? `${draftStars}점` : '별점 선택' }}</small>
         </div>
-        <div class="report-picker">
-          <small class="muted">그날 붐빔</small>
-          <button v-for="option in reportOptions" :key="option.value" type="button" class="report-btn" :class="{ on: draftReport === option.value }"
-            @click="draftReport = draftReport === option.value ? '' : option.value">{{ option.label }}</button>
-        </div>
         <textarea v-model="draftText" rows="3" placeholder="방문 후기를 남겨주세요" />
         <div class="phrow">
           <span v-for="(p, i) in attach" :key="p.preview" class="pht">
@@ -569,9 +557,6 @@ watch(() => (auth as any).user?.userId ?? null, id => loadFavorites(id), { immed
 .star-picker{display:flex;align-items:center;gap:4px}
 .star-btn{background:none;border:0;font-size:20px;color:var(--line);padding:0 1px;cursor:pointer}
 .star-btn.on{color:#f0a92b}
-.report-picker{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-.report-btn{padding:4px 12px;border:1px solid var(--line);border-radius:999px;background:transparent;font-size:12px;color:var(--tx2);cursor:pointer}
-.report-btn.on{border-color:var(--ac);color:var(--ac-dk);font-weight:700}
 .review-form textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:12px;resize:none;background:transparent;font:inherit}
 .form-foot{display:flex;align-items:center;justify-content:flex-end;gap:10px}
 /* 비로그인 상자 */
@@ -597,7 +582,6 @@ watch(() => (auth as any).user?.userId ?? null, id => loadFavorites(id), { immed
   .nav{width:34px;height:34px;font-size:20px}
   .info>div{grid-template-columns:86px 1fr;gap:10px}
   .mini-map{height:180px}
-  .report-btn{padding:8px 14px;font-size:13px}
   .star-btn{font-size:26px;padding:0 3px}
   .review-form textarea{font-size:16px}
   .rphotos button{width:108px;height:108px}
