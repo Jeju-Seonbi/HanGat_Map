@@ -496,9 +496,12 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
             <span>예상 비용 <b>{{ estimatedCost }}</b></span>
           </div>
         </div>
-        <div class="result-actions-row">
-          <button class="btn" @click="viewOnMap">지도에서 보기</button>
-          <button class="btn result-save" :disabled="result.status === 'SAVED' || !canModify" @click="openSave">{{ result.status === 'SAVED' ? '저장 완료' : '코스 저장' }}</button>
+        <div class="result-actions-block">
+          <div class="result-actions-row">
+            <button class="btn result-map" @click="viewOnMap">지도에서 보기</button>
+            <button class="btn result-save" :disabled="result.status === 'SAVED' || !canModify" @click="openSave">{{ result.status === 'SAVED' ? '저장 완료' : '코스 저장' }}</button>
+          </div>
+          <p v-if="result.status === 'READY'" class="temporary-course-notice">미저장 코스는 생성 2시간 후 만료돼요.</p>
         </div>
       </header>
 
@@ -565,7 +568,6 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
       <div class="result-actions">
         <button class="btn" @click="editConditions">조건 수정</button>
         <button class="btn primary" :disabled="loading" @click="generate(condition, true)">{{ loading ? '새 코스를 만드는 중…' : '같은 조건으로 다른 코스 만들기' }}</button>
-        <p v-if="result?.status === 'READY'" class="temporary-course-notice">저장하지 않은 코스는 생성 후 2시간 뒤 삭제됩니다.</p>
       </div>
     </section>
 
@@ -603,7 +605,59 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
   background: var(--course-surface-2);
 }
 
+.result-actions-block {
+  display: grid;
+  flex: 0 0 min(320px, 100%);
+  gap: 8px;
+  width: min(320px, 100%);
+}
+
+.result-actions-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+
+.result-actions-row .btn {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 12px;
+}
+
+.result-actions-row .result-map {
+  border-color: var(--course-line-2);
+  background: var(--course-surface-2);
+  color: var(--course-text);
+}
+
+.result-actions-row .result-save {
+  border-color: var(--course-accent);
+  background: var(--course-accent);
+  color: var(--course-on-ac);
+}
+
+.temporary-course-notice {
+  margin: 0;
+  color: var(--course-text-2);
+  font-size: 0.72rem;
+  line-height: 1.45;
+  text-align: center;
+  word-break: keep-all;
+}
+
+@media (min-width: 768px) {
+  .result-actions-block {
+    align-self: center;
+  }
+}
+
 @media (max-width: 767px) {
+  .result-actions-block {
+    width: 100%;
+  }
+
   .course-day > header {
     padding: 14px 0 11px;
   }
