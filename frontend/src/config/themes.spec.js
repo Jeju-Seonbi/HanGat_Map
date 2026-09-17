@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { buildThemes, displayName, tileCopy, themeNamesFor, GROUPS } from './themes.js'
 
-const spot = (c, tc, extra = {}) => ({ id: 1, n: c, c, tc, cat: 'TOURIST', good: false, hg: false, closed: false, ...extra })
+let seq = 0
+const spot = (c, tc, extra = {}) => ({ id: ++seq, n: c, c, tc, cat: 'TOURIST', good: false, hg: false, closed: false, ...extra })
 
 describe('테마 타일 (구석구석 구조, 세부분류 전부)', () => {
   it('관광공사 코드 앞 두 글자로 묶고 세부분류마다 타일 하나, 곳수는 장소 수', () => {
@@ -15,6 +16,7 @@ describe('테마 타일 (구석구석 구조, 세부분류 전부)', () => {
     expect(na.total).toBe(3)
     expect(na.tiles.map(t => [t.title, t.count])).toEqual([['오름·산', 2], ['해변·해수욕장', 1]])   // 곳수 많은 순
     expect(na.tiles[0].key).toBe('NA010100')
+    expect(na.tiles[0].sample).toEqual({ id: layers.spot[0].id, layer: 'spot' })   // 묶음 머리 사진은 이 장소에서
   })
 
   it('예보 유무는 보지 않는다 - series 가 없어도 센다. 폐업만 뺀다', () => {
@@ -28,7 +30,7 @@ describe('테마 타일 (구석구석 구조, 세부분류 전부)', () => {
     expect(groups[0].tiles[0].key).toBe('n-터널')
   })
 
-  it('먹고 마시기·머물기·숨은 명소는 레이어와 표시로 고른다', () => {
+  it('식당·숙소·숨은 명소는 레이어와 표시로 고른다', () => {
     const layers = {
       spot: [spot('오름', 'NA010100', { hg: true }), spot('오름', 'NA010100')],
       food: [{ c: '한식', good: true, closed: false }, { c: '분식', good: true, closed: false }, { c: '한식', good: true, closed: true }],

@@ -10,7 +10,7 @@
  * 이름 표를 110개 손으로 쓰지 않는 이유: 관광공사가 세부분류를 추가해도 자동으로 제자리에 들어가게.
  * 세부분류 이름은 코드표 그대로라 부호가 특이하다("산, 고개, 오름, 봉우리", "해변. 해수욕장") - DISPLAY 로 보기 좋게 바꾼다.
  *
- * 관광지 밖 묶음 셋은 레이어·표시로 고른다: 먹고 마시기(착한가격·관광식당), 머물기(숙소 세부분류), 한갓지도가 고른(숨은 명소).
+ * 관광지 밖 묶음 셋은 레이어·표시로 고른다: 식당(착한가격·관광식당), 숙소(숙소 세부분류), 한갓지도가 고른(숨은 명소).
  */
 
 /** 코드 앞 두 글자 → 묶음. 순서가 화면 순서. tint 는 묶음 아이콘 동그라미의 옅은 배경색 */
@@ -22,8 +22,8 @@ export const GROUPS = [
   { key: 'LS', tint: '#e0eff8', title: '레저와 스포츠', emoji: '🏇', desc: '승마·골프·카트·바다 위 놀이' },
   { key: 'EV', tint: '#fbe6ee', title: '축제와 행사', emoji: '🎉', desc: '때를 맞춰 가야 볼 수 있는 것들' },
   { key: 'AC', tint: '#e6f3dc', title: '캠핑', emoji: '⛺', desc: '야영장·카라반·글램핑' },
-  { key: 'FD', tint: '#fde9e3', title: '먹고 마시기', emoji: '🍽️', desc: '가격이 정직한 집과 관광공사가 고른 식당' },
-  { key: 'ST', tint: '#ece7f9', title: '머물기', emoji: '🛏️', desc: '호텔·펜션·게스트하우스' },
+  { key: 'FD', tint: '#fde9e3', title: '식당', emoji: '🍽️', desc: '가격이 정직한 집과 관광공사가 고른 식당' },
+  { key: 'ST', tint: '#ece7f9', title: '숙소', emoji: '🛏️', desc: '호텔·펜션·게스트하우스' },
   { key: 'HG', tint: '#e2f2ef', title: '한갓지도가 고른', emoji: '🔍', desc: '등록돼 있지만 아직 덜 알려진 곳' }
 ]
 
@@ -98,7 +98,8 @@ const keyOf = (code, name) => code || `n-${name}`
  * 레이어 데이터로 테마 타일을 만든다. 예보 유무는 보지 않는다.
  * @param {{ spot?: object[], dine?: object[], food?: object[], stay?: object[] }} layers MapPlace 배열들(없는 레이어는 건너뜀)
  * @returns {{ key: string, title: string, emoji: string, desc: string, total: number, tiles: Tile[] }[]}
- *   Tile = { key, title, raw, code, group, count, tagline, desc, tags, layer, special? }
+ *   Tile = { key, title, raw, code, group, count, tagline, desc, tags, layer, special?, sample }
+ *   sample = { id, layer } 그 타일의 첫 장소 - 묶음 머리 사진용(가장 곳수 많은 타일의 첫 장소 상세를 받아 사진을 깐다)
  */
 export function buildThemes (layers) {
   const byGroup = new Map(GROUPS.map(g => [g.key, new Map()]))
@@ -111,17 +112,17 @@ export function buildThemes (layers) {
   for (const p of layers.spot ?? []) {
     if (p.closed || !p.c) continue
     const code = p.tc ?? null, group = code ? code.slice(0, 2) : 'VE'
-    add(group, { key: keyOf(code, p.c), title: displayName(p.c), raw: p.c, code, group, count: 1, layer: 'spot', ...(COPY[p.c] ?? {}) })
+    add(group, { key: keyOf(code, p.c), title: displayName(p.c), raw: p.c, code, group, count: 1, layer: 'spot', sample: { id: p.id, layer: 'spot' }, ...(COPY[p.c] ?? {}) })
   }
   // 숙소: 세부분류(호텔·펜션…)마다 타일 하나
   for (const p of layers.stay ?? []) {
     if (p.closed || !p.c || p.c === '정보 없음') continue
-    add('ST', { key: keyOf(p.tc, p.c), title: displayName(p.c), raw: p.c, code: p.tc ?? null, group: 'ST', count: 1, layer: 'stay' })
+    add('ST', { key: keyOf(p.tc, p.c), title: displayName(p.c), raw: p.c, code: p.tc ?? null, group: 'ST', count: 1, layer: 'stay', sample: { id: p.id, layer: 'stay' } })
   }
   // 특별 테마
   for (const s of SPECIAL) {
     const rows = (layers[s.layer] ?? []).filter(p => !p.closed && s.pick(p))
-    if (rows.length) add(s.group, { key: s.key, title: s.title, raw: s.title, code: null, group: s.group, count: rows.length, layer: s.layer, special: s.key, tagline: s.tagline, desc: s.desc, tags: s.tags })
+    if (rows.length) add(s.group, { key: s.key, title: s.title, raw: s.title, code: null, group: s.group, count: rows.length, layer: s.layer, special: s.key, sample: { id: rows[0].id, layer: s.layer }, tagline: s.tagline, desc: s.desc, tags: s.tags })
   }
   return GROUPS.map(g => {
     const tiles = [...byGroup.get(g.key).values()].sort((a, b) => b.count - a.count || a.title.localeCompare(b.title, 'ko'))
