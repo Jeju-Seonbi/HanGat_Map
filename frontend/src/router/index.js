@@ -34,6 +34,7 @@ export const routes = [
 
   /* ── 테마 — 관광지 소개 페이지의 입구(구석구석 테마 구조, 2026-09-17) ── */
   { path: '/themes', name: 'themes', component: () => import('../views/theme/ThemeView.vue'), meta: { skin: 'toss', styleScope: 'content', title: '테마' } },
+  { path: '/themes/:key', name: 'theme-detail', component: () => import('../views/theme/ThemeDetailView.vue'), meta: { skin: 'toss', styleScope: 'content', title: '테마' } },
 
   /* ── 관광지 상세 ──
      백엔드 placeId(숫자)만 받는다. 옛 목업 id('bijarim' 등)는 이제 열 장소가 없어 지도로 보낸다 -

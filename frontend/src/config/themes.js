@@ -130,6 +130,31 @@ export function buildThemes (layers) {
   }).filter(g => g.tiles.length)
 }
 
+/**
+ * 타일에 속한 장소들 - 이름순. 관광지·숙소는 세부분류 이름으로, 특별 테마는 그 규칙으로 고른다. 폐업은 뺀다.
+ * 정렬이 이름순인 이유: 장소 자체를 소개하는 페이지라 혼잡·인기 순위를 매기지 않는다(2026-09-17 사용자 결정)
+ */
+export function placesOfTile (layers, tile) {
+  if (!tile) return []
+  let rows
+  if (tile.special) {
+    const s = SPECIAL.find(x => x.key === tile.special)
+    rows = s ? (layers[s.layer] ?? []).filter(s.pick) : []
+  } else {
+    rows = (layers[tile.layer] ?? []).filter(p => p.c === tile.raw)
+  }
+  return rows.filter(p => !p.closed).sort((a, b) => a.n.localeCompare(b.n, 'ko'))
+}
+
+/** URL 키로 타일 찾기 - buildThemes 결과에서. 없으면 null */
+export function findTile (groups, key) {
+  for (const group of groups) {
+    const tile = group.tiles.find(t => t.key === key)
+    if (tile) return { group, tile }
+  }
+  return null
+}
+
 /** 타일의 소개 글 - 손으로 쓴 게 없으면 기본 문장 */
 export function tileCopy (tile) {
   return {

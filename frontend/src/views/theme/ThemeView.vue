@@ -10,6 +10,7 @@
  */
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import MapPlaceService from '../../services/map/MapPlaceService'
+import { loadThemeLayers } from '../../services/themeData.js'
 import { buildThemes } from '../../config/themes.js'
 
 const groups = ref([])
@@ -43,14 +44,9 @@ async function loadPhoto (g) {
 
 onMounted(async () => {
   headerH.value = document.querySelector('nav.nav')?.offsetHeight ?? 80   // 앱 헤더(.nav 80px, 폰 60px). 페이지의 <header class="hero"> 가 아니라
-  // 관광지·식당·착한가격·숙소 네 레이어만 - 카페·편의점·마트(소상공인 상가 5천여 곳)는 소개글·사진이 없어 테마에 안 넣는다
-  const keys = ['spot', 'dine', 'food', 'stay']
-  const results = await Promise.allSettled(keys.map(k => MapPlaceService.getLayer(k)))
-  const layers = {}
-  results.forEach((r, i) => {
-    if (r.status === 'fulfilled' && r.value) layers[keys[i]] = r.value
-    else failed.value.push({ spot: '관광지', dine: '식당', food: '착한가격', stay: '숙소' }[keys[i]])
-  })
+  // 관광지·식당·착한가격·숙소 네 레이어 - 테마 상세와 같은 로더(세션 안에서 한 번만 받는다)
+  const { layers, failed: f } = await loadThemeLayers()
+  failed.value = f
   groups.value = buildThemes(layers)
   loading.value = false
   // 화면에 들어오는 묶음부터 사진을 받는다. 지원 안 되는 브라우저는 전부 받는다
@@ -98,10 +94,10 @@ onBeforeUnmount(() => io?.disconnect())
       </div>
       <ul class="tiles">
         <li v-for="t in g.tiles" :key="t.key">
-          <button type="button" class="tile" :title="t.raw !== t.title ? `관광공사 분류명: ${t.raw}` : undefined">
+          <RouterLink :to="`/themes/${t.key}`" class="tile" :title="t.raw !== t.title ? `관광공사 분류명: ${t.raw}` : undefined">
             <b>{{ t.title }}</b>
             <small>{{ t.count.toLocaleString() }}곳</small>
-          </button>
+          </RouterLink>
         </li>
       </ul>
     </section>
@@ -145,7 +141,7 @@ onBeforeUnmount(() => io?.disconnect())
 .band-src{position:absolute;right:12px;bottom:8px;font-size:10px;color:rgba(255,255,255,.75)}
 
 .tiles{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
-.tile{width:100%;display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:11px 13px;
+.tile{width:100%;display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:11px 13px;text-decoration:none;
   background:var(--surf);border:1px solid var(--line);border-radius:12px;text-align:left;cursor:pointer;
   transition:transform .12s,box-shadow .12s,border-color .12s}
 .tile:hover{transform:translateY(-1px);box-shadow:var(--sh);border-color:var(--ac)}

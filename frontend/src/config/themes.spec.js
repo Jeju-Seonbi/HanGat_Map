@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildThemes, displayName, tileCopy, themeNamesFor, GROUPS } from './themes.js'
+import { buildThemes, displayName, tileCopy, themeNamesFor, placesOfTile, findTile, GROUPS } from './themes.js'
 
 let seq = 0
 const spot = (c, tc, extra = {}) => ({ id: ++seq, n: c, c, tc, cat: 'TOURIST', good: false, hg: false, closed: false, ...extra })
@@ -63,6 +63,21 @@ describe('테마 타일 (구석구석 구조, 세부분류 전부)', () => {
     expect(themeNamesFor({ c: '산, 고개, 오름, 봉우리', hg: true, good: false })).toEqual(['오름·산', '숨은명소'])
     expect(themeNamesFor({ c: '정보 없음', good: true })).toEqual(['착한가격'])
     expect(themeNamesFor(null)).toEqual([])
+  })
+
+  it('타일의 장소 목록 - 세부분류로 고르고 이름순, 폐업 제외. 특별 테마는 규칙으로', () => {
+    const layers = {
+      spot: [spot('산, 고개, 오름, 봉우리', 'NA010100', { n: '용눈이오름' }), spot('산, 고개, 오름, 봉우리', 'NA010100', { n: '다랑쉬오름' }),
+        spot('산, 고개, 오름, 봉우리', 'NA010100', { n: '폐업오름', closed: true }), spot('해변. 해수욕장', 'NA010300', { n: '협재해수욕장' })],
+      food: [{ id: 9, n: '착한집', c: '한식', good: true, closed: false }, { id: 10, n: '일반집', c: '한식', good: false, closed: false }]
+    }
+    const groups = buildThemes(layers)
+    const oreum = findTile(groups, 'NA010100')
+    expect(oreum.group.key).toBe('NA')
+    expect(placesOfTile(layers, oreum.tile).map(p => p.n)).toEqual(['다랑쉬오름', '용눈이오름'])
+    expect(placesOfTile(layers, findTile(groups, 'goodprice').tile).map(p => p.n)).toEqual(['착한집'])
+    expect(findTile(groups, '없는키')).toBeNull()
+    expect(placesOfTile(layers, null)).toEqual([])
   })
 
   it('묶음 순서는 자연부터 한갓지도가 고른까지 열 개', () => {
