@@ -66,6 +66,15 @@ const idx = ref(0)
 const lightbox = ref<InstanceType<typeof PhotoLightbox> | null>(null)
 const current = computed(() => photos.value[idx.value] ?? null)
 const go = (n: number) => { const len = photos.value.length; if (len) idx.value = (idx.value + n + len) % len }
+/* 작은 사진 줄 - 큰 사진을 넘기면 지금 사진의 작은 그림이 줄 가운데로 오게 줄만 옮긴다(페이지는 안 움직임).
+   폰에선 줄이 화면보다 길어 5번째부터는 보이지 않았다(2026-09-18 사용자 제보) */
+const thumbsEl = ref<HTMLElement | null>(null)
+watch(idx, async () => {
+  await nextTick()
+  const el = thumbsEl.value; const on = el?.querySelector<HTMLElement>('button.on')
+  if (!el || !on) return
+  el.scrollTo({ left: on.offsetLeft - (el.clientWidth - on.offsetWidth) / 2, behavior: 'smooth' })
+})
 function onSliderKey (e: KeyboardEvent) {
   if (e.key === 'ArrowLeft') { e.preventDefault(); go(-1) }
   if (e.key === 'ArrowRight') { e.preventDefault(); go(1) }
@@ -284,6 +293,7 @@ async function load () {
   place.value = detail
   loading.value = false
   if (!detail) return
+  document.title = `${detail.name} · 한갓지도`   // 라우터가 준 '관광지 · 한갓지도' 를 장소 이름으로(공유·즐겨찾기·탭 제목)
   await nextTick()
   drawMap()
   await loadReviews(id)   // 후기는 상세가 떠 있는 동안 채운다
@@ -341,7 +351,7 @@ watch(() => (auth as any).user?.userId ?? null, id => loadFavorites(id), { immed
       </div>
       <div v-else class="no-photo"><span>🏞️</span>이미지 준비 중입니다</div>
       <p v-if="current?.caption" class="caption">{{ current.caption }}</p>
-      <ul v-if="photos.length > 1" class="thumbs" aria-label="사진 목록">
+      <ul v-if="photos.length > 1" ref="thumbsEl" class="thumbs" aria-label="사진 목록">
         <li v-for="(p, i) in photos" :key="p.url">
           <button type="button" :class="{ on: i === idx }" :aria-label="`${i + 1}번째 사진`" :aria-current="i === idx ? 'true' : undefined" @click="idx = i">
             <img :src="p.thumb" :alt="''" loading="lazy" decoding="async" @error="onThumbError($event, p)">
@@ -606,6 +616,8 @@ watch(() => (auth as any).user?.userId ?? null, id => loadFavorites(id), { immed
   .info>div{grid-template-columns:86px 1fr;gap:10px}
   .mini-map{height:180px}
   .star-btn{font-size:26px;padding:0 3px}
+  .more{min-height:36px}                        /* '내용 더보기' 손가락 크기(전엔 77×21) */
+  .copy{height:32px;padding:0 12px;font-size:12px}   /* 주소 '복사'(전엔 41×24) */
   .review-form textarea{font-size:16px}
   .rphotos button{width:108px;height:108px}
   .form-foot{flex-wrap:wrap}
