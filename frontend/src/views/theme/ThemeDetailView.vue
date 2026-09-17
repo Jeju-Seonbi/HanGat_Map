@@ -6,6 +6,16 @@
  * 카드를 누르면 장소 소개 페이지(/places/:id)로.
  */
 import { computed, onMounted, ref, watch } from 'vue'
+
+/* 뒤로 가기 복원 - 장소 페이지에 갔다 돌아오면 권역·'더 보기'로 편 개수가 처음(전체·24개)으로 돌아가 있었다(2026-09-18 점검).
+   테마 키별로 탭 세션에만 남긴다(새 탭·새 세션이면 처음부터). 스크롤 위치는 라우터 scrollBehavior 가 되돌린다 */
+const STATE_KEY = key => `hangat:theme:${key}`
+function readState (key) {
+  try { const v = JSON.parse(sessionStorage.getItem(STATE_KEY(key)) ?? 'null'); return v && typeof v === 'object' ? v : null } catch { return null }
+}
+function writeState (key, state) {
+  try { sessionStorage.setItem(STATE_KEY(key), JSON.stringify(state)) } catch { /* 저장 못 해도 화면은 그대로 */ }
+}
 import { useRoute } from 'vue-router'
 import MapPlaceService from '../../services/map/MapPlaceService'
 import { loadThemeLayers } from '../../services/themeData.js'
@@ -37,8 +47,15 @@ async function load () {
   const { layers, failed: f } = await loadThemeLayers()
   failed.value = f
   const groups = buildThemes(layers)
-  found.value = findTile(groups, String(route.params.key))
+  const key = String(route.params.key)
+  found.value = findTile(groups, key)
   places.value = found.value ? placesOfTile(layers, found.value.tile) : []
+  const saved = readState(key)
+  if (saved && found.value) {
+    if (REGIONS.includes(saved.region)) region.value = saved.region
+    if (Number.isInteger(saved.shown) && saved.shown > PAGE) shown.value = Math.min(saved.shown, places.value.length + PAGE)
+  }
+  if (found.value) document.title = `${found.value.tile.title} · 테마 · 한갓지도`   // 라우터가 준 '테마 · 한갓지도' 를 구체화(공유·즐겨찾기용)
   loading.value = false
   // 머리 띠 사진: 앞쪽 장소 넷 중 사진 있는 첫 곳
   for (const p of places.value.slice(0, 4)) {
@@ -49,6 +66,7 @@ async function load () {
 }
 onMounted(load)
 watch(() => route.params.key, load)
+watch([region, shown], () => { if (found.value) writeState(String(route.params.key), { region: region.value, shown: shown.value }) })
 </script>
 
 <template>
@@ -140,6 +158,8 @@ watch(() => route.params.key, load)
 @media (max-width:900px){.cards{grid-template-columns:repeat(3,1fr)}}
 @media (max-width:640px){
   .td-page{padding:12px 16px 48px}
+  .crumb a{padding:8px 0}                       /* 손가락 크기(전엔 25×20) */
+  .chip{height:36px;padding:0 14px}             /* 권역 칩 30 → 36 */
   .band{min-height:120px;padding:16px 16px;gap:12px}.emoji{width:46px;height:46px;font-size:22px}.band h1{font-size:21px}
   .cards{grid-template-columns:repeat(2,1fr);gap:14px 10px}
 }

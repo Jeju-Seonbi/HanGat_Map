@@ -71,6 +71,7 @@ onBeforeUnmount(() => io?.disconnect())
         <h1>어떤 제주를 찾고 있나요?</h1>
         <p>오름부터 야영장까지, 관광공사가 나눈 종류 그대로 모았어요.<br>종류를 고르면 그 안의 장소를 하나씩 소개합니다.</p>
       </div>
+      <span class="hero-src">ⓒ한국관광공사</span>
     </header>
 
     <nav v-if="groups.length" class="jump" aria-label="묶음 바로가기">
@@ -112,6 +113,7 @@ onBeforeUnmount(() => io?.disconnect())
 .hero-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 60%}
 .hero::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(15,25,35,.05) 0%,rgba(15,25,35,.62) 100%)}
 .hero-inner{position:relative;z-index:1;padding:28px 28px 26px}
+.hero-src{position:absolute;right:14px;bottom:10px;z-index:1;font-size:11px;color:rgba(255,255,255,.8)}   /* 사진이 관광공사 것이라 출처(심사 규정) */
 .pill{display:inline-block;padding:4px 11px;border-radius:999px;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);color:#fff;font-size:12px;font-weight:700;backdrop-filter:blur(4px)}
 .hero h1{font-size:28px;font-weight:800;letter-spacing:-.03em;margin:10px 0 6px;text-shadow:0 2px 12px rgba(0,0,0,.25)}
 .hero p{margin:0;font-size:14px;color:rgba(255,255,255,.88);max-width:560px;line-height:1.55}

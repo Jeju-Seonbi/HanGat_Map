@@ -86,7 +86,8 @@ export const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes,
-  scrollBehavior: () => ({ top: 0 })
+  // 새 화면은 맨 위, 뒤로/앞으로 가기는 있던 자리로(테마 목록·상세에서 장소를 봤다 돌아올 때, 2026-09-18). 목록이 비동기로 채워지는 시간을 조금 기다린다
+  scrollBehavior: (to, from, saved) => (saved ? new Promise(resolve => setTimeout(() => resolve(saved), 80)) : { top: 0 })
 })
 
 /**
