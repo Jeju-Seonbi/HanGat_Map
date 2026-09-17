@@ -7,6 +7,8 @@
  * 순서·라벨은 지정된 값이다. 임의로 바꾸지 말 것:
  *   메인 / AI코스 / 지도 / 테마 / 저장코스(여기서부터 오른쪽) / 회원(사진) / 로그인·로그아웃
  *   (테마는 2026-09-17 추가 - 관광지 소개 페이지의 입구. 헤더·모바일 탭바 둘 다에 들어간다)
+ *   (메인은 2026-09-18 부터 PC 헤더 줄에서만 뺐다 - 로고가 메인으로 가므로 겹친다는 사용자 결정.
+ *    폰 하단 탭바와 폰 메뉴에는 그대로 있다. headerHidden 플래그 참고)
  *
  * ⚠️ 마이페이지 탭은 **넣지 않는다** (로그인 여부와 무관하게 숨김).
  *    마이페이지로 가는 길은 헤더 오른쪽의 회원 아바타뿐이다.
@@ -23,11 +25,12 @@
  * @property {'left'|'right'} side   스페이서 기준 배치
  * @property {'exact'|'prefix'} match 활성 판정 방식
  * @property {boolean} [badge] 읽지 않은 알림 수를 표시할지
+ * @property {boolean} [headerHidden] PC 헤더 줄에서는 숨긴다(폰 탭바·폰 메뉴엔 남음)
  */
 
 /** @type {NavTab[]} */
 export const NAV_TABS = [
-  { to: '/', label: '메인', icon: 'home', side: 'left', match: 'exact' },
+  { to: '/', label: '메인', icon: 'home', side: 'left', match: 'exact', headerHidden: true },
   { to: '/ai-course', label: 'AI코스', icon: 'route', side: 'left', match: 'prefix' },
   { to: '/map', label: '지도', icon: 'map', side: 'left', match: 'prefix' },
   { to: '/themes', label: '테마', icon: 'album', side: 'left', match: 'prefix' },
@@ -44,5 +47,5 @@ export const NAV_TABS = [
 export const isTabActive = (tab, path) =>
   tab.match === 'prefix' ? path.startsWith(tab.to) : path === tab.to
 
-export const LEFT_TABS = NAV_TABS.filter(t => t.side === 'left')
+export const LEFT_TABS = NAV_TABS.filter(t => t.side === 'left' && !t.headerHidden)
 export const RIGHT_TABS = NAV_TABS.filter(t => t.side === 'right')
