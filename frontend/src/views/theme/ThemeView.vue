@@ -69,7 +69,7 @@ onBeforeUnmount(() => io?.disconnect())
       <div class="hero-inner">
         <span class="pill">테마로 고르기</span>
         <h1>어떤 제주를 찾고 있나요?</h1>
-        <p>오름부터 야영장까지, 관광공사가 나눈 종류 그대로 모았어요. 종류를 고르면 그 안의 장소를 하나씩 소개합니다.</p>
+        <p>오름부터 야영장까지, 관광공사가 나눈 종류 그대로 모았어요.<br>종류를 고르면 그 안의 장소를 하나씩 소개합니다.</p>
       </div>
     </header>
 
