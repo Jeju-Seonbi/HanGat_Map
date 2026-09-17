@@ -4,7 +4,7 @@
  *
  *   제목·지역·한 줄 소개·찜·공유·지도에서 보기 → 구간 이동 탭(사진보기·상세정보·후기) → 사진 슬라이더 1/N →
  *   소개(문단) 또는 메뉴·가격 → 상세정보(작은 지도 + 문의·주소·이용시간·휴일·주차·화장실·요금 표) →
- *   사진 후기(후기에 달린 사진 띠) → 후기(목록 · 사진 첨부 등록. 비로그인이면 안내 상자와 사진·등록 버튼만, 누르면 로그인으로)
+ *   사진 후기(읽은 후기에 달린 사진 띠) → 후기(10건씩 '더보기'로 이어 붙임 · 사진 첨부 등록. 비로그인이면 안내 상자와 사진·등록 버튼만, 누르면 로그인으로)
  *
  * 이전 판(2단 구성)에서 뺀 것: '추천 근거' 카드(추천 화면의 부품이라 소개 페이지에선 뜻이 안 통함),
  * '혼잡 예보 커버 밖' 카드, '← 뒤로', 제목 밑 칩 줄(혼잡·착한가격·숨은 명소·별점), 그리고 날짜별 혼잡 예보 막대와
@@ -35,8 +35,11 @@ const placeId = computed(() => Number(route.params.placeId))
 
 const loading = ref(true)
 const place = ref<PlaceDetail | null>(null)
-const reviews = ref<ReviewItem[]>([])
+const reviews = ref<ReviewItem[]>([])    // 지금까지 읽은 후기 - '더보기'로 다음 페이지를 이어 붙인다(지도 후기 패널과 같은 방식)
 const reviewTotal = ref(0)
+const reviewPage = ref(0)                 // 마지막으로 읽은 페이지 번호
+const reviewPages = ref(0)                // 전체 페이지 수
+const reviewsLoading = ref(false)
 const reviewNotice = ref('')
 const draftStars = ref(0)
 const draftText = ref('')
@@ -169,9 +172,8 @@ async function share () {
 }
 
 /* ───────── 후기 (이전 판 그대로) ───────── */
-/** 사진 후기 띠 재료 - 최근 두 페이지(20건)의 후기 사진. 목록엔 5건만 보여도 사진은 더 모은다 */
-const photoPool = ref<ReviewItem[]>([])
-const reviewPhotos = computed(() => photoPool.value.flatMap(r => r.imageUrls.map(u => ({ url: absUrl(u), who: r.nickname ?? `여행자${r.userId}`, when: r.createdAt.slice(0, 10) }))))
+/** 사진 후기 띠 재료 - 읽은 후기 전부의 사진. '더보기'로 후기를 더 읽으면 띠도 같이 늘어난다 */
+const reviewPhotos = computed(() => reviews.value.flatMap(r => r.imageUrls.map(u => ({ url: absUrl(u), who: r.nickname ?? `여행자${r.userId}`, when: r.createdAt.slice(0, 10) }))))
 function openReviewPhoto (i: number) {
   const list = reviewPhotos.value
   ;(lightbox.value as any)?.show(list.map(x => x.url), i, { alts: list.map(x => `${x.who}님의 후기 사진 · ${x.when}`), source: '' })
@@ -192,17 +194,31 @@ watch(reviewPhotos, () => nextTick(stripSync), { flush: 'post' })
 async function loadReviews (id: number) {
   try {
     const first = await ReviewApiService.getReviews(id, 0)
-    reviews.value = first.content.slice(0, 5)
+    if (placeId.value !== id) return   // 기다리는 사이 다른 장소로 갔으면 버린다
+    reviews.value = first.content
     reviewTotal.value = first.totalElements
-    let pool = first.content
-    if (first.totalPages > 1) {
-      const second = await ReviewApiService.getReviews(id, 1).catch(() => null)
-      if (second) pool = pool.concat(second.content)
-    }
-    photoPool.value = pool
+    reviewPage.value = first.number ?? 0
+    reviewPages.value = first.totalPages
   } catch {
-    reviews.value = []
-    photoPool.value = []
+    reviews.value = []; reviewTotal.value = 0; reviewPage.value = 0; reviewPages.value = 0
+  }
+}
+/** '더보기' - 다음 페이지(10건)를 목록 뒤에 이어 붙인다 */
+async function loadMoreReviews () {
+  const id = placeId.value
+  if (reviewsLoading.value || reviewPage.value + 1 >= reviewPages.value) return
+  reviewsLoading.value = true
+  try {
+    const page = await ReviewApiService.getReviews(id, reviewPage.value + 1)
+    if (placeId.value !== id) return   // 응답을 기다리는 사이 장소가 바뀌었으면 이전 장소의 후기가 붙지 않게
+    reviews.value = reviews.value.concat(page.content)
+    reviewTotal.value = page.totalElements
+    reviewPage.value = page.number
+    reviewPages.value = page.totalPages
+  } catch {
+    toast('후기를 더 불러오지 못했어요')
+  } finally {
+    reviewsLoading.value = false
   }
 }
 
@@ -259,8 +275,8 @@ async function submitReview () {
 /* ───────── 로드 ───────── */
 async function load () {
   loading.value = true
-  place.value = null; reviews.value = []; reviewTotal.value = 0; reviewNotice.value = ''
-  photoPool.value = []; attach.value.forEach(p => URL.revokeObjectURL(p.preview)); attach.value = []
+  place.value = null; reviews.value = []; reviewTotal.value = 0; reviewPage.value = 0; reviewPages.value = 0; reviewNotice.value = ''
+  attach.value.forEach(p => URL.revokeObjectURL(p.preview)); attach.value = []
   idx.value = 0; introOpen.value = false; mapFailed.value = false
   const id = placeId.value
   if (!Number.isFinite(id)) { loading.value = false; return }
@@ -408,6 +424,9 @@ watch(() => (auth as any).user?.userId ?? null, id => loadFavorites(id), { immed
         </li>
       </ul>
       <p v-else class="muted">아직 후기가 없어요.</p>
+      <button v-if="reviews.length < reviewTotal" type="button" class="rv-more" :disabled="reviewsLoading" @click="loadMoreReviews">
+        {{ reviewsLoading ? '불러오는 중…' : `후기 ${reviewTotal - reviews.length}개 더보기` }}
+      </button>
 
       <!-- 비로그인: 구석구석 댓글 상자처럼 안내 한 줄 + 사진·등록 버튼. 누르면 로그인으로(2026-09-18 사용자 요청) -->
       <div v-if="!auth.isLoggedIn" class="review-form guest">
@@ -553,6 +572,9 @@ watch(() => (auth as any).user?.userId ?? null, id => loadFavorites(id), { immed
 .stars{color:#f0a92b;letter-spacing:-1px}
 .review-photos{display:flex;gap:6px;margin-top:6px}
 .review-photos img{width:72px;height:72px;object-fit:cover;border-radius:10px}
+.rv-more{width:100%;padding:11px;border:1px solid var(--line2);border-radius:12px;background:var(--surf2);font:inherit;font-size:13px;font-weight:700;color:var(--tx2);cursor:pointer}
+.rv-more:hover{border-color:var(--ac);color:var(--ac-dk)}
+.rv-more:disabled{opacity:.6;cursor:default}
 .review-form{display:grid;gap:8px;padding-top:14px;border-top:1px solid var(--line)}
 .star-picker{display:flex;align-items:center;gap:4px}
 .star-btn{background:none;border:0;font-size:20px;color:var(--line);padding:0 1px;cursor:pointer}
