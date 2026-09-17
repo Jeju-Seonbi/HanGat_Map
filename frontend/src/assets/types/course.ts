@@ -117,6 +117,7 @@ export interface CourseResult {
   car_route?: CarRouteResult
 }
 export interface AlternativePlace {
+  overview?: string | null
   place_id: number; place_name: string; category_name: string; subcategory_name?: string; image_url?: string
   distance_m: number; congestion_rate?: number; congestion_level?: CongestionLevel
   recommendation_reason: string; replacement_reason: string; radius_km?: 10|20

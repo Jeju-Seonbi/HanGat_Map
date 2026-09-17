@@ -42,7 +42,7 @@ export const routes = [
   /* ── 저장 코스 · 코스 상세 ──
      목록은 내 데이터라 로그인이 필요하고, 상세는 공유 링크로도 열려야 해서 공개다 */
   { path: '/courses', name: 'courses', component: () => import('../views/course/SavedCoursesView.vue'), meta: { requiresAuth: true, skin: 'toss', styleScope: 'content', title: '저장한 코스' } },
-  { path: '/courses/:courseId', name: 'course-detail', component: () => import('../views/course/CourseDetailView.vue'), meta: { styleScope: 'content', title: '코스 상세' } },
+  { path: '/courses/:courseId', name: 'course-detail', component: () => import('../views/course/SavedCoursesView.vue'), meta: { skin: 'toss', styleScope: 'content', title: '코스 상세' } },
 
   /* ── 회원 (USER_001~003) — 자체 2단 구성이라 헤더를 얹지 않는다 ── */
   { path: '/login', name: 'login', component: () => import('../views/auth/LoginView.vue'), meta: { layout: 'bare', guestOnly: true, title: '로그인' } },
