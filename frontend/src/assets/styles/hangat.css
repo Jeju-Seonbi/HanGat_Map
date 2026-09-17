@@ -331,9 +331,9 @@
 .tipbox b{font-weight:800;color:var(--ac-dk)}
 .tipbox:hover{filter:brightness(.97)}
 .spark{margin-bottom:13px}
-.spark .st{font-size:11.5px;font-weight:700;color:var(--tx2);margin-bottom:7px;
+.spark .st,.pinfo .st{font-size:11.5px;font-weight:700;color:var(--tx2);margin-bottom:7px;
   display:flex;align-items:center;gap:5px}
-.spark .st i{width:3px;height:11px;background:var(--ac);border-radius:2px;display:inline-block}
+.spark .st i,.pinfo .st i{width:3px;height:11px;background:var(--ac);border-radius:2px;display:inline-block}
 .spark svg{width:100%;height:62px;display:block;background:var(--surf2);border-radius:11px}
 .spark .sx{display:flex;justify-content:space-between;font-size:10px;color:var(--tx3);margin-top:4px}
 .wxrow{display:flex;gap:7px;overflow-x:auto;padding:2px 0 6px;margin-bottom:13px}
@@ -411,6 +411,7 @@
   font-size:12.5px;font-weight:700;color:var(--tx2)}
 .rvp-more:hover{background:var(--ac-bg);color:var(--ac-dk)}
 .amen{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:13px}
+.pinfo .amen{margin:2px 0 7px}
 .am{font-size:11px;font-weight:600;padding:5px 11px;border-radius:var(--rp);
   background:var(--surf2);color:var(--tx2)}
 .am.no{opacity:.4;text-decoration:line-through}

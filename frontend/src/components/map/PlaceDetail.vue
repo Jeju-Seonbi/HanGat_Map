@@ -410,14 +410,6 @@ async function shareNative() {
         <template v-else>🕐 <b>{{ fmtK(at(best.k)) }}</b>로 가면 <b>{{ tipText }}</b> 날이에요.</template>
       </div>
 
-      <!-- 없는 정보(null)는 배지를 그리지 않는다 - '주차 없음'과 '주차 정보 없음'은 다르다 -->
-      <div v-if="hasAmen" class="amen">
-        <span v-if="feeBadge" class="am">{{ feeBadge }}</span>
-        <span v-if="s.park != null" class="am" :class="{ no: !s.park }">주차</span>
-        <span v-if="s.wc != null" class="am" :class="{ no: !s.wc }">화장실</span>
-        <span v-if="s.in" class="am">실내</span>
-      </div>
-
       <!-- 착한가격 대표 메뉴 (행안부 실데이터) - 메뉴 없는 업소는 섹션 자체를 숨긴다 -->
       <div v-if="menuRows.length" class="menu">
         <div class="mn-h"><i></i>대표 메뉴<span v-if="s.good" class="mn-b">착한가격</span></div>
@@ -428,8 +420,17 @@ async function shareNative() {
         <div v-if="s.good" class="mn-src">{{ goodPriceSourceLine(detail?.goodPriceBaseDate) }}</div>
       </div>
 
-      <!-- 주소(복사) · 운영시간(있을 때만 — 상시 개방은 줄 자체를 표시하지 않음) · 전화 -->
+      <!-- 방문 정보 - 제목을 붙여 '날짜별 날씨와 혼잡'·'방문 후기'와 같은 묶음으로 읽히게(2026-09-17 사용자 요청).
+           편의 칩(요금·주차·화장실·실내)도 이 묶음 첫 줄로. 주소(복사) · 운영시간(있을 때만 — 상시 개방은 줄 자체를 표시하지 않음) · 전화 -->
       <div class="pinfo">
+        <div class="st"><i></i>방문 정보</div>
+        <!-- 없는 정보(null)는 배지를 그리지 않는다 - '주차 없음'과 '주차 정보 없음'은 다르다 -->
+        <div v-if="hasAmen" class="amen">
+          <span v-if="feeBadge" class="am">{{ feeBadge }}</span>
+          <span v-if="s.park != null" class="am" :class="{ no: !s.park }">주차</span>
+          <span v-if="s.wc != null" class="am" :class="{ no: !s.wc }">화장실</span>
+          <span v-if="s.in" class="am">실내</span>
+        </div>
         <!-- 주소가 없으면(대체 객체·원천 결측) 빈 줄과 복사 버튼을 내지 않는다 - 누르면 'undefined'가 복사됐다 -->
         <div v-if="s.addr" class="pi">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
