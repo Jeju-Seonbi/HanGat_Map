@@ -38,6 +38,8 @@ export interface MapPlace {
   hours: string | null
   /** 착한가격 지정 여부 - 상세 메뉴 섹션의 '착한가격' 뱃지 조건 (일반 식당 메뉴엔 안 붙인다) */
   good: boolean
+  /** 숨은 명소 판정(백엔드 HiddenGemRule) - 테마 페이지 '한갓지도가 고른' 묶음과 소개 페이지 해시태그가 쓴다 */
+  hg: boolean
   park: boolean | null
   wc: boolean | null
   /** 그 장소의 날짜별 집중률. CrowdService가 채운다. 예보 없으면 null */
@@ -276,6 +278,7 @@ function toMapPlace (row: BackendPlace): MapPlace {
     tel: row.phone,
     hours: row.operatingHoursText,
     good: row.goodPrice,
+    hg: !!row.hiddenGem,
     park: row.parkingAvailable,
     wc: row.toiletAvailable,
     series: null,
