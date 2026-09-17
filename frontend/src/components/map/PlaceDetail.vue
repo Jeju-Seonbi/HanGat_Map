@@ -6,7 +6,7 @@ import ReviewSection from './ReviewSection.vue'
 import ProfileAvatar from '../common/ProfileAvatar.vue'
 import { state, toggleFav, isFav, toast, placeKey } from '@/stores/mapStore'
 
-import { crowd, tier, tierKo, forecastDays, bestDay, CROWD_KO } from '@/utils/crowd'
+import { crowd, tier, tierKo, forecastDays, bestDay } from '@/utils/crowd'
 import { at, fmtK } from '@/utils/date'
 import { wxOf, wxIcon, wxIssuedAt } from '@/utils/weather'
 import { weatherBasis } from '@/services/map/MapWeatherService'
@@ -16,7 +16,7 @@ import { shareToKakao, preloadKakao } from '@/composables/useKakaoShare'
 import { goodPriceSourceLine } from '@/utils/dataSources'
 import { introOf, paragraphsOf } from '@/utils/intro'
 import MapPlaceService from '@/services/map/MapPlaceService'
-import ReviewApiService, { LEVEL_TO_KEY, absUrl } from '@/services/map/ReviewApiService'
+import ReviewApiService, { absUrl } from '@/services/map/ReviewApiService'
 
 const props = defineProps({ place: { type: Object, required: true } })
 const emit = defineEmits(['close', 'open-place', 'open-photo'])
@@ -528,10 +528,7 @@ async function shareNative() {
             </div>
             <div class="rv-mt">
               <template v-if="r.rating"><StarIcon v-for="n in 5" :key="n" :filled="n <= r.rating" :size="12" /></template>
-              <span v-if="LEVEL_TO_KEY[r.congestionReport]" class="bdg"
-                :style="{ background: `var(--${LEVEL_TO_KEY[r.congestionReport]}-bg)`, color: `var(--${LEVEL_TO_KEY[r.congestionReport]})`, fontSize: '10px', padding: '2px 8px' }">
-                {{ CROWD_KO[LEVEL_TO_KEY[r.congestionReport]] }}
-              </span>
+              <!-- 예전 후기의 혼잡 제보 배지는 더 이상 보여주지 않는다(2026-09-18) - ReviewSection 과 같은 결정 -->
             </div>
             <div v-if="r.content" class="rv-tx">{{ r.content }}</div>
             <div v-if="r.imageUrls && r.imageUrls.length" class="rv-imgs">
