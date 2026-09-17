@@ -580,7 +580,8 @@ watch(() => (auth as any).user?.userId ?? null, id => loadFavorites(id), { immed
 .star-btn{background:none;border:0;font-size:20px;color:var(--line);padding:0 1px;cursor:pointer}
 .star-btn.on{color:#f0a92b}
 .review-form textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:12px;resize:none;background:transparent;font:inherit}
-.form-foot{display:flex;align-items:center;justify-content:flex-end;gap:10px}
+.form-foot{display:flex;align-items:center;justify-content:flex-end;gap:8px}
+.form-foot .btn{padding:9px 16px;font-size:13px;border-radius:10px}   /* 전역 .btn(13px 20px)은 이 폼엔 너무 크다(2026-09-18) */
 /* 비로그인 상자 */
 .review-form.guest textarea:disabled{background:var(--surf2);color:var(--tx3);cursor:default}
 .review-form.guest textarea::placeholder{color:var(--tx3)}
