@@ -1,6 +1,6 @@
 <script setup>
 /* MAP_007 장소 상세 — 상세 화면과 후기 화면을 한 패널 안에서 전환한다 */
-import { ref, computed, watch, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import StarIcon from './StarIcon.vue'
 import ReviewSection from './ReviewSection.vue'
 import ProfileAvatar from '../common/ProfileAvatar.vue'
@@ -14,7 +14,7 @@ import { dist, won } from '@/utils/geo'
 import { copyText } from '@/utils/clipboard'
 import { shareToKakao, preloadKakao } from '@/composables/useKakaoShare'
 import { goodPriceSourceLine } from '@/utils/dataSources'
-import { introOf, needsMore } from '@/utils/intro'
+import { introOf, paragraphsOf } from '@/utils/intro'
 import MapPlaceService from '@/services/map/MapPlaceService'
 import ReviewApiService, { LEVEL_TO_KEY, absUrl } from '@/services/map/ReviewApiService'
 
@@ -123,6 +123,14 @@ const menuRows = computed(() => {
 /* 관광공사 소개글 (MAP_008) - 사진 아래 2줄로 접어 두고 더보기로 펼친다. 장소가 바뀌면 다시 접는다 */
 const intro = computed(() => introOf(detail.value?.overview))
 const introOpen = ref(false)
+const introParas = computed(() => paragraphsOf(intro.value))
+/* '더보기'는 2줄로 접은 글이 실제로 잘렸을 때만 - 전엔 70자 기준 추정이라 글자 크기·패널 폭이 바뀌면 잘렸는데 버튼이 없거나 그 반대가 됐다 */
+const introEl = ref(null)
+const introCut = ref(false)
+watch([intro, introOpen], () => nextTick(() => {
+  const el = introEl.value
+  introCut.value = !introOpen.value && !!el && el.scrollHeight > el.clientHeight + 1
+}), { flush: 'post' })
 
 /** 관광공사(KTO) 공식 사진 - 상세에 싣는 사진은 이것뿐이다 */
 const ktoImages = computed(() => detail.value?.images ?? [])
@@ -363,8 +371,10 @@ async function shareNative() {
            기본 2줄로 접어 혼잡 정보가 아래로 밀리지 않게 하고 더보기로 펼친다 -->
       <div v-if="intro" class="intro">
         <div class="intro-h"><i></i>소개<span class="intro-src">ⓒ한국관광공사</span></div>
-        <p class="intro-t" :class="{ clamp: !introOpen }">{{ intro }}</p>
-        <button v-if="needsMore(intro)" type="button" class="intro-more" :aria-expanded="introOpen"
+        <!-- 접힘: 한 덩어리를 2줄로 클램프. 펼침: 문장 3개씩 문단(글자는 원문 그대로, 표시만 나눔) -->
+        <p v-if="!introOpen" ref="introEl" class="intro-t clamp">{{ intro }}</p>
+        <div v-else class="intro-t"><p v-for="(pg, i) in introParas" :key="i" class="intro-p">{{ pg }}</p></div>
+        <button v-if="introOpen || introCut" type="button" class="intro-more" :aria-expanded="introOpen"
           @click="introOpen = !introOpen">{{ introOpen ? '접기 ‹' : '더보기 ›' }}</button>
       </div>
 
