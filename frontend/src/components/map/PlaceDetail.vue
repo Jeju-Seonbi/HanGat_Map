@@ -308,7 +308,12 @@ async function shareNative() {
       <div class="poh">
         <div style="flex:1">
           <h4>{{ s.n }}</h4>
-          <div class="sub">{{ [s.c, s.r].filter(Boolean).join(' · ') }}</div>
+          <div class="sub">
+            <span>{{ [s.c, s.r].filter(Boolean).join(' · ') }}</span>
+            <!-- 전체 상세 페이지(/places/:id)로 - 그 페이지의 '지도에서 보기'와 짝(2026-09-17 사용자 요청).
+                 id 없는 목업·검색 임시 객체엔 안 그린다 -->
+            <RouterLink v-if="s.id != null" class="more" :to="`/places/${s.id}`">자세히 보기 ›</RouterLink>
+          </div>
         </div>
         <!-- MAP_009 찜 -->
         <button class="fav" :class="{ on: isFav(s) }" :aria-pressed="isFav(s)" aria-label="찜하기" @click="toggleFav(s)">♥</button>
