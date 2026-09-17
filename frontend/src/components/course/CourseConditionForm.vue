@@ -12,6 +12,7 @@ const emit = defineEmits<{ submit: [condition: CourseCondition]; draft: [conditi
 
 const cloneCondition = (value: CourseCondition) => JSON.parse(JSON.stringify(value)) as CourseCondition
 const form = reactive<CourseCondition>(cloneCondition(props.initial))
+const formElement = ref<HTMLFormElement>()
 const { minimum: minimumDate, maximum: maximumDate } = courseDateWindow()
 watch(form, () => emit('draft', cloneCondition(form)), { deep: true })
 const preferenceKey = (item: PlacePreference) => item.source_place_id ? `KAKAO:${item.source_place_id}` : `DB:${item.place_id ?? item.place_name}`
@@ -188,7 +189,43 @@ function validate() {
 }
 
 function submit() {
+  if (props.loading) return
   if (validate()) emit('submit', cloneCondition(form))
+}
+
+// Share the submit validator; input changes never move focus or scroll.
+watch(form, validate, { deep: true, immediate: true })
+
+const validationIssues = computed(() => {
+  const issues: Array<{ target: string; message: string }> = []
+  if (basicErrors.dates) issues.push({
+    target: !form.start_date || form.start_date < minimumDate || form.start_date > maximumDate ? 'start-date' : 'end-date',
+    message: basicErrors.dates,
+  })
+  if (basicErrors.people) issues.push({ target: 'people', message: basicErrors.people })
+  if (basicErrors.budget) issues.push({ target: 'budget', message: basicErrors.budget })
+  if (selectionErrors.transport) issues.push({ target: 'transport', message: selectionErrors.transport })
+  if (selectionErrors.styles) issues.push({ target: 'styles', message: selectionErrors.styles })
+  for (const preference of [...wantPreferences.value, ...avoidPreferences.value]) {
+    const key = preferenceKey(preference)
+    if (preferenceErrors[key] && !issues.some(issue => issue.target === key)) {
+      issues.push({ target: key, message: `${preference.place_name}: ${preferenceErrors[key]}` })
+    }
+  }
+  return issues
+})
+
+function focusFirstError() {
+  const first = validationIssues.value[0]
+  if (!first || props.loading) return
+  const field = Array.from(formElement.value?.querySelectorAll<HTMLElement>('[data-error-target]') ?? [])
+    .find(element => element.dataset.errorTarget === first.target)
+  if (!field) return
+  const control = field.querySelector<HTMLElement>('.fixed-schedule-picker button:not([disabled])')
+    ?? field.querySelector<HTMLElement>('input:not([disabled]), select:not([disabled])')
+    ?? field.querySelector<HTMLElement>('button:not([disabled])') ?? field
+  control.focus({ preventScroll: true })
+  field.scrollIntoView({ block: 'center', behavior: 'auto' })
 }
 
 const summary = computed(() => ({
@@ -205,18 +242,18 @@ const summary = computed(() => ({
 </script>
 
 <template>
-  <form class="course-builder" novalidate @submit.prevent="submit">
+  <form ref="formElement" class="course-builder" novalidate :aria-busy="loading" @submit.prevent="submit">
     <div class="course-form-grid">
       <div class="condition-main">
         <section class="condition-section basic-condition">
           <div class="section-title"><span>01</span><div><h2>여행 기본 정보</h2><p>여행 기간과 인원, 전체 예산을 입력해 주세요.</p></div></div>
           <div class="field-grid">
-            <label>여행 시작일<input v-model="form.start_date" type="date" :min="minimumDate" :max="maximumDate" @input="basicErrors.dates = ''"></label>
-            <label>여행 종료일<input v-model="form.end_date" type="date" :min="minimumDate" :max="maximumDate" @input="basicErrors.dates = ''"></label>
+            <label data-error-target="start-date">여행 시작일<input v-model="form.start_date" type="date" :min="minimumDate" :max="maximumDate" :aria-invalid="!!basicErrors.dates" :aria-describedby="basicErrors.dates ? 'course-dates-error' : undefined"></label>
+            <label data-error-target="end-date">여행 종료일<input v-model="form.end_date" type="date" :min="minimumDate" :max="maximumDate" :aria-invalid="!!basicErrors.dates" :aria-describedby="basicErrors.dates ? 'course-dates-error' : undefined"></label>
             <small class="field-span field-help">오늘부터 30일까지 혼잡 예보 범위로 선택할 수 있어요. 범위 안이어도 아직 적재되지 않은 예보는 '정보 없음'으로 표시돼요.</small>
-            <p v-if="basicErrors.dates" class="course-field-error field-span">{{ basicErrors.dates }}</p>
-            <label>인원<input v-model.number="form.people" type="number" min="1" @input="basicErrors.people = ''"><small v-if="basicErrors.people" class="course-field-error">{{ basicErrors.people }}</small></label>
-            <label>전체 예산<input v-model.number="form.budget_total" type="number" min="1" step="10000" placeholder="원 단위" @input="basicErrors.budget = ''"><small v-if="basicErrors.budget" class="course-field-error">{{ basicErrors.budget }}</small></label>
+            <p v-if="basicErrors.dates" id="course-dates-error" class="course-field-error field-span">{{ basicErrors.dates }}</p>
+            <label data-error-target="people">인원<input v-model.number="form.people" type="number" min="1" :aria-invalid="!!basicErrors.people" :aria-describedby="basicErrors.people ? 'course-people-error' : undefined"><small v-if="basicErrors.people" id="course-people-error" class="course-field-error">{{ basicErrors.people }}</small></label>
+            <label data-error-target="budget">전체 예산<input v-model.number="form.budget_total" type="number" min="1" step="10000" placeholder="원 단위" :aria-invalid="!!basicErrors.budget" :aria-describedby="basicErrors.budget ? 'course-budget-error' : undefined"><small v-if="basicErrors.budget" id="course-budget-error" class="course-field-error">{{ basicErrors.budget }}</small></label>
             <AccommodationSearch class="field-span" :selected="form.accommodation" @select="selectAccommodation" @clear="clearAccommodation" />
           </div>
         </section>
@@ -228,14 +265,14 @@ const summary = computed(() => ({
 
         <section class="condition-section">
           <div class="section-title"><span>03</span><div><h2>이동수단</h2><p>여행 중 주로 이용할 수단을 하나 골라주세요.</p></div></div>
-          <div class="course-radio"><label v-for="[value, label] in transports" :key="value"><input v-model="form.transport" type="radio" :value="value" @change="selectionErrors.transport = ''"><span>{{ label }}</span></label></div>
-          <p v-if="selectionErrors.transport" class="course-field-error section-field-error">{{ selectionErrors.transport }}</p>
+          <div class="course-radio" data-error-target="transport" role="group" aria-label="이동수단" :aria-describedby="selectionErrors.transport ? 'course-transport-error' : undefined"><label v-for="[value, label] in transports" :key="value"><input v-model="form.transport" type="radio" :value="value" :aria-invalid="!!selectionErrors.transport"><span>{{ label }}</span></label></div>
+          <p v-if="selectionErrors.transport" id="course-transport-error" class="course-field-error section-field-error">{{ selectionErrors.transport }}</p>
         </section>
 
         <section class="condition-section">
           <div class="section-title"><span>04</span><div><h2>여행 스타일</h2><p>내 취향에 가까운 키워드를 여러 개 골라주세요.</p></div></div>
-          <div class="chips"><button v-for="style in styles" :key="style.tag_id" type="button" :class="{ active: hasStyle(style.tag_id) }" @click="toggleStyle(style)">{{ style.name }}</button></div>
-          <p v-if="selectionErrors.styles" class="course-field-error section-field-error">{{ selectionErrors.styles }}</p>
+          <div class="chips" data-error-target="styles" role="group" aria-label="여행 스타일" :aria-describedby="selectionErrors.styles ? 'course-styles-error' : undefined"><button v-for="style in styles" :key="style.tag_id" type="button" :class="{ active: hasStyle(style.tag_id) }" :aria-pressed="hasStyle(style.tag_id)" @click="toggleStyle(style)">{{ style.name }}</button></div>
+          <p v-if="selectionErrors.styles" id="course-styles-error" class="course-field-error section-field-error">{{ selectionErrors.styles }}</p>
         </section>
       </div>
 
@@ -260,7 +297,7 @@ const summary = computed(() => ({
         <div class="section-title"><span>05</span><div><h2>꼭 가고 싶은 장소</h2><p>일정에 포함하고 싶은 장소를 여러 개 추가할 수 있어요.</p></div></div>
         <KakaoPlaceSearch mode="GENERAL" placeholder="가고 싶은 장소를 검색해 주세요" loading-text="장소를 검색하고 있어요..." empty-text="제주에서 해당 장소를 찾지 못했어요." @query-change="preferenceInputErrors.WANT = ''" @select="selectPreference($event, 'WANT')" />
         <p v-if="preferenceInputErrors.WANT" class="course-field-error">{{ preferenceInputErrors.WANT }}</p>
-        <div v-for="preference in wantPreferences" :key="preferenceKey(preference)" class="preference want-preference">
+        <div v-for="(preference, index) in wantPreferences" :key="preferenceKey(preference)" class="preference want-preference" :data-error-target="preferenceKey(preference)" :aria-describedby="preferenceErrors[preferenceKey(preference)] ? `course-want-error-${index}` : undefined" role="group" :aria-label="preference.place_name" tabindex="-1">
           <div class="preference-head"><b>{{ preference.place_name }}</b><button type="button" @click="removePreference(preference)">삭제</button></div>
           <small v-if="preference.road_address || preference.address">{{ preference.road_address || preference.address }}</small>
           <label class="fixed-toggle"><input type="checkbox" :checked="fixedSchedules.has(preferenceKey(preference))" @change="toggleFixed(preference)"><span>방문 일정 고정</span></label>
@@ -273,7 +310,7 @@ const summary = computed(() => ({
             @update:date="updateFixedDate(preference, $event)"
             @update:time="updateFixedTime(preference, $event)"
           />
-          <p v-if="preferenceErrors[preferenceKey(preference)]" class="course-field-error">{{ preferenceErrors[preferenceKey(preference)] }}</p>
+          <p v-if="preferenceErrors[preferenceKey(preference)]" :id="`course-want-error-${index}`" class="course-field-error">{{ preferenceErrors[preferenceKey(preference)] }}</p>
         </div>
       </section>
 
@@ -281,12 +318,52 @@ const summary = computed(() => ({
         <div class="section-title"><span>06</span><div><h2>피하고 싶은 장소</h2><p>추천에서 제외할 장소를 여러 개 추가할 수 있어요.</p></div></div>
         <KakaoPlaceSearch mode="GENERAL" placeholder="피하고 싶은 장소를 검색해 주세요" loading-text="장소를 검색하고 있어요..." empty-text="제주에서 해당 장소를 찾지 못했어요." @query-change="preferenceInputErrors.AVOID = ''" @select="selectPreference($event, 'AVOID')" />
         <p v-if="preferenceInputErrors.AVOID" class="course-field-error">{{ preferenceInputErrors.AVOID }}</p>
-        <div v-for="preference in avoidPreferences" :key="preferenceKey(preference)" class="preference compact-pref"><div><b>{{ preference.place_name }}</b><small v-if="preference.road_address || preference.address">{{ preference.road_address || preference.address }}</small></div><button type="button" @click="removePreference(preference)">삭제</button></div>
+        <div v-for="(preference, index) in avoidPreferences" :key="preferenceKey(preference)" class="preference compact-pref" :data-error-target="preferenceKey(preference)" role="group" :aria-label="preference.place_name" :aria-describedby="preferenceErrors[preferenceKey(preference)] ? `course-avoid-error-${index}` : undefined" tabindex="-1"><div><b>{{ preference.place_name }}</b><small v-if="preference.road_address || preference.address">{{ preference.road_address || preference.address }}</small><p v-if="preferenceErrors[preferenceKey(preference)]" :id="`course-avoid-error-${index}`" class="course-field-error">{{ preferenceErrors[preferenceKey(preference)] }}</p></div><button type="button" @click="removePreference(preference)">삭제</button></div>
       </section>
     </div>
 
     <div class="course-form-footer">
-      <button class="course-cta" :disabled="loading">{{ loading ? '코스를 만들고 있어요…' : 'AI 코스 만들기' }}</button>
+      <div class="validation-feedback" aria-live="polite" aria-atomic="true">
+        <template v-if="!loading && validationIssues.length">
+          <p id="course-validation-summary">{{ validationIssues[0]?.message }}<span v-if="validationIssues.length > 1"> (외 {{ validationIssues.length - 1 }}개 오류)</span></p>
+          <button type="button" class="validation-review" @click="focusFirstError">입력 확인하기</button>
+        </template>
+      </div>
+      <button class="course-cta" :disabled="loading || validationIssues.length > 0" :aria-describedby="!loading && validationIssues.length ? 'course-validation-summary' : undefined">{{ loading ? '코스를 만들고 있어요…' : 'AI 코스 만들기' }}</button>
     </div>
   </form>
 </template>
+
+<style scoped>
+[data-error-target] {
+  scroll-margin-block: 100px calc(var(--mobile-tabbar-h, 0px) + 24px);
+}
+.course-form-footer {
+  padding-bottom: calc(28px + var(--mobile-tabbar-h, 0px));
+}
+.validation-feedback {
+  max-width: 440px;
+  margin-inline: auto;
+  color: var(--course-text);
+  font-size: 0.85rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.validation-feedback p { margin: 0 0 8px; }
+.validation-review {
+  min-height: 44px;
+  margin-bottom: 12px;
+  padding: 8px 14px;
+  border: 1px solid var(--course-line-2);
+  border-radius: 10px;
+  background: var(--course-surface-2);
+  color: var(--course-text);
+  font: inherit;
+  cursor: pointer;
+}
+.validation-review:focus-visible,
+[data-error-target]:focus-visible {
+  outline: 2px solid var(--course-accent);
+  outline-offset: 3px;
+}
+</style>
