@@ -14,11 +14,10 @@ import type { CongestionLevel } from '../assets/types'
 import type { AlternativePlace } from '../assets/types/course'
 import type { AccommodationInput, CourseBudgetSummary } from '../assets/types/course'
 
-export interface RoadAlternatives {
+export interface StraightAlternatives {
   forecast_date: string
-  distance_basis: 'CAR_ROAD'
+  distance_basis: 'STRAIGHT_LINE'
   places: AlternativePlace[]
-  unavailable_count: number
 }
 
 /** 화면이 그리는 코스 카드 한 장 - 메인 추천과 저장 목록이 같은 모양을 쓴다(백엔드 계약도 동일). */
@@ -305,10 +304,10 @@ export const CourseService = {
     return await apiRequest(`/places/${placeId}/alternatives?${query.toString()}`) as AlternativePlace[]
   },
 
-  async getRoadAlternatives(placeId: number, excludeIds: number[]): Promise<RoadAlternatives> {
+  async getStraightAlternatives(placeId: number, excludeIds: number[]): Promise<StraightAlternatives> {
     const query = new URLSearchParams()
     if (excludeIds.length) query.set('exclude', excludeIds.join(','))
-    return await apiRequest(`/places/${placeId}/road-alternatives?${query}`, { timeoutMs: 70000 }) as RoadAlternatives
+    return await apiRequest(`/places/${placeId}/straight-alternatives?${query}`, { timeoutMs: 15000 }) as StraightAlternatives
   },
 
   /**

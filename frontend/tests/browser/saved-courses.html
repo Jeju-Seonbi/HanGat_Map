@@ -23,10 +23,10 @@ window.qaDeleted=[];
 window.qaRenamed=[];window.qaSwaps=[];
 CourseService.renameCourse=async(id,title)=>{window.qaRenamed.push({id,title});titles[Number(id)-1]=title;return title};
 CourseService.getAlternatives=async()=>[{place_id:99,place_name:'협재해수욕장',category_name:'관광지',distance_m:3500,congestion_level:'QUIET',radius_km:10,recommendation_reason:'한산한 대안이에요'}];
-window.qaRoadCalls=[];
-CourseService.getRoadAlternatives=async(placeId,exclude)=>{
- window.qaRoadCalls.push({placeId,exclude});
- return {forecast_date:'2026-09-18',distance_basis:'CAR_ROAD',unavailable_count:0,places:Array.from({length:7},(_,i)=>({
+window.qaAlternativeCalls=[];
+CourseService.getStraightAlternatives=async(placeId,exclude)=>{
+ window.qaAlternativeCalls.push({placeId,exclude});
+ return {forecast_date:'2026-09-18',distance_basis:'STRAIGHT_LINE',places:Array.from({length:7},(_,i)=>({
   place_id:99+i,place_name:i?`대안 관광지 ${i+1}`:'협재해수욕장',category_name:'관광지',distance_m:3500+i*2000,
   congestion_level:'QUIET',radius_km:i>3?20:10,overview:'해안 풍경을 감상하며 산책할 수 있는 장소입니다. 이 소개는 화면 검증을 위한 샘플입니다.',
   image_url:i%2?null:'/images/places/gwangchigi.jpg',recommendation_reason:'',replacement_reason:''

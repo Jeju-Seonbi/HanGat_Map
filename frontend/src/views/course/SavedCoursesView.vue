@@ -347,7 +347,7 @@ onBeforeUnmount(() => { alive = false; listSequence++; browserObserver?.disconne
   </section>
   <CourseShareDialog v-if="sharing" :key="sharing.id" :course-id="sharing.id" :title="sharing.title" @close="sharing = null" />
   <AlternativePlaceModal v-if="modalItem" :item="modalItem" :alternatives="alternatives" :loading="altLoading" :notice="altNotice" :busy="swapping"
-    :forecast-date="swaps.forecastDate.value" :has-more="swaps.hasMore.value" :load-failed="swaps.loadFailed.value" :unavailable-count="swaps.unavailableCount.value"
+    :forecast-date="swaps.forecastDate.value" :has-more="swaps.hasMore.value" :load-failed="swaps.loadFailed.value"
     @close="swaps.reset()" @select="swaps.applySwap" @more="swaps.loadMore()" @retry="swaps.loadMore(true)" />
   <dialog ref="renameDialog" class="course-rename-dialog" aria-labelledby="rename-title" @cancel="event => { if (renameBusy) event.preventDefault() }">
     <form @submit.prevent="saveRename">
