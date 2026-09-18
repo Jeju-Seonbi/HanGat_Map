@@ -84,7 +84,7 @@ watch(tiles, () => { if (seen) loadPhotos() })
 <style scoped>
 .tt{display:flex;flex-direction:column;gap:22px}
 .tt-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
-.tt-head h2{margin:0;font-size:26px;font-weight:800;letter-spacing:-.02em}
+.tt-head h2{margin:0;font-size:30px;font-weight:800;letter-spacing:-.02em}   /* 메인 다른 구간 제목과 같은 크기 */
 .tt-head p{margin:6px 0 0;font-size:14px;color:var(--sub)}
 .tt-more{font-size:14px;font-weight:700;color:var(--primary-dark);white-space:nowrap}
 .tt-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:16px}
@@ -98,7 +98,7 @@ watch(tiles, () => { if (seen) loadPhotos() })
 .tt-empty{margin:0;font-size:14px;color:var(--sub)}
 @media (max-width:767px){
   .tt{gap:14px}
-  .tt-head h2{font-size:20px}.tt-head p{font-size:12.5px}.tt-more{font-size:13px}
+  .tt-head h2{font-size:22px}.tt-head p{font-size:12.5px}.tt-more{font-size:13px}
   .tt-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
   .tt-ph{height:96px;border-radius:12px}
   .tt-tile b{font-size:13.5px}.tt-tile small{font-size:11.5px}
