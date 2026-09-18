@@ -51,7 +51,7 @@ const url=(process.env.SAVED_COURSES_TEST_URL || 'http://127.0.0.1:5208')+'/test
  await firstStop.getByRole('button',{name:/ 대안 보기$/}).click();
  const alternativeName=await page.locator('.alt-list article h3').first().innerText();
  assert.equal(await page.locator('.alt-list article').count(),3);
- assert.match(await page.locator('.alternative-header').innerText(),/자동차 도로거리 20km/);
+ assert.match(await page.locator('.alternative-header').innerText(),/직선거리 20km/);
  assert.equal(await page.locator('.alternative-map').first().getAttribute('href'),'/map?place=99');
  await page.getByRole('button',{name:'이곳으로 변경'}).first().click();
  await page.waitForFunction(name=>document.querySelector('.stop-card')?.textContent.includes(name),alternativeName);

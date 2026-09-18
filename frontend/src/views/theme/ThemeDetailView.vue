@@ -21,6 +21,7 @@ import MapPlaceService from '../../services/map/MapPlaceService'
 import { loadThemeLayers } from '../../services/themeData.js'
 import { buildThemes, findTile, placesOfTile, tileCopy } from '../../config/themes.js'
 import ThemePlaceCard from '../../components/theme/ThemePlaceCard.vue'
+import UnavailableCard from '../../components/common/UnavailableCard.vue'
 
 const PAGE = 24
 const REGIONS = ['전체', '동부', '서부', '남부', '북부']
@@ -79,10 +80,9 @@ watch([region, shown], () => { if (found.value) writeState(String(route.params.k
     <p v-if="loading" class="note">장소 목록을 불러오고 있어요…</p>
 
     <template v-else-if="!found">
-      <div class="band" style="background:var(--surf2)">
-        <div class="band-text"><h1>테마를 찾지 못했어요</h1><p>주소가 바뀌었거나 사라진 테마예요.</p></div>
-      </div>
-      <RouterLink to="/themes" class="btn">테마 목록으로</RouterLink>
+      <UnavailableCard title="테마를 찾지 못했어요" description="주소가 바뀌었거나 사라진 테마예요.">
+        <RouterLink to="/themes" class="btn2 primary">테마 목록으로</RouterLink>
+      </UnavailableCard>
     </template>
 
     <template v-else>

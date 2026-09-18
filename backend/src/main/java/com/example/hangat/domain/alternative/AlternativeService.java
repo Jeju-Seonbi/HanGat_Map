@@ -34,6 +34,15 @@ import java.util.Set;
 @Transactional(readOnly = true)
 public class AlternativeService {
     public enum Sort { CONGESTION, DISTANCE }
+    @com.fasterxml.jackson.databind.annotation.JsonNaming(com.fasterxml.jackson.databind.PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record StraightResponse(LocalDate forecastDate, String distanceBasis, List<AlternativePlaceResponse> places) {}
+
+    public StraightResponse straightAlternatives(Long placeId, Set<Long> excludeIds) {
+        LocalDate today = com.example.hangat.common.util.DateTimes.todayKst();
+        return new StraightResponse(today, "STRAIGHT_LINE",
+                alternatives(placeId, today, excludeIds, Integer.MAX_VALUE, Sort.DISTANCE));
+    }
+
     public record RoadCandidate(AlternativePlaceResponse place, com.example.hangat.course.route.AlternativeRoadDistance.Point point) {}
     public record RoadInput(LocalDate date, com.example.hangat.course.route.AlternativeRoadDistance.Point origin, List<RoadCandidate> candidates) {}
 
