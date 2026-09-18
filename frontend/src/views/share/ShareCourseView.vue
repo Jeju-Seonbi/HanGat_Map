@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import CourseShareService, { type SharedCourse } from '../../services/CourseShareService'
 import KakaoMap from '../../components/map/KakaoMap.vue'
 import AppIcon from '../../components/common/AppIcon.vue'
+import UnavailableCard from '../../components/common/UnavailableCard.vue'
 import { stayDuration } from '../../services/course/stayDuration'
 import { dayWeatherLabels } from '../../services/course/dailyWeather'
 import type { Place } from '../../assets/types'
@@ -79,7 +80,12 @@ const mapPlaces = computed<Place[]>(() => (currentDay.value?.items ?? []).map(it
 <template>
   <main class="shared-course">
     <p v-if="loading" class="share-message" role="status">공유된 코스를 불러오는 중이에요…</p>
-    <section v-else-if="error" class="share-message" role="alert"><h1>{{ error }}</h1><p>{{ unavailable ? '공유가 중지되었거나 삭제된 코스일 수 있어요.' : '잠시 후 다시 시도해 주세요.' }}</p><button v-if="!unavailable" type="button" @click="load">다시 시도</button><RouterLink to="/ai-course">내 코스 만들기</RouterLink></section>
+    <div v-else-if="unavailable" class="doc">
+      <UnavailableCard title="이 공유 코스를 볼 수 없어요." description="공유가 중지되었거나 삭제된 코스일 수 있어요.">
+        <RouterLink class="btn2 primary" to="/ai-course">내 코스 만들기</RouterLink>
+      </UnavailableCard>
+    </div>
+    <section v-else-if="error" class="share-message" role="alert"><h1>{{ error }}</h1><p>잠시 후 다시 시도해 주세요.</p><button type="button" @click="load">다시 시도</button><RouterLink to="/ai-course">내 코스 만들기</RouterLink></section>
     <template v-else-if="course">
       <div ref="workspace" class="shared-layout" :style="{ '--sheet-height': panelHeight + '%' }">
         <section class="shared-itinerary" aria-label="공유 코스 일정">

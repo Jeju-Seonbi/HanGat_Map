@@ -3,7 +3,7 @@
  * 찜한 장소 (요구사항 정의서 MY_006 · MY_007).
  *
  *  MY_006 — 내 찜만 조회 / 카드·목록 형태 / 대표 이미지·장소명·카테고리·주소·평점·운영 상태
- *           날씨·혼잡 표시 / 선택 시 지도 + 상세 / 지도 보기 / 최근·이름·카테고리 정렬 / 빈 상태
+ *           날씨·혼잡 표시 / 선택 시 카드 안 장소 메뉴 / 지도 보기 / 최근·이름·카테고리 정렬 / 빈 상태
  *  MY_007 — 찜 해제 시 목록에서 즉시 제거
  */
 import { computed, onMounted, ref, watch } from 'vue'
@@ -12,27 +12,32 @@ import WeatherBadge from '../../components/common/WeatherBadge.vue'
 import EmptyState from '../../components/common/EmptyState.vue'
 import StateBlock from '../../components/common/StateBlock.vue'
 import SortSeg from '../../components/mypage/SortSeg.vue'
+import ListPagination from '../../components/mypage/ListPagination.vue'
 import PlaceThumb from '../../components/mypage/PlaceThumb.vue'
 import StarRating from '../../components/mypage/StarRating.vue'
-import MapRenderer from '../../components/map/MapRenderer.vue'
 /* 2026-09-07 백엔드 찜 API 연결(지도 담당 이후경) - 목업(api/mypage.js) 대신 api/favorites.js 를 읽는다. 항목 모양은 같다 */
 import { listFavorites, removeFavorite, FAVORITE_SORTS } from '../../api/favorites.js'
 import { operationStatus } from '../../data/places.js'
 import { useUiStore } from '../../stores/ui.js'
 import { useApiError } from '../../composables/useApiError.js'
-import { toKakaoFavoritePlaces } from './favoriteMapModel'
 
 const ui = useUiStore()
 const toMessage = useApiError()
 
 const sort = ref('recent')
 const view = ref('card') // card | list
-const showMap = ref(false)
+const deletingId = ref(null)
+const actionError = ref('')
 const selectedId = ref(null)
 
 const loading = ref(true)
 const error = ref(null)
 const data = ref({ items: [], total: 0 })
+const page = ref(0)
+const pageSize = 6
+const totalPages = computed(() => Math.ceil(data.value.items.length / pageSize))
+const visibleItems = computed(() => data.value.items.slice(page.value * pageSize, (page.value + 1) * pageSize))
+watch(totalPages, pages => { page.value = Math.min(page.value, Math.max(0, pages - 1)) })
 
 async function fetchList () {
   loading.value = data.value.items.length === 0
@@ -51,17 +56,19 @@ async function fetchList () {
 }
 
 onMounted(fetchList)
-watch(sort, fetchList)
+watch(sort, () => { page.value = 0; fetchList() })
 
-const selected = computed(() => data.value.items.find(i => i.placeId === selectedId.value) || null)
-const favoriteMapPlaces = computed(() => toKakaoFavoritePlaces(data.value.items))
+watch([page, sort, view], () => { selectedId.value = null; actionError.value = '' })
 
 function select (placeId) {
   selectedId.value = selectedId.value === placeId ? null : placeId
-  if (selectedId.value) showMap.value = true
+  actionError.value = ''
 }
 
 async function unfavorite (item) {
+  if (deletingId.value != null) return
+  deletingId.value = item.placeId
+  actionError.value = ''
   try {
     await removeFavorite(item.placeId)
     // 즉시 반영 (MY_007)
@@ -74,7 +81,9 @@ async function unfavorite (item) {
     ui.toast(`${item.name} 찜을 해제했어요`)
   } catch (e) {
     const msg = toMessage(e)
-    if (msg) ui.toast(msg)
+    if (msg) { actionError.value = msg; ui.toast(msg) }
+  } finally {
+    deletingId.value = null
   }
 }
 
@@ -85,8 +94,6 @@ const status = item => item.closed
   : item.hours
     ? operationStatus(item)
     : { code: item.hoursText ? 'TEXT' : 'UNKNOWN', label: item.hoursText ?? '운영시간 정보 없음' }
-/* 입장료는 원문+무료 여부로 온다 - 모르면 '무료'가 아니라 '정보 없음' */
-const feeLabel = item => item.feeText ?? (item.free ? '무료' : '정보 없음')
 </script>
 
 <template>
@@ -101,9 +108,6 @@ const feeLabel = item => item.feeText ?? (item.free ? '무료' : '정보 없음'
         <button :class="{ on: view === 'card' }" @click="view = 'card'">카드</button>
         <button :class="{ on: view === 'list' }" @click="view = 'list'">목록</button>
       </div>
-      <button class="btn2" :class="{ primary: showMap }" @click="showMap = !showMap">
-        {{ showMap ? '지도 닫기' : '지도 보기' }}
-      </button>
     </div>
 
     <StateBlock :loading="loading" :error="error" :rows="3" @retry="fetchList" />
@@ -118,51 +122,11 @@ const feeLabel = item => item.feeText ?? (item.free ? '무료' : '정보 없음'
       />
 
       <template v-else>
-        <!-- 지도 + 상세 (MY_006: 선택하면 지도에서 보여주고 옆에 상세도 띄운다) -->
-        <div v-if="showMap" class="mapwrap" :class="{ withDetail: !!selected }">
-          <div class="favorites-kakao-map">
-            <MapRenderer :places="favoriteMapPlaces" :selected-id="selectedId"
-              @select="place => select(place.id)" />
-          </div>
-
-          <aside v-if="selected" class="detail fl">
-            <div class="dh">
-              <div>
-                <h3>{{ selected.name }}</h3>
-                <p class="note">{{ selected.category }} · {{ selected.region }}</p>
-              </div>
-              <button class="x" aria-label="상세 닫기" @click="selectedId = null">×</button>
-            </div>
-            <div class="dbadges">
-              <CrowdBadge :value="selected.crowd" show-value />
-              <WeatherBadge v-if="selected.weather" :kind="selected.weather.kind" :t="selected.weather.t" />
-            </div>
-            <dl class="dmeta">
-              <div><dt>주소</dt><dd>{{ selected.addr }}</dd></div>
-              <div><dt>운영</dt><dd>{{ status(selected).label }}</dd></div>
-              <div><dt>입장료</dt><dd>{{ feeLabel(selected) }}</dd></div>
-              <div><dt>편의</dt>
-                <dd>
-                  <span class="am" :class="{ no: !selected.park }">주차</span>
-                  <span class="am" :class="{ no: !selected.toilet }">화장실</span>
-                  <span v-if="selected.indoor" class="am">실내</span>
-                </dd>
-              </div>
-            </dl>
-            <div class="dacts">
-              <RouterLink class="btn2 primary" :to="{ name: 'map', query: { place: selected.placeId } }">
-                지도에서 열기
-              </RouterLink>
-              <button class="btn2 danger" @click="unfavorite(selected)">찜 해제</button>
-            </div>
-          </aside>
-        </div>
-
         <!-- 카드 보기 -->
         <ul v-if="view === 'card'" class="cards">
-          <li v-for="p in data.items" :key="p.placeId">
+          <li v-for="p in visibleItems" :key="p.placeId">
             <article class="card hoverable" :class="{ sel: p.placeId === selectedId }">
-              <button class="hit" :aria-label="`${p.name} 상세 보기`" @click="select(p.placeId)">
+              <button class="hit" :aria-label="`${p.name} 메뉴`" :aria-expanded="selectedId === p.placeId" @click="select(p.placeId)">
                 <!-- 대표사진 = 장소 상세에 뜨는 첫 사진(백엔드 imageUrl). 없거나 깨지면 색 썸네일 -->
                 <PlaceThumb :category="p.category" :name="p.name" :src="p.imageUrl" size="100%" radius="12px" class="th" />
                 <div class="cbody">
@@ -183,15 +147,20 @@ const feeLabel = item => item.feeText ?? (item.free ? '무료' : '정보 없음'
                   </div>
                 </div>
               </button>
-              <button class="unfav" :aria-label="`${p.name} 찜 해제`" @click="unfavorite(p)">♥</button>
+              <div v-if="selectedId === p.placeId" class="place-actions">
+<RouterLink class="btn2" :to="{ name: 'map', query: { place: p.placeId } }">지도에서 보기</RouterLink>
+<RouterLink class="btn2" :to="{ name: 'place-detail', params: { placeId: p.placeId } }">장소 상세 보기</RouterLink>
+<button type="button" class="btn2 danger" :aria-label="`${p.name} 찜 해제`" :disabled="deletingId != null" @click="unfavorite(p)">{{ deletingId === p.placeId ? '해제 중…' : '찜 해제' }}</button>
+<p v-if="actionError" class="action-error" role="alert">{{ actionError }}</p>
+</div>
             </article>
           </li>
         </ul>
 
         <!-- 목록 보기 (원본 .row 구조) -->
         <ul v-else class="rows">
-          <li v-for="p in data.items" :key="p.placeId">
-            <button class="row" :class="{ sel: p.placeId === selectedId }" @click="select(p.placeId)">
+          <li v-for="p in visibleItems" :key="p.placeId">
+            <button class="row" :aria-label="`${p.name} 메뉴`" :aria-expanded="selectedId === p.placeId" :class="{ sel: p.placeId === selectedId }" @click="select(p.placeId)">
               <span v-if="p.crowdTier" class="rpin" :class="p.crowdTier" aria-hidden="true" />
               <span class="rinfo">
                 <span class="rn">{{ p.name }}</span>
@@ -199,10 +168,16 @@ const feeLabel = item => item.feeText ?? (item.free ? '무료' : '정보 없음'
               </span>
               <CrowdBadge :value="p.crowd" />
             </button>
-            <button class="unfav row-un" :aria-label="`${p.name} 찜 해제`" @click="unfavorite(p)">♥</button>
+            <div v-if="selectedId === p.placeId" class="place-actions">
+<RouterLink class="btn2" :to="{ name: 'map', query: { place: p.placeId } }">지도에서 보기</RouterLink>
+<RouterLink class="btn2" :to="{ name: 'place-detail', params: { placeId: p.placeId } }">장소 상세 보기</RouterLink>
+<button type="button" class="btn2 danger" :aria-label="`${p.name} 찜 해제`" :disabled="deletingId != null" @click="unfavorite(p)">{{ deletingId === p.placeId ? '해제 중…' : '찜 해제' }}</button>
+<p v-if="actionError" class="action-error" role="alert">{{ actionError }}</p>
+</div>
           </li>
         </ul>
 
+        <ListPagination :page="page" :total-pages="totalPages" :busy="loading" label="찜 페이지" @change="page = $event" />
       </template>
     </template>
   </section>
@@ -216,33 +191,6 @@ const feeLabel = item => item.feeText ?? (item.free ? '무료' : '정보 없음'
 .tools { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .seg.small { width: 150px; }
 .tools .btn2 { padding: 8px 14px; }
-
-.mapwrap { display: grid; grid-template-columns: 1fr; gap: 10px; margin-bottom: 14px; }
-.mapwrap.withDetail { grid-template-columns: 1fr 300px; }
-.favorites-kakao-map {
-  height: 340px; overflow: hidden; border: 1px solid var(--line);
-  border-radius: 14px; background: var(--surf2);
-}
-.favorites-kakao-map :deep(.kakao-map),
-.favorites-kakao-map :deep(.mock-map) { width: 100%; height: 100%; min-height: 0; border-radius: 14px; }
-
-.detail { padding: 16px; align-self: start; }
-.dh { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 10px; }
-.dh h3 { font-size: 16px; font-weight: 800; letter-spacing: -.03em; }
-.dh .x { color: var(--tx3); font-size: 19px; line-height: 1; padding: 3px 7px; border-radius: 9px; margin-left: auto; }
-.dh .x:hover { background: var(--surf2); }
-.dbadges { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
-.dmeta > div { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
-.dmeta > div:last-child { border: none; }
-.dmeta dt { font-size: 11.5px; color: var(--tx3); font-weight: 600; width: 44px; flex-shrink: 0; }
-.dmeta dd { font-size: 12px; font-weight: 600; flex: 1; }
-.am {
-  display: inline-block; font-size: 11px; font-weight: 600; padding: 4px 10px;
-  border-radius: var(--rp); background: var(--surf2); color: var(--tx2); margin: 0 4px 4px 0;
-}
-.am.no { opacity: .4; text-decoration: line-through; }
-.dacts { display: flex; gap: 7px; margin-top: 12px; }
-.dacts > * { flex: 1; text-align: center; }
 
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(224px, 1fr)); gap: 10px; }
 .cards .card { padding: 10px; position: relative; }
@@ -259,16 +207,9 @@ const feeLabel = item => item.feeText ?? (item.free ? '무료' : '정보 없음'
 .op.closed { color: var(--busy); }
 .cbadges { display: flex; gap: 5px; margin-top: 9px; flex-wrap: wrap; }
 
-.unfav {
-  position: absolute; top: 16px; right: 16px;
-  width: 30px; height: 30px; border-radius: 50%;
-  background: rgba(255, 255, 255, .92); color: var(--pink);
-  font-size: 15px; line-height: 1; box-shadow: var(--sh);
-}
-.unfav:hover { background: var(--pink-bg); }
-
 .rows { display: flex; flex-direction: column; gap: 6px; }
-.rows li { display: flex; align-items: center; gap: 4px; }
+.rows li { display: flex; flex-direction: column; gap: 4px; padding: 8px; background: var(--surf); border: 1px solid var(--line); border-radius: 12px; }
+.rows .row { width: 100%; }
 .row {
   flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px;
   padding: 9px 11px; border-radius: 12px;
@@ -280,11 +221,8 @@ const feeLabel = item => item.feeText ?? (item.free ? '무료' : '정보 없음'
 .rinfo { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .rn { font-size: 13.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rs { font-size: 11px; color: var(--tx3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.row-un { position: static; box-shadow: none; background: var(--surf2); flex-shrink: 0; }
-
-.foot { margin-top: 12px; }
-
-@media (max-width: 900px) {
-  .mapwrap.withDetail { grid-template-columns: 1fr; }
-}
+.place-actions { display: flex; flex-direction: column; gap: 8px; width: 100%; border-top: 1px solid var(--line); margin-top: 12px; padding-top: 12px; }
+.place-actions .btn2 { width: 100%; min-height: 44px; text-align: center; }
+.action-error { color: var(--busy); font-size: 12px; line-height: 1.6; }
+.hit:focus-visible, .row:focus-visible { outline: 2px solid var(--ac); outline-offset: 2px; }
 </style>

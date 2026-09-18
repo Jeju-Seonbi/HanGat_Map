@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 메인 페이지 (담당: 정동현 · 2026-09-18 메인 시안대로 재구성: 이후경)
-// 구성: ① 히어로(소개 + 조건 바 + 실제 숫자, MAIN_003) ② 날씨 띠 ③ 오늘 한적한 곳 캐러셀(MAIN_001)
-//       ④ 추천 코스 3종 → 코스 상세(MAIN_002) ⑤ 테마로 둘러보기(/themes 입구) ⑥ 푸터(출처)
+// 구성: ① 히어로(소개 + 조건 바 + 실제 숫자, MAIN_003) ② 오늘 한적한 곳 캐러셀(MAIN_001) ③ 추천 코스 3종 → 코스 상세(MAIN_002)
+//       ④ 날씨 띠 ⑤ 테마로 둘러보기(/themes 입구) ⑥ 푸터(출처)   (날씨는 2026-09-18 사용자 결정으로 코스 뒤로)
 // 정직성 원칙: 혼잡은 '날짜 단위 예보'로만 표현한다 (시간대별 혼잡 표현 금지 - 데이터 없음).
 //             히어로의 숫자는 실제 목록·예보로만 세고, 못 세면 그 항목을 뺀다(자리표시 숫자 금지).
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
@@ -25,6 +25,8 @@ const store = useTravelStore()
 const weeklyWeather = ref<DailyWeather[]>([])
 // true = 기상청 실데이터, false = 백엔드 미가동 시 시연용 샘플 폴백
 const weatherLive = ref(false)
+/** 구간 부제에 넣는 오늘 요약(첫 날) */
+const weatherToday = computed(() => weeklyWeather.value[0] ?? null)
 
 const fmtDate = (iso: string) => {
   const [, m, d] = iso.split('-')
@@ -139,13 +141,8 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateArrows))
       <span class="hero-credit">ⓒ한국관광공사</span>
     </section>
 
-    <!-- ② 날씨 띠 -->
-    <section class="hm-sec hm-wx">
-      <WeatherStrip :days="weeklyWeather" :live="weatherLive" />
-    </section>
-
-    <!-- ③ MAIN_001: 오늘 한적한 곳 -->
-    <section class="hm-sec">
+    <!-- ② MAIN_001: 오늘 한적한 곳 - 히어로 바로 아래 첫 구간이라 선 없이 여백만 -->
+    <section class="hm-sec hm-first">
       <div class="hm-head">
         <div>
           <h2>오늘 한적한 곳부터</h2>
@@ -173,8 +170,8 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateArrows))
       </div>
     </section>
 
-    <!-- ④ MAIN_002: 코스 추천 3종 (클릭 → 코스 상세) -->
-    <section class="hm-sec">
+    <!-- ③ MAIN_002: 코스 추천 3종 (클릭 → 코스 상세) -->
+    <section class="hm-sec hm-line">
       <div class="hm-head">
         <div>
           <h2>한적한 곳으로 이어 만든 코스</h2>
@@ -206,8 +203,19 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateArrows))
       </div>
     </section>
 
+    <!-- ④ 날씨 띠 - 코스와 테마 사이(2026-09-18 사용자 결정: 히어로 아래엔 사진 구간이 바로 오게). 제목은 다른 구간과 같은 모양 -->
+    <section class="hm-sec hm-line hm-wx">
+      <div class="hm-head">
+        <div>
+          <h2>제주 일주일 날씨</h2>
+          <p><template v-if="weatherToday">오늘 {{ weatherToday.temperature === null ? '-' : `${weatherToday.temperature}°` }} {{ weatherToday.sky ?? '' }} · </template>{{ weatherLive ? '기상청 단기·중기예보 · 날짜 단위' : '시연용 데이터 · 백엔드 연결 대기' }}</p>
+        </div>
+      </div>
+      <WeatherStrip :days="weeklyWeather" />
+    </section>
+
     <!-- ⑤ 테마로 둘러보기 -->
-    <section class="hm-sec hm-last">
+    <section class="hm-sec hm-line hm-last">
       <ThemeTiles :layers="layers ?? undefined" />
     </section>
 
@@ -219,10 +227,13 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateArrows))
 <style scoped>
 .home{display:flex;flex-direction:column}
 .hm-sec{max-width:1240px;width:100%;margin:0 auto;padding:60px 24px 0;box-sizing:border-box;display:flex;flex-direction:column;gap:22px}
-.hm-wx{padding-top:32px}
+.hm-first{padding-top:48px}
+/* 구간 경계 - 본문 폭의 얇은 선. 선 위 72px·선 아래 제목까지 40px 로 비대칭을 줘야 "다음 주제의 시작"으로 읽힌다(2026-09-18, 구석구석 방식) */
+.hm-line{padding-top:72px}
+.hm-line::before{content:'';display:block;height:1px;background:var(--border);margin-bottom:18px}   /* 18 + 구간 gap 22 = 40 */
 .hm-last{padding-bottom:72px}
 .hm-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
-.hm-head h2{margin:0;font-size:26px;font-weight:800;letter-spacing:-.02em}
+.hm-head h2{margin:0;font-size:30px;font-weight:800;letter-spacing:-.02em}
 .hm-head p{margin:6px 0 0;font-size:14px;color:var(--sub)}
 .hm-more{font-size:14px;font-weight:700;color:var(--primary-dark);white-space:nowrap}
 
@@ -281,9 +292,11 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateArrows))
 
 @media (max-width:767px){
   .hm-sec{padding:30px 16px 0;gap:14px}
-  .hm-wx{padding-top:16px}
+  .hm-first{padding-top:26px}
+  .hm-line{padding-top:40px}
+  .hm-line::before{margin-bottom:10px}   /* 10 + gap 14 = 24 */
   .hm-last{padding-bottom:40px}
-  .hm-head h2{font-size:20px}.hm-head p{font-size:12.5px}.hm-more{font-size:13px}
+  .hm-head h2{font-size:22px}.hm-head p{font-size:12.5px}.hm-more{font-size:13px}
   .hero-full{min-height:520px;align-items:flex-start}
   .hero-inner{padding:34px 16px 44px;gap:14px}
   .hero-inner h1{font-size:32px}

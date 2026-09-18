@@ -191,6 +191,49 @@ class AlternativeApiTest {
     }
 
     @Test
+    void 직선_대안은_오늘_예보로_전체_후보를_거리순으로_주고_도로_API를_호출하지_않는다() throws Exception {
+        for (int i = 1; i <= 11; i++) save("추가 후보 " + i, tourist, 33.46 + i * 0.01, 126.9425, "20.00");
+        LocalDate today = com.example.hangat.common.util.DateTimes.todayKst();
+        for (var forecast : forecastRepository.findAll()) {
+            forecastRepository.save(CongestionForecast.of(forecast.getPlace(), source,
+                    PlaceNameNormalizer.jejuDayToUtc(today), 발표버전, forecast.getRate()));
+        }
+        em.flush();
+        mockMvc.perform(get("/places/{id}/straight-alternatives", baseId).param("exclude", nearCalmId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.distance_basis").value("STRAIGHT_LINE"))
+                .andExpect(jsonPath("$.result.forecast_date").value(today.toString()))
+                .andExpect(jsonPath("$.result.places.length()").value(12))
+                .andExpect(jsonPath("$.result.places[0].place_name").value("추가 후보 1"))
+                .andExpect(jsonPath("$.result.places[1].place_name").value("광치기해변"))
+                .andExpect(jsonPath("$.result.places[*].distance_m", org.hamcrest.Matchers.everyItem(org.hamcrest.Matchers.lessThanOrEqualTo(20000))))
+                .andExpect(jsonPath("$.result.places[?(@.place_name == '혼인지')]").isEmpty());
+        org.mockito.Mockito.verifyNoInteractions(roads);
+    }
+
+    @Test
+    void 직선_대안은_20km_경계_밖을_제외하고_예보없음과_빈결과를_구분한다() throws Exception {
+        forecastRepository.deleteAll();
+        mockMvc.perform(get("/places/{id}/straight-alternatives", baseId))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value(3401));
+        Long inside = save("경계 안", tourist, 33.6378, 126.9425, "20.00"); // 약 19.98km
+        save("경계 밖", tourist, 33.6381, 126.9425, "20.00"); // 약 20.02km
+        LocalDate today = com.example.hangat.common.util.DateTimes.todayKst();
+        for (var forecast : forecastRepository.findAll()) {
+            forecastRepository.save(CongestionForecast.of(forecast.getPlace(), source,
+                    PlaceNameNormalizer.jejuDayToUtc(today), 발표버전, forecast.getRate()));
+        }
+        em.flush();
+        mockMvc.perform(get("/places/{id}/straight-alternatives", baseId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.places.length()").value(1))
+                .andExpect(jsonPath("$.result.places[0].place_id").value(inside));
+        mockMvc.perform(get("/places/{id}/straight-alternatives", baseId).param("exclude", inside.toString()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.result.places").isEmpty());
+        org.mockito.Mockito.verifyNoInteractions(roads);
+    }
+
+    @Test
     void 자동차_대안은_오늘_예보와_DB_소개를_사용하고_제외목록을_반영한다() throws Exception {
         LocalDate today = com.example.hangat.common.util.DateTimes.todayKst();
         Place candidate = placeRepository.findById(nearCalmId).orElseThrow();

@@ -4,17 +4,17 @@ import type { AlternativePlace, CourseItem } from '../assets/types/course'
 import { ApiError } from '../api/errors.js'
 import { todayKst } from '../utils/format.js'
 
-/** One complete road-ranked snapshot per modal; scrolling only reveals its next three items. */
-export function useSavedCourseActions(course: Ref<CourseDetail | null>, api: Pick<typeof CourseService, 'getRoadAlternatives' | 'swapItem' | 'getCourseDetail'> = CourseService) {
+/** One complete straight-distance-ranked snapshot per modal; scrolling only reveals its next three items. */
+export function useSavedCourseActions(course: Ref<CourseDetail | null>, api: Pick<typeof CourseService, 'getStraightAlternatives' | 'swapItem' | 'getCourseDetail'> = CourseService) {
   const target = ref<{ item: CourseDetailItem; dayNo: number; visitDate: string } | null>(null)
   const alternatives = ref<AlternativePlace[]>([])
   const loading = ref(false), busy = ref(false), notice = ref(''), message = ref('')
-  const hasMore = ref(false), loadFailed = ref(false), forecastDate = ref(''), unavailableCount = ref(0)
+  const hasMore = ref(false), loadFailed = ref(false), forecastDate = ref('')
   let epoch = 0, remaining: AlternativePlace[] = []
   function reset() {
     epoch++; target.value = null; alternatives.value = []; remaining = []; loading.value = false
     busy.value = false; notice.value = ''; message.value = ''; hasMore.value = false
-    loadFailed.value = false; forecastDate.value = ''; unavailableCount.value = 0
+    loadFailed.value = false; forecastDate.value = ''
   }
   const modalItem = computed<CourseItem | null>(() => {
     if (!target.value || !course.value) return null
@@ -34,11 +34,10 @@ export function useSavedCourseActions(course: Ref<CourseDetail | null>, api: Pic
     const exclude = [...new Set(course.value.days.flatMap(d => d.items).filter(i => i.id !== item.id).map(i => i.placeId))]
     loading.value = true; loadFailed.value = false; notice.value = ''
     try {
-      const result = await api.getRoadAlternatives(item.placeId, exclude)
+      const result = await api.getStraightAlternatives(item.placeId, exclude)
       if (request !== epoch || course.value?.id !== id) return
-      if (result.distance_basis !== 'CAR_ROAD' || !Array.isArray(result.places)) throw new Error('Invalid road-distance response')
+      if (result.distance_basis !== 'STRAIGHT_LINE' || !Array.isArray(result.places)) throw new Error('Invalid straight-distance response')
       forecastDate.value = result.forecast_date
-      unavailableCount.value = result.unavailable_count
       const seen = new Set([...exclude, item.placeId])
       remaining = result.places.filter(p => {
         if (seen.has(p.place_id)) return false
@@ -50,7 +49,7 @@ export function useSavedCourseActions(course: Ref<CourseDetail | null>, api: Pic
         loadFailed.value = true; hasMore.value = false
         notice.value = error instanceof ApiError && Number(error.code) === 3401
           ? '오늘의 혼잡 예보가 없어 대안을 추천할 수 없어요.'
-          : '자동차 도로거리 대안을 확인하지 못했어요. 잠시 후 다시 시도해 주세요.'
+          : '직선거리 대안을 확인하지 못했어요. 잠시 후 다시 시도해 주세요.'
       }
     } finally { if (request === epoch) loading.value = false }
   }
@@ -82,5 +81,5 @@ export function useSavedCourseActions(course: Ref<CourseDetail | null>, api: Pic
         ? `바꾸지 못했어요. ${error.message}` : '장소를 바꾸지 못했어요. 다시 시도해 주세요.'
     } finally { if (request === epoch) busy.value = false }
   }
-  return { target, modalItem, alternatives, loading, busy, notice, message, hasMore, loadFailed, forecastDate, unavailableCount, reset, openSwap, loadMore, applySwap }
+  return { target, modalItem, alternatives, loading, busy, notice, message, hasMore, loadFailed, forecastDate, reset, openSwap, loadMore, applySwap }
 }

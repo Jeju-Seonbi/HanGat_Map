@@ -19,6 +19,14 @@ function memory() { const m = new Map<string, string>(); return { getItem: (k: s
 const state: RestoreState = { mode: 'result', courseId: 29, condition }
 beforeEach(() => vi.clearAllMocks())
 describe('same-tab result restoration', () => {
+  it('preserves authoritative budget summary after async generation and saved-course reload', () => {
+    const summary = { has_cost_data: true, budget_total: 400000, verified_total: 0,
+      estimated_min: 16000, estimated_max: 24000, total_expected_min: 16000,
+      total_expected_max: 24000, remaining_budget: 376000, usage_rate: 6, over_budget: false, unknown_count: 2 }
+    const restored = resultFromDetail({ ...detail, status: 'SAVED', budget_summary: summary })
+    expect(restored.budget_summary).toEqual(summary)
+    expect(restored.budget_total).toBe(400000)
+  })
   it('reload uses latest server weather without snapshotting or regenerating, and tolerates missing weather', async () => {
     const d = structuredClone(detail)
     d.days[0].items[0].weather = [{ forecast_date: d.start_date, precipitation_probability: 30, daily_evidence: {

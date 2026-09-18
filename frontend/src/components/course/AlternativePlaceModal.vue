@@ -5,7 +5,7 @@ import AppIcon from '../common/AppIcon.vue'
 
 const props = defineProps<{
   item: CourseItem; alternatives: AlternativePlace[]; loading: boolean; notice?: string; busy?: boolean
-  forecastDate?: string; hasMore?: boolean; loadFailed?: boolean; unavailableCount?: number
+  forecastDate?: string; hasMore?: boolean; loadFailed?: boolean
 }>()
 const emit = defineEmits<{ close: []; select: [AlternativePlace]; more: []; retry: [] }>()
 const crowded = computed(() => props.item.congestion_level === 'CROWDED')
@@ -31,7 +31,7 @@ onBeforeUnmount(() => { dialog.value?.close(); returnFocus.value?.focus() })
       <button type="button" class="modal-close" :disabled="busy" aria-label="대안 창 닫기" @click="emit('close')">×</button>
       <span class="eyebrow">장소 대안</span>
       <h2 id="alternative-title">{{ forecastDate ? `${item.place_name} 대신 다른 장소` : crowded ? `${item.place_name} 대신 한산한 장소` : `${item.place_name} 대신 다른 장소` }}</h2>
-      <p v-if="forecastDate" class="muted">{{ forecastDate }} (한국 시간) 예보 기준 · 같은 카테고리에서 자동차 도로거리 20km 이내, 혼잡 미만인 장소를 가까운 순으로 추천해요. 코스 날짜는 바뀌지 않아요.</p>
+      <p v-if="forecastDate" class="muted">{{ forecastDate }} (한국 시간) 예보 기준 · 같은 카테고리에서 직선거리 20km 이내, 혼잡 미만인 장소를 가까운 순으로 추천해요. 코스 날짜는 바뀌지 않아요.</p>
       <p v-else class="muted">같은 카테고리 중 이 날짜 혼잡 예보가 혼잡 미만인 곳을 10km 안에서 먼저, 부족하면 20km 안에서 집중률 낮은 순으로 찾았어요.</p>
     </header>
     <div class="alternative-scroll" tabindex="0" aria-label="대안 장소 목록" @scroll="maybeLoadMore">
@@ -39,7 +39,7 @@ onBeforeUnmount(() => { dialog.value?.close(); returnFocus.value?.focus() })
         <article v-for="alt in alternatives" :key="alt.place_id">
           <div class="alternative-copy">
             <h3>{{ alt.place_name }}</h3>
-            <p>{{ alt.category_name }} · {{ forecastDate ? '차량' : '직선' }} {{ (alt.distance_m / 1000).toFixed(1) }}km · {{ alt.congestion_level === 'QUIET' ? '한산' : alt.congestion_level === 'CROWDED' ? '혼잡' : alt.congestion_level === 'NORMAL' ? '보통' : '예보 없음' }}</p>
+            <p>{{ alt.category_name }} · 직선 {{ (alt.distance_m / 1000).toFixed(1) }}km · {{ alt.congestion_level === 'QUIET' ? '한산' : alt.congestion_level === 'CROWDED' ? '혼잡' : alt.congestion_level === 'NORMAL' ? '보통' : '예보 없음' }}</p>
             <p class="alternative-overview">{{ alt.overview || '등록된 장소 소개가 없습니다.' }}</p>
           </div>
           <div class="alternative-photo">
@@ -52,9 +52,8 @@ onBeforeUnmount(() => { dialog.value?.close(); returnFocus.value?.focus() })
           </div>
         </article>
       </div>
-      <p v-if="loading" role="status" class="alternative-status">자동차 도로거리를 비교하고 있어요. 잠시만 기다려 주세요…</p>
+      <p v-if="loading" role="status" class="alternative-status">가까운 대안 장소를 찾고 있어요. 잠시만 기다려 주세요…</p>
       <p v-if="notice" role="alert" class="course-notice">{{ notice }}</p>
-      <p v-if="unavailableCount" class="alternative-status">차량 경로를 확인할 수 없는 {{ unavailableCount }}곳은 제외했어요.</p>
       <button v-if="loadFailed" type="button" class="btn" :disabled="busy || loading" @click="emit('retry')">다시 시도</button>
       <template v-if="forecastDate && !loading && !loadFailed">
         <button v-if="hasMore" type="button" class="btn alternative-more" :disabled="busy" @click="emit('more')">다음 대안 3곳 보기</button>

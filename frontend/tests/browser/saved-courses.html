@@ -23,10 +23,10 @@ window.qaDeleted=[];
 window.qaRenamed=[];window.qaSwaps=[];
 CourseService.renameCourse=async(id,title)=>{window.qaRenamed.push({id,title});titles[Number(id)-1]=title;return title};
 CourseService.getAlternatives=async()=>[{place_id:99,place_name:'협재해수욕장',category_name:'관광지',distance_m:3500,congestion_level:'QUIET',radius_km:10,recommendation_reason:'한산한 대안이에요'}];
-window.qaRoadCalls=[];
-CourseService.getRoadAlternatives=async(placeId,exclude)=>{
- window.qaRoadCalls.push({placeId,exclude});
- return {forecast_date:'2026-09-18',distance_basis:'CAR_ROAD',unavailable_count:0,places:Array.from({length:7},(_,i)=>({
+window.qaAlternativeCalls=[];
+CourseService.getStraightAlternatives=async(placeId,exclude)=>{
+ window.qaAlternativeCalls.push({placeId,exclude});
+ return {forecast_date:'2026-09-18',distance_basis:'STRAIGHT_LINE',places:Array.from({length:7},(_,i)=>({
   place_id:99+i,place_name:i?`대안 관광지 ${i+1}`:'협재해수욕장',category_name:'관광지',distance_m:3500+i*2000,
   congestion_level:'QUIET',radius_km:i>3?20:10,overview:'해안 풍경을 감상하며 산책할 수 있는 장소입니다. 이 소개는 화면 검증을 위한 샘플입니다.',
   image_url:i%2?null:'/images/places/gwangchigi.jpg',recommendation_reason:'',replacement_reason:''
@@ -40,10 +40,21 @@ CourseService.getCourseDetail=async(id)=>({id,title:titles[(Number(id)-1)%5],tra
 const fetchCourse=CourseService.getCourseDetail;
 CourseService.getCourseDetail=async(id)=>{
  const value=await fetchCourse(id);value.status='SAVED';
+ if(new URLSearchParams(location.search).has('budget')) {
+  value.budgetTotal=Number(id)*100000;
+  value.budgetSummary={has_cost_data:true,budget_total:value.budgetTotal,verified_total:0,
+   estimated_min:16000,estimated_max:24000,total_expected_min:16000,total_expected_max:24000,
+   remaining_budget:value.budgetTotal-24000,usage_rate:24/Number(id),over_budget:false,unknown_count:2};
+  value.budgetLabel='예상 16,000~24,000원';
+ }
  for(const swap of window.qaSwaps.filter(s=>s.id===id))for(const day of value.days)for(const item of day.items)if(item.id===swap.itemId){item.placeName='협재해수욕장';item.placeId=99}
  return value;
 };
 const originalFetch=window.fetch.bind(window);let trip={courseId:null,version:0};
+if(new URLSearchParams(location.search).has('budget')) {
+ const savedList=CourseService.getSavedCourses;
+ CourseService.getSavedCourses=async(...args)=>{const list=await savedList(...args);list.cards.forEach(c=>c.budgetTotal=Number(c.id)*100000);return list};
+}
 window.fetch=async(input,init)=>{
  const url=new URL(typeof input==='string'?input:input.url,location.origin);
  if(url.pathname.endsWith('/users/me/trip-confirmation')){

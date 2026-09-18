@@ -16,7 +16,7 @@ const base=process.env.SAVED_COURSES_TEST_URL || 'http://127.0.0.1:5210';
    await open.click();
    await page.locator('.alt-list article').first().waitFor();
    assert.equal(await page.locator('.alt-list article').count(),3);
-   assert.match(await page.locator('.alternative-header').innerText(),/자동차 도로거리 20km/);
+   assert.match(await page.locator('.alternative-header').innerText(),/직선거리 20km/);
    assert.equal(await page.locator('.alternative-map').first().getAttribute('href'),'/map?place=99');
    assert.equal(await page.locator('.alternative-map').first().getAttribute('target'),'_blank');
    assert.match(await page.locator('.alternative-overview').first().innerText(),/해안 풍경/);
@@ -39,7 +39,7 @@ const base=process.env.SAVED_COURSES_TEST_URL || 'http://127.0.0.1:5210';
    await page.getByText('더 이상 가능한 장소 대안이 없습니다.',{exact:true}).waitFor();
    assert.equal(await page.locator('.alt-list article').count(),7);
    for(let i=0;i<4;i++)await list.evaluate(el=>el.dispatchEvent(new Event('scroll')));
-   assert.equal(await page.evaluate(()=>window.qaRoadCalls.length),1,'scrolling never refetches road distances');
+   assert.equal(await page.evaluate(()=>window.qaAlternativeCalls.length),1,'scrolling never refetches alternatives');
    await page.keyboard.press('Escape');
    assert.equal(await page.locator('.alternative-modal').count(),0);
    if(mobile){
@@ -54,6 +54,6 @@ const base=process.env.SAVED_COURSES_TEST_URL || 'http://127.0.0.1:5210';
    }
    await context.close();
   }
-  console.log('Road alternative desktop/mobile layout, pagination, request counts and sheet bounds passed');
+  console.log('Straight-line alternative desktop/mobile layout, pagination, request counts and sheet bounds passed');
  } finally {await browser.close()}
 })().catch(e=>{console.error(e);process.exit(1)});
