@@ -129,7 +129,7 @@ class CourseReviewRegressionTest {
         var input = input(1, List.of("CAFE"), List.of(), List.of(food("restaurant")));
         assertThatThrownBy(() -> validator.validate(input, dayResult("restaurant")))
                 .isInstanceOfSatisfying(CourseAiValidationException.class,
-                        e -> assertThat(e.getCode()).isEqualTo(CourseAiValidationCode.AI_RESULT_SELECTED_STYLE_MISSING));
+                        e -> assertThat(e.getCode()).isEqualTo(CourseAiValidationCode.AI_RESULT_STYLE_CANDIDATE_MISSING));
         assertThatThrownBy(() -> new DeterministicCourseFallback().generate(input))
                 .isInstanceOf(CourseAiException.class);
     }

@@ -48,7 +48,7 @@ public class CourseAiGenerationService {
             validationFailure = exception;
             initialFailureId = record(traceId, INITIAL, exception);
         } catch (CourseAiException providerFailure) {
-            return recordedFallback(input, record(traceId, INITIAL, providerFailure));
+            return recordedFallback(input, traceId, record(traceId, INITIAL, providerFailure));
         }
 
         try {
@@ -58,7 +58,7 @@ public class CourseAiGenerationService {
             complete(initialFailureId, CORRECTION_SUCCEEDED);
             return corrected;
         } catch (CourseAiException finalFailure) {
-            return recordedFallback(input, initialFailureId, record(traceId, CORRECTION, finalFailure));
+            return recordedFallback(input, traceId, initialFailureId, record(traceId, CORRECTION, finalFailure));
         }
     }
 
@@ -71,26 +71,21 @@ public class CourseAiGenerationService {
         if (diagnostics != null) diagnostics.complete(id, outcome);
     }
 
-    private CourseAiResultDto recordedFallback(CourseAiInputDto input, UUID... failureIds) {
+    private CourseAiResultDto recordedFallback(CourseAiInputDto input, UUID traceId, UUID... failureIds) {
         boolean succeeded = false;
         try {
-            CourseAiResultDto result = validatedFallback(input);
+            CourseAiResultDto result = fallback.generate(input);
+            validator.validate(input, result);
             succeeded = true;
             return result;
+        } catch (CourseAiException failure) {
+            complete(record(traceId, FALLBACK, failure), FALLBACK_FAILED);
+            if (failure.getFailureType() == CourseAiFailureType.TEMPORARILY_UNAVAILABLE) throw failure;
+            throw new CourseAiException(CourseAiFailureType.TEMPORARILY_UNAVAILABLE,
+                    "필수 조건을 유지한 대체 코스를 구성할 수 없습니다.");
         } finally {
             for (UUID id : failureIds) complete(id, succeeded ? FALLBACK_SUCCEEDED : FALLBACK_FAILED);
         }
     }
 
-    private CourseAiResultDto validatedFallback(CourseAiInputDto input) {
-        try {
-            CourseAiResultDto deterministic = fallback.generate(input);
-            validator.validate(input, deterministic);
-            return deterministic;
-        } catch (CourseAiException failure) {
-            if (failure.getFailureType() == CourseAiFailureType.TEMPORARILY_UNAVAILABLE) throw failure;
-            throw new CourseAiException(CourseAiFailureType.TEMPORARILY_UNAVAILABLE,
-                    "필수 조건을 유지한 대체 코스를 구성할 수 없습니다.", failure);
-        }
-    }
 }

@@ -64,10 +64,38 @@ class CourseAiDiagnosticPersistenceTest {
             assertThatThrownBy(() -> service.generate(input(false))).isInstanceOf(CourseAiException.class);
             status.setRollbackOnly();
         });
-        var rows = jdbc.queryForList("SELECT * FROM course_ai_diagnostics");
+        var rows = jdbc.queryForList("SELECT * FROM course_ai_diagnostics WHERE call_kind='INITIAL'");
         assertThat(rows).hasSize(1);
         assertThat(rows.get(0)).containsEntry("HTTP_STATUS", 429)
                 .containsEntry("OUTCOME", "FALLBACK_FAILED");
+        assertThat(jdbc.queryForList("SELECT * FROM course_ai_diagnostics WHERE call_kind='FALLBACK'"))
+                .singleElement().satisfies(row -> assertThat(row).containsEntry("OUTCOME","FALLBACK_FAILED"));
+    }
+
+    @Test void fallbackValidationCodeIsStoredWithoutPrivateMessages() {
+        var brokenFallback = new DeterministicCourseFallback() {
+            @Override public CourseAiResultDto generate(CourseAiInputDto input) {
+                throw new CourseAiValidationException(CourseAiValidationCode.AI_RESULT_TRAVEL_TIME_OVERLAP,
+                        "private-api-key private-prompt private-response");
+            }
+        };
+        var generating=new CourseAiGenerationService(actual -> { throw new CourseAiException(CourseAiFailureType.RATE_LIMIT,"private-response"); },
+                new CourseAiResultValidator(),brokenFallback,recorder);
+        assertThatThrownBy(()->generating.generate(input(true))).isInstanceOf(CourseAiException.class);
+        var rows=jdbc.queryForList("SELECT * FROM course_ai_diagnostics WHERE call_kind='FALLBACK'");
+        assertThat(rows).singleElement().satisfies(row -> assertThat(row)
+                .containsEntry("VALIDATION_CODE","AI_RESULT_TRAVEL_TIME_OVERLAP").containsEntry("OUTCOME","FALLBACK_FAILED"));
+        assertThat(rows.toString()).doesNotContain("private-api-key","private-prompt","private-response");
+        assertThat(jdbc.queryForObject("SELECT COUNT(DISTINCT trace_id) FROM course_ai_diagnostics",Integer.class)).isEqualTo(1);
+    }
+    @Test void missingCafeCandidateGetsSpecificFallbackCode() {
+        var base=input(true);
+        var cafeInput=new CourseAiInputDto(base.contractVersion(),base.trip(),
+                new CourseAiInputDto.SoftPreferencesDto(List.of(),List.of("CAFE")),base.hardConstraints(),
+                base.accommodation(),base.candidates(),base.weatherFactSets(),base.travelFacts(),base.compatibility());
+        assertThatThrownBy(()->service.generate(cafeInput)).isInstanceOf(CourseAiException.class);
+        assertThat(jdbc.queryForList("SELECT * FROM course_ai_diagnostics WHERE call_kind='FALLBACK'"))
+                .singleElement().satisfies(row -> assertThat(row).containsEntry("VALIDATION_CODE","AI_RESULT_STYLE_CANDIDATE_MISSING"));
     }
 
     @Test void missingDiagnosticTableDoesNotBreakFallbackOrLogSensitiveCause() {
@@ -171,8 +199,9 @@ class CourseAiDiagnosticPersistenceTest {
             CourseAiException failure = catchThrowableOfType(CourseAiException.class, () -> generating.generate(input(false)));
             assertThat(failure).isNotNull();
             var rows = jdbc.queryForList("SELECT * FROM course_ai_diagnostics");
-            assertThat(rows).hasSize(1);
-            assertThat(rows.get(0)).containsEntry("HTTP_STATUS", 403).containsEntry("GOOGLE_REASON", "OTHER");
+            assertThat(rows).hasSize(2);
+            assertThat(rows).anySatisfy(row -> assertThat(row).containsEntry("CALL_KIND","INITIAL")
+                    .containsEntry("HTTP_STATUS", 403).containsEntry("GOOGLE_REASON", "OTHER"));
             String userBody = mapper.writeValueAsString(new com.example.hangat.common.exception.GlobalExceptionHandler()
                     .handleCourseAiException(failure).getBody());
             assertThat(rows.toString() + userBody + appender.list.stream().map(ch.qos.logback.classic.spi.ILoggingEvent::getFormattedMessage).toList())

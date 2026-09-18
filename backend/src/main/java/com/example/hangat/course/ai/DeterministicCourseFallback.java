@@ -2,6 +2,7 @@ package com.example.hangat.course.ai;
 
 import com.example.hangat.course.ai.CourseAiInputDto.CandidateFactDto;
 import com.example.hangat.course.ai.CourseAiInputDto.RequiredCandidateConstraintDto;
+import com.example.hangat.course.CourseSchedulePolicy;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -26,7 +27,9 @@ public class DeterministicCourseFallback {
         List<LocalDate> dates = input.trip().startDate().datesUntil(input.trip().endDate().plusDays(1)).toList();
         if (input.candidates().size() < dates.size()) throw unavailable();
         if (input.preferences().selectedStyleCodes().contains("CAFE")
-                && input.candidates().stream().noneMatch(this::isCafe)) throw unavailable();
+                && input.candidates().stream().noneMatch(this::isCafe))
+            throw new CourseAiValidationException(CourseAiValidationCode.AI_RESULT_STYLE_CANDIDATE_MISSING,
+                    "카페 스타일을 유지할 확인된 카페 후보가 부족합니다.");
         boolean regenerate = input.generationMetadata() != null
                 && input.generationMetadata().generationReason() == com.example.hangat.course.model.GenerationReason.USER_REGENERATE;
         if (regenerate && input.candidates().size() < 2) throw unavailable();
@@ -42,8 +45,8 @@ public class DeterministicCourseFallback {
             if (candidate == null || !used.add(required.candidateId())) throw unavailable();
             LocalDate date = required.fixedDate() == null ? leastLoaded(scheduled) : required.fixedDate();
             if (!scheduled.containsKey(date)) throw unavailable();
-            LocalTime time = required.fixedTime() == null ? nextTime(scheduled.get(date)) : required.fixedTime();
-            if (time == null || scheduled.get(date).stream().anyMatch(item -> time.equals(item.startTime()))) throw unavailable();
+            LocalTime time = required.fixedTime() == null ? fittingTime(input, byId, candidate, scheduled.get(date)) : required.fixedTime();
+            if (time == null || !fits(input,byId,candidate,time,scheduled.get(date))) throw unavailable();
             scheduled.get(date).add(item(candidate, time, input.preferences().selectedStyleCodes()));
         }
 
@@ -52,22 +55,44 @@ public class DeterministicCourseFallback {
                 .thenComparingInt(this::congestionRank)
                 .thenComparing(CandidateFactDto::candidateId,
                         regenerate ? Comparator.reverseOrder() : Comparator.naturalOrder());
-        List<CandidateFactDto> ordinary = input.candidates().stream()
+        List<CandidateFactDto> ordinary = new ArrayList<>(input.candidates().stream()
                 .filter(candidate -> !used.contains(candidate.candidateId()))
                 .sorted(stableOrder)
-                .toList();
-        int cursor = 0;
+                .toList());
         // Populate empty dates first, then balance additional visits without consuming later days' candidates.
-        while (cursor < ordinary.size()) {
+        List<CandidateFactDto> deferred = new ArrayList<>();
+        int placedAtPassStart = used.size();
+        while (!ordinary.isEmpty() || !deferred.isEmpty()) {
+            if (ordinary.isEmpty()) {
+                // Retry only after progress: at most one successful placement per candidate.
+                if (used.size() == placedAtPassStart) break;
+                ordinary.addAll(deferred);
+                deferred.clear();
+                placedAtPassStart = used.size();
+            }
+            Set<String> covered = new HashSet<>();
+            used.stream().map(byId::get).forEach(c -> {
+                covered.addAll(c.styleHintCodes());
+                if(isCafe(c))covered.add("CAFE");
+            });
+            boolean needsCafe=input.preferences().selectedStyleCodes().contains("CAFE") && !covered.contains("CAFE");
+            ordinary.sort(Comparator.comparing((CandidateFactDto c)->needsCafe && !isCafe(c))
+                    .thenComparing(Comparator.comparingLong((CandidateFactDto c)->c.styleHintCodes().stream()
+                            .filter(input.preferences().selectedStyleCodes()::contains).filter(s->!covered.contains(s)).count()).reversed())
+                    .thenComparing(stableOrder));
+            CandidateFactDto candidate = ordinary.remove(0);
             LocalDate date = scheduled.entrySet().stream()
-                    .filter(entry -> entry.getValue().size() < 3 && nextTime(entry.getValue()) != null)
+                    .filter(entry -> entry.getValue().size() < 3
+                            && respectsCongestionPolicy(input,candidate,entry.getKey(),used)
+                            && fittingTime(input,byId,candidate,entry.getValue()) != null)
                     .min(Comparator.comparingInt((Map.Entry<LocalDate, List<CourseAiResultDto.ItemDto>> entry)
                             -> entry.getValue().size()).thenComparing(Map.Entry::getKey))
                     .map(Map.Entry::getKey).orElse(null);
-            if (date == null) break;
-            CandidateFactDto candidate = ordinary.get(cursor++);
-            LocalTime time = nextTime(scheduled.get(date));
-            if (time == null) break;
+            if (date == null) {
+                deferred.add(candidate);
+                continue;
+            }
+            LocalTime time = fittingTime(input,byId,candidate,scheduled.get(date));
             used.add(candidate.candidateId());
             scheduled.get(date).add(item(candidate, time, input.preferences().selectedStyleCodes()));
         }
@@ -76,6 +101,47 @@ public class DeterministicCourseFallback {
                 .map(entry -> new CourseAiResultDto.DayDto(entry.getKey(), entry.getValue().stream()
                         .sorted(Comparator.comparing(CourseAiResultDto.ItemDto::startTime)).toList()))
                 .toList());
+    }
+
+    private boolean respectsCongestionPolicy(CourseAiInputDto input, CandidateFactDto candidate,
+                                             LocalDate date, Set<String> used) {
+        if (levelOn(candidate,date) != com.example.hangat.map.model.enums.CongestionLevel.CROWDED) return true;
+        return input.candidates().stream().filter(c -> !used.contains(c.candidateId()))
+                .map(c -> levelOn(c,date)).noneMatch(level ->
+                        level == com.example.hangat.map.model.enums.CongestionLevel.QUIET
+                        || level == com.example.hangat.map.model.enums.CongestionLevel.NORMAL);
+    }
+
+    private com.example.hangat.map.model.enums.CongestionLevel levelOn(CandidateFactDto candidate, LocalDate date) {
+        return candidate.congestionFacts().stream().filter(f -> date.equals(f.date()))
+                .map(CourseAiInputDto.CongestionFactDto::level).filter(java.util.Objects::nonNull).findFirst().orElse(null);
+    }
+
+    private LocalTime fittingTime(CourseAiInputDto input, Map<String,CandidateFactDto> byId,
+                                  CandidateFactDto candidate, List<CourseAiResultDto.ItemDto> items) {
+        return DEFAULT_TIMES.stream().filter(t->fits(input,byId,candidate,t,items)).findFirst().orElse(null);
+    }
+
+    private boolean fits(CourseAiInputDto input, Map<String,CandidateFactDto> byId, CandidateFactDto candidate,
+                         LocalTime time, List<CourseAiResultDto.ItemDto> items) {
+        if(items.stream().anyMatch(i->time.equals(i.startTime())))return false;
+        var timeline=new ArrayList<>(items);
+        timeline.add(item(candidate,time,input.preferences().selectedStyleCodes()));
+        timeline.sort(Comparator.comparing(CourseAiResultDto.ItemDto::startTime));
+        for(int i=0;i<timeline.size();i++) {
+            var current=timeline.get(i);
+            var fact=byId.get(current.candidateId());
+            long end=current.startTime().toSecondOfDay()/60L + CourseSchedulePolicy.dwellMinutes(
+                    input.preferences().selectedStyleCodes(),fact.styleHintCodes(),fact.internalCategoryCode());
+            if(end>CourseSchedulePolicy.DAY_END.toSecondOfDay()/60)return false;
+            if(i+1<timeline.size()) {
+                var next=timeline.get(i+1);
+                int travel=input.travelFacts().stream().filter(t->current.candidateId().equals(t.fromRef()) && next.candidateId().equals(t.toRef()))
+                        .map(CourseAiInputDto.TravelFactDto::travelMinutes).filter(java.util.Objects::nonNull).findFirst().orElse(0);
+                if(end+travel>next.startTime().toSecondOfDay()/60)return false;
+            }
+        }
+        return true;
     }
 
     private int congestionRank(CandidateFactDto candidate) {
@@ -108,12 +174,6 @@ public class DeterministicCourseFallback {
         return scheduled.entrySet().stream().min(Comparator
                 .comparingInt((Map.Entry<LocalDate, List<CourseAiResultDto.ItemDto>> entry) -> entry.getValue().size())
                 .thenComparing(Map.Entry::getKey)).orElseThrow().getKey();
-    }
-
-    private LocalTime nextTime(List<CourseAiResultDto.ItemDto> items) {
-        Set<LocalTime> used = new HashSet<>();
-        items.forEach(item -> used.add(item.startTime()));
-        return DEFAULT_TIMES.stream().filter(time -> !used.contains(time)).findFirst().orElse(null);
     }
 
     private CourseAiException unavailable() {
