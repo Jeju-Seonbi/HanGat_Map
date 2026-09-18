@@ -248,7 +248,8 @@ public class AsyncCourseService {
 
     private void execute(Ticket ticket) {
         runningThreads.put(ticket.id(), Thread.currentThread());
-        try {
+        try (var diagnosticContext = com.example.hangat.course.ai.CourseAiDiagnosticContext
+                .forJob(UUID.fromString(ticket.id()))) {
             requireActiveUser(ticket.userId());
 
             // 외부 API와 Gemini 호출 중에는 작업 행의 DB 잠금을 잡지 않는다.

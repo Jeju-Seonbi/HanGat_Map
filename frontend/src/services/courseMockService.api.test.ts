@@ -535,4 +535,26 @@ describe('alternative places and swap (backend, 담당 정동현)', () => {
 
     expect(requestMock).toHaveBeenCalledWith('/courses/101/items/1/swap', expect.objectContaining({ auth: true }))
   })
+
+  it('replaces the old budget and item cost with the authoritative swap result', async () => {
+    const summary = { has_cost_data: true, budget_total: 400000, verified_total: 0,
+      estimated_min: 24000, estimated_max: 24000, total_expected_min: 24000,
+      total_expected_max: 24000, remaining_budget: 376000, unknown_count: 1 }
+    const cost = { id: 9, course_id: 101, course_item_id: 1, category: 'FOOD', accuracy_type: 'ESTIMATED',
+      amount_min: 24000, amount_max: 24000, currency: 'KRW', basis_text: '대표메뉴 × 2명' }
+    vi.mocked(apiRequest).mockResolvedValue({ course_id: 101, budget_summary: summary, updated_items: [
+      { item_id: 1, place_id: 601, place_name: '새 장소', costs: [cost] },
+    ] })
+    const result = await courseMockService.replaceCourseItem(course('SAVED'), 1, alternative)
+    expect(result.budget_summary).toEqual(summary)
+    expect(result.estimated_cost_max).toBe(24000)
+    expect(result.days[0].items[0].costs).toEqual([cost])
+    vi.mocked(apiRequest).mockResolvedValue({ course_id: 101, budget_summary: {
+      has_cost_data: false, budget_total: 400000, total_expected_min: null, total_expected_max: null,
+    }, updated_items: [{ item_id: 1, place_id: 602, place_name: '가격 미상', costs: [] }] })
+    const unknown = await courseMockService.replaceCourseItem(result, 1, { ...alternative, place_id: 602 })
+    expect(unknown.budget_summary?.has_cost_data).toBe(false)
+    expect(unknown.estimated_cost_max).toBeNull()
+    expect(unknown.days[0].items[0].costs).toEqual([])
+  })
 })

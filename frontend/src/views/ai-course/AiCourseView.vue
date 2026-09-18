@@ -537,7 +537,7 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
         </main>
 
         <aside class="course-side">
-          <BudgetGauge :summary="result.budget_summary" />
+          <BudgetGauge :summary="result.budget_summary" :budget-total="result.budget_total" />
           <section class="course-summary-card">
             <span class="summary-kicker">TRIP SUMMARY</span>
             <h3>코스 요약</h3>

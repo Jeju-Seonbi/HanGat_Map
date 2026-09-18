@@ -64,6 +64,9 @@ class CourseQueryApiTest {
     @Autowired CourseCommandService commandService;
     @Autowired CourseRepository courseRepository;
     @Autowired CourseItemRepository itemRepository;
+    @Autowired com.example.hangat.course.CourseBudgetService budgets;
+    @Autowired com.example.hangat.course.repository.CourseItemCostRepository costs;
+    @Autowired com.fasterxml.jackson.databind.ObjectMapper mapper;
     @Autowired PlaceRepository placeRepository;
     @Autowired CongestionForecastRepository forecastRepository;
     @Autowired RegionRepository regionRepository;
@@ -79,6 +82,53 @@ class CourseQueryApiTest {
     private User 남;
     private Course 임시코스;      // 소유자 없음 - 공개
     private Course 저장코스;      // 주인 소유
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {
+            "대표메뉴: 국수 0원", "대표메뉴: 국수 -5000원", "대표메뉴: 국수 8,00원",
+            "대표메뉴: 국수 999999999999999999999원", "대표메뉴: 국수 2147483647원",
+            "대표메뉴: 국수 8,000원 · 가격 문의", "입장료는 대략 5000원입니다"
+    })
+    void untrustedOrUnusableMenuPricesStayUnknown(String overview) {
+        itemRepository.findItemsWithPlace(저장코스.getId()).get(0).getPlace().markGoodPrice(출발일, overview, null);
+        var detail = mapper.valueToTree(queryService.detail(저장코스.getId(), 주인.getId()));
+        assertThat(detail.path("budget_summary").path("has_cost_data").asBoolean()).isFalse();
+        assertThat(detail.path("budget_summary").path("total_expected_max").isNull()).isTrue();
+        assertThat(detail.path("budget_summary").path("budget_total").asInt()).isEqualTo(400000);
+    }
+
+    @Test
+    void legacySavedCourseReturnsBudgetAndEvidenceBasedEstimateWithoutWritingOnRead() throws Exception {
+        var items = itemRepository.findItemsWithPlace(저장코스.getId());
+        items.get(0).getPlace().markGoodPrice(출발일, "대표메뉴: 국수 8,000원 · 정식 12,000원", null);
+        em.flush();
+        long before = costs.count();
+        var detail = mapper.valueToTree(queryService.detail(저장코스.getId(), 주인.getId()));
+        assertThat(detail.path("budget_summary").path("budget_total").asInt()).isEqualTo(400000);
+        assertThat(detail.path("budget_summary").path("estimated_min").asInt()).isEqualTo(16000);
+        assertThat(detail.path("budget_summary").path("estimated_max").asInt()).isEqualTo(24000);
+        assertThat(detail.path("budget_summary").path("verified_total").asInt()).isZero();
+        assertThat(detail.path("days").get(0).path("items").get(0).path("costs").get(0).path("accuracy_type").asText()).isEqualTo("ESTIMATED");
+        var card = mapper.valueToTree(queryService.savedCourses(주인.getId(), PageRequest.of(0, 10)).getContent().get(0));
+        assertThat(card.path("budget_total").asInt()).isEqualTo(400000);
+        assertThat(costs.count()).isEqualTo(before);
+    }
+
+    @Test
+    void costCalculationPersistsMenuEstimateOnceAndKeepsUnknownPlacesUnknown() throws Exception {
+        var items = itemRepository.findItemsWithPlace(임시코스.getId());
+        items.get(0).getPlace().markGoodPrice(출발일, "대표메뉴: 국수 8,000원", null);
+        var result = budgets.calculateAndCache(임시코스.getId());
+        assertThat(result.totalExpectedMax()).isEqualTo(16000);
+        assertThat(result.summary().unknownCount()).isEqualTo(2);
+        budgets.calculateAndCache(임시코스.getId());
+        assertThat(costs.findByCourseId(임시코스.getId())).hasSize(3);
+        mockMvc.perform(get("/courses/{id}", 임시코스.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.budget_summary.budget_total").value(400000))
+                .andExpect(jsonPath("$.result.budget_summary.estimated_max").value(16000))
+                .andExpect(jsonPath("$.result.budget_summary.unknown_count").value(2));
+    }
 
     @BeforeEach
     void seed() {
@@ -174,6 +224,7 @@ class CourseQueryApiTest {
     private Course course(User owner, String title) {
         return courseRepository.save(Course.builder()
                 .user(owner).title(title)
+                .people((short) 2).budgetTotal(400000)
                 .startDate(출발일).endDate(출발일.plusDays(1))
                 .transport(Transport.RENTAL_CAR)
                 .averageCongestionRate(new BigDecimal("33.00"))

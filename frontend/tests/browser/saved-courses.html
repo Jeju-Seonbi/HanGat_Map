@@ -40,10 +40,21 @@ CourseService.getCourseDetail=async(id)=>({id,title:titles[(Number(id)-1)%5],tra
 const fetchCourse=CourseService.getCourseDetail;
 CourseService.getCourseDetail=async(id)=>{
  const value=await fetchCourse(id);value.status='SAVED';
+ if(new URLSearchParams(location.search).has('budget')) {
+  value.budgetTotal=Number(id)*100000;
+  value.budgetSummary={has_cost_data:true,budget_total:value.budgetTotal,verified_total:0,
+   estimated_min:16000,estimated_max:24000,total_expected_min:16000,total_expected_max:24000,
+   remaining_budget:value.budgetTotal-24000,usage_rate:24/Number(id),over_budget:false,unknown_count:2};
+  value.budgetLabel='예상 16,000~24,000원';
+ }
  for(const swap of window.qaSwaps.filter(s=>s.id===id))for(const day of value.days)for(const item of day.items)if(item.id===swap.itemId){item.placeName='협재해수욕장';item.placeId=99}
  return value;
 };
 const originalFetch=window.fetch.bind(window);let trip={courseId:null,version:0};
+if(new URLSearchParams(location.search).has('budget')) {
+ const savedList=CourseService.getSavedCourses;
+ CourseService.getSavedCourses=async(...args)=>{const list=await savedList(...args);list.cards.forEach(c=>c.budgetTotal=Number(c.id)*100000);return list};
+}
 window.fetch=async(input,init)=>{
  const url=new URL(typeof input==='string'?input:input.url,location.origin);
  if(url.pathname.endsWith('/users/me/trip-confirmation')){
