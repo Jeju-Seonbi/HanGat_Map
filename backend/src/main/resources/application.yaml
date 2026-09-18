@@ -24,6 +24,13 @@ spring:
     baseline-on-migrate: false
     baseline-version: 1
 
+# HTTP client/converter debug or trace logging can contain AI prompts and raw responses.
+# Keep diagnostics in the application's allowlisted recorder, never wire/body logging.
+logging:
+  level:
+    org.springframework.web.client: 'OFF'
+    org.springframework.http.converter: 'OFF'
+
 # KTO candidate lookup only; duration suffixes are required (s/ms).
 tour-api:
   connect-timeout: ${KTO_CONNECT_TIMEOUT:3s}

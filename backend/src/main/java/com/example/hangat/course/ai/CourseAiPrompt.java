@@ -84,8 +84,7 @@ public class CourseAiPrompt {
         } catch (JsonProcessingException exception) {
             throw new CourseAiException(
                     CourseAiFailureType.INVALID_RESPONSE,
-                    "AI 코스 입력을 JSON으로 변환할 수 없습니다.",
-                    exception
+                    "AI 코스 입력을 JSON으로 변환할 수 없습니다."
             );
         }
     }
@@ -137,8 +136,7 @@ public class CourseAiPrompt {
         } catch (JsonProcessingException exception) {
             throw new CourseAiException(
                     CourseAiFailureType.INVALID_RESPONSE,
-                    "이전 AI 코스 결과를 교정 요청 JSON으로 변환할 수 없습니다.",
-                    exception
+                    "이전 AI 코스 결과를 교정 요청 JSON으로 변환할 수 없습니다."
             );
         }
     }
