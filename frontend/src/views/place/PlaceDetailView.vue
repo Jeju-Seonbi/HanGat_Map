@@ -21,7 +21,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PlaceDetailService, { type PlaceDetail, type PlaceForecast } from '../../services/PlaceDetailService'
-import ReviewApiService, { type ReviewItem, absUrl } from '../../services/map/ReviewApiService'
+import ReviewApiService, { type ReviewItem, absUrl, failText } from '../../services/map/ReviewApiService'
 import { useAuthStore } from '../../stores/auth.js'
 import { isFav, loadFavorites, toggleFav, toast, state as mapState } from '../../stores/mapStore'
 import PhotoLightbox from '../../components/map/PhotoLightbox.vue'
@@ -40,6 +40,7 @@ const placeId = computed(() => Number(route.params.placeId))
 
 const loading = ref(true)
 const place = ref<PlaceDetail | null>(null)
+const loadFailed = ref(false)             // 연결·서버 문제로 못 받음 - "없는 장소"(place null + false)와 구분해 다시 시도를 보여준다
 /* 오늘 혼잡 배지 - 관광공사 집중률 예보(날짜 단위)에서 오늘 값만. 대상 밖(식당·카페 등)이거나 오늘 값이 없으면 null → 배지 없음 */
 const forecast = ref<PlaceForecast | null>(null)
 const today = todayKst()
@@ -49,6 +50,7 @@ const reviewTotal = ref(0)
 const reviewPage = ref(0)                 // 마지막으로 읽은 페이지 번호
 const reviewPages = ref(0)                // 전체 페이지 수
 const reviewsLoading = ref(false)
+const reviewsFailed = ref(false)          // 후기 첫 페이지를 못 받음 - "아직 후기가 없어요"라고 거짓말하지 않게(지도 패널 reviewFailed 와 같은 방식)
 const reviewNotice = ref('')
 const draftStars = ref(0)
 const draftText = ref('')
@@ -210,6 +212,7 @@ function stripGo (dir: -1 | 1) {
 watch(reviewPhotos, () => nextTick(stripSync), { flush: 'post' })
 
 async function loadReviews (id: number) {
+  reviewsFailed.value = false
   try {
     const first = await ReviewApiService.getReviews(id, 0)
     if (placeId.value !== id) return   // 기다리는 사이 다른 장소로 갔으면 버린다
@@ -219,6 +222,7 @@ async function loadReviews (id: number) {
     reviewPages.value = first.totalPages
   } catch {
     reviews.value = []; reviewTotal.value = 0; reviewPage.value = 0; reviewPages.value = 0
+    reviewsFailed.value = true
   }
 }
 /** '더보기' - 다음 페이지(10건)를 목록 뒤에 이어 붙인다 */
@@ -284,7 +288,7 @@ async function submitReview () {
     await loadReviews(id)
     reviewNotice.value = imageUrls.length ? `사진 ${imageUrls.length}장과 함께 후기를 남겼어요.` : '후기를 남겼어요.'
   } catch (error) {
-    reviewNotice.value = error instanceof Error && error.message ? `후기를 남기지 못했어요. ${error.message}` : '후기를 남기지 못했어요.'
+    reviewNotice.value = failText(error, '후기를 남기지 못했어요')   // 서버 원문("JWT 토큰 유효하지 않음" 등)은 안 보여준다
   } finally {
     submitting.value = false
   }
@@ -294,12 +298,14 @@ async function submitReview () {
 async function load () {
   loading.value = true
   place.value = null; forecast.value = null; reviews.value = []; reviewTotal.value = 0; reviewPage.value = 0; reviewPages.value = 0; reviewNotice.value = ''
+  loadFailed.value = false; reviewsFailed.value = false
   attach.value.forEach(p => URL.revokeObjectURL(p.preview)); attach.value = []
   idx.value = 0; introOpen.value = false; mapFailed.value = false
   const id = placeId.value
   if (!Number.isFinite(id)) { loading.value = false; return }
-  const detail = await PlaceDetailService.getDetail(id)
+  const { detail, missing } = await PlaceDetailService.getById(id)
   place.value = detail
+  loadFailed.value = !detail && !missing   // 4xx 는 "없는 장소", 그 외 실패는 "못 받음"
   loading.value = false
   if (!detail) return
   document.title = `${detail.name} · 한갓지도`   // 라우터가 준 '관광지 · 한갓지도' 를 장소 이름으로(공유·즐겨찾기·탭 제목)
@@ -319,6 +325,12 @@ watch(() => (auth as any).user?.userId ?? null, id => loadFavorites(id), { immed
 <template>
   <section v-if="loading" class="page place-state">
     <h2>장소 정보를 불러오고 있어요.</h2>
+  </section>
+
+  <section v-else-if="loadFailed" class="page place-state">
+    <h2>장소 정보를 불러오지 못했어요.</h2>
+    <p class="muted">인터넷 연결을 확인한 뒤 다시 시도해 주세요.</p>
+    <button type="button" class="btn primary" @click="load">다시 시도</button>
   </section>
 
   <section v-else-if="!place" class="page place-state">
@@ -448,6 +460,10 @@ watch(() => (auth as any).user?.userId ?? null, id => loadFavorites(id), { immed
           </div>
         </li>
       </ul>
+      <template v-else-if="reviewsFailed">
+        <p class="muted">후기를 불러오지 못했어요.</p>
+        <button type="button" class="rv-more" @click="loadReviews(placeId)">다시 시도</button>
+      </template>
       <p v-else class="muted">아직 후기가 없어요.</p>
       <button v-if="reviews.length < reviewTotal" type="button" class="rv-more" :disabled="reviewsLoading" @click="loadMoreReviews">
         {{ reviewsLoading ? '불러오는 중…' : `후기 ${reviewTotal - reviews.length}개 더보기` }}

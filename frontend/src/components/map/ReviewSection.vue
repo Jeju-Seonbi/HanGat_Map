@@ -7,7 +7,7 @@ import ReviewEditDialog from '../review/ReviewEditDialog.vue'
 import { useReviewEditWindow } from '@/composables/useReviewEditWindow.js'
 import { toast } from '@/stores/mapStore'
 import { useAuthStore } from '@/stores/auth.js'
-import ReviewApiService, { absUrl } from '@/services/map/ReviewApiService'
+import ReviewApiService, { absUrl, failText } from '@/services/map/ReviewApiService'
 
 const props = defineProps({
   place: { type: Object, required: true },
@@ -165,7 +165,7 @@ async function submit () {
     emit('changed')             // 부모가 상세와 후기 첫 페이지를 다시 읽는다 - 별점 요약과 이 목록(firstPage)이 함께 갱신된다
     toast('후기가 등록됐어요')
   } catch (err) {
-    toast(err?.message ?? '후기 등록에 실패했어요')
+    toast(failText(err, '후기를 남기지 못했어요'))   // 서버 원문("JWT 토큰 유효하지 않음" 등)을 그대로 띄우지 않는다
   } finally {
     submitting.value = false
   }
@@ -177,7 +177,7 @@ async function removeReview (r) {
     emit('changed')
     toast('후기를 삭제했어요')
   } catch (err) {
-    toast(err?.message ?? '삭제에 실패했어요')
+    toast(failText(err, '후기를 삭제하지 못했어요'))
   }
 }
 </script>
