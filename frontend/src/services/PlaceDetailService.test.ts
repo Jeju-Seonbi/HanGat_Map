@@ -22,6 +22,25 @@ describe('장소 상세 조회 (MAP_008, 담당 정동현)', () => {
     expect(await PlaceDetailService.getDetail(999999)).toBeNull()
   })
 
+  describe('getById - 소개 페이지는 "없는 장소"와 "못 받음"을 가른다', () => {
+    it('받으면 detail, missing false', async () => {
+      vi.mocked(apiGet).mockResolvedValue({ id: 1613, name: '제주현대미술관' })
+      expect(await PlaceDetailService.getById(1613)).toEqual({ detail: { id: 1613, name: '제주현대미술관' }, missing: false })
+    })
+
+    it('백엔드가 4xx 로 답하면(없는 id 는 PLACE_NOT_FOUND 3201 → 400) missing', async () => {
+      vi.mocked(apiGet).mockRejectedValue(new Error('HTTP 400'))
+      expect(await PlaceDetailService.getById(999999)).toEqual({ detail: null, missing: true })
+    })
+
+    it('서버 오류·연결 끊김·시간 초과는 missing 이 아니다 - 화면이 다시 시도를 보여준다', async () => {
+      for (const err of [new Error('HTTP 500'), new TypeError('Failed to fetch'), new DOMException('The user aborted a request.', 'AbortError')]) {
+        vi.mocked(apiGet).mockRejectedValue(err)
+        expect(await PlaceDetailService.getById(1613)).toEqual({ detail: null, missing: false })
+      }
+    })
+  })
+
   it('예보는 최신 발표분에서 이 장소 것만 꺼낸다', async () => {
     vi.mocked(apiGet).mockResolvedValue({
       from: '2026-09-08', baseDate: '2026-09-09', days: 3,
