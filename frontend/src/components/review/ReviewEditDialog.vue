@@ -10,21 +10,16 @@ import { getBackendSessionVersion } from '@/api/backendClient.js'
 const props = defineProps({ review: { type: Object, required: true } })
 const emit = defineEmits(['close', 'saved'])
 const rating = ref(props.review.rating ?? '')
-const report = ref(props.review.congestionReport ?? '')
 const content = ref(props.review.content ?? '')
 const photos = ref((props.review.imageUrls ?? []).map(url => ({ url, preview: absUrl(url) })))
 const fileInput = ref(null)
-const crowdOptions = [
-  { value: 'QUIET', label: '한산', tone: 'calm' },
-  { value: 'NORMAL', label: '보통', tone: 'mid' },
-  { value: 'CROWDED', label: '혼잡', tone: 'busy' },
-]
 const busy = ref(false)
 const sessionExpired = ref(false)
 const error = ref('')
 const { canEdit } = useReviewEditWindow()
 const editable = computed(() => canEdit(props.review))
-const canSave = computed(() => editable.value && !busy.value && !sessionExpired.value && (!!rating.value || !!report.value))
+/* 혼잡 제보 입력은 뺐다(2026-09-18) - 서버가 별점·제보 중 하나를 요구하므로 별점이 있어야 저장할 수 있다 */
+const canSave = computed(() => editable.value && !busy.value && !sessionExpired.value && !!rating.value)
 const epoch = getBackendSessionVersion()
 const previousFocus = typeof document === 'undefined' ? null : document.activeElement
 let alive = true
@@ -83,7 +78,7 @@ async function save() {
     }
     const result = await ReviewApiService.update(props.review.id ?? props.review.reviewId, {
       rating: rating.value === '' ? null : Number(rating.value),
-      congestionReport: report.value || null,
+      congestionReport: null,   // 예전에 저장된 제보도 수정 시 비운다 - 서비스 어디에도 보여주지 않는 값
       content: content.value || null,
       imageUrls: photos.value.map(photo => photo.url)
     })
@@ -116,14 +111,6 @@ async function save() {
               </button>
             </div>
             <button v-if="rating" type="button" class="clear-rating" @click="rating = ''">별점 선택 해제</button>
-          </div>
-          <div class="crowd-field">
-            <span id="review-crowd-label" class="field-label">방문 당시 혼잡도</span>
-            <div class="crowd-choices" role="group" aria-labelledby="review-crowd-label">
-              <button v-for="option in crowdOptions" :key="option.value" type="button"
-                :class="[option.tone, { on: report === option.value }]" :aria-pressed="report === option.value"
-                @click="report = report === option.value ? '' : option.value">{{ option.label }}</button>
-            </div>
           </div>
           <div class="photo-label"><span class="field-label">사진 <span class="hint">(선택)</span></span><span class="hint">{{ photos.length }}/5 · 한 장당 최대 5MB</span></div>
           <div class="photos">
@@ -159,12 +146,6 @@ label, .field-label { display: block; font-size: 13px; font-weight: 700; }
 .stars { display: flex; justify-content: center; gap: 3px; margin-top: 7px; }
 .stars button { width: 36px; height: 36px; display: grid; place-items: center; padding: 0; background: transparent; border: 0; border-radius: 8px; }
 .clear-rating { padding: 4px 8px; margin-top: 2px; font-size: 11px; color: var(--tx3); background: transparent; border: 0; border-radius: 6px; }
-.crowd-field { margin-bottom: 18px; }
-.crowd-choices { display: flex; gap: 5px; margin-top: 8px; }
-.crowd-choices button { flex: 1; min-height: 38px; padding: 8px 0; border: 0; border-radius: 9px; font-size: 12px; font-weight: 700; background: var(--surf2); color: var(--tx3); }
-.crowd-choices .on.calm { background: var(--calm-bg); color: var(--calm); }
-.crowd-choices .on.mid { background: var(--mid-bg); color: var(--mid); }
-.crowd-choices .on.busy { background: var(--busy-bg); color: var(--busy); }
 .photo-label { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 10px; margin-bottom: 10px; }
 .content-label input { display: block; width: 100%; box-sizing: border-box; margin-top: 7px; padding: 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--surf2); color: var(--tx); font: inherit; font-size: 12.5px; font-weight: 400; }
 .content-label input::placeholder { color: var(--tx3); }

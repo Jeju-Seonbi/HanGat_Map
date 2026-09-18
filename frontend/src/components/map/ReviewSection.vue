@@ -1,14 +1,13 @@
 <script setup>
 /* MAP-09 후기 — 실 API. 열람은 누구나, 작성·삭제는 회원만 (JWT) */
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import StarIcon from './StarIcon.vue'
 import ProfileAvatar from '../common/ProfileAvatar.vue'
 import ReviewEditDialog from '../review/ReviewEditDialog.vue'
 import { useReviewEditWindow } from '@/composables/useReviewEditWindow.js'
 import { toast } from '@/stores/mapStore'
 import { useAuthStore } from '@/stores/auth.js'
-import ReviewApiService, { LEVEL_TO_KEY, absUrl } from '@/services/map/ReviewApiService'
-import { CROWD_KO } from '@/utils/crowd'
+import ReviewApiService, { absUrl } from '@/services/map/ReviewApiService'
 
 const props = defineProps({
   place: { type: Object, required: true },
@@ -25,9 +24,6 @@ const emit = defineEmits(['open-photo', 'changed'])
 
 const auth = useAuthStore()
 
-/* 화면 키(calm/mid/busy) → 서버 레벨 */
-const TO_LEVEL = { calm: 'QUIET', mid: 'NORMAL', busy: 'CROWDED' }
-const FROM_LEVEL = LEVEL_TO_KEY
 
 const MAX_PHOTOS = 5
 /* 서버(ImageValidator)가 받는 기준과 같다 - 5MB 이하, JPG·PNG·WEBP. 고르는 순간 걸러야
@@ -74,12 +70,29 @@ async function loadMore () {
   }
 }
 
-const counts = computed(() => {
-  const c = { calm: 0, mid: 0, busy: 0 }
-  items.value.forEach(r => { const k = FROM_LEVEL[r.congestionReport]; if (k) c[k]++ })
-  return c
+/* 사진 후기 띠 - 지금까지 읽은 후기(첫 페이지 + 더보기)에 달린 사진 전부. 한산·보통·혼잡 제보 막대가 있던 자리다.
+   폭을 넘치면 양쪽 ‹ › 로 넘긴다(장소 소개 페이지의 띠와 같은 동작) */
+const stripPhotos = computed(() => items.value.flatMap(r => (r.imageUrls ?? []).map(u => ({ url: absUrl(u), who: r.nickname ?? `여행자${r.userId}` }))))
+const stripEl = ref(null)
+const stripCan = ref({ l: false, r: false })
+function stripSync () {
+  const el = stripEl.value
+  stripCan.value = el ? { l: el.scrollLeft > 2, r: el.scrollLeft + el.clientWidth < el.scrollWidth - 2 } : { l: false, r: false }
+}
+function stripGo (dir) {
+  const el = stripEl.value
+  if (el) el.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: 'smooth' })
+}
+watch(stripPhotos, () => nextTick(stripSync), { flush: 'post' })
+/* 이 화면은 v-show 라 숨어 있는 동안 폭이 0 이다 - 보이게 되는 순간(크기 변화)에도 다시 잰다 */
+let stripRo = null
+watch(stripEl, el => {
+  stripRo?.disconnect(); stripRo = null
+  if (el && 'ResizeObserver' in window) { stripRo = new ResizeObserver(stripSync); stripRo.observe(el) }
+  stripSync()
 })
-const total = computed(() => (counts.value.calm + counts.value.mid + counts.value.busy) || 1)
+onBeforeUnmount(() => stripRo?.disconnect())
+function openStrip (i) { emit('open-photo', { photos: stripPhotos.value.map(p => p.url), index: i }) }
 const myId = computed(() => auth.user?.userId ?? null)
 const editing = ref(null)
 const { canEdit } = useReviewEditWindow()
@@ -94,16 +107,16 @@ const dateOf = iso => { const d = new Date(iso); return `${d.getFullYear()}.${d.
 
 /* ── 작성 ── */
 const star = ref(0)
-const crowdVote = ref('')
 const text = ref('')
 const photos = ref([])          // { file, preview }
 const submitting = ref(false)
 const fileInput = ref(null)
 
-const canSubmit = computed(() => (!!star.value || !!crowdVote.value) && !submitting.value)
+/* 백엔드(ReviewService)는 별점·혼잡 제보 중 하나를 요구한다. 제보 입력을 뺐으니 별점이 있어야 등록 버튼이 켜진다 */
+const canSubmit = computed(() => !!star.value && !submitting.value)
 
 function resetForm () {
-  star.value = 0; crowdVote.value = ''; text.value = ''; photos.value = []
+  star.value = 0; text.value = ''; photos.value = []
 }
 
 function onFiles (e) {
@@ -144,7 +157,7 @@ async function submit () {
       : []
     await ReviewApiService.create(props.place.id, {
       rating: star.value || null,
-      congestionReport: TO_LEVEL[crowdVote.value] ?? null,
+      congestionReport: null,
       content: text.value.trim() || null,
       imageUrls
     })
@@ -176,11 +189,6 @@ async function removeReview (r) {
       <button v-for="n in 5" :key="n" :aria-label="`${n}점`" @click="star = n">
         <StarIcon :filled="n <= star" :size="26" />
       </button>
-    </div>
-
-    <div class="rv-c">
-      <button v-for="c in ['calm', 'mid', 'busy']" :key="c" :class="[c, { on: crowdVote === c }]"
-        @click="crowdVote = crowdVote === c ? '' : c">{{ CROWD_KO[c] }}</button>
     </div>
 
     <div class="rv-phrow">
@@ -217,13 +225,17 @@ async function removeReview (r) {
         <span class="avg">{{ ratingAvg != null ? ratingAvg.toFixed(1) : '-' }}</span>
         <span class="cnt">후기 {{ totalElements }}</span>
       </div>
-      <div class="rv-bar">
-        <div v-for="c in ['calm', 'mid', 'busy']" :key="c" class="rv-b">
-          <span :style="{ color: `var(--${c})` }">{{ CROWD_KO[c] }}</span>
-          <span class="bg">
-            <i class="tier-bg" :class="c" :style="{ width: Math.round(counts[c] / total * 100) + '%' }"></i>
-          </span>
-          <b>{{ counts[c] }}</b>
+      <!-- 사진 후기 띠 - 사진 달린 후기가 있을 때만 -->
+      <div v-if="stripPhotos.length" class="rv-photos">
+        <div class="rv-photos-h">사진 후기 <b>{{ stripPhotos.length }}</b></div>
+        <div class="rv-strip">
+          <button v-if="stripCan.l" class="rv-pnav prev" aria-label="이전 사진들" @click="stripGo(-1)">‹</button>
+          <ul ref="stripEl" aria-label="후기 사진" @scroll.passive="stripSync">
+            <li v-for="(p, i) in stripPhotos" :key="p.url + i">
+              <button :aria-label="`${p.who}님의 후기 사진 크게 보기`" @click="openStrip(i)"><img :src="p.url" :alt="`${p.who}님의 후기 사진`" loading="lazy" decoding="async"></button>
+            </li>
+          </ul>
+          <button v-if="stripCan.r" class="rv-pnav next" aria-label="다음 사진들" @click="stripGo(1)">›</button>
         </div>
       </div>
 
@@ -240,10 +252,7 @@ async function removeReview (r) {
         </div>
         <div class="rv-mt">
           <template v-if="r.rating"><StarIcon v-for="n in 5" :key="n" :filled="n <= r.rating" :size="12" /></template>
-          <span v-if="FROM_LEVEL[r.congestionReport]" class="bdg"
-            :style="{ background: `var(--${FROM_LEVEL[r.congestionReport]}-bg)`, color: `var(--${FROM_LEVEL[r.congestionReport]})`, fontSize: '10px', padding: '2px 8px' }">
-            {{ CROWD_KO[FROM_LEVEL[r.congestionReport]] }}
-          </span>
+          <!-- 예전 후기에 저장된 혼잡 제보(한산·보통·혼잡)는 더 이상 보여주지 않는다(2026-09-18 사용자 결정). 값은 DB 에 남아 있을 뿐 -->
         </div>
         <div v-if="r.content" class="rv-tx">{{ r.content }}</div>
         <div v-if="r.imageUrls && r.imageUrls.length" class="rv-imgs">

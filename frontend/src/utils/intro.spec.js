@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { introOf, paragraphsOf } from './intro'
+import { introOf, paragraphsOf, firstMenu } from './intro'
 
 describe('introOf (MAP_008)', () => {
   it('returns the KTO overview text trimmed', () => {
@@ -8,6 +8,13 @@ describe('introOf (MAP_008)', () => {
 
   it('never shows a menu paragraph as an introduction', () => {
     expect(introOf('대표메뉴: 순대국밥 9,000원 · 해물순두부 9,000원')).toBeNull()
+  })
+
+  it('firstMenu - 메뉴 문단의 첫 메뉴와 가격, 메뉴 문단이 아니면 null', () => {
+    expect(firstMenu('대표메뉴: 똣똣라면(오리지널) 6,500원 · 똣똣라면(순한맛) 6,500원')).toEqual({ n: '똣똣라면(오리지널)', p: '6,500원' })
+    expect(firstMenu('대표메뉴: 성게비빔밥')).toEqual({ n: '성게비빔밥', p: '' })
+    expect(firstMenu('제주교육박물관은 …')).toBeNull()
+    expect(firstMenu(null)).toBeNull()
   })
 
   it('is null when there is nothing to say', () => {

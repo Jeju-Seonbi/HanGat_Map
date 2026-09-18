@@ -32,6 +32,10 @@ export const routes = [
   /* ── 지도 — 전용 레이아웃 (문서 스크롤 없음) ── */
   { path: '/map', name: 'map', component: () => import('../views/map/MapView.vue'), meta: { layout: 'map', title: '지도' } },
 
+  /* ── 테마 — 관광지 소개 페이지의 입구(구석구석 테마 구조, 2026-09-17) ── */
+  { path: '/themes', name: 'themes', component: () => import('../views/theme/ThemeView.vue'), meta: { skin: 'toss', styleScope: 'content', title: '테마' } },
+  { path: '/themes/:key', name: 'theme-detail', component: () => import('../views/theme/ThemeDetailView.vue'), meta: { skin: 'toss', styleScope: 'content', title: '테마' } },
+
   /* ── 관광지 상세 ──
      백엔드 placeId(숫자)만 받는다. 옛 목업 id('bijarim' 등)는 이제 열 장소가 없어 지도로 보낸다 -
      예전 목업 페이지는 숫자 id가 들어오면 매칭에 실패해 항상 첫 목업 장소를 보여줬다. */
@@ -82,7 +86,8 @@ export const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes,
-  scrollBehavior: () => ({ top: 0 })
+  // 새 화면은 맨 위, 뒤로/앞으로 가기는 있던 자리로(테마 목록·상세에서 장소를 봤다 돌아올 때, 2026-09-18). 목록이 비동기로 채워지는 시간을 조금 기다린다
+  scrollBehavior: (to, from, saved) => (saved ? new Promise(resolve => setTimeout(() => resolve(saved), 80)) : { top: 0 })
 })
 
 /**

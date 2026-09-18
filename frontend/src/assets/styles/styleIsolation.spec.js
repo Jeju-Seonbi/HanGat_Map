@@ -53,7 +53,7 @@ describe('page CSS ownership', () => {
       // .savebox 는 지도 패널의 로컬 코스 저장 UI 였고 2026-09-07 죽은 코드로 제거됐다
       '.seg button{', '#cond-body{', '.cal-h button',
       '.map-lightbox img', '.acts button{', '.rv-star button{',
-      '.rv-c button{', '.rv-in input{', '.rv-in button{', '.sb-eg button{',
+      '.rv-strip li button{', '.rv-in input{', '.rv-in button{', '.sb-eg button{',
       '.ftr button{'
     ]) expect(builtCss).toContain(selector)
   })

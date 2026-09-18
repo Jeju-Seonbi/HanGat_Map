@@ -6,7 +6,7 @@ import ReviewSection from './ReviewSection.vue'
 import ProfileAvatar from '../common/ProfileAvatar.vue'
 import { state, toggleFav, isFav, toast, placeKey } from '@/stores/mapStore'
 
-import { crowd, tier, tierKo, forecastDays, bestDay, CROWD_KO } from '@/utils/crowd'
+import { crowd, tier, tierKo, forecastDays, bestDay } from '@/utils/crowd'
 import { at, fmtK } from '@/utils/date'
 import { wxOf, wxIcon, wxIssuedAt } from '@/utils/weather'
 import { weatherBasis } from '@/services/map/MapWeatherService'
@@ -16,7 +16,7 @@ import { shareToKakao, preloadKakao } from '@/composables/useKakaoShare'
 import { goodPriceSourceLine } from '@/utils/dataSources'
 import { introOf, paragraphsOf } from '@/utils/intro'
 import MapPlaceService from '@/services/map/MapPlaceService'
-import ReviewApiService, { LEVEL_TO_KEY, absUrl } from '@/services/map/ReviewApiService'
+import ReviewApiService, { absUrl } from '@/services/map/ReviewApiService'
 
 const props = defineProps({ place: { type: Object, required: true } })
 const emit = defineEmits(['close', 'open-place', 'open-photo'])
@@ -308,7 +308,12 @@ async function shareNative() {
       <div class="poh">
         <div style="flex:1">
           <h4>{{ s.n }}</h4>
-          <div class="sub">{{ [s.c, s.r].filter(Boolean).join(' · ') }}</div>
+          <div class="sub">
+            <span>{{ [s.c, s.r].filter(Boolean).join(' · ') }}</span>
+            <!-- 전체 상세 페이지(/places/:id)로 - 그 페이지의 '지도에서 보기'와 짝(2026-09-17 사용자 요청).
+                 id 없는 목업·검색 임시 객체엔 안 그린다 -->
+            <RouterLink v-if="s.id != null" class="more" :to="`/places/${s.id}`">자세히 보기 ›</RouterLink>
+          </div>
         </div>
         <!-- MAP_009 찜 -->
         <button class="fav" :class="{ on: isFav(s) }" :aria-pressed="isFav(s)" aria-label="찜하기" @click="toggleFav(s)">♥</button>
@@ -523,10 +528,7 @@ async function shareNative() {
             </div>
             <div class="rv-mt">
               <template v-if="r.rating"><StarIcon v-for="n in 5" :key="n" :filled="n <= r.rating" :size="12" /></template>
-              <span v-if="LEVEL_TO_KEY[r.congestionReport]" class="bdg"
-                :style="{ background: `var(--${LEVEL_TO_KEY[r.congestionReport]}-bg)`, color: `var(--${LEVEL_TO_KEY[r.congestionReport]})`, fontSize: '10px', padding: '2px 8px' }">
-                {{ CROWD_KO[LEVEL_TO_KEY[r.congestionReport]] }}
-              </span>
+              <!-- 예전 후기의 혼잡 제보 배지는 더 이상 보여주지 않는다(2026-09-18) - ReviewSection 과 같은 결정 -->
             </div>
             <div v-if="r.content" class="rv-tx">{{ r.content }}</div>
             <div v-if="r.imageUrls && r.imageUrls.length" class="rv-imgs">
