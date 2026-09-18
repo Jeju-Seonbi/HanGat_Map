@@ -118,13 +118,8 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateArrows))
       <div class="hero-inner">
         <span class="pill">제주 분산 여행 가이드</span>
         <h1>사람을 피해,<br><em>제주를 더 깊이.</em></h1>
-        <p class="hero-desc">혼잡도와 날씨, 이동 시간을 함께 읽어<br>나만의 한적한 제주 코스를 만들어요.</p>
-      </div>
-      <span class="hero-credit">ⓒ한국관광공사</span>
-    </section>
-
-    <!-- 조건 바 + 숫자 - 히어로 아래에 걸쳐 놓는다(2026-09-18 사용자 요청: 날씨 띠 바로 위). 누르면 AI 코스 화면(조건 편집)으로. 값은 travel 스토어 그대로 -->
-    <section class="hm-sec hm-cond">
+        <p class="hero-desc">혼잡도와 날씨, 이동 시간을 함께 읽어 나만의 한적한 제주 코스를 만들어요.</p>
+        <!-- 조건 바 - 소개 문장 바로 아래, 다른 구간과 같은 폭(2026-09-18 사용자 결정). 누르면 AI 코스 화면(조건 편집)으로. 값은 travel 스토어 그대로 -->
         <div class="cond">
           <RouterLink class="cond-f" to="/ai-course"><small>여행 일정</small><b>{{ fmtDate(store.condition.startDate) }} – {{ fmtDate(store.condition.endDate) }}</b></RouterLink>
           <RouterLink class="cond-f" to="/ai-course"><small>함께 가는 사람</small><b>{{ store.condition.people }}명 · {{ store.condition.preference }}</b></RouterLink>
@@ -140,6 +135,8 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateArrows))
             <span>{{ s.label }} {{ s.value.toLocaleString() }}곳</span>
           </template>
         </p>
+      </div>
+      <span class="hero-credit">ⓒ한국관광공사</span>
     </section>
 
     <!-- ② 날씨 띠 -->
@@ -222,7 +219,7 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateArrows))
 <style scoped>
 .home{display:flex;flex-direction:column}
 .hm-sec{max-width:1240px;width:100%;margin:0 auto;padding:60px 24px 0;box-sizing:border-box;display:flex;flex-direction:column;gap:22px}
-.hm-wx{padding-top:24px}
+.hm-wx{padding-top:32px}
 .hm-last{padding-bottom:72px}
 .hm-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
 .hm-head h2{margin:0;font-size:26px;font-weight:800;letter-spacing:-.02em}
@@ -230,25 +227,24 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateArrows))
 .hm-more{font-size:14px;font-weight:700;color:var(--primary-dark);white-space:nowrap}
 
 /* 히어로 */
-.hero-full{position:relative;min-height:520px;display:flex;align-items:center;overflow:hidden;background:var(--deep)}
+.hero-full{position:relative;min-height:600px;display:flex;align-items:center;overflow:hidden;background:var(--deep)}
 .hero-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 55%}
 .hero-scrim{position:absolute;inset:0;background:rgba(15,25,35,.42)}
-.hero-inner{position:relative;z-index:1;width:100%;max-width:1240px;margin:auto;padding:56px 24px 96px;box-sizing:border-box;display:flex;flex-direction:column;gap:18px;color:#fff}
+.hero-inner{position:relative;z-index:1;width:100%;max-width:1240px;margin:auto;padding:64px 24px 60px;box-sizing:border-box;display:flex;flex-direction:column;gap:18px;color:#fff}
 .hero-inner .pill{align-self:flex-start;background:rgba(255,255,255,.18);color:#fff;font-size:12.5px;font-weight:700;padding:6px 12px;border-radius:99px}
 .hero-inner h1{margin:0;font-size:48px;line-height:1.18;font-weight:800;letter-spacing:-.03em;color:#fff}
 .hero-inner h1 em{font-style:normal;font-family:'Gowun Dodum',sans-serif;font-weight:400;color:#9fe3d2}
-.hero-desc{margin:0;font-size:16px;line-height:1.7;color:rgba(255,255,255,.92);max-width:640px}
-.hm-cond{padding-top:0;margin-top:-52px;position:relative;z-index:2;gap:12px}
-.cond{display:flex;align-items:stretch;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:8px;color:var(--text);box-shadow:0 10px 30px rgba(15,25,35,.14)}   /* 폭은 다른 구간(1240 상자)과 같게 - 좁히면 날씨 띠와 칸이 안 맞는다 */
-.cond-f{flex:1 1 0;display:flex;flex-direction:column;gap:4px;padding:10px 18px;border-right:1px solid var(--border);color:var(--text);min-width:0}
+.hero-desc{margin:0;font-size:16px;line-height:1.7;color:rgba(255,255,255,.92)}   /* PC 에선 한 줄(2026-09-18 사용자 요청), 폰은 폭대로 접힘 */
+.cond{margin-top:8px;display:flex;align-items:stretch;background:#fff;border-radius:16px;padding:8px;color:#17262b}   /* 사진 위라 흰색 고정. 폭은 다른 구간(1240 상자)과 같게 - 좁히면 아래 날씨 띠와 칸이 안 맞는다 */
+.cond-f{flex:1 1 0;display:flex;flex-direction:column;gap:4px;padding:10px 18px;border-right:1px solid #e3eae7;color:#17262b;min-width:0}
 .cond-f:last-of-type{border-right:0}
-.cond-f small{font-size:12px;font-weight:600;color:var(--sub)}
+.cond-f small{font-size:12px;font-weight:600;color:#5f736f}
 .cond-f b{font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.cond-f:hover{background:var(--muted);border-radius:10px}
+.cond-f:hover{background:#f3f7f5;border-radius:10px}
 .cond-go{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:0 22px;border-radius:12px;background:var(--primary);color:#fff;font-size:15px;font-weight:800;white-space:nowrap}
 .cond-go:hover{background:var(--primary-dark);color:#fff}
-.hero-stats{margin:0;display:flex;align-items:center;flex-wrap:wrap;gap:8px 14px;font-size:13.5px;font-weight:600;color:var(--sub)}
-.hero-stats .dot{width:3px;height:3px;border-radius:50%;background:var(--sub);opacity:.6}
+.hero-stats{margin:0;display:flex;align-items:center;flex-wrap:wrap;gap:8px 14px;font-size:13.5px;font-weight:500;color:rgba(255,255,255,.9)}
+.hero-stats .dot{width:3px;height:3px;border-radius:50%;background:rgba(255,255,255,.6)}
 .hero-credit{position:absolute;right:20px;bottom:14px;z-index:1;color:rgba(255,255,255,.82);font-size:12px}
 
 /* 오늘 한적한 곳 - 포스터 캐러셀 */
@@ -285,17 +281,16 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateArrows))
 
 @media (max-width:767px){
   .hm-sec{padding:30px 16px 0;gap:14px}
-  .hm-wx{padding-top:14px}
+  .hm-wx{padding-top:16px}
   .hm-last{padding-bottom:40px}
   .hm-head h2{font-size:20px}.hm-head p{font-size:12.5px}.hm-more{font-size:13px}
-  .hero-full{min-height:400px;align-items:flex-start}
-  .hero-inner{padding:34px 16px 60px;gap:14px}
-  .hm-cond{margin-top:-28px;gap:10px}
+  .hero-full{min-height:520px;align-items:flex-start}
+  .hero-inner{padding:34px 16px 44px;gap:14px}
   .hero-inner h1{font-size:32px}
   .hero-desc{font-size:14px}
   .cond{flex-direction:column;padding:6px}
-  .cond-f{border-right:0;border-bottom:1px solid var(--border);padding:11px 14px;flex-direction:row;justify-content:space-between;align-items:center}
-  .cond-f:last-of-type{border-bottom:1px solid var(--border)}
+  .cond-f{border-right:0;border-bottom:1px solid #e3eae7;padding:11px 14px;flex-direction:row;justify-content:space-between;align-items:center}
+  .cond-f:last-of-type{border-bottom:1px solid #e3eae7}
   .cond-f small{font-size:12.5px}.cond-f b{font-size:14.5px}
   .cond-go{margin-top:6px;height:46px;justify-content:center}
   .hero-stats{font-size:12.5px;gap:6px 10px}
