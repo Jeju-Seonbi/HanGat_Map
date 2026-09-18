@@ -106,6 +106,8 @@ export interface CourseDetailItem {
   replacedFromPlaceName: string | null
   inboundDistanceM: number | null
   inboundTravelMinutes: number | null
+  /** 실내 여부 - 백엔드 이름 키워드 휴리스틱. 비 예보일 실내 배지용 */
+  indoor?: boolean
 }
 
 export interface CourseDetailDay {
@@ -180,6 +182,7 @@ interface BackendCourseDetail {
       replaced_from_place_name: string | null
       inbound_distance_m: number | null
       inbound_travel_minutes: number | null
+      indoor?: boolean
     }>
   }>
 }
@@ -385,6 +388,7 @@ export const CourseService = {
             replacedFromPlaceName: item.replaced_from_place_name,
             inboundDistanceM: item.inbound_distance_m,
             inboundTravelMinutes: item.inbound_travel_minutes,
+            indoor: item.indoor,
           })),
         })),
       }

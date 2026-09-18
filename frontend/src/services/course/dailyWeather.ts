@@ -47,6 +47,28 @@ export function dailyWeatherLabel(item: ItemWeather, today = todayKst()): string
   const rain = fact.precipitation_probability != null ? `강수확률 ${fact.precipitation_probability}%` : '강수확률 정보 없음'
   return `예보 · 기상청 · ${issuedAt(evidence.issued_at_utc)} · ${state} · ${temperature} · ${rain}`
 }
+/**
+ * 비 예보일 임계값(강수확률 %). 백엔드 RainyDayRule.PROB_FROM과 같은 값이어야 한다 -
+ * 배치 코스·AI 생성·폴백이 60에서 실내 위주로 담는데 배지만 다른 값을 쓰면 한 화면에서 말이 어긋난다.
+ */
+export const RAINY_PROB_FROM = 60
+/** 배치 코스의 추천 사유와 같은 문장(RainyDayRule.INDOOR_REASON). 실내 여부는 휴리스틱이라 '위주'까지만 말한다 */
+export const RAINY_INDOOR_NOTICE = '비 예보가 있어 실내 위주로 담았어요'
+type ItemIndoor = ItemWeather & Pick<CourseItem, 'indoor'>
+/**
+ * DAY 머리 배지 - 그 날짜의 일 단위 강수확률이 임계값 이상이고 실내 장소가 과반일 때만 문구를 준다. 아니면 null.
+ * 실내 여부는 백엔드가 이름 키워드로 판정한 indoor 값이다. 값이 없는 옛 응답은 실외로 세어 배지를 안 띄운다.
+ */
+export function rainyIndoorNotice(items: ItemIndoor[]): string | null {
+  if (!items.length) return null
+  const rainy = items.some(item => {
+    const probability = daily(item)?.precipitation_probability
+    return probability != null && probability >= RAINY_PROB_FROM
+  })
+  if (!rainy) return null
+  const indoor = items.filter(item => item.indoor === true).length
+  return indoor * 2 > items.length ? RAINY_INDOOR_NOTICE : null
+}
 /** Once per date/region; island forecasts are never presented as local precision. */
 export function dayWeatherLabels(items: ItemWeather[]): string[] {
   const groups = new Map<string, { scope: string; text: string }>()

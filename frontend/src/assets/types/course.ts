@@ -77,6 +77,8 @@ export interface CourseItem {
     precipitation_probability?: number | null; daily_evidence?: { source_code: string; region_code: string;
       spatial_scope: string; granularity: string; issued_at_utc: string; temp_min?: number | null; temp_max?: number | null } | null }> | null
   operating_hours_warning?: boolean; accommodation_influenced?: boolean; costs: CourseItemCost[]
+  /** 실내 여부 - 백엔드 이름 키워드 휴리스틱(IndoorClassifier). 비 예보일 '실내 위주' 배지 근거. 옛 응답이면 없다 */
+  indoor?: boolean
 }
 export interface CourseDay {
   day_no: number; visit_date: string; items: CourseItem[]

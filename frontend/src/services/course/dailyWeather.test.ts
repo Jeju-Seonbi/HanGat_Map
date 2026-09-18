@@ -1,5 +1,34 @@
 import { describe, it, expect } from 'vitest'
-import { dailyWeatherLabel, dayWeatherLabels, dayWeatherBadges } from './dailyWeather'
+import { dailyWeatherLabel, dayWeatherLabels, dayWeatherBadges, rainyIndoorNotice, RAINY_INDOOR_NOTICE, RAINY_PROB_FROM } from './dailyWeather'
+
+describe('rainyIndoorNotice - 비 예보일 실내 위주 배지', () => {
+  const evidence = { source_code: 'KMA_SHORT', region_code: 'EAST', spatial_scope: 'REGION', granularity: 'DAILY', issued_at_utc: '2026-09-19T20:00:00Z', temp_min: 20, temp_max: 25 }
+  const item = (indoor: boolean | undefined, probability: number | null) => ({
+    visit_date: '2026-09-20', indoor,
+    weather: [{ forecast_date: '2026-09-20', precipitation_probability: probability, daily_evidence: evidence }],
+  })
+
+  it('강수확률이 임계값 이상이고 실내가 과반이면 배치 코스와 같은 문장을 준다', () => {
+    expect(rainyIndoorNotice([item(true, 80), item(true, 80), item(false, 80)])).toBe(RAINY_INDOOR_NOTICE)
+    expect(RAINY_PROB_FROM).toBe(60)   // 백엔드 RainyDayRule.PROB_FROM과 같아야 한다
+  })
+
+  it('비 예보라도 실내가 과반이 아니면 띄우지 않는다 - 실내 위주라고 말할 수 없다', () => {
+    expect(rainyIndoorNotice([item(true, 80), item(false, 80), item(false, 80)])).toBeNull()
+    expect(rainyIndoorNotice([item(true, 80), item(false, 80)])).toBeNull()   // 반반은 과반이 아니다
+  })
+
+  it('임계값 바로 아래거나 강수확률을 모르면 띄우지 않는다', () => {
+    expect(rainyIndoorNotice([item(true, RAINY_PROB_FROM - 1), item(true, RAINY_PROB_FROM - 1)])).toBeNull()
+    expect(rainyIndoorNotice([item(true, RAINY_PROB_FROM), item(true, RAINY_PROB_FROM)])).toBe(RAINY_INDOOR_NOTICE)
+    expect(rainyIndoorNotice([item(true, null), item(true, null)])).toBeNull()
+    expect(rainyIndoorNotice([])).toBeNull()
+  })
+
+  it('실내 여부가 없는 옛 응답은 실외로 세어 배지를 띄우지 않는다', () => {
+    expect(rainyIndoorNotice([item(undefined, 90), item(undefined, 90)])).toBeNull()
+  })
+})
 describe('stored daily weather', () => {
   it('builds compact badges from actual daily values, preserving zero and missing data', () => {
     const item = { visit_date: '2026-09-20', weather: [{ forecast_date: '2026-09-20', sky_condition_code: '맑음', precipitation_probability: 0,
