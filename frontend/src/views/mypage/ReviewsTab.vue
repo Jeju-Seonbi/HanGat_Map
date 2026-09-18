@@ -33,7 +33,6 @@ async function onEdited() {
   await load(true)
 }
 const deleteBusy = ref(false)
-const CROWD_KO = { QUIET: '한산했어요', NORMAL: '보통이었어요', CROWDED: '혼잡했어요' }
 let alive = true
 let deleteVersion = 0
 watch(() => auth.user?.userId, () => { deleteVersion += 1; deleting.value = null; deleteBusy.value = false }, { flush: 'sync' })
@@ -93,8 +92,8 @@ async function confirmDelete() {
               <StarRating :model-value="r.rating" :size="14" />
               <span class="score tnum">{{ Number(r.rating).toFixed(1) }}</span>
             </template>
-            <span v-else class="note">별점 없는 혼잡 제보</span>
-            <span v-if="CROWD_KO[r.congestionReport]" class="bdg" :class="r.congestionReport">{{ CROWD_KO[r.congestionReport] }}</span>
+            <span v-else class="note">별점 없음</span>
+            <!-- 혼잡 제보 배지(한산했어요 등)는 더 이상 보여주지 않는다(2026-09-18) - 작성·수정 화면에서 제보 입력을 뺐다 -->
           </div>
           <p v-if="r.content" class="content">{{ r.content }}</p>
           <div v-if="r.imageUrls?.length" class="photos">
@@ -136,9 +135,6 @@ async function confirmDelete() {
 .top { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; padding-right: 180px; }
 .place { font-size: 15px; font-weight: 800; overflow-wrap: anywhere; }
 .place:hover { color: var(--ac-dk); }
-.bdg.QUIET { background: var(--calm-bg); color: var(--calm); }
-.bdg.NORMAL { background: var(--mid-bg); color: var(--mid); }
-.bdg.CROWDED { background: var(--busy-bg); color: var(--busy); }
 .rate { display: flex; align-items: center; gap: 7px; margin: 10px 0 6px; flex-wrap: wrap; }
 .score { font-size: 12.5px; font-weight: 800; }
 .content { font-size: 12.5px; color: var(--tx2); line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }

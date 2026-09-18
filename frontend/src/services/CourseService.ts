@@ -14,6 +14,13 @@ import type { CongestionLevel } from '../assets/types'
 import type { AlternativePlace } from '../assets/types/course'
 import type { AccommodationInput } from '../assets/types/course'
 
+export interface RoadAlternatives {
+  forecast_date: string
+  distance_basis: 'CAR_ROAD'
+  places: AlternativePlace[]
+  unavailable_count: number
+}
+
 /** 화면이 그리는 코스 카드 한 장 - 메인 추천과 저장 목록이 같은 모양을 쓴다(백엔드 계약도 동일). */
 export interface CourseCard {
   /** 라우팅 키. 실데이터는 숫자 id, 목업은 'sample-aewol' 같은 문자열이다 */
@@ -284,10 +291,17 @@ export const CourseService = {
    * 같은 카테고리·그 날짜 예보 혼잡 미만·10km 우선(부족하면 20km)·코스 내 중복 제외는 서버가 한다.
    * apiGet은 4xx 본문을 읽지 않아 코드를 잃으므로 apiRequest를 쓴다 - 그 날짜 예보가 없으면 ApiError(3401)가 온다.
    */
-  async getAlternatives (placeId: number, visitDate: string, excludeIds: number[]): Promise<AlternativePlace[]> {
-    const query = new URLSearchParams({ date: visitDate, limit: '3' })
+  async getAlternatives (placeId: number, visitDate: string, excludeIds: number[], options?: { limit?: number; sort?: 'DISTANCE' }): Promise<AlternativePlace[]> {
+    const query = new URLSearchParams({ date: visitDate, limit: String(options?.limit ?? 3) })
+    if (options?.sort) query.set('sort', options.sort)
     if (excludeIds.length) query.set('exclude', excludeIds.join(','))
     return await apiRequest(`/places/${placeId}/alternatives?${query.toString()}`) as AlternativePlace[]
+  },
+
+  async getRoadAlternatives(placeId: number, excludeIds: number[]): Promise<RoadAlternatives> {
+    const query = new URLSearchParams()
+    if (excludeIds.length) query.set('exclude', excludeIds.join(','))
+    return await apiRequest(`/places/${placeId}/road-alternatives?${query}`, { timeoutMs: 70000 }) as RoadAlternatives
   },
 
   /**

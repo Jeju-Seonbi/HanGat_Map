@@ -4,6 +4,10 @@ const {join}=require('node:path');
 const {tmpdir}=require('node:os');
 const jsQR=require('jsqr');
 const url=(process.env.SAVED_COURSES_TEST_URL || 'http://127.0.0.1:5208')+'/tests/browser/course-share.html';
+async function openFirstShare(page){
+ await page.locator('.library-card').first().getByRole('button',{name:/ 메뉴$/}).click();
+ await page.getByRole('menuitem',{name:'공유',exact:true}).click();
+}
 const item={id:1,place_id:11,place_name:'금오름',category_name:'오름',region_name:'서부',place_business_status:null,image_url:null,latitude:33.35,longitude:126.3,position:1,start_time:'10:00:00',end_time:'11:20:00',inbound_distance_m:null,inbound_travel_minutes:null,congestion_rate:null,congestion_level:null,congestion_label:null,weather:null};
 const course={title:'서부 힐링 코스',start_date:'2026-09-20',end_date:'2026-09-21',transport:'RENTAL_CAR',days:[{day_no:1,visit_date:'2026-09-20',items:[item,{...item,id:2,place_id:22,place_name:'목장',position:2,longitude:126.32,inbound_travel_minutes:15,inbound_distance_m:3200,congestion_level:'QUIET',congestion_rate:24,congestion_label:'한산'}]},{day_no:2,visit_date:'2026-09-21',items:[{...item,id:3,place_name:'둘째 날 장소'}]}]};
 (async()=>{
@@ -14,14 +18,14 @@ const course={title:'서부 힐링 코스',start_date:'2026-09-20',end_date:'202
  await page.route('**/courses/12/share',async route=>{const method=route.request().method();requests.push(method);if(method==='POST'){active=true;version++}if(method==='DELETE')active=false;await route.fulfill({json:{success:true,result:{active,token:active?'token-'+version:null}}})});
  await page.route('**/shared-courses/*',async route=>{const token=route.request().url().split('/').pop();assert.equal(route.request().headers().authorization,undefined);if(token==='slow')await new Promise(r=>setTimeout(r,350));await route.fulfill(token==='revoked'?{status:404,json:{success:false,code:3310,message:'unavailable'}}:{json:{success:true,result:{...course,title:token==='slow'?'OLD':course.title}}})});
  await page.goto(url);
- await page.getByRole('button',{name:'서부 힐링 코스 공유',exact:true}).click();
+ await openFirstShare(page);
  await page.getByRole('button',{name:'공유 링크 만들기',exact:true}).waitFor();
  assert.deepEqual(requests,['GET'],'opening must never POST');
  assert.notEqual(await page.locator('.create-share').evaluate(el=>getComputedStyle(el).backgroundColor),'rgba(0, 0, 0, 0)','create CTA needs a visible background');
- assert.equal(await page.locator('dialog').evaluate(el=>el.open),true);
- await page.keyboard.press('Escape');assert.equal(await page.locator('dialog').count(),0);
- assert.equal(await page.getByRole('button',{name:'서부 힐링 코스 공유',exact:true}).evaluate(el=>el===document.activeElement),true);
- await page.getByRole('button',{name:'서부 힐링 코스 공유',exact:true}).click();
+ assert.equal(await page.locator('.course-share-dialog').evaluate(el=>el.open),true);
+ await page.keyboard.press('Escape');assert.equal(await page.locator('.course-share-dialog').count(),0);
+ assert.equal(await page.locator('.library-card').first().getByRole('button',{name:/ 메뉴$/}).evaluate(el=>el===document.activeElement),true);
+ await openFirstShare(page);
  await page.getByRole('button',{name:'공유 링크 만들기',exact:true}).click();
  await page.getByLabel('공유 링크',{exact:true}).waitFor();
  await page.getByRole('button',{name:'QR 코드',exact:true}).click({timeout:3000});
@@ -82,10 +86,10 @@ const course={title:'서부 힐링 코스',start_date:'2026-09-20',end_date:'202
  await mobile.setViewportSize({width:320,height:640});
  assert.ok(await mobile.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'320px touch mobile must fit viewport');
  await mobile.getByRole('button',{name:'저장 코스 목록',exact:true}).click();
- await mobile.getByRole('button',{name:'서부 힐링 코스 공유',exact:true}).click();
+ await openFirstShare(mobile);
  await mobile.getByRole('button',{name:'QR 코드',exact:true}).click();
  await mobile.getByRole('img',{name:'코스 공유 링크 QR 코드'}).waitFor();
- assert.ok(await mobile.locator('dialog').evaluate(el=>el.scrollWidth<=el.clientWidth),'QR modal must fit narrow mobile');
+ assert.ok(await mobile.locator('.course-share-dialog').evaluate(el=>el.scrollWidth<=el.clientWidth),'QR modal must fit narrow mobile');
  await mobile.screenshot({path:join(tmpdir(),'course-share-dialog-mobile.png')});
  await mobileContext.close();
  // Exercise the real application route/layout too, not only the isolated fixture.

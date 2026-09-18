@@ -5,6 +5,19 @@
  */
 const MENU_PREFIX = '대표메뉴:'
 
+/**
+ * 착한가격 메뉴 문단("대표메뉴: 흑돼지 9,000원 · 갈치조림 12,000원")의 첫 메뉴 - { n: 이름, p: '9,000원' }.
+ * 테마 카드가 사진 대신 보여준다(사진 없는 착한가격 식당 271곳). 메뉴 문단이 아니면 null. 규칙은 지도 패널 menuRows 와 같다.
+ */
+export function firstMenu (overview) {
+  const o = (overview ?? '').trim()
+  if (!o.startsWith(MENU_PREFIX)) return null
+  const item = o.slice(MENU_PREFIX.length).trim().split(' · ')[0]
+  if (!item) return null
+  const m = item.match(/^(.*?)\s*([\d,]+원)$/)
+  return m ? { n: m[1], p: m[2] } : { n: item, p: '' }
+}
+
 /** 소개로 보여줄 글. 없거나 메뉴 문단이면 null */
 export function introOf (overview) {
   const t = (overview ?? '').trim()

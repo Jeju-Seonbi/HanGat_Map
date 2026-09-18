@@ -6,7 +6,7 @@ import ReviewSection from './ReviewSection.vue'
 import ProfileAvatar from '../common/ProfileAvatar.vue'
 import { state, toggleFav, isFav, toast, placeKey } from '@/stores/mapStore'
 
-import { crowd, tier, tierKo, forecastDays, bestDay, CROWD_KO } from '@/utils/crowd'
+import { crowd, tier, tierKo, forecastDays, bestDay } from '@/utils/crowd'
 import { at, fmtK } from '@/utils/date'
 import { wxOf, wxIcon, wxIssuedAt } from '@/utils/weather'
 import { weatherBasis } from '@/services/map/MapWeatherService'
@@ -16,7 +16,7 @@ import { shareToKakao, preloadKakao } from '@/composables/useKakaoShare'
 import { goodPriceSourceLine } from '@/utils/dataSources'
 import { introOf, paragraphsOf } from '@/utils/intro'
 import MapPlaceService from '@/services/map/MapPlaceService'
-import ReviewApiService, { LEVEL_TO_KEY, absUrl } from '@/services/map/ReviewApiService'
+import ReviewApiService, { absUrl } from '@/services/map/ReviewApiService'
 
 const props = defineProps({ place: { type: Object, required: true } })
 const emit = defineEmits(['close', 'open-place', 'open-photo'])
@@ -308,7 +308,12 @@ async function shareNative() {
       <div class="poh">
         <div style="flex:1">
           <h4>{{ s.n }}</h4>
-          <div class="sub">{{ [s.c, s.r].filter(Boolean).join(' · ') }}</div>
+          <div class="sub">
+            <span>{{ [s.c, s.r].filter(Boolean).join(' · ') }}</span>
+            <!-- 전체 상세 페이지(/places/:id)로 - 그 페이지의 '지도에서 보기'와 짝(2026-09-17 사용자 요청).
+                 id 없는 목업·검색 임시 객체엔 안 그린다 -->
+            <RouterLink v-if="s.id != null" class="more" :to="`/places/${s.id}`">자세히 보기 ›</RouterLink>
+          </div>
         </div>
         <!-- MAP_009 찜 -->
         <button class="fav" :class="{ on: isFav(s) }" :aria-pressed="isFav(s)" aria-label="찜하기" @click="toggleFav(s)">♥</button>
@@ -410,40 +415,6 @@ async function shareNative() {
         <template v-else>🕐 <b>{{ fmtK(at(best.k)) }}</b>로 가면 <b>{{ tipText }}</b> 날이에요.</template>
       </div>
 
-      <!-- 폐업 장소는 날씨·혼잡 줄을 그리지 않는다 - 갈 수 없는 곳의 예보다 -->
-      <template v-if="!s.closed">
-      <div class="spark" style="margin-bottom:6px"><div class="st"><i></i>{{ crowdUi ? '날짜별 날씨와 혼잡' : '날짜별 날씨' }}</div></div>
-      <div class="wxrow">
-        <!-- 날짜는 달력에서만 바꾼다 - 카드는 보기 전용, 달력에서 고른 날만 강조(2026-09-16 사용자 결정) -->
-        <div v-for="w in week" :key="w.k" class="wxc" :class="{ on: w.k === state.di }">
-          <div class="wd">{{ w.label }}</div>
-          <!-- 아이콘은 3종이라 눈·소나기·흐림은 글자(title·낭독기)로 보완한다(최종점검 #41) -->
-          <div class="wi" :title="w.w?.label" :aria-label="w.w?.label" v-html="w.w ? wxIcon(w.w.k, 27) : ''"></div>
-          <!-- 날씨 없는 날은 고장이 아니라 원래 없는 것 - '-' 대신 명시적으로 말한다 -->
-          <div v-if="w.w" class="wt">{{ w.w.t }}°</div>
-          <div v-else class="wt pre">예보 전</div>
-          <!-- 강수확률 30% 이상만 표시. 빈 칸도 같은 높이로 두어 카드 줄이 맞는다 -->
-          <div class="wp">
-            <template v-if="w.w && w.w.rp >= 30">
-              <svg width="7" height="9" viewBox="0 0 8 10" aria-hidden="true"><path d="M4 .4C5.3 2.3 6.8 4 6.8 5.9a2.8 2.8 0 1 1-5.6 0C1.2 4 2.7 2.3 4 .4Z" fill="#2F93E0"/></svg>{{ w.w.rp }}%
-            </template>
-          </div>
-          <!-- 혼잡 바는 핀과 같은 면색(-st) - 글자용 진한 톤을 면에 쓰면 핀과 색이 어긋난다 -->
-          <div v-if="crowdUi" class="wc tier-bg" :class="w.t" :title="w.ko"></div>
-        </div>
-      </div>
-      <div v-if="hasWx" class="wx-src">{{ wxSource }}</div>
-      <div v-if="weatherGap && wxUntil" class="wx-note">날씨는 {{ wxUntil }}까지 제공돼요<template v-if="crowdUi && untilText"> · 혼잡은 {{ untilText }}까지</template></div>
-      </template>
-
-      <!-- 없는 정보(null)는 배지를 그리지 않는다 - '주차 없음'과 '주차 정보 없음'은 다르다 -->
-      <div v-if="hasAmen" class="amen">
-        <span v-if="feeBadge" class="am">{{ feeBadge }}</span>
-        <span v-if="s.park != null" class="am" :class="{ no: !s.park }">주차</span>
-        <span v-if="s.wc != null" class="am" :class="{ no: !s.wc }">화장실</span>
-        <span v-if="s.in" class="am">실내</span>
-      </div>
-
       <!-- 착한가격 대표 메뉴 (행안부 실데이터) - 메뉴 없는 업소는 섹션 자체를 숨긴다 -->
       <div v-if="menuRows.length" class="menu">
         <div class="mn-h"><i></i>대표 메뉴<span v-if="s.good" class="mn-b">착한가격</span></div>
@@ -454,8 +425,17 @@ async function shareNative() {
         <div v-if="s.good" class="mn-src">{{ goodPriceSourceLine(detail?.goodPriceBaseDate) }}</div>
       </div>
 
-      <!-- 주소(복사) · 운영시간(있을 때만 — 상시 개방은 줄 자체를 표시하지 않음) · 전화 -->
+      <!-- 방문 정보 - 제목을 붙여 '날짜별 날씨와 혼잡'·'방문 후기'와 같은 묶음으로 읽히게(2026-09-17 사용자 요청).
+           편의 칩(요금·주차·화장실·실내)도 이 묶음 첫 줄로. 주소(복사) · 운영시간(있을 때만 — 상시 개방은 줄 자체를 표시하지 않음) · 전화 -->
       <div class="pinfo">
+        <div class="st"><i></i>방문 정보</div>
+        <!-- 없는 정보(null)는 배지를 그리지 않는다 - '주차 없음'과 '주차 정보 없음'은 다르다 -->
+        <div v-if="hasAmen" class="amen">
+          <span v-if="feeBadge" class="am">{{ feeBadge }}</span>
+          <span v-if="s.park != null" class="am" :class="{ no: !s.park }">주차</span>
+          <span v-if="s.wc != null" class="am" :class="{ no: !s.wc }">화장실</span>
+          <span v-if="s.in" class="am">실내</span>
+        </div>
         <!-- 주소가 없으면(대체 객체·원천 결측) 빈 줄과 복사 버튼을 내지 않는다 - 누르면 'undefined'가 복사됐다 -->
         <div v-if="s.addr" class="pi">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -504,6 +484,33 @@ async function shareNative() {
         <span v-else-if="nearbyOn" style="color:var(--tx3)">반경 12km 안에는 한산한 대안이 없어요.</span>
       </div>
 
+      <!-- 날짜별 날씨와 혼잡 - 후기 바로 위(2026-09-17 사용자 요청). '한산한 날 찾기' 안내문 밑에 오므로 날짜를 옮긴 결과가 그 자리에서 보인다.
+           폐업 장소는 날씨·혼잡 줄을 그리지 않는다 - 갈 수 없는 곳의 예보다 -->
+      <template v-if="!s.closed">
+      <div class="spark" style="margin:18px 0 6px"><div class="st"><i></i>{{ crowdUi ? '날짜별 날씨와 혼잡' : '날짜별 날씨' }}</div></div>
+      <div class="wxrow">
+        <!-- 날짜는 달력에서만 바꾼다 - 카드는 보기 전용, 달력에서 고른 날만 강조(2026-09-16 사용자 결정) -->
+        <div v-for="w in week" :key="w.k" class="wxc" :class="{ on: w.k === state.di }">
+          <div class="wd">{{ w.label }}</div>
+          <!-- 아이콘은 3종이라 눈·소나기·흐림은 글자(title·낭독기)로 보완한다(최종점검 #41) -->
+          <div class="wi" :title="w.w?.label" :aria-label="w.w?.label" v-html="w.w ? wxIcon(w.w.k, 27) : ''"></div>
+          <!-- 날씨 없는 날은 고장이 아니라 원래 없는 것 - '-' 대신 명시적으로 말한다 -->
+          <div v-if="w.w" class="wt">{{ w.w.t }}°</div>
+          <div v-else class="wt pre">예보 전</div>
+          <!-- 강수확률 30% 이상만 표시. 빈 칸도 같은 높이로 두어 카드 줄이 맞는다 -->
+          <div class="wp">
+            <template v-if="w.w && w.w.rp >= 30">
+              <svg width="7" height="9" viewBox="0 0 8 10" aria-hidden="true"><path d="M4 .4C5.3 2.3 6.8 4 6.8 5.9a2.8 2.8 0 1 1-5.6 0C1.2 4 2.7 2.3 4 .4Z" fill="#2F93E0"/></svg>{{ w.w.rp }}%
+            </template>
+          </div>
+          <!-- 혼잡 바는 핀과 같은 면색(-st) - 글자용 진한 톤을 면에 쓰면 핀과 색이 어긋난다 -->
+          <div v-if="crowdUi" class="wc tier-bg" :class="w.t" :title="w.ko"></div>
+        </div>
+      </div>
+      <div v-if="hasWx" class="wx-src">{{ wxSource }}</div>
+      <div v-if="weatherGap && wxUntil" class="wx-note">날씨는 {{ wxUntil }}까지 제공돼요<template v-if="crowdUi && untilText"> · 혼잡은 {{ untilText }}까지</template></div>
+      </template>
+
       <!-- 상세 하단 후기 미리보기 (최근 3개, 실 API) -->
       <div class="rvprev">
         <div class="rvp-h"><i></i>방문 후기
@@ -521,10 +528,7 @@ async function shareNative() {
             </div>
             <div class="rv-mt">
               <template v-if="r.rating"><StarIcon v-for="n in 5" :key="n" :filled="n <= r.rating" :size="12" /></template>
-              <span v-if="LEVEL_TO_KEY[r.congestionReport]" class="bdg"
-                :style="{ background: `var(--${LEVEL_TO_KEY[r.congestionReport]}-bg)`, color: `var(--${LEVEL_TO_KEY[r.congestionReport]})`, fontSize: '10px', padding: '2px 8px' }">
-                {{ CROWD_KO[LEVEL_TO_KEY[r.congestionReport]] }}
-              </span>
+              <!-- 예전 후기의 혼잡 제보 배지는 더 이상 보여주지 않는다(2026-09-18) - ReviewSection 과 같은 결정 -->
             </div>
             <div v-if="r.content" class="rv-tx">{{ r.content }}</div>
             <div v-if="r.imageUrls && r.imageUrls.length" class="rv-imgs">

@@ -8,6 +8,7 @@ import Header from '/src/components/layout/AppHeader.vue';
 import CourseService from '/src/services/CourseService';
 import PlaceDetailService from '/src/services/PlaceDetailService';
 import { acceptLoginResponse } from '/src/api/backendClient';
+import { useAuthStore } from '/src/stores/auth';
 import '/src/assets/styles/fonts.css';
 import '/src/assets/styles/tokens.css';
 import '/src/assets/styles/base.css';
@@ -18,7 +19,7 @@ window.qaSends=[];
 window.Kakao={Share:{sendDefault:x=>window.qaSends.push(x)},isInitialized:()=>true};
 const maps={load:fn=>fn(),LatLng:class{},LatLngBounds:class{extend(){}},Map:class{constructor(el){this.el=el;el.style.background='#cfe8df'}setCenter(){}panTo(){}setBounds(){}setLevel(){}relayout(){}},CustomOverlay:class{constructor(o){this.content=o.content;o.map.el.append(o.content)}setMap(m){if(!m)this.content.remove()}},Polyline:class{setMap(){}}};
 window.kakao={maps};
-const router=createRouter({history:createMemoryHistory(),routes:[{path:'/courses',component:Saved},{path:'/share/:token',component:Shared},{path:'/:pathMatch(.*)*',component:{template:'<p>다른 페이지</p>'}}]});
+const router=createRouter({history:createMemoryHistory(),routes:[{path:'/courses',component:Saved},{path:'/courses/:courseId',component:Saved},{path:'/share/:token',component:Shared},{path:'/:pathMatch(.*)*',component:{render:()=>h('p','다른 페이지')}}]});
 window.qaGo=path=>router.push(path);
 // Explicit, local-only interactive preview. Browser tests without ?preview=1 intercept HTTP themselves.
 const preview=new URLSearchParams(location.search).get('preview')==='1';
@@ -48,5 +49,6 @@ const previewTools=()=>h('aside',{style:'padding:10px 16px;background:#eef6f4;co
  h('button',{onClick:()=>router.push(`/share/demo-${version}`)},'공유받은 화면'),
  h('button',{onClick:()=>router.push('/share/revoked')},'만료된 링크 화면'),
 ]);
-createApp({render:()=>h('div',[preview?previewTools():null,h(Header),h('div',{class:'content-scope'},[h(RouterView)])])}).use(createPinia()).use(router).mount('#app');
+const pinia=createPinia();const auth=useAuthStore(pinia);auth.user={userId:7,nickname:'테스트 사용자'};auth.ready=true;
+createApp({render:()=>h('div',[preview?previewTools():null,h(Header),h('div',{class:'content-scope'},[h(RouterView)])])}).use(pinia).use(router).mount('#app');
 </script></body></html>

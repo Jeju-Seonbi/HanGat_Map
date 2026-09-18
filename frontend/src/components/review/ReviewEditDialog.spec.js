@@ -101,23 +101,20 @@ describe('리뷰 수정 입력', () => {
     expect(byLabel('5점').props['aria-pressed']).toBe(true)
     await submit()
     expect(ReviewApiService.update).toHaveBeenCalledWith(42, {
-      rating: 5, congestionReport: 'NORMAL', content: '산책하기 좋아요', imageUrls: ['/reviews/42/photo.jpg'],
+      rating: 5, congestionReport: null, content: '산책하기 좋아요', imageUrls: ['/reviews/42/photo.jpg'],
     })
     expect(ReviewApiService.uploadPhotos).not.toHaveBeenCalled()
   })
 
-  it('혼잡도 버튼을 바꾸거나 해제하고 별점 없는 기존 후기도 그대로 저장한다', async () => {
+  it('혼잡도 버튼이 없고, 별점 없는 기존 후기는 별점을 골라야 저장되며 저장 시 제보는 비운다', async () => {
     mount({ rating: null })
-    const quiet = () => all(node => node.tag === 'button' && textOf(node) === '한산')[0]
-    expect(quiet()).toBeDefined()
-    quiet().props.onClick()
-    await nextTick()
-    expect(quiet().props['aria-pressed']).toBe(true)
-    await submit()
-    expect(ReviewApiService.update).toHaveBeenLastCalledWith(42, expect.objectContaining({ rating: null, congestionReport: 'QUIET' }))
-    quiet().props.onClick()
-    await nextTick()
+    expect(all(node => node.tag === 'button' && textOf(node) === '한산')).toHaveLength(0)
     expect(all(node => node.props.type === 'submit')[0].props.disabled).toBe(true)
+    byLabel('4점').props.onClick()
+    await nextTick()
+    expect(all(node => node.props.type === 'submit')[0].props.disabled).toBe(false)
+    await submit()
+    expect(ReviewApiService.update).toHaveBeenLastCalledWith(42, expect.objectContaining({ rating: 4, congestionReport: null }))
   })
 
   it('사진 추가 타일로 파일 선택을 열고 기존 사진과 새 사진을 함께 저장한다', async () => {

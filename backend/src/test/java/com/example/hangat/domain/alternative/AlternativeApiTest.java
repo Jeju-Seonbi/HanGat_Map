@@ -48,6 +48,8 @@ class AlternativeApiTest {
     @Autowired CongestionForecastRepository forecastRepository;
     @Autowired RegionRepository regionRepository;
     @Autowired PlaceCategoryRepository categoryRepository;
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    com.example.hangat.course.route.AlternativeRoadDistance roads;
 
     private Region east;
     private PlaceCategory tourist;
@@ -169,9 +171,43 @@ class AlternativeApiTest {
     }
 
     @Test
+    void 거리순은_집중률보다_거리를_우선하고_소개와_사진을_반환한다() throws Exception {
+        Place near = placeRepository.findById(nearCalmId).orElseThrow();
+        near.updateOverview("호수와 숲을 둘러보는 산책 장소입니다.");
+        mockMvc.perform(get("/places/{id}/alternatives", baseId)
+                        .param("date", DATE.toString()).param("sort", "DISTANCE"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.length()").value(2))
+                .andExpect(jsonPath("$.result[0].place_name").value("광치기해변"))
+                .andExpect(jsonPath("$.result[1].place_name").value("혼인지"))
+                .andExpect(jsonPath("$.result[1].overview").value("호수와 숲을 둘러보는 산책 장소입니다."));
+    }
+
+    @Test
     void 예보가_없는_날짜는_3401을_돌려준다() throws Exception {
         mockMvc.perform(get("/places/{id}/alternatives", baseId).param("date", "2030-01-01"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(3401));
+    }
+
+    @Test
+    void 자동차_대안은_오늘_예보와_DB_소개를_사용하고_제외목록을_반영한다() throws Exception {
+        LocalDate today = com.example.hangat.common.util.DateTimes.todayKst();
+        Place candidate = placeRepository.findById(nearCalmId).orElseThrow();
+        candidate.updateOverview("호수와 숲을 둘러보는 산책 장소입니다.");
+        forecastRepository.save(CongestionForecast.of(candidate, source,
+                PlaceNameNormalizer.jejuDayToUtc(today), 발표버전, new BigDecimal("23.00")));
+        em.flush();
+        org.mockito.Mockito.when(roads.distance(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any()))
+                .thenReturn(java.util.OptionalInt.of(12345));
+        mockMvc.perform(get("/places/{id}/road-alternatives",baseId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.distance_basis").value("CAR_ROAD"))
+                .andExpect(jsonPath("$.result.forecast_date").value(today.toString()))
+                .andExpect(jsonPath("$.result.places[0].distance_m").value(12345))
+                .andExpect(jsonPath("$.result.places[0].overview").value("호수와 숲을 둘러보는 산책 장소입니다."));
+        mockMvc.perform(get("/places/{id}/road-alternatives",baseId).param("exclude",nearCalmId.toString()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.result.places").isEmpty());
+        org.mockito.Mockito.verify(roads,org.mockito.Mockito.times(1)).distance(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any());
     }
 }

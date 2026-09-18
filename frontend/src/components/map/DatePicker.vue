@@ -47,6 +47,9 @@ const shiftMonth = n => {
   cursor.value = new Date(cursor.value.getFullYear(), cursor.value.getMonth() + n, 1)
 }
 function pick(k) { state.di = k; close() }
+/* '오늘' - 오늘을 고르고 닫는다(날짜 칸을 누른 것과 같은 동작). 이미 오늘이 선택돼 있고 오늘 달을 보고 있으면 버튼 자체를 숨긴다.
+   달만 넘겨 둔 상태면 보인다 - 눌러서 돌아온다(2026-09-17 사용자 요청) */
+const atToday = computed(() => state.di === 0 && monthKey(cursor.value) === monthKey(today()))
 
 /** 방향키로 날짜 사이를 옮긴다(WAI-ARIA 달력 패턴) - ←→ 하루, ↑↓ 일주일, Home 오늘, End 마지막 날.
     달을 넘어가면 그 달로 넘기고 그 날짜에 커서를 둔다. Tab 은 전처럼 다음 버튼으로(최종점검 #37) */
@@ -104,6 +107,8 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKey))
           <button aria-label="다음 달" :disabled="!canNext" @click="shiftMonth(1)">›</button>
         </div>
         <button class="cal-x" aria-label="닫기" @click="close">×</button>
+        <!-- 오늘에서 벗어났을 때만 왼쪽 위에 조용히 뜬다(× 와 대칭). 달력 앱들의 '오늘' 자리 -->
+        <button v-if="!atToday" type="button" class="cal-today" aria-label="오늘로 돌아가기" @click="pick(0)">오늘</button>
         <div class="cal-wd">
           <span class="sun">일</span><span>월</span><span>화</span><span>수</span>
           <span>목</span><span>금</span><span class="sat">토</span>
@@ -146,4 +151,8 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKey))
 .cal-grid .cd:disabled{opacity:.26;cursor:default}
 .cal-grid .cd.on{background:var(--ac);color:var(--on-ac);font-weight:800;box-shadow:0 3px 10px rgba(0,184,163,.35)}
 .cal-note{font-size:11px;color:var(--tx3);text-align:center;margin-top:12px}
+.cal-today{position:absolute;top:13px;left:13px;height:26px;padding:0 11px;border-radius:13px;
+  background:var(--surf2);border:1px solid var(--line2);color:var(--tx2);font-size:11.5px;font-weight:700;letter-spacing:-.01em}
+.cal-today:hover{background:var(--ac-bg);border-color:var(--ac);color:var(--ac-dk)}
+.cal-today:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 </style>
