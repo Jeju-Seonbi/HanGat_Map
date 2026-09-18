@@ -61,6 +61,23 @@ class CourseSwapTest {
     @Autowired CourseSwapService swapService;
     @Autowired CourseRepository courseRepository;
     @Autowired CourseItemRepository itemRepository;
+    @Autowired com.example.hangat.course.CourseBudgetService budgets;
+    @Autowired com.example.hangat.course.repository.CourseItemCostRepository costs;
+
+    @Test
+    void swappingRemovesOldPlaceCostsAndRecalculatesNewMenuEstimate() throws Exception {
+        성산일출봉.markGoodPrice(출발일, "대표메뉴: 정식 8,000원", null);
+        혼인지.markGoodPrice(출발일, "대표메뉴: 정식 12,000원", null);
+        budgets.calculateAndCache(course.getId());
+        assertThat(course.getEstimatedCostMax()).isEqualTo(8000 * course.getPeople());
+        var response = swapService.swap(course.getId(), 첫날_첫칸.getId(), 혼인지.getId(), null);
+        assertThat(course.getEstimatedCostMax()).isEqualTo(12000 * course.getPeople());
+        assertThat(costs.findByCourseId(course.getId()).stream()
+                .filter(c -> c.getCourseItem() != null && c.getCourseItem().getId().equals(첫날_첫칸.getId()))
+                .map(c -> c.getAmountMax())).containsExactly(12000 * course.getPeople());
+        swapService.swap(course.getId(), 첫날_첫칸.getId(), 예보없는곳.getId(), null);
+        assertThat(course.getEstimatedCostMax()).isNull();
+    }
     @Autowired PlaceRepository placeRepository;
     @Autowired CongestionForecastRepository forecastRepository;
     @Autowired RegionRepository regionRepository;

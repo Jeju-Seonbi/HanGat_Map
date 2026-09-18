@@ -138,7 +138,7 @@ class ReadyCourseCleanupServiceTest {
                 items,
                 mock(CongestionService.class),
                 mock(DbCourseWeatherFactsProvider.class),
-                retention);
+                retention, mock(com.example.hangat.course.CourseBudgetService.class));
 
         assertThatThrownBy(() -> queries.detail(41L, null))
                 .isInstanceOfSatisfying(BaseException.class, failure ->

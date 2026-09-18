@@ -32,7 +32,8 @@ class CourseBudgetServiceTest {
                         course, null, CostCategory.LODGING,
                         70000, 120000, "추정 범위")));
         CourseBudgetService service = new CourseBudgetService(
-                courseRepository, costRepository, new CourseBudgetCalculator());
+                courseRepository, costRepository, new CourseBudgetCalculator(),
+                mock(com.example.hangat.course.repository.CourseItemRepository.class));
 
         CourseBudgetCalculation result = service.calculateAndCache(10L);
 

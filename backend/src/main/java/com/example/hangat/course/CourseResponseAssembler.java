@@ -196,7 +196,7 @@ public class CourseResponseAssembler {
                 persistedItem.getRecommendationReason(),
                 budget.itemCostsByItemId()
                         .getOrDefault(persistedItem.getId(), List.of()).stream()
-                        .map(this::toCostDto)
+                        .map(CourseResponseAssembler::toCostDto)
                         .toList(),
                 inboundDistance,
                 inboundTravelMinutes,
@@ -206,7 +206,7 @@ public class CourseResponseAssembler {
                 weather);
     }
 
-    private BudgetSummaryDto toBudgetSummary(CourseBudgetCalculation budget) {
+    public static BudgetSummaryDto toBudgetSummary(CourseBudgetCalculation budget) {
         CourseBudgetCalculation.BudgetSummary summary = budget.summary();
         return new BudgetSummaryDto(
                 summary.hasCostData(),
@@ -224,7 +224,7 @@ public class CourseResponseAssembler {
                 summary.unknownCount());
     }
 
-    private CourseItemCostDto toCostDto(CourseBudgetCalculation.CostLine cost) {
+    public static CourseItemCostDto toCostDto(CourseBudgetCalculation.CostLine cost) {
         return new CourseItemCostDto(
                 cost.id(),
                 cost.courseId(),

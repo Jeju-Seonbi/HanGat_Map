@@ -42,7 +42,8 @@ public record CourseSummaryResponse(
         int placeCount,
         List<String> highlightNames,
         /** 저장 코스 목록의 정렬 기준. 저장하지 않은 코스는 null. */
-        LocalDateTime savedAt
+        LocalDateTime savedAt,
+        Integer budgetTotal
 ) {
 
     private static final int HIGHLIGHT_COUNT = 3;
@@ -75,6 +76,6 @@ public record CourseSummaryResponse(
                         .map(item -> item.getPlace().getName())
                         .limit(HIGHLIGHT_COUNT)
                         .toList(),
-                course.getSavedAt());
+                course.getSavedAt(), course.getBudgetTotal());
     }
 }
