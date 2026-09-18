@@ -12,7 +12,7 @@ import { apiRequest, getBackendUserId } from '../api/backendClient'
 import { homeCourses } from '../data/courses'
 import type { CongestionLevel } from '../assets/types'
 import type { AlternativePlace } from '../assets/types/course'
-import type { AccommodationInput } from '../assets/types/course'
+import type { AccommodationInput, CourseBudgetSummary } from '../assets/types/course'
 
 export interface RoadAlternatives {
   forecast_date: string
@@ -23,6 +23,7 @@ export interface RoadAlternatives {
 
 /** 화면이 그리는 코스 카드 한 장 - 메인 추천과 저장 목록이 같은 모양을 쓴다(백엔드 계약도 동일). */
 export interface CourseCard {
+  budgetTotal?: number | null
   /** 라우팅 키. 실데이터는 숫자 id, 목업은 'sample-aewol' 같은 문자열이다 */
   id: string
   title: string
@@ -57,6 +58,7 @@ export interface SavedCourses {
 
 /** 백엔드 CourseSummaryResponse (course/model/CourseSummaryResponse.java 와 동일 모양) */
 interface BackendCourseCard {
+  budget_total?: number | null
   id: number
   course_type: 'USER' | 'SAMPLE'
   title: string | null
@@ -116,6 +118,8 @@ export interface CourseDetailDay {
 }
 
 export interface CourseDetail {
+  budgetTotal?: number | null
+  budgetSummary?: CourseBudgetSummary
   transport?: string | null
   id: string
   status?: string
@@ -139,6 +143,8 @@ export interface CourseDetail {
 }
 
 interface BackendCourseDetail {
+  budget_total?: number | null
+  budget_summary?: CourseBudgetSummary
   transport?: string | null
   id: number
   status?: string
@@ -216,6 +222,7 @@ const savedAtLabelOf = (savedAt: string | null): string | null => {
 }
 
 const toCard = (row: BackendCourseCard): CourseCard => ({
+  budgetTotal: row.budget_total,
   id: String(row.id),
   title: row.title ?? '이름 없는 코스',
   conditionLabel: conditionLabelOf(row.region_name, row.duration_text, row.people),
@@ -355,6 +362,8 @@ export const CourseService = {
         levelLabel: row.congestion_label,
         averageRate: row.average_congestion_rate,
         plannedAverageRate: row.planned_average_congestion_rate,
+        budgetTotal: row.budget_total,
+        budgetSummary: row.budget_summary,
         budgetLabel: budgetLabelOf(row.estimated_cost_min, row.estimated_cost_max),
         swappable: row.swappable,
         manageable: row.manageable,

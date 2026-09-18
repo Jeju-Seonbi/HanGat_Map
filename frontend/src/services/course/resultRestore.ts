@@ -109,11 +109,11 @@ export function rememberEditing(condition: CourseCondition, port = storage()) {
   try { port?.setItem(RESTORE_KEY, JSON.stringify({ mode: 'editing', condition: inputOnly(condition) })) } catch { clearRestore(port) }
 }
 
-/** Existing detail API has no generation facts, costs, candidate identity or weather. Do not invent them. */
+/** Restore only authoritative detail data; do not fabricate generation facts. */
 export interface CourseDetail extends Omit<CourseResult, 'generation_reason' | 'days'> {
   swappable: boolean
   manageable: boolean
-  days: Array<{ day_no: number; visit_date: string; items: Array<Omit<CourseItem, 'course_id' | 'costs'>> }>
+  days: Array<{ day_no: number; visit_date: string; items: Array<Omit<CourseItem, 'course_id' | 'costs'> & { costs?: CourseItem['costs'] }> }>
 }
 export function resultFromDetail(detail: CourseDetail, proof?: RestoreState): CourseResult {
   if (!validId(detail.id) || !Array.isArray(detail.days) || (proof?.courseId != null && proof.courseId !== detail.id)) throw new Error('Invalid course response')
@@ -121,6 +121,7 @@ export function resultFromDetail(detail: CourseDetail, proof?: RestoreState): Co
     id: detail.id, course_type: detail.course_type, status: detail.status, title: detail.title,
     start_date: detail.start_date, end_date: detail.end_date, people: detail.people, budget_total: detail.budget_total,
     transport: detail.transport, estimated_cost_min: detail.estimated_cost_min, estimated_cost_max: detail.estimated_cost_max,
+    budget_summary: detail.budget_summary,
     average_congestion_rate: detail.average_congestion_rate, accommodation: detail.accommodation,
     swappable: detail.swappable, manageable: detail.manageable,
     days: detail.days.map(day => ({ day_no: day.day_no, visit_date: day.visit_date, items: day.items.map(item => ({
@@ -130,7 +131,7 @@ export function resultFromDetail(detail: CourseDetail, proof?: RestoreState): Co
       item_source: item.item_source, inbound_distance_m: item.inbound_distance_m, inbound_travel_minutes: item.inbound_travel_minutes,
       congestion_rate: item.congestion_rate, congestion_level: item.congestion_level,
       recommendation_reason: item.recommendation_reason, recommendation_reason_code: item.recommendation_reason_code,
-      replaced_from_place_id: item.replaced_from_place_id, weather: item.weather, costs: [],
+      replaced_from_place_id: item.replaced_from_place_id, weather: item.weather, costs: item.costs ?? [],
     })) })),
   }
 }

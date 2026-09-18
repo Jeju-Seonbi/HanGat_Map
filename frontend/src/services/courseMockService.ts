@@ -675,12 +675,14 @@ export const generateMockCourseForTest = generateMockCourse
 
 /** 백엔드 CourseSwapResponse(course/model/CourseSwapResponse.java, snake_case) - 교체된 칸과 이동이 바뀐 다음 칸만 온다 */
 interface CourseSwapResponse {
+  budget_summary?: CourseResult['budget_summary']
   course_id: number
   average_congestion_rate: number | null
   congestion_level: CongestionLevel | null
   congestion_label: string | null
   message: string | null
   updated_items: Array<{
+    costs?: CourseItemCost[]
     item_id: number; day_no: number; position: number; visit_date: string
     place_id: number; place_name: string; category_name: string; image_url: string | null
     congestion_rate: number | null; congestion_level: CongestionLevel | null; congestion_label: string | null
@@ -758,10 +760,13 @@ export const courseMockService = {
         delete item.longitude
         delete item.source_code
         delete item.source_place_id
-        item.costs = []
+        item.costs = updated.costs ?? []
       }
     }
-    // 비용 집계는 서버가 스왑에서 건드리지 않는다(실측 없는 비용을 지어내지 않음) - 로컬에서도 다시 계산하지 않는다
+    // The server recalculates the ledger; never retain the old place's summary.
+    copy.budget_summary = swap.budget_summary
+    copy.estimated_cost_min = swap.budget_summary?.total_expected_min
+    copy.estimated_cost_max = swap.budget_summary?.total_expected_max
     if (swap.average_congestion_rate != null) copy.average_congestion_rate = swap.average_congestion_rate
     // 렌터카 경로는 옛 장소 기준 구간이라 버린다 - 화면이 교체된 장소로 다시 받는다
     delete copy.car_route
