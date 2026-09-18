@@ -30,6 +30,13 @@ public class AlternativeController {
         this.roadAlternativeService = roadAlternativeService;
     }
 
+    @GetMapping("/{placeId}/straight-alternatives")
+    @Operation(summary = "오늘 예보 기준 직선거리 20km 이내 대안", description = "같은 카테고리·혼잡 미만 후보를 직선거리순으로 반환합니다. 전체 결과를 화면에서 3개씩 표시하며 자동차 경로 API는 호출하지 않습니다.")
+    public BaseResponse<AlternativeService.StraightResponse> straightAlternatives(@PathVariable Long placeId,
+            @RequestParam(required = false, defaultValue = "") Set<Long> exclude) {
+        return BaseResponse.success(alternativeService.straightAlternatives(placeId, exclude));
+    }
+
     @GetMapping("/{placeId}/road-alternatives")
     @Operation(summary = "오늘 예보 기준 자동차 도로거리 20km 이내 대안", description = "같은 카테고리·혼잡 미만 후보를 최단 자동차 도로거리순으로 반환합니다. 전체 결과를 화면에서 3개씩 표시하며, 예보·경로 조회 실패는 빈 목록과 구분합니다.")
     public BaseResponse<RoadAlternativeService.Response> roadAlternatives(@PathVariable Long placeId,
