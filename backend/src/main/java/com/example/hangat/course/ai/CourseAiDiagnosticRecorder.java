@@ -16,7 +16,7 @@ import java.util.UUID;
 /** No method accepts a Throwable or free-form diagnostic message. Not exposed by a controller. */
 @Service
 public class CourseAiDiagnosticRecorder {
-    public enum CallKind { INITIAL, CORRECTION }
+    public enum CallKind { INITIAL, CORRECTION, FALLBACK }
     public enum Outcome { PENDING, CORRECTION_SUCCEEDED, FALLBACK_SUCCEEDED, FALLBACK_FAILED }
     private static final Logger log = LoggerFactory.getLogger(CourseAiDiagnosticRecorder.class);
     private final JdbcTemplate jdbc;

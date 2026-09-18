@@ -51,18 +51,42 @@ public class CourseDbCandidateService {
                 + "and c.code in ('TOURIST','FOOD','CAFE','LODGING') "
                 + "and p.latitude between 32.9 and 33.7 and p.longitude between 126.0 and 127.1 ";
         if (!regions.isEmpty()) where += "and r.code in :regions ";
+        List<String> avoided = preferences.stream().filter(Objects::nonNull)
+                .filter(p -> p.getPreferenceType() == PreferenceType.AVOID && "KTO".equals(p.getSourceCode()))
+                .map(PlacePreferenceDto::getSourcePlaceId).filter(Objects::nonNull).toList();
+        if (!avoided.isEmpty()) where += "and m.sourcePlaceId not in :avoided ";
+        // Fetch a bounded style-specific pool BEFORE the general ID-ordered cap.
+        // Otherwise a cafe beyond row 300 is invisible even though it exists in the DB.
+        for (String style : styles) {
+            String tagPredicate = "pt.tag.code=:style";
+            List<String> prefixes = StoredPlaceStyleResolver.prefixes(style);
+            for (int i=0;i<prefixes.size();i++) tagPredicate += " or pt.tag.code like :prefix"+i;
+            String categoryPredicate = "CAFE".equals(style) ? "c.code='CAFE' or " : "";
+            var styleQuery = entityManager.createQuery(FETCH + where + "and ("+categoryPredicate
+                    + "exists (select pt.place.id from PlaceTag pt where pt.place=p and pt.tag.isActive=true and ("
+                    + tagPredicate + "))) order by m.sourcePlaceId,m.id", PlaceSourceMapping.class);
+            styleQuery.setParameter("style",style);
+            for(int i=0;i<prefixes.size();i++)styleQuery.setParameter("prefix"+i,prefixes.get(i)+"%");
+            if(!regions.isEmpty())styleQuery.setParameter("regions",regions);
+            if(!avoided.isEmpty())styleQuery.setParameter("avoided",avoided);
+            styleQuery.setMaxResults(CourseCandidateShortlistService.MAX_SHORTLIST_SIZE).getResultList()
+                    .forEach(m -> pool.putIfAbsent(key(m),m));
+        }
         var query = entityManager.createQuery(FETCH + where + "order by m.sourcePlaceId, m.id", PlaceSourceMapping.class);
         if (!regions.isEmpty()) query.setParameter("regions", regions);
+        if (!avoided.isEmpty()) query.setParameter("avoided", avoided);
         query.setMaxResults(TourApiService.MAX_RAW_CANDIDATES).getResultList().forEach(m -> pool.putIfAbsent(key(m), m));
         if (pool.isEmpty()) return List.of();
         List<Long> ids = pool.values().stream().map(m -> m.getPlace().getId()).distinct().toList();
         Map<Long, List<StyleHint>> tags = new HashMap<>();
         if (!styles.isEmpty()) {
             for (Object[] row : entityManager.createQuery("select pt.place.id, pt.tag.code from PlaceTag pt "
-                    + "where pt.place.id in :ids and pt.tag.code in :styles order by pt.place.id,pt.tag.code", Object[].class)
-                    .setParameter("ids", ids).setParameter("styles", styles).getResultList()) {
-                tags.computeIfAbsent((Long) row[0], ignored -> new ArrayList<>())
-                        .add(new StyleHint(row[1].toString(), "DB_PLACE_TAG", row[1].toString()));
+                    + "where pt.place.id in :ids and pt.tag.isActive=true order by pt.place.id,pt.tag.code", Object[].class)
+                    .setParameter("ids", ids).getResultList()) {
+                for(String code : StoredPlaceStyleResolver.resolve(row[1].toString())) {
+                    tags.computeIfAbsent((Long) row[0], ignored -> new ArrayList<>())
+                            .add(new StyleHint(code, "DB_PLACE_TAG", row[1].toString()));
+                }
             }
         }
         List<CourseCandidate> facts = new ArrayList<>();
@@ -73,6 +97,8 @@ public class CourseDbCandidateService {
             if (preference != null && preference.getPreferenceType() == PreferenceType.AVOID) continue;
             boolean want = preference != null && preference.getPreferenceType() == PreferenceType.WANT;
             List<StyleHint> hints = new ArrayList<>(tags.getOrDefault(p.getId(), List.of()));
+            if ("CAFE".equals(p.getPrimaryCategory().getCode()) && hints.stream().noneMatch(h -> "CAFE".equals(h.styleCode())))
+                hints.add(new StyleHint("CAFE", "DB_CATEGORY", "CAFE"));
             if (mapping.getRawPayload() != null && mapping.getSource().getCode().equals("KTO")) {
                 try {
                     TourPlaceDto raw = mapper.readerFor(TourPlaceDto.class)
@@ -147,7 +173,16 @@ public class CourseDbCandidateService {
             }
             ranked = diversified;
         }
-        ranked.stream().limit(Math.max(0, CourseCandidateShortlistService.targetSize(request)-wants.size())).forEach(result::add);
+        int target = CourseCandidateShortlistService.targetSize(request);
+        for (String style : new TreeSet<>(styles)) {
+            if(result.size() >= target) break;
+            if(result.stream().anyMatch(f -> f.styleHints().stream().anyMatch(h -> style.equals(h.styleCode())))) continue;
+            ranked.stream().filter(f -> f.styleHints().stream().anyMatch(h -> style.equals(h.styleCode())))
+                    .findFirst().ifPresent(result::add);
+        }
+        Set<String> selected = result.stream().map(f -> f.identity().candidateId()).collect(java.util.stream.Collectors.toSet());
+        ranked.stream().filter(f -> !selected.contains(f.identity().candidateId()))
+                .limit(Math.max(0, target-result.size())).forEach(result::add);
         return List.copyOf(result);
     }
 

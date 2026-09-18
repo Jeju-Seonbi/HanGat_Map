@@ -74,13 +74,21 @@ class CourseCandidateShortlistService {
 
         int targetSize = targetSize(request);
         List<ShortlistedPlace> result = new ArrayList<>(wants);
-        int ordinarySlots = Math.max(0, targetSize - result.size());
         Comparator<ShortlistedPlace> proximity = proximityOrder(request, wants, styleMatched, remaining);
+        Comparator<ShortlistedPlace> styleOrder = proximity == null
+                ? Comparator.comparing(c -> c.place().getContentId()) : proximity;
+        for(String style : new java.util.TreeSet<>(selectedStyles)) {
+            if(result.size() >= targetSize)break;
+            if(result.stream().anyMatch(c -> c.confirmedStyleHints().contains(style)))continue;
+            styleMatched.stream().filter(c -> c.confirmedStyleHints().contains(style)).min(styleOrder).ifPresent(result::add);
+        }
+        styleMatched.removeAll(result);
+        int ordinarySlots = Math.max(0, targetSize - result.size());
         if (proximity != null) {
             List<ShortlistedPlace> ordinary = new ArrayList<>(styleMatched);
             ordinary.addAll(remaining);
             Set<String> names = new LinkedHashSet<>();
-            wants.forEach(c -> names.add(displayVarietyKey(c.place().getTitle())));
+            result.forEach(c -> names.add(displayVarietyKey(c.place().getTitle())));
             if (request.getCoursePlacePreferences() != null) {
                 request.getCoursePlacePreferences().stream()
                         .filter(p -> p != null && p.getPreferenceType() == PreferenceType.WANT)

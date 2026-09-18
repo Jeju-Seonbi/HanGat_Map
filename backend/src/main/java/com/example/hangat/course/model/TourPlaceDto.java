@@ -31,6 +31,9 @@ public class TourPlaceDto {
     @JsonProperty("cat3")
     private String category3;
 
+    @JsonProperty("lclsSystm3")
+    private String classificationCode;
+
     @JsonProperty("firstimage")
     private String imageUrl;
 
