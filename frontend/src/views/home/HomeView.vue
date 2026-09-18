@@ -145,7 +145,7 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateArrows))
     </section>
 
     <!-- ③ MAIN_001: 오늘 한적한 곳 -->
-    <section class="hm-sec">
+    <section class="hm-sec hm-line">
       <div class="hm-head">
         <div>
           <h2>오늘 한적한 곳부터</h2>
@@ -174,7 +174,7 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateArrows))
     </section>
 
     <!-- ④ MAIN_002: 코스 추천 3종 (클릭 → 코스 상세) -->
-    <section class="hm-sec">
+    <section class="hm-sec hm-line">
       <div class="hm-head">
         <div>
           <h2>한적한 곳으로 이어 만든 코스</h2>
@@ -207,7 +207,7 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateArrows))
     </section>
 
     <!-- ⑤ 테마로 둘러보기 -->
-    <section class="hm-sec hm-last">
+    <section class="hm-sec hm-line hm-last">
       <ThemeTiles :layers="layers ?? undefined" />
     </section>
 
@@ -220,9 +220,12 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateArrows))
 .home{display:flex;flex-direction:column}
 .hm-sec{max-width:1240px;width:100%;margin:0 auto;padding:60px 24px 0;box-sizing:border-box;display:flex;flex-direction:column;gap:22px}
 .hm-wx{padding-top:32px}
+/* 구간 경계 - 본문 폭의 얇은 선. 선 위 72px·선 아래 제목까지 40px 로 비대칭을 줘야 "다음 주제의 시작"으로 읽힌다(2026-09-18, 구석구석 방식) */
+.hm-line{padding-top:72px}
+.hm-line::before{content:'';display:block;height:1px;background:var(--border);margin-bottom:18px}   /* 18 + 구간 gap 22 = 40 */
 .hm-last{padding-bottom:72px}
 .hm-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
-.hm-head h2{margin:0;font-size:26px;font-weight:800;letter-spacing:-.02em}
+.hm-head h2{margin:0;font-size:30px;font-weight:800;letter-spacing:-.02em}
 .hm-head p{margin:6px 0 0;font-size:14px;color:var(--sub)}
 .hm-more{font-size:14px;font-weight:700;color:var(--primary-dark);white-space:nowrap}
 
@@ -282,8 +285,10 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateArrows))
 @media (max-width:767px){
   .hm-sec{padding:30px 16px 0;gap:14px}
   .hm-wx{padding-top:16px}
+  .hm-line{padding-top:40px}
+  .hm-line::before{margin-bottom:10px}   /* 10 + gap 14 = 24 */
   .hm-last{padding-bottom:40px}
-  .hm-head h2{font-size:20px}.hm-head p{font-size:12.5px}.hm-more{font-size:13px}
+  .hm-head h2{font-size:22px}.hm-head p{font-size:12.5px}.hm-more{font-size:13px}
   .hero-full{min-height:520px;align-items:flex-start}
   .hero-inner{padding:34px 16px 44px;gap:14px}
   .hero-inner h1{font-size:32px}
