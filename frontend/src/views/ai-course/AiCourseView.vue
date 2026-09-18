@@ -587,10 +587,11 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
 </template>
 
 <style scoped>
-/* 일차 머리의 예보·총 이동·경로 안내는 본문 크기 그대로라 일정보다 눈에 먼저 들어왔다 - 보조 정보 크기로 */
+/* 일차 머리의 예보·총 이동·경로 안내는 본문 크기 그대로라 일정보다 눈에 먼저 들어왔다 - 보조 정보 크기로.
+   route-status는 일정 안팎에 흩어져 있다. 한 화면에 같은 성격의 안내가 두 모양으로 뜨지 않게 전부 같이 잡는다 */
 .daily-weather,
 .route-summary,
-.day-timeline .route-status {
+.route-status {
   margin: 7px 0 0;
   color: var(--course-text-2);
   font-size: 0.73rem;
@@ -599,7 +600,7 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
   overflow-wrap: break-word;
 }
 /* 좌표 보정 같은 긴 안내는 문단으로 흐르면 일정을 가린다 - 옅은 상자에 담는다 */
-.day-timeline .route-status {
+.route-status {
   padding: 8px 10px;
   border-radius: 10px;
   background: var(--course-surface-2);
