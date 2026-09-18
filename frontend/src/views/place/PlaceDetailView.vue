@@ -12,22 +12,27 @@
  * 운영시간·휴무·요금을 항목·소제목·비고로 펴는 표(infoText)와 후기 등록은 그대로 가져왔다.
  *
  * 정직성 규칙
- * - 혼잡·날씨 정보는 이 페이지에서 만들지 않는다. 지도 상세 패널(/map?place=)로 보낸다
+ * - 혼잡은 분류 줄의 '오늘' 배지 하나뿐이다(메인 카드의 '한산 · 동부' 와 같은 날짜·같은 값, 2026-09-18 사용자 결정).
+ *   예보 대상 밖이거나 오늘 값이 없으면 배지를 아예 그리지 않는다. 0이나 '예보 없음'으로 채우지 않는다.
+ *   날짜별 막대·날씨는 이 페이지에 없다 - 지도 상세 패널(/map?place=)이 맡는다
  * - 가격은 착한가격업소만 검증가로 부르고 기준일을 함께 적는다
  * - 원문(소개·사진 설명)은 고치지 않는다. 문단은 표시만 나눈다. 사진 출처 ⓒ한국관광공사
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import PlaceDetailService, { type PlaceDetail } from '../../services/PlaceDetailService'
+import PlaceDetailService, { type PlaceDetail, type PlaceForecast } from '../../services/PlaceDetailService'
 import ReviewApiService, { type ReviewItem, absUrl } from '../../services/map/ReviewApiService'
 import { useAuthStore } from '../../stores/auth.js'
 import { isFav, loadFavorites, toggleFav, toast, state as mapState } from '../../stores/mapStore'
 import PhotoLightbox from '../../components/map/PhotoLightbox.vue'
+import CongestionBadge from '../../components/common/CongestionBadge.vue'
 import { paragraphsOf } from '../../utils/intro.js'
 import { displayName } from '../../config/themes.js'
 import { loadKakaoMap } from '../../composables/useKakaoLoader.js'
 import { safeLoginReturnTo } from '../../utils/loginReturn.js'
 import { isWideInfo, parseInfoText } from './infoText'
+import { buildForecastSeries } from './forecastSeries'
+import { todayKst } from '../../utils/format.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -35,6 +40,10 @@ const placeId = computed(() => Number(route.params.placeId))
 
 const loading = ref(true)
 const place = ref<PlaceDetail | null>(null)
+/* 오늘 혼잡 배지 - 관광공사 집중률 예보(날짜 단위)에서 오늘 값만. 대상 밖(식당·카페 등)이거나 오늘 값이 없으면 null → 배지 없음 */
+const forecast = ref<PlaceForecast | null>(null)
+const today = todayKst()
+const todayLevel = computed(() => buildForecastSeries(forecast.value, today).find(d => d.date === today && d.rate != null)?.level ?? null)
 const reviews = ref<ReviewItem[]>([])    // 지금까지 읽은 후기 - '더보기'로 다음 페이지를 이어 붙인다(지도 후기 패널과 같은 방식)
 const reviewTotal = ref(0)
 const reviewPage = ref(0)                 // 마지막으로 읽은 페이지 번호
@@ -284,7 +293,7 @@ async function submitReview () {
 /* ───────── 로드 ───────── */
 async function load () {
   loading.value = true
-  place.value = null; reviews.value = []; reviewTotal.value = 0; reviewPage.value = 0; reviewPages.value = 0; reviewNotice.value = ''
+  place.value = null; forecast.value = null; reviews.value = []; reviewTotal.value = 0; reviewPage.value = 0; reviewPages.value = 0; reviewNotice.value = ''
   attach.value.forEach(p => URL.revokeObjectURL(p.preview)); attach.value = []
   idx.value = 0; introOpen.value = false; mapFailed.value = false
   const id = placeId.value
@@ -296,6 +305,8 @@ async function load () {
   document.title = `${detail.name} · 한갓지도`   // 라우터가 준 '관광지 · 한갓지도' 를 장소 이름으로(공유·즐겨찾기·탭 제목)
   await nextTick()
   drawMap()
+  // 오늘 배지는 기다리지 않고 채운다 - 실패하면 배지만 없다
+  PlaceDetailService.getForecast(id).then(rows => { if (placeId.value === id) forecast.value = rows }).catch(() => null)
   await loadReviews(id)   // 후기는 상세가 떠 있는 동안 채운다
 }
 
@@ -319,7 +330,11 @@ watch(() => (auth as any).user?.userId ?? null, id => loadFavorites(id), { immed
   <article v-else class="place-page">
     <!-- 제목 · 지역 · 한 줄 소개 · 찜 · 공유 · 지도에서 보기 -->
     <header class="head">
-      <p class="kicker">{{ [place.tagName ? displayName(place.tagName) : place.categoryName, place.regionName ? `제주 ${place.regionName}` : null].filter(Boolean).join(' · ') }}</p>
+      <div class="kicker-row">
+        <p class="kicker">{{ [place.tagName ? displayName(place.tagName) : place.categoryName, place.regionName ? `제주 ${place.regionName}` : null].filter(Boolean).join(' · ') }}</p>
+        <!-- 오늘 혼잡 - 메인 카드의 '한산 · 동부' 와 같은 배지. 예보 대상이 아니면 안 그린다 -->
+        <CongestionBadge v-if="todayLevel" :level="todayLevel" class="today-badge" title="오늘 혼잡 예보 · 한국관광공사 집중률 예보" />
+      </div>
       <h1>{{ place.name }}</h1>
       <p v-if="lead" class="lead">{{ lead }}</p>
       <!-- 제목 밑 칩 줄(혼잡·착한가격·숨은 명소·별점)은 전부 뺐다(2026-09-18 사용자 결정) - 장소 소개 페이지라 혼잡은 아래 예보 구간에서만 -->
@@ -482,7 +497,9 @@ watch(() => (auth as any).user?.userId ?? null, id => loadFavorites(id), { immed
 
 /* 제목 블록 */
 .head{display:grid;gap:8px;padding:6px 0 4px}
+.kicker-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .kicker{margin:0;font-size:13px;font-weight:600;color:var(--tx3)}
+.today-badge{padding:3px 9px;font-size:11.5px;font-weight:700}
 .head h1{margin:0;font-size:clamp(1.7rem,3.4vw,2.3rem);font-weight:800;letter-spacing:-.03em;line-height:1.2}
 .lead{margin:0;font-size:15px;line-height:1.6;color:var(--tx2);max-width:720px;word-break:keep-all}
 .actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
