@@ -6,9 +6,9 @@ const { tmpdir } = require('node:os');
  const browser = await chromium.launch({headless:true});
  try {
   for (const width of [1440,390,320]) {
-   const page = await browser.newPage({viewport:{width,height:1000}});
+   const page = await browser.newPage({viewport:{width,height:1000},isMobile:width<768,hasTouch:width<768});
    const errors=[];page.on('pageerror',e=>errors.push(e.message));
-   await page.goto('http://127.0.0.1:5211/tests/browser/ai-builder.html');
+   await page.goto('http://127.0.0.1:5211/tests/browser/ai-builder.html?nav');
    const nav=page.getByRole('navigation',{name:'코스 조건 입력 단계'});
    if(width<1024){await nav.getByRole('button',{name:'4 필터'}).click();await page.getByText('여정 확인 →',{exact:true}).click();}
    await page.getByRole('button',{name:'AI 코스 만들기',exact:true}).click();
@@ -35,6 +35,12 @@ const { tmpdir } = require('node:os');
    assert.equal(await page.locator('.result-actions-block .temporary-course-notice').count(),1);
    await page.getByRole('button',{name:'지도에서 보기',exact:true}).click();
    assert.ok(await page.getByText('코스를 저장한 뒤 지도에서 확인해 주세요.',{exact:true}).isVisible());
+   const notice = await page.locator('.ai-course-page .toast').boundingBox();
+   assert.ok(notice.x >= 12 && notice.x + notice.width <= width - 12, 'Notice stays within viewport');
+   if(width<768){
+    const bar=await page.locator('.mtabbar').boundingBox();
+    assert.ok(notice.y + notice.height <= bar.y - 12, 'Notice must be fully above the mobile navigation');
+   }
    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
    assert.deepEqual(errors,[]);
    await tabs.first().click();

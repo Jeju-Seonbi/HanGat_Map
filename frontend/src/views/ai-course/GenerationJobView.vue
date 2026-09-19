@@ -41,7 +41,6 @@ onBeforeUnmount(() => { epoch++; clearTimeout(timer); document.removeEventListen
 </script>
 <template>
   <main class="job-page">
-    <RouterLink to="/ai-course">AI 코스</RouterLink>
     <section>
       <GenerationArtwork v-if="job && !error" :status="job.status" />
       <div aria-live="polite">
