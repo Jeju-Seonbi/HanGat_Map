@@ -70,9 +70,11 @@ public class AsyncCourseController {
 
     @GetMapping("/users/me/course-generation-jobs")
     public ResponseEntity<BaseResponse<Map<String, Object>>> recent(
-            @AuthenticationPrincipal Long userId
+            @AuthenticationPrincipal Long userId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
     ) {
-        return response(jobs.recent(userId));
+        return response(jobs.recent(userId, page, size));
     }
 
     private ResponseEntity<BaseResponse<Map<String, Object>>> response(

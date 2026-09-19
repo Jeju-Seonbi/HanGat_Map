@@ -245,7 +245,7 @@ onBeforeUnmount(() => { alive = false; listSequence++; browserObserver?.disconne
           </div>
         </nav>
         <div class="tab-toolbar">
-          <RouterLink v-if="!active" class="new-course" to="/ai-course">새 코스 +</RouterLink>
+          <RouterLink v-if="!active" class="new-course" :to="{ path: '/ai-course', query: { entry: 'new' } }">새 코스 +</RouterLink>
           <template v-else>
             <TripConfirmation v-if="course?.manageable && course.status === 'SAVED'" :course-id="active" compact />
             <RouterLink class="toolbar-map icon-button" :to="`/map?course=${active}`" aria-label="지도에서 보기" title="지도에서 보기"><AppIcon name="map" /></RouterLink>

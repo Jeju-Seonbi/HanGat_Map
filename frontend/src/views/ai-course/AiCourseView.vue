@@ -23,15 +23,15 @@ import { ASYNC_COURSES_ENABLED } from '../../api/notifications.js'
 import { getGenerationResult, submitGenerationJob } from '../../api/courseGeneration.js'
 import GenerationJobs from '../../components/course/GenerationJobs.vue'
 import GenerationArtwork from '../../components/course/GenerationArtwork.vue'
-import { storePendingCourseClaim, takePendingCourseClaim } from '../../services/pendingCourseClaim'
+import { storePendingCourseClaim, takePendingCourseClaim, clearPendingCourseClaim } from '../../services/pendingCourseClaim'
 import { routeSummary, accessNotices } from '../../services/course/courseSummary'
 import { ApiError } from '../../api/errors.js'
 import { readRestore, rememberResult, rememberEditing, useResultRestore, validProof, singleFlight, useClaimRenewal, clearCourseProof, fetchRestoredCourse } from '../../services/course/resultRestore'
 import type { AccommodationInput, AccommodationRecommendation, AlternativePlace, CarDayRoute, CarRouteLeg, CourseCondition, CourseItem, CourseResult } from '../../assets/types/course'
 
-const today = todayKst()
-
-const condition = reactive<CourseCondition>({
+function defaultCondition(): CourseCondition {
+  const today = todayKst()
+  return {
   start_date: today,
   end_date: addCalendarDays(today, 2),
   people: 2,
@@ -39,7 +39,16 @@ const condition = reactive<CourseCondition>({
   course_regions: [],
   course_styles: [],
   course_place_preferences: [],
-})
+  }
+}
+const condition = reactive<CourseCondition>(defaultCondition())
+const formRevision = ref(0)
+function resetCondition() {
+  // Remove optional/legacy fields too; assigning defaults alone leaves accommodation behind.
+  for (const key of Object.keys(condition)) delete (condition as unknown as Record<string, unknown>)[key]
+  Object.assign(condition, defaultCondition())
+  formRevision.value++ // the step form clones initial props; remount only for a fresh entry
+}
 
 const result = ref<CourseResult>()
 const selectedDay = ref(1)
@@ -81,13 +90,22 @@ const saveLoading = ref(false)
 const toast = ref('')
 const auth = useAuthStore()
 const ui = useUiStore()
-const conditionFormKey = ref(0)
-watch(() => ui.aiCourseEntryVersion, () => {
-  editConditions()
-  error.value = ''
-  conditionFormKey.value++
-})
+watch(() => ui.aiCourseEntryVersion, () => enterInput())
 const historyDialog = ref<HTMLDialogElement>()
+const historyTrigger = ref<HTMLButtonElement>()
+const historyOpen = ref(false)
+function openHistory() {
+  if (!auth.isLoggedIn || !editing.value) return
+  historyOpen.value = true
+  historyDialog.value?.showModal()
+}
+function closeHistory() {
+  const wasOpen = historyOpen.value
+  historyOpen.value = false
+  historyDialog.value?.close()
+  if (wasOpen) historyTrigger.value?.focus()
+}
+watch(() => [auth.isLoggedIn, (auth.user as { userId: number } | null)?.userId], closeHistory)
 const router = useRouter()
 const route = useRoute()
 const restoration = useResultRestore()
@@ -101,7 +119,7 @@ if (typeof route.query.course === 'string' && /^[1-9]\d{0,14}$/.test(route.query
   if (restoringState.value?.courseId !== id) restoringState.value = { mode: 'result', courseId: id, condition: restoringState.value?.condition ?? { ...condition } }
 }
 // The form clones its initial props: hydrate before its first render, not onMounted.
-if (restoringState.value) Object.assign(condition, restoringState.value.condition)
+if (restoringState.value && route.query.entry !== 'new') Object.assign(condition, restoringState.value.condition)
 const fetchRoute = singleFlight(courseMockService.getCarRoute)
 const transit = useTransitRoute()
 const accommodationSelection = useAccommodationSelection()
@@ -131,9 +149,23 @@ function editConditions() {
   selected.value = undefined; saveOpen.value = false
   accommodationPickerOpen.value = false
   rememberEditing(condition)
-  if (route.query.course != null || route.query.job != null) void router.replace({ path: route.path, query: { ...route.query, course: undefined, job: undefined } })
+  if (route.query.course != null || route.query.job != null || route.query.entry != null) void router.replace({ path: route.path, query: { ...route.query, entry: undefined, course: undefined, job: undefined } })
 }
 watch(condition, () => { if (editing.value && !restoring.value) rememberEditing(condition) }, { deep: true })
+function enterInput() {
+  editConditions(); closeHistory(); clearPendingCourseClaim()
+  resetCondition(); rememberEditing(condition)
+  result.value = undefined; error.value = ''; saveError.value = ''
+  recommendedAccommodations.value = []; alternatives.value = []
+}
+watch(() => route.query.entry, entry => { if (entry === 'new') enterInput() })
+watch(() => route.query.course, id => {
+  if (route.query.entry === 'new' || !id) return
+  if (typeof id !== 'string' || !/^[1-9]\d{0,14}$/.test(id)) return
+  transit.cancel(); restoration.cancel(); renewal.cancel(); viewEpoch++; routeEpoch++
+  restoringState.value = { mode: 'result', courseId: Number(id), condition: { ...condition } }
+  void restoreResult()
+})
 async function restoreResult() {
   if (!restoringState.value || restoringState.value.mode !== 'result') return
   accommodationSelection.cancel()
@@ -436,23 +468,30 @@ watch(() => route.query.job, (id, previous) => {
   if (id) void restoreJobResult()
   else if (previous) { loading.value = false; editing.value = true; result.value = undefined }
 })
-watch(() => (auth.user as { userId: number } | null)?.userId, () => {
+watch(() => (auth.user as { userId: number } | null)?.userId, (_userId, previousUserId) => {
   transit.cancel(); accommodationSelection.cancel(); viewEpoch++; routeEpoch++; restoration.cancel(); renewal.cancel()
+  if (result.value) clearCourseProof(result.value)
+  result.value = undefined; restoringState.value = null; editing.value = true; loading.value = false
+  selected.value = undefined; saveOpen.value = false; saveLoading.value = false
+  alternatives.value = []; recommendedAccommodations.value = []
+  if (previousUserId != null) clearPendingCourseClaim()
+  resetCondition()
+  rememberEditing(condition)
   if (route.query.job) { result.value = undefined; editing.value = true; loading.value = false; void restoreJobResult() }
 })
 onMounted(async () => {
   clock = setInterval(() => { now.value = Date.now() }, 1000)
+  if (route.query.entry === 'new') { enterInput(); return }
   if (await restoreJobResult()) return
   const pending = auth.isAuthenticated ? takePendingCourseClaim() : null
-  if (!pending) {
-    if (route.query.course) await restoreResult()
-    else { restoringState.value = null; rememberEditing(condition) }
-    return
-  }
+  if (!pending) { await restoreResult(); return }
 
   saveLoading.value = true
+  const ticket = ++viewEpoch
   try {
-    result.value = await courseMockService.saveCourse(pending.course, pending.title)
+    const saved = await courseMockService.saveCourse(pending.course, pending.title)
+    if (ticket !== viewEpoch) return
+    result.value = saved
     renewal.cancel(); clearCourseProof(result.value)
     Object.assign(condition, pending.condition)
     syncConfirmedCourseCondition(condition, result.value)
@@ -461,9 +500,10 @@ onMounted(async () => {
     void loadCarRoute()
     toast.value = '코스를 저장했어요.'
   } catch {
+    if (ticket !== viewEpoch) return
     error.value = '로그인 전 생성한 코스를 저장하지 못했어요. 다시 생성해 주세요.'
   } finally {
-    saveLoading.value = false
+    if (ticket === viewEpoch) saveLoading.value = false
   }
 })
 
@@ -480,11 +520,11 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
         <h1>{{ loading ? '제주 여행을 구성하고 있어요' : editing ? '언제, 누구와 같이 한갓진 코스를 생성하고 싶으신가요?' : '추천 코스' }}</h1>
         <p v-if="!editing">{{ loading ? '선택한 조건을 바탕으로 잠시만 기다려 주세요.' : '선택한 조건과 예상 혼잡도를 반영한 제주 여행 일정이에요.' }}</p>
       </div>
-      <button v-if="editing && auth.isLoggedIn && ASYNC_COURSES_ENABLED" class="history-trigger" @click="historyDialog?.showModal()">최근에 생성한 코스들 ↗</button>
+      <button v-if="editing && auth.isLoggedIn && ASYNC_COURSES_ENABLED" ref="historyTrigger" class="history-trigger" aria-haspopup="dialog" @click="openHistory">최근 생성 요청</button>
     </header>
-    <dialog ref="historyDialog" class="history-dialog" @click="($event.target === historyDialog) && historyDialog?.close()">
-      <button class="history-close" aria-label="최근 생성 코스 닫기" @click="historyDialog?.close()">×</button>
-      <GenerationJobs v-if="auth.isLoggedIn" />
+    <dialog ref="historyDialog" class="history-dialog" aria-label="최근 생성 코스" @cancel.prevent="closeHistory" @close="closeHistory" @click="($event.target === historyDialog) && closeHistory()">
+      <button class="history-close" aria-label="최근 생성 코스 닫기" @click="closeHistory">×</button>
+      <GenerationJobs v-if="auth.isLoggedIn && historyOpen" @selected="closeHistory" />
     </dialog>
 
     <section v-if="jobResultError" class="course-shell generation-state" role="alert">
@@ -509,7 +549,7 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
         <GenerationArtwork status="FAILED" />
         <p class="course-error">{{ error }} <button class="text-link" @click="generate(condition)">다시 시도</button></p>
       </div>
-      <CourseConditionForm :key="conditionFormKey" :initial="condition" :loading="loading" @submit="generate" @draft="draft => Object.assign(condition, draft, { accommodation: draft.accommodation })" />
+      <CourseConditionForm :key="`${(auth.user as { userId: number } | null)?.userId ?? 'guest'}:${formRevision}`" :initial="condition" :loading="loading" @submit="generate" @draft="draft => Object.assign(condition, draft, { accommodation: draft.accommodation })" />
     </section>
 
     <section v-else-if="result" class="course-shell result-shell">
