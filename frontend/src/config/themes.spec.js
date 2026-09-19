@@ -80,7 +80,7 @@ describe('테마 타일 (구석구석 구조, 세부분류 전부)', () => {
     expect(placesOfTile(layers, null)).toEqual([])
   })
 
-  it('묶음 순서는 자연부터 한갓지도가 고른까지 열 개', () => {
+  it('묶음 순서는 자연부터 한갓지도가 고른 명소까지 열 개', () => {
     expect(GROUPS.map(g => g.key)).toEqual(['NA', 'VE', 'HS', 'EX', 'LS', 'EV', 'AC', 'FD', 'ST', 'HG'])
   })
 })

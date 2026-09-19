@@ -137,8 +137,6 @@
 .gp-tip b{font-size:12.5px;color:var(--tx)}
 .gp-tip span{font-size:11.5px;font-weight:600;color:var(--tx2)}
 .gp-tip .gp-src{font-style:normal;font-size:10.5px;font-weight:600;color:var(--tx3);margin-top:2px}
-.gp-tip .gp-more{margin-top:5px;padding:5px 0 1px;border:0;border-top:1px solid rgba(0,0,0,.08);
-  background:none;color:var(--ac);font-size:11.5px;font-weight:800;cursor:pointer}
 
 /* 상세 패널 착한가격 대표 메뉴 (MAP_007) */
 .menu{margin:10px 0 4px;padding:10px 12px;background:var(--surf2);border-radius:12px}
