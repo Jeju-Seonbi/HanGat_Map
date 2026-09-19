@@ -7,7 +7,7 @@ import { syncConfirmedCourseCondition } from './accommodationSelection'
 import type { CourseDetail, RestoreState } from './resultRestore'
 import type { CourseCondition, CourseResult } from '../../assets/types/course'
 vi.mock('../../api/backendClient.js', () => ({ apiRequest: vi.fn() }))
-const condition: CourseCondition = { start_date: '2026-09-07', end_date: '2026-09-09', people: 2, budget_total: 400000,
+const condition: CourseCondition = { start_date: '2026-09-07', end_date: '2026-09-09', people: 2,
   transport: 'RENTAL_CAR', course_regions: [], course_styles: [], course_place_preferences: [] }
 const detail: CourseDetail = { id: 29, course_type: 'USER', status: 'READY', ...condition, swappable: true, manageable: false,
   accommodation: { source_code: 'KAKAO_LOCAL', source_place_id: 'actual-hotel', place_name: '저장된 숙소', latitude: 33.4, longitude: 126.5 },
@@ -19,13 +19,19 @@ function memory() { const m = new Map<string, string>(); return { getItem: (k: s
 const state: RestoreState = { mode: 'result', courseId: 29, condition }
 beforeEach(() => vi.clearAllMocks())
 describe('same-tab result restoration', () => {
+  it.each([undefined, 400000])('restores drafts with removed legacy budget %s', budget => {
+    const port = memory()
+    const inputs = condition
+    port.setItem(RESTORE_KEY, JSON.stringify({ mode: 'editing', condition: { ...inputs, budget_total: budget } }))
+    expect(readRestore(port)?.condition).toEqual(inputs)
+    expect(JSON.parse(port.getItem(RESTORE_KEY)!).condition).toEqual(inputs)
+  })
   it('preserves authoritative budget summary after async generation and saved-course reload', () => {
-    const summary = { has_cost_data: true, budget_total: 400000, verified_total: 0,
+    const summary = { has_cost_data: true, verified_total: 0,
       estimated_min: 16000, estimated_max: 24000, total_expected_min: 16000,
-      total_expected_max: 24000, remaining_budget: 376000, usage_rate: 6, over_budget: false, unknown_count: 2 }
+      total_expected_max: 24000, unknown_count: 2 }
     const restored = resultFromDetail({ ...detail, status: 'SAVED', budget_summary: summary })
     expect(restored.budget_summary).toEqual(summary)
-    expect(restored.budget_total).toBe(400000)
   })
   it('reload uses latest server weather without snapshotting or regenerating, and tolerates missing weather', async () => {
     const d = structuredClone(detail)

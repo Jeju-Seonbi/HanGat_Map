@@ -16,7 +16,6 @@ import CourseShareDialog from '../../components/course/CourseShareDialog.vue'
 import CourseActionsMenu from '../../components/course/CourseActionsMenu.vue'
 import TripConfirmation from '../../components/course/TripConfirmation.vue'
 import AlternativePlaceModal from '../../components/course/AlternativePlaceModal.vue'
-import BudgetGauge from '../../components/course/BudgetGauge.vue'
 import { useSavedCourseActions } from '../../composables/useSavedCourseActions'
 const route = useRoute(), router = useRouter(), auth = useAuthStore()
 const sharing = ref<{ id: string; title: string } | null>(null)
@@ -266,7 +265,6 @@ onBeforeUnmount(() => { alive = false; listSequence++; browserObserver?.disconne
               :disabled="deleting" @click="choose(card.id)">
               <span class="course-tab-title">{{ card.title }}</span>
               <strong>{{ card.stops || card.conditionLabel }}</strong><small>{{ card.conditionLabel }}</small>
-              <small>전체 예산 {{ card.budgetTotal == null ? '정보 없음' : `${card.budgetTotal.toLocaleString()}원` }}</small>
             </button>
             <CourseActionsMenu :title="card.title" :disabled="deleting || renameBusy" @rename="startRename(card)" @share="sharing = { id: card.id, title: card.title }" @delete="removeCourse(card.id)" />
             </article>
@@ -291,16 +289,11 @@ onBeforeUnmount(() => { alive = false; listSequence++; browserObserver?.disconne
         <template v-else-if="course">
           <div class="course-summary">
             <div><CongestionBadge v-if="course.level" :level="course.level" /><span v-else>혼잡 정보 없음</span><small>{{ course.conditionLabel }}</small></div>
-            <strong>{{ course.budgetLabel }}</strong>
           </div>
           <div v-show="expanded" class="sheet-body">
             <div class="course-actions">
               <strong>{{ course.title }}</strong>
             </div>
-            <details class="saved-budget">
-              <summary>예산·예상 경비 <span>{{ course.budgetTotal == null ? '예산 정보 없음' : `${course.budgetTotal.toLocaleString()}원` }}</span></summary>
-              <BudgetGauge :summary="course.budgetSummary" :budget-total="course.budgetTotal" />
-            </details>
             <p v-if="!course.days.length" class="sheet-message">등록된 일정이 없어요.</p>
             <section v-for="day in course.days" :key="day.dayNo" class="itinerary-day">
               <div class="day-heading">
@@ -361,9 +354,4 @@ onBeforeUnmount(() => { alive = false; listSequence++; browserObserver?.disconne
 
 <style scoped src="./savedCourses.css"></style>
 <style scoped>
-.saved-budget{margin:0 0 16px;padding:12px;border:1px solid var(--border-color,#dce5e5);border-radius:12px;font-size:.8rem}
-.saved-budget summary{cursor:pointer;font-weight:600}.saved-budget summary span{float:right;font-weight:400}
-.saved-budget :deep(.budget){padding:14px 0 0;background:transparent;color:inherit;border:0;border-radius:0}
-.saved-budget :deep(.budget-row){display:flex;justify-content:space-between;gap:12px}
-.saved-budget :deep(.budget-details dt),.saved-budget :deep(.budget-details dd),.saved-budget :deep(.budget-no-data){color:inherit}
 </style>
