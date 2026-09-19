@@ -5,6 +5,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface MediaCleanupRepository extends JpaRepository<MediaCleanupCandidate, String> {
+    @Query(value = "SELECT COUNT(*) FROM deleted_media_owners WHERE user_id=:owner", nativeQuery = true)
+    int deletedOwnerCount(@Param("owner") long owner);
     /** 삭제된 후기만 참조하는 파일은 정리 가능. 회원·장소 참조는 상태와 무관하게 보호한다. */
     @Query(value = """
             SELECT CASE WHEN

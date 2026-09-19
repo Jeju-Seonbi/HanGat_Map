@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class BatchApplicationContextTest {
 
     @ParameterizedTest
-    @ValueSource(strings = {"places", "media-cleanup"})
+    @ValueSource(strings = {"places", "media-cleanup", "account-cleanup", "account-media-cleanup"})
     void prodBatchStartsWithoutApiOnlyAccommodationService(String job) {
         new ApplicationContextRunner()
                 .withInitializer(new ConfigDataApplicationContextInitializer())
@@ -49,9 +49,14 @@ class BatchApplicationContextTest {
                     assertThat(context).hasNotFailed();
                     assertThat(context).doesNotHaveBean(CourseAccommodationService.class);
                     assertThat(context).hasSingleBean(CourseService.class);
-                    if (job.equals("media-cleanup")) {
+                    if (job.equals("media-cleanup") || job.equals("account-media-cleanup")) {
                         assertThat(context).doesNotHaveBean(BatchJobRunner.class);
                         assertThat(context).hasSingleBean(MediaCleanupJobService.class);
+                    } else if (job.equals("account-cleanup")) {
+                        assertThat(context).doesNotHaveBean(BatchJobRunner.class);
+                        assertThat(context).doesNotHaveBean(MediaCleanupJobService.class);
+                        assertThat(context).hasSingleBean(AccountCleanupService.class);
+                        assertThat(context).hasBean("accountCleanupRunner");
                     } else {
                         assertThat(context).hasSingleBean(BatchJobRunner.class);
                         assertThat(context).doesNotHaveBean(MediaCleanupJobService.class);
