@@ -10,9 +10,11 @@
  *
  * 가독성(2026-09-19 외부 피드백 "카테고리가 너무 많아 뭐가 있는지 안 들어온다"): 타일 121개 중 49개가 1~2곳뿐이라 큰 타일이
  * 똑같은 크기로 서 있었다. 묶음마다 곳수 많은 순 6개만 타일로 보이고, 나머지는 "그 밖의 종류 N개 보기"를 누르면 작은 칩으로 펼친다.
- * 분류를 합치거나 빼지 않는다(관광공사 분류 그대로 - 페이지 약속). 펼친 묶음은 세션 안에서 기억해 상세를 갔다 와도 그대로다.
+ * 분류를 합치거나 빼지 않는다(관광공사 분류 그대로 - 페이지 약속). 펼친 묶음은 상세로 갔다가 **뒤로 가기**로 돌아올 때만 유지한다 -
+ * 새로고침·다른 메뉴 갔다 오기는 전부 접힌 첫 화면(2026-09-19 사용자 지적: 세션 내내 기억하면 한 번 펼친 뒤론 정돈 효과가 없다).
  */
 import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { onBeforeRouteLeave } from 'vue-router'
 import MapPlaceService from '../../services/map/MapPlaceService'
 import { loadThemeLayers } from '../../services/themeData.js'
 import { buildThemes } from '../../config/themes.js'
@@ -27,9 +29,16 @@ let io = null
 
 /* 접기 - 묶음마다 처음엔 곳수 많은 순 TOP 개만 타일. 나머지가 2개 미만이면 접을 게 없으니 전부 보인다 */
 const TOP = 6
-const OPEN_KEY = 'hangat:themes:open'
+const OPEN_KEY = 'hangat:themes:open'   // 상세로 나갈 때만 적고, 돌아와 한 번 읽으면 지운다 - 새로고침·다른 메뉴 경유는 접힌 채
 const open = ref(new Set())
-try { open.value = new Set(JSON.parse(sessionStorage.getItem(OPEN_KEY) ?? '[]')) } catch { /* 저장소 접근 불가 - 전부 접힌 채 시작 */ }
+try {
+  const saved = sessionStorage.getItem(OPEN_KEY)
+  if (saved) { sessionStorage.removeItem(OPEN_KEY); open.value = new Set(JSON.parse(saved)) }
+} catch { /* 저장소 접근 불가 - 전부 접힌 채 시작 */ }
+onBeforeRouteLeave(to => {
+  if (to.name !== 'theme-detail' || !open.value.size) return
+  try { sessionStorage.setItem(OPEN_KEY, JSON.stringify([...open.value])) } catch { /* 기억만 못 할 뿐 */ }
+})
 const foldable = g => g.tiles.length - TOP >= 2
 const shownTiles = g => foldable(g) ? g.tiles.slice(0, TOP) : g.tiles   // 접을 수 있는 묶음은 펼쳐도 타일은 6개, 나머지는 칩
 const restTiles = g => g.tiles.slice(TOP)
@@ -37,7 +46,6 @@ function toggleOpen (key) {
   const next = new Set(open.value)
   next.has(key) ? next.delete(key) : next.add(key)
   open.value = next
-  try { sessionStorage.setItem(OPEN_KEY, JSON.stringify([...next])) } catch { /* 기억만 못 할 뿐 */ }
 }
 
 const bandStyle = key => photos.value[key]
