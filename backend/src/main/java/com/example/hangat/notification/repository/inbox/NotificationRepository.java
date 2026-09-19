@@ -23,6 +23,7 @@ public interface NotificationRepository extends Repository<NotificationEntity, L
                    n.createdAt as createdAt, n.readAt as readAt
             from NotificationEntity n
             where n.userId = :userId and n.id < :before and n.deletedAt is null
+              and n.headerHiddenAt is null
             order by n.id desc
             """)
     List<NotificationView> findPage(
@@ -82,6 +83,12 @@ public interface NotificationRepository extends Repository<NotificationEntity, L
     @Modifying(flushAutomatically = true)
     @Query("update NotificationEntity n set n.deletedAt = :at where n.userId = :userId and n.deletedAt is null")
     int hideAll(@Param("userId") Long userId, @Param("at") LocalDateTime at);
+
+    /** 새로 도착한 미확인 알림은 남기고, 읽은 알림만 헤더에서 숨긴다. */
+    @Transactional
+    @Modifying(flushAutomatically = true)
+    @Query("update NotificationEntity n set n.headerHiddenAt = :at where n.userId = :userId and n.readAt is not null and n.deletedAt is null and n.headerHiddenAt is null")
+    int hideHeader(@Param("userId") Long userId, @Param("at") LocalDateTime at);
 
     /** API 변환에 필요한 필드만 담는 조회 결과. */
     interface NotificationView {

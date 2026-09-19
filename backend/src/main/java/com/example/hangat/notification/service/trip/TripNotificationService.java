@@ -55,7 +55,7 @@ public class TripNotificationService {
         TripNotificationSettings row = locks.lock(userId);
         requireVersion(request.version(), row.getPreferencesVersion());
         row.changePreferences(
-                request.aiCourse(), request.weatherWarning(), request.forecastChange(),
+                request.aiCourse(), request.forecastChange(),
                 request.congestion(), request.tripSummary(), request.reviewRequest(), nowUtc()
         );
         return toState(row).preferences();
@@ -154,18 +154,10 @@ public class TripNotificationService {
 
         LocalDate date = today();
 
-        boolean duringTrip =
-                !date.isBefore(trip.startDate())
-                        && !date.isAfter(trip.endDate());
-
         boolean beforeTripEnds =
                 !date.isAfter(trip.endDate());
 
         return switch (type) {
-            // 이번에는 공식 기상특보 생성 작업을 구현하지 않는다.
-            case "WEATHER_WARNING" ->
-                    preferences.weatherWarning() && duringTrip;
-
             // 출발 전도 허용한다.
             case "FORECAST_CHANGE" ->
                     preferences.forecastChange() && beforeTripEnds;
@@ -203,7 +195,7 @@ public class TripNotificationService {
 
     private State toState(TripNotificationSettings row) {
         Preferences preferences = new Preferences(
-                row.isAiCourse(), row.isWeatherWarning(), row.isForecastChange(),
+                row.isAiCourse(), row.isForecastChange(),
                 row.isCongestion(), row.isTripSummary(), row.isReviewRequest(), row.getPreferencesVersion()
         );
         Trip trip = row.getTripCourseId() == null
@@ -215,7 +207,7 @@ public class TripNotificationService {
 
     private State defaultState() {
         return new State(
-                new Preferences(true, true, true, true, true, true, 0L),
+                new Preferences(true, true, true, true, true, 0L),
                 new Trip(null, null, null, null, 0, false)
         );
     }

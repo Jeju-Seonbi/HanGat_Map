@@ -7,7 +7,7 @@ public enum NotificationCategory {
     ALL(List.of()),
     LOGIN(List.of("SECURITY_LOGIN")),
     COURSE(List.of("AI_COURSE_COMPLETED", "AI_COURSE_FAILED")),
-    TRIP(List.of("FORECAST_CHANGE", "CONGESTION_WORSENED", "TRIP_SUMMARY", "REVIEW_REQUEST", "WEATHER_WARNING")),
+    TRIP(List.of("FORECAST_CHANGE", "CONGESTION_WORSENED", "TRIP_SUMMARY", "REVIEW_REQUEST")),
     OTHER(List.of());
 
     private final List<String> types;
