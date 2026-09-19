@@ -54,6 +54,8 @@ public class AuthService {
     private final PasswordHasher passwordHasher;
     private final JwtProvider jwtProvider;
     private final NotificationService notifications;
+    private final AccountWithdrawalService withdrawal;
+    private final jakarta.persistence.EntityManager em;
 
     // ────────────────────────── 로그인 ──────────────────────────
     @Transactional
@@ -71,13 +73,6 @@ public class AuthService {
     public AuthInternalDto.LoginResult loginSocial(
             User user) {
 
-        if (!user.canLogin()) {
-            throw new BaseException(
-                    user.getStatus()
-                            .getLoginDeniedStatus()
-            );
-        }
-
         return completeLogin(user);
     }
     /**
@@ -86,6 +81,12 @@ public class AuthService {
      */
     private AuthInternalDto.LoginResult completeLogin(
             User user) {
+
+        user = lockUser(user.getId());
+        if (user.getStatus() == com.example.hangat.user.model.UserStatus.WITHDRAWN) {
+            return new AuthInternalDto.LoginResult(null, null, withdrawal.issue(user));
+        }
+        if (!user.canLogin()) throw new BaseException(user.getStatus().getLoginDeniedStatus());
 
         if (!user.isDemoAccount()) revokeAll(
                 user.getId(),
@@ -124,6 +125,7 @@ public class AuthService {
 
         User user = userRepository.findByEmail(EmailNormalizer.normalize(request.email()))
                 .orElse(null);
+        if (user != null) user = lockUser(user.getId());
 
         // 계정이 없거나 소셜 전용 계정이어도 더미를 이용해서 소요 시간 맞춤.
         String storedHash = (user != null && user.hasPassword()) ?
@@ -135,7 +137,7 @@ public class AuthService {
             throw new BaseException(BaseResponseStatus.PASSWORD_WRONG);
         }
         // 비밀번호가 맞은 사람에게만 구체적인 사유 알려줌.
-        if (!user.canLogin()) {
+        if (!user.canLogin() && user.getStatus() != com.example.hangat.user.model.UserStatus.WITHDRAWN) {
             throw new BaseException(user.getStatus().getLoginDeniedStatus());
         }
         return user;
@@ -157,8 +159,13 @@ public class AuthService {
             throw new BaseException(BaseResponseStatus.JWT_INVALID);
         }
 
-        RefreshToken token = refreshRepository.findByTokenHashForUpdate(TokenHasher.hash(rawRefreshToken))
+        String hash = TokenHasher.hash(rawRefreshToken);
+        RefreshToken candidate = refreshRepository.findByTokenHash(hash)
                 .orElseThrow(() -> new BaseException(BaseResponseStatus.JWT_INVALID));
+        User user = lockUser(candidate.getUser().getId());
+        RefreshToken token = refreshRepository.findByTokenHashForUpdate(hash)
+                .orElseThrow(() -> new BaseException(BaseResponseStatus.JWT_INVALID));
+        em.refresh(token);
 
         // 재사용 탐지.
         if(token.isRevoked()) {
@@ -168,7 +175,6 @@ public class AuthService {
             throw new BaseException(BaseResponseStatus.JWT_EXPIRED);
         }
 
-        User user = token.getUser();
         if(!user.canLogin()) {
             revokeAll(user.getId(), RefreshRevokeReason.SUSPENDED);
             throw new BaseException(user.getStatus().getLoginDeniedStatus());
@@ -222,12 +228,19 @@ public class AuthService {
     }
     private TokenDto.AccessTokenResponse accessToken(User user) {
         return new TokenDto.AccessTokenResponse(
-                jwtProvider.createAccessToken(user.getId()),
+                jwtProvider.createAccessToken(user.getId(), user.getAuthVersion()),
                 jwtProvider.getAccessTokenTtlMs()
         );
     }
     private void revokeAll(Long userId, RefreshRevokeReason reason) {
         refreshRepository.findAllActiveForUpdate(userId)
                 .forEach(token -> token.revoke(reason));
+    }
+    private User lockUser(Long id) {
+        User user = userRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new BaseException(BaseResponseStatus.JWT_INVALID));
+        em.flush();
+        em.refresh(user);
+        return user;
     }
 }

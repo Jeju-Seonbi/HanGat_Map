@@ -22,7 +22,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
+@org.springframework.transaction.annotation.Transactional
 class FavoriteControllerTest {
+
+    @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
+
+    @org.junit.jupiter.api.BeforeEach
+    void activeAccount() {
+        if (jdbc.queryForObject("SELECT COUNT(*) FROM users WHERE id=1", Integer.class) == 0) {
+            jdbc.update("INSERT INTO users(id,email,nickname,status,auth_version,created_at,updated_at) VALUES (1,'favorite-boundary@example.com','찜회원','ACTIVE',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
+        }
+    }
 
     @Autowired
     MockMvc mockMvc;
