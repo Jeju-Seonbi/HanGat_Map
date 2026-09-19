@@ -259,6 +259,15 @@ public class AsyncCourseJobRepository {
         );
     }
 
+    public List<Map<String, Object>> findPageByUser(Long userId, int page, int size) {
+        return jdbc.queryForList("""
+                SELECT * FROM course_generation_jobs
+                WHERE user_id = ?
+                ORDER BY created_at DESC, id DESC
+                LIMIT ? OFFSET ?
+                """, userId, size + 1, (long) page * size);
+    }
+
     /** 요청한 사용자 소유의 작업만 조회한다. */
     public List<Map<String, Object>> findOwned(String id, Long userId) {
         return jdbc.queryForList("""

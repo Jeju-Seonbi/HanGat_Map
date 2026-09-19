@@ -13,7 +13,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth.js'
 import { useUiStore } from '../../stores/ui.js'
 import { useNotificationStore } from '../../stores/notifications.js'
-import { LEFT_TABS, NAV_TABS, RIGHT_TABS, isTabActive } from '../../config/navTabs.js'
+import { LEFT_TABS, NAV_TABS, RIGHT_TABS, isTabActive, tabDestination } from '../../config/navTabs.js'
 import ThemeToggle from './ThemeToggle.vue'
 import NotificationBell from './NotificationBell.vue'
 import ProfileAvatar from '../common/ProfileAvatar.vue'
@@ -68,7 +68,7 @@ async function onLogout () {
         v-for="t in LEFT_TABS"
         @click="ui.enterAiCourse(t.to, $event)"
         :key="t.to"
-        :to="t.to"
+        :to="tabDestination(t)"
         class="tab"
         :class="{ on: activeOf(t) }"
         :aria-current="activeOf(t) ? 'page' : undefined"
@@ -82,7 +82,7 @@ async function onLogout () {
       <RouterLink
         v-for="t in RIGHT_TABS"
         :key="t.to"
-        :to="t.to"
+        :to="tabDestination(t)"
         class="tab"
         :class="{ on: activeOf(t) }"
         :aria-current="activeOf(t) ? 'page' : undefined"
@@ -143,7 +143,7 @@ async function onLogout () {
       <RouterLink
         v-for="t in NAV_TABS"
         :key="`mobile-${t.to}`"
-        :to="t.to"
+        :to="tabDestination(t)"
         class="mobile-menu-link"
         :class="{ on: activeOf(t) }"
         :aria-current="activeOf(t) ? 'page' : undefined"

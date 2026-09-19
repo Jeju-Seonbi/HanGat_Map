@@ -2,7 +2,9 @@ import { apiRequest, BACKEND_BASE_URL, getBackendAccessToken, getBackendSessionV
 
 // 백엔드 배포 전에는 새 API를 호출하지 않는다. Vite 빌드 시 활성화한다.
 export const NOTIFICATIONS_ENABLED = import.meta.env.VITE_NOTIFICATIONS_ENABLED === 'true'
-export const ASYNC_COURSES_ENABLED = import.meta.env.VITE_ASYNC_COURSES_ENABLED === 'true'
+// Shared backend default enables member async generation/history in every app mode.
+// Explicit false remains available for a coordinated feature shutdown.
+export const ASYNC_COURSES_ENABLED = (import.meta.env.VITE_ASYNC_COURSES_ENABLED ?? 'true') === 'true'
 export const TRIP_ALERTS_ENABLED = import.meta.env.VITE_TRIP_ALERTS_ENABLED === 'true'
 // 여행 확정 API와 별개: 실제 비교·일정 배치 배포를 확인한 뒤 켠다.
 export const TRIP_NOTIFICATIONS_ENABLED = import.meta.env.VITE_TRIP_NOTIFICATIONS_ENABLED === 'true'

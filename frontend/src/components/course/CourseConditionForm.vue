@@ -367,23 +367,26 @@ const summary = computed(() => ({
 .builder-progress button { text-align: left; padding-top: 8px; border-top: 6px solid var(--course-line); border-radius:3px 3px 0 0; font-size: 12px; color: var(--course-muted); }
 .builder-progress button.active, .builder-progress button.complete { border-color: var(--course-accent); color: var(--course-accent); }
 .builder-progress button span { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--course-surface-2); margin-right: 5px; }
-.builder-progress button.active span { background: var(--course-accent); color: var(--course-on-accent, white); }
+.builder-progress button.active span { background: var(--course-accent); color: var(--course-on-ac); }
 .condition-main, .preference-sections { grid-column: 1; grid-row: 2; background: var(--course-surface); border-inline: 1px solid var(--course-line); padding: 0 32px; min-height: 380px; min-width: 0; }
 .condition-section { border: 0; padding: 20px 0; }
 .step-4 .condition-main, .step-5 .condition-main { display: none; }
 .section-title > span { display: none; }
-.basic-condition .field-grid, .chips, .course-radio, .section-field-error { margin-left: 0; }
+.stitch-builder .basic-condition .field-grid,
+.stitch-builder .chips,
+.stitch-builder .course-radio,
+.stitch-builder .section-field-error { margin-inline: 0; }
 .field-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .section-title h2 { font-size: 18px; }
-.section-title h2,.field-label{display:flex;align-items:center;gap:7px}.section-title h2 :deep(svg),.field-label :deep(svg){color:#1f7a6d}
+.section-title h2,.field-label{display:flex;align-items:center;gap:7px}.section-title h2 :deep(svg),.field-label :deep(svg){color:var(--course-accent)}
 .stitch-builder .chips:not(.region-cards) button,.stitch-builder .course-radio span{display:flex;align-items:center;gap:6px}
 .region-step .chips { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
 .region-step .chips button { min-height: 92px; font-size: 14px; }
-.region-step .region-cards button{display:flex;align-items:flex-start;gap:12px;padding:14px;border:1px solid #e5e7eb;border-radius:16px;background:white;color:#1c2925;text-align:left;font-weight:500}
-.region-step .region-cards button.active{border:2px solid #1f7a6d;padding:13px;background:#ecfdf580;color:#145147}
-.region-cards b{display:block;font-size:14px}.region-cards small{display:block;margin-top:4px;font-size:12px;line-height:1.5;color:#6b7280;font-weight:400}
-.region-cards .region-symbol{display:grid;place-items:center;width:40px;height:40px;flex-shrink:0;background:#fef3c7;color:#92400e;border-radius:12px;font-size:24px}
-.region-cards .WEST{background:#1f7a6d;color:white}.region-cards .SOUTH{background:#dbeafe;color:#1e40af}.region-cards .NORTH{background:#cffafe;color:#155e75}
+.region-step .region-cards button{display:flex;align-items:flex-start;gap:12px;padding:14px;border:1px solid var(--course-line);border-radius:16px;background:var(--course-surface);color:var(--course-text);text-align:left;font-weight:500}
+.region-step .region-cards button.active{border:2px solid var(--course-accent);padding:13px;background:var(--course-accent-bg);color:var(--course-accent-dark)}
+.region-cards b{display:block;font-size:14px}.region-cards small{display:block;margin-top:4px;font-size:12px;line-height:1.5;color:var(--course-text-2);font-weight:400}
+.region-cards .region-symbol{display:grid;place-items:center;width:40px;height:40px;flex-shrink:0;background:var(--mid-bg);color:var(--mid);border-radius:12px;font-size:24px}
+.region-cards .WEST{background:var(--course-accent);color:var(--course-on-ac)}.region-cards .SOUTH{background:var(--ai-bg);color:var(--ai-tx)}.region-cards .NORTH{background:var(--course-accent-bg);color:var(--course-accent-dark)}
 .region-step .region-cards .all-regions{grid-column:1/-1;min-height:0;padding:8px 14px;justify-content:center;font-size:12px;border-radius:12px}
 .preference-sections { display: grid; grid-template-columns: 1fr; }
 .preference-section { padding: 20px 0; border: 0; }
@@ -391,25 +394,25 @@ const summary = computed(() => ({
 .builder-navigation { grid-column: 1; grid-row: 3; display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--course-surface); border: 1px solid var(--course-line); border-top: 0; border-radius: 0 0 24px 24px; padding: 24px 32px 32px; box-shadow:0 10px 30px -4px rgba(15,60,52,.08),0 4px 12px -2px rgba(0,0,0,.03); }
 .builder-navigation button { min-height: 42px; padding: 10px 16px; border: 1px solid var(--course-line); border-radius: 12px; font-size: 12px; }
 .builder-navigation button:disabled { opacity: .4; }
-.builder-navigation .next-step { color: white; background: #1f7a6d; }
+.builder-navigation .next-step { color: var(--course-on-ac); background: var(--course-accent); }
 .mobile-review { display: none; }
 .desktop-helper { font-size: 11px; color: var(--course-muted); }
-.condition-summary { grid-column: 2; grid-row: 1 / 4; align-self:start; position: static; border: 1px solid #1f7a6d33; border-radius: 24px; background: var(--course-surface); padding: 0 24px 24px; overflow: hidden; min-width: 0; box-shadow:0 14px 40px -8px rgba(31,122,109,.12),0 2px 8px rgba(0,0,0,.04); }
+.condition-summary { grid-column: 2; grid-row: 1 / 4; align-self:start; position: static; border: 1px solid var(--course-line-2); border-radius: 24px; background: var(--course-surface); padding: 0 24px 24px; overflow: hidden; min-width: 0; box-shadow:0 14px 40px -8px rgba(31,122,109,.12),0 2px 8px rgba(0,0,0,.04); }
 .ticket-head { margin: 0 -24px; padding: 24px; background: linear-gradient(135deg,#1f7a6d,#1e6f63,#124e45); color: white; }
-.ticket-perforation{position:relative;margin:0 -24px 20px;height:24px;background:linear-gradient(90deg,#6ee7b7b3 50%,transparent 50%) center/8px 1px repeat-x,#ecfdf580}.ticket-perforation:before,.ticket-perforation:after{content:'';position:absolute;width:16px;height:16px;top:4px;border-radius:50%;background:var(--course-bg)}.ticket-perforation:before{left:-8px}.ticket-perforation:after{right:-8px}
+.ticket-perforation{position:relative;margin:0 -24px 20px;height:24px;background:linear-gradient(90deg,#6ee7b7b3 50%,transparent 50%) center/8px 1px repeat-x,var(--course-accent-bg)}.ticket-perforation:before,.ticket-perforation:after{content:'';position:absolute;width:16px;height:16px;top:4px;border-radius:50%;background:var(--course-bg)}.ticket-perforation:before{left:-8px}.ticket-perforation:after{right:-8px}
 .ticket-head h2 { color: white; font-size: 20px; margin: 12px 0 4px; }
 .ticket-head p { font-size: 12px; opacity: .85; }
 .ticket-head .summary-kicker { display:inline-flex;color: white; background: #ffffff33; border-radius: 20px; padding: 2px 10px; font-size: 11px;letter-spacing:.025em; }
-.condition-summary dl { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; padding: 14px; border-radius: 16px; background: #f9fafbe6;border:1px solid #f3f4f6; }
+.condition-summary dl { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; padding: 14px; border-radius: 16px; background: var(--course-surface-2);border:1px solid var(--course-line); }
 .condition-summary dl > div { display: block; border: 0; padding: 0; min-width: 0; }
 .condition-summary dd { overflow-wrap: anywhere; text-align: left; margin: 4px 0 0; }
 .course-form-footer { background: var(--course-surface); border:0; padding:16px 0 0; }
 .course-cta { width: 100%; min-width: 0; border-radius: 16px;font-size:14px;min-height:48px;box-shadow:0 4px 6px -1px #1f7a6d33; }
-.stitch-builder .course-cta{color:#fff;background:#1f7a6d}.stitch-builder .course-cta:hover{background:#145147}
+.stitch-builder .course-cta{color:var(--course-on-ac);background:var(--course-accent)}.stitch-builder .course-cta:hover{background:var(--course-accent-dark)}
 .condition-summary dd{font-size:12px}.condition-summary dt{font-size:10.5px}
-.condition-main :deep(input:not([type=radio]):not([type=checkbox])),.preference-sections :deep(input:not([type=checkbox])){background:#f9fafbcc;border:1px solid #e5e7eb;border-radius:12px;padding:10px 12px;font-size:14px;color:#374151}
-.stitch-builder .chips:not(.region-cards) button,.stitch-builder .course-radio span{background:white;border:1px solid #e5e7eb;color:#4b5563;font-size:12px;font-weight:500}
-.stitch-builder .chips:not(.region-cards) button.active,.stitch-builder .course-radio input:checked+span{border:2px solid #1f7a6d;background:#eff9f6;color:#1f7a6d;font-weight:700;padding-block:8px}
+.condition-main :deep(input:not([type=radio]):not([type=checkbox])),.preference-sections :deep(input:not([type=checkbox])){background:var(--course-surface-2);border:1px solid var(--course-line);border-radius:12px;padding:10px 12px;font-size:14px;color:var(--course-text)}
+.stitch-builder .chips:not(.region-cards) button,.stitch-builder .course-radio span{background:var(--course-surface);border:1px solid var(--course-line);color:var(--course-text-2);font-size:12px;font-weight:500}
+.stitch-builder .chips:not(.region-cards) button.active,.stitch-builder .course-radio input:checked+span{border:2px solid var(--course-accent);background:var(--course-accent-bg);color:var(--course-accent);font-weight:700;padding-block:8px}
 .ticket-note { font-size: 11px; color: var(--course-muted); margin: 12px 0 0; }
 @media(max-width: 1023px) {
   .stitch-builder { display: flex; flex-direction: column; gap: 0; }
