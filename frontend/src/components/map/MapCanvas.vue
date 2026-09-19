@@ -61,36 +61,53 @@ function clearOverlays() {
   pool.clear()
 }
 
-/* MAP_001 착한가격 클릭 툴팁 - 한 번에 하나만 띄운다 */
+/* MAP_001 착한가격 미리보기 말풍선 - PC 에서 핀에 마우스를 올리면 뜨고 벗어나면 사라진다. 한 번에 하나만.
+   전엔 클릭 시 말풍선 → 안의 '상세 보기'를 다시 눌러야 패널이 열려 다른 핀과 동작이 달랐다(사용자 피드백, 2026-09-19).
+   이제 클릭은 모든 핀이 곧 상세 패널이고, 말풍선은 마우스가 있는 PC 에서만 미리보기로 남는다 */
 let tip = null
+let tipTimer = 0
 
 function closeTip() {
+  if (tipTimer) { clearTimeout(tipTimer); tipTimer = 0 }
   if (tip) { tip.setMap(null); tip = null }
 }
 
-/** 메뉴·가격은 목록엔 없고 상세 응답(overview)에만 있어 클릭 시점에 받아온다 */
+/** 마우스가 있는 환경인가 - 폰·태블릿은 올림 자체가 없어 미리보기를 만들지 않는다(클릭 = 패널) */
+const canHover = () => typeof window !== 'undefined' && !!window.matchMedia?.('(hover: hover) and (pointer: fine)').matches
+
+/* 지금 마우스가 올라가 있는 핀 키. 판단은 mousemove 로만 한다 - mouseover/mouseout 은 카카오가 오버레이(말풍선)를 붙일 때
+   핀 레이어를 뗐다 붙이면서 헛발이 나서, 말풍선이 뜨는 순간 mouseout → 닫힘 → 다시 mouseover → 300ms 뒤 또 뜸을 반복했다 */
+let hoverKey = null
+function onPinHover(ev) {
+  const key = ev.target.closest?.('.pw')?.dataset.k ?? null
+  if (key === hoverKey) return   // 같은 핀 안(또는 빈 지도 안)에서 움직인 것
+  hoverKey = key
+  closeTip()
+  const e = key && pool.get(key)
+  if (!e || e.group !== 'food') return
+  tipTimer = setTimeout(() => { tipTimer = 0; showGoodPriceTip(e.data) }, 300)   // 스쳐 가는 동안엔 안 뜨게
+}
+
+/** 메뉴·가격은 목록엔 없고 상세 응답(overview)에만 있어 올린 시점에 받아온다 */
 async function showGoodPriceTip(f) {
   closeTip()
   const node = document.createElement('div')
   node.className = 'gp-tip'
-  const render = body => {
-    node.innerHTML = `<b>${escapeHtml(f.n)}</b>${body}<button class="gp-more">상세 보기</button>`
-    node.querySelector('.gp-more').addEventListener('click', () => { closeTip(); emit('select', f) })
-  }
+  node.style.pointerEvents = 'none'   // 옆 핀을 가려도 올림·클릭이 그 핀으로 가게
+  const render = body => { node.innerHTML = `<b>${escapeHtml(f.n)}</b>${body}` }
   render('<span>메뉴 불러오는 중…</span>')
-  node.addEventListener('click', e => e.stopPropagation())
   const my = new kakao.maps.CustomOverlay({
-    position: LL(f.y, f.x), content: node, yAnchor: 1.3, zIndex: 500, clickable: true,
+    position: LL(f.y, f.x), content: node, yAnchor: 1.3, zIndex: 500, clickable: false,
   })
   my.setMap(map)
   tip = my
   const d = f.id != null ? await MapPlaceService.getDetail(f.id) : null
   if (tip !== my) return   // 기다리는 사이 닫혔거나 다른 핀으로 바뀜
-  // 응답이 아예 없으면(연결 끊김·서버 재시작·타임아웃) "메뉴가 없다"가 아니라 "못 받았다"고 말한다 - 다시 누르면 다시 받아온다(최종점검 #33)
+  // 응답이 아예 없으면(연결 끊김·서버 재시작·타임아웃) "메뉴가 없다"가 아니라 "못 받았다"고 말한다 - 클릭하면 패널이 다시 받아온다(최종점검 #33)
   const menu = d?.overview
     ? d.overview.replace(/^대표메뉴:\s*/, '').split(' · ').map(m => `<span>${escapeHtml(m)}</span>`).join('')
     : d ? '<span>메뉴 정보 없음</span>'
-    : '<span>메뉴를 불러오지 못했어요 · 다시 눌러 주세요</span>'
+    : '<span>메뉴를 불러오지 못했어요 · 눌러서 상세에서 확인해 주세요</span>'
   // 가격표 밑에 출처·기준일 - 상세 패널과 같은 문장 (MAP_003)
   render(menu + (f.good ? `<i class="gp-src">${goodPriceSourceLine(d?.goodPriceBaseDate)}</i>` : ''))
 }
@@ -205,9 +222,8 @@ function ensureLayer() {
     const e = pw && pool.get(pw.dataset.k)
     if (!e) return
     ev.stopPropagation()
-    // 착한가격은 정의서(MAP_001)대로 툴팁, 나머지 업종은 관광지처럼 상세 패널
-    if (e.group === 'food') showGoodPriceTip(e.data)
-    else emit('select', e.data)
+    closeTip()
+    emit('select', e.data)   // 핀 종류와 무관하게 클릭 = 상세 패널(착한가격도, 2026-09-19)
   })
   layerOv = new kakao.maps.CustomOverlay({
     position: map.getCenter(), content: layerNode, xAnchor: 0, yAnchor: 0, zIndex: 50, clickable: true,
@@ -502,6 +518,10 @@ onMounted(async () => {
   map.setMaxLevel(JEJU_MAX_LEVEL)   // 제주 밖(남해안)까지 축소되지 않게 (MAP_001)
   map.addControl(new kakao.maps.ZoomControl(), kakao.maps.ControlPosition.BOTTOMRIGHT)
   kakao.maps.event.addListener(map, 'click', () => { closeTip(); emit('blank-click') })
+  if (canHover()) {   // 착한가격 미리보기(PC) - 리스너는 지도 상자에 두 개뿐, 핀 수천 개에 하나씩 붙이지 않는다
+    el.value.addEventListener('mousemove', onPinHover)
+    el.value.addEventListener('mouseleave', () => { hoverKey = null; closeTip() })
+  }
   kakao.maps.event.addListener(map, 'zoom_changed', onZoomChanged)
   kakao.maps.event.addListener(map, 'center_changed', onCenterChanged)
   kakao.maps.event.addListener(map, 'idle', onIdle)
