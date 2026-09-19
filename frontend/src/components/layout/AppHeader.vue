@@ -66,6 +66,7 @@ async function onLogout () {
       <!-- 왼쪽: 메인 · AI코스 · 지도 -->
       <RouterLink
         v-for="t in LEFT_TABS"
+        @click="ui.enterAiCourse(t.to, $event)"
         :key="t.to"
         :to="t.to"
         class="tab"
@@ -146,7 +147,7 @@ async function onLogout () {
         class="mobile-menu-link"
         :class="{ on: activeOf(t) }"
         :aria-current="activeOf(t) ? 'page' : undefined"
-        @click="mobileMenuOpen = false"
+        @click="mobileMenuOpen = false; ui.enterAiCourse(t.to, $event)"
       >
         {{ t.label }}
       </RouterLink>

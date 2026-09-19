@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import '@fontsource/noto-sans-kr/400.css'
+import '@fontsource/noto-sans-kr/500.css'
+import '@fontsource/noto-sans-kr/700.css'
 import { congestionLabel } from '../../utils/congestion'
-import { dayWeatherLabels } from '../../services/course/dailyWeather'
+import DailyWeatherBadges from '../../components/course/DailyWeatherBadges.vue'
+import AppIcon from '../../components/common/AppIcon.vue'
 import { expectedTransitEdges, transitTopologyMatches, useTransitRoute } from '../../services/course/transitRoute'
 import { useAccommodationSelection, syncConfirmedCourseCondition } from '../../services/course/accommodationSelection'
 import TransitDayRoute from '../../components/course/TransitDayRoute.vue'
@@ -9,6 +13,7 @@ import TransitLegCard from '../../components/course/TransitLegCard.vue'
 import { todayKst, addCalendarDays, formatCalendarDate } from '../../utils/format.js'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../app/stores/auth'
+import { useUiStore } from '../../stores/ui.js'
 import CourseConditionForm from '../../components/course/CourseConditionForm.vue'
 import CourseItemCard from '../../components/course/CourseItemCard.vue'
 import AlternativePlaceModal from '../../components/course/AlternativePlaceModal.vue'
@@ -37,6 +42,23 @@ const condition = reactive<CourseCondition>({
 })
 
 const result = ref<CourseResult>()
+const selectedDay = ref(1)
+const activeDays = computed(() => {
+  const days = result.value?.days ?? []
+  const day = days.find(day => day.day_no === selectedDay.value) ?? days[0]
+  return day ? [day] : []
+})
+watch(() => result.value?.id, () => { selectedDay.value = result.value?.days[0]?.day_no ?? 1 })
+function navigateDay(event: KeyboardEvent, index: number) {
+  const days = result.value?.days ?? []
+  const next = event.key === 'Home' ? 0 : event.key === 'End' ? days.length - 1
+    : event.key === 'ArrowRight' ? (index + 1) % days.length
+      : event.key === 'ArrowLeft' ? (index + days.length - 1) % days.length : -1
+  if (next < 0 || !days[next]) return
+  event.preventDefault()
+  selectedDay.value = days[next].day_no
+  document.getElementById(`course-tab-${selectedDay.value}`)?.focus()
+}
 const loading = ref(false)
 const error = ref('')
 const jobResultError = ref('')
@@ -58,6 +80,13 @@ const saveError = ref('')
 const saveLoading = ref(false)
 const toast = ref('')
 const auth = useAuthStore()
+const ui = useUiStore()
+const conditionFormKey = ref(0)
+watch(() => ui.aiCourseEntryVersion, () => {
+  editConditions()
+  error.value = ''
+  conditionFormKey.value++
+})
 const historyDialog = ref<HTMLDialogElement>()
 const router = useRouter()
 const route = useRoute()
@@ -415,7 +444,11 @@ onMounted(async () => {
   clock = setInterval(() => { now.value = Date.now() }, 1000)
   if (await restoreJobResult()) return
   const pending = auth.isAuthenticated ? takePendingCourseClaim() : null
-  if (!pending) { await restoreResult(); return }
+  if (!pending) {
+    if (route.query.course) await restoreResult()
+    else { restoringState.value = null; rememberEditing(condition) }
+    return
+  }
 
   saveLoading.value = true
   try {
@@ -442,7 +475,7 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
 
 <template>
   <div class="ai-course-page" :class="{ 'builder-page': editing && !loading }">
-    <header class="course-page-header">
+    <header v-if="editing || loading || !result" class="course-page-header">
       <div>
         <h1>{{ loading ? '제주 여행을 구성하고 있어요' : editing ? '언제, 누구와 같이 한갓진 코스를 생성하고 싶으신가요?' : '추천 코스' }}</h1>
         <p v-if="!editing">{{ loading ? '선택한 조건을 바탕으로 잠시만 기다려 주세요.' : '선택한 조건과 예상 혼잡도를 반영한 제주 여행 일정이에요.' }}</p>
@@ -476,11 +509,10 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
         <GenerationArtwork status="FAILED" />
         <p class="course-error">{{ error }} <button class="text-link" @click="generate(condition)">다시 시도</button></p>
       </div>
-      <CourseConditionForm :initial="condition" :loading="loading" @submit="generate" @draft="draft => Object.assign(condition, draft, { accommodation: draft.accommodation })" />
+      <CourseConditionForm :key="conditionFormKey" :initial="condition" :loading="loading" @submit="generate" @draft="draft => Object.assign(condition, draft, { accommodation: draft.accommodation })" />
     </section>
 
     <section v-else-if="result" class="course-shell result-shell">
-      <GenerationArtwork status="SUCCEEDED" />
       <header class="course-result-head">
         <div class="result-heading-copy">
           <span class="result-label">추천 코스</span>
@@ -490,14 +522,13 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
             <span v-if="regionSummary">{{ regionSummary }}</span>
             <span v-if="styleSummary">{{ styleSummary }}</span>
           </div>
-          <div class="result-metrics">
-            <span>평균 혼잡도 <b>{{ averageCongestionText }}</b></span>
-          </div>
         </div>
         <div class="result-actions-block">
           <div class="result-actions-row">
-            <button class="btn result-map" @click="viewOnMap">지도에서 보기</button>
-            <button class="btn result-save" :disabled="result.status === 'SAVED' || !canModify" @click="openSave">{{ result.status === 'SAVED' ? '저장 완료' : '코스 저장' }}</button>
+            <button class="btn" @click="editConditions"><AppIcon name="tune" :size="15" />조건 수정</button>
+            <button class="btn result-regenerate" :disabled="loading" @click="generate(condition, true)"><AppIcon name="route" :size="15" />다른 코스 만들기</button>
+            <button class="btn result-map" @click="viewOnMap"><AppIcon name="map" :size="15" />지도에서 보기</button>
+            <button class="btn result-save" :disabled="result.status === 'SAVED' || !canModify" @click="openSave"><AppIcon name="bookmark" :size="15" />{{ result.status === 'SAVED' ? '저장 완료' : '코스 저장' }}</button>
           </div>
           <p v-if="result.status === 'READY'" class="temporary-course-notice">미저장 코스는 생성 2시간 후 만료돼요.</p>
         </div>
@@ -507,10 +538,12 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
       <p v-else-if="renewalNotice" class="route-status">{{ renewalNotice }}</p>
       <p v-else-if="!canModify && result.status !== 'SAVED'" class="route-status">유효한 코스 저장 증명이 없어 저장·숙소 변경을 사용할 수 없어요. 일정 조회는 유지됩니다.</p>
       <div class="course-result-grid">
-        <main>
-          <section v-for="day in result.days" :key="day.day_no" class="course-day">
-            <header><b>DAY {{ day.day_no }}</b><span>{{ formatDate(day.visit_date) }}</span></header>
-            <p v-for="weather in dayWeatherLabels(day.items)" :key="weather" class="daily-weather">{{ weather }}</p>
+        <main class="itinerary-card">
+          <div class="day-tabs" role="tablist" aria-label="여행 날짜">
+            <button v-for="(day, index) in result.days" :id="`course-tab-${day.day_no}`" :key="day.day_no" role="tab" :aria-selected="activeDays[0]?.day_no === day.day_no" :aria-controls="`course-day-${day.day_no}`" :tabindex="activeDays[0]?.day_no === day.day_no ? 0 : -1" @click="selectedDay = day.day_no" @keydown="navigateDay($event, index)">DAY {{ day.day_no }} <small>{{ formatDate(day.visit_date) }}</small></button>
+          </div>
+          <section v-for="day in activeDays" :id="`course-day-${day.day_no}`" :key="day.day_no" class="course-day" role="tabpanel" :aria-labelledby="`course-tab-${day.day_no}`" tabindex="0">
+            <header><div class="day-title"><b>● {{ day.day_no }}일차 일정</b><span> · {{ formatDate(day.visit_date) }}</span></div><DailyWeatherBadges :items="day.items" /></header>
             <TransitDayRoute v-if="result.transport === 'PUBLIC_TRANSIT'" :day="transitData?.days.find(d => d.day_no === day.day_no)" :expected-edges="expectedTransitEdges(result, day.day_no)" :loading="transitLoading" :error="transitError" />
             <p v-if="result.transport === 'RENTAL_CAR'" class="route-summary">
               총 이동 {{ routeSummary([routeForDay(day.day_no) ?? {}], routeLoading) }}
@@ -545,8 +578,8 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
               <dt>이동수단</dt><dd>{{ transportLabel[result.transport] }}</dd>
               <dt>숙소</dt><dd>{{ result.accommodation?.place_name ?? '미정' }}</dd>
             </dl>
+            <button v-if="canModify" class="btn accommodation-change" :disabled="accommodationLoading || accommodationSaving" @click="chooseAccommodation">{{ result.accommodation ? '숙소 변경' : '숙소 찾아보기' }}</button>
           </section>
-          <button v-if="canModify" class="btn" :disabled="accommodationLoading || accommodationSaving" @click="chooseAccommodation">{{ result.accommodation ? '숙소 변경' : '숙소 찾아보기' }}</button>
           <p v-if="accommodationSaving" class="route-status">숙소를 서버에 저장하고 확인하고 있어요.</p>
           <p v-if="accommodationSaveError" role="alert" class="course-error">{{ accommodationSaveError }} <button class="text-link" @click="restoreResult">다시 불러오기</button></p>
           <AccommodationRecommendations
@@ -560,10 +593,6 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
         </aside>
       </div>
 
-      <div class="result-actions">
-        <button class="btn" @click="editConditions">조건 수정</button>
-        <button class="btn primary" :disabled="loading" @click="generate(condition, true)">{{ loading ? '새 코스를 만드는 중…' : '같은 조건으로 다른 코스 만들기' }}</button>
-      </div>
     </section>
 
     <AlternativePlaceModal v-if="selected" :item="selected" :alternatives="alternatives" :loading="altLoading" :notice="altNotice" :busy="swapping" @close="selected = undefined" @select="replace" />
@@ -582,7 +611,9 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
 </template>
 
 <style scoped>
-.builder-page { background: var(--surf2); min-height: calc(100vh - 80px); padding-bottom: 40px; }
+.ai-course-page { --course-accent: #1f7a6d; --course-accent-dark: #145147; --course-accent-bg: #eff9f6; --course-bg: #f7faf8; --course-line: #e6ede9; --course-line-2: #d1ded8; --course-surface: #fff; --course-surface-2: #f8faf9; --course-text: #1c2925; --course-text-2: #61736d; --course-text-3: #87958f; --course-muted: #87958f; background: var(--course-bg); }
+.ai-course-page .generation-state { border: 0; box-shadow: none; background: transparent; }
+.builder-page { background: var(--course-bg); min-height: calc(100vh - 80px); padding-bottom: 40px; }
 .builder-page .course-page-header { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding-block: 38px 28px; }
 .builder-page .course-page-header h1 { font-size: clamp(22px, 2.5vw, 30px); letter-spacing: -.04em; }
 .ai-course-page .course-shell.builder-shell { border: 0; background: transparent; box-shadow: none; overflow: visible; }
@@ -610,88 +641,44 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
   background: var(--course-surface-2);
 }
 
-.result-actions-block {
-  display: grid;
-  flex: 0 0 min(320px, 100%);
-  gap: 8px;
-  width: min(320px, 100%);
-}
-
-.result-actions-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 10px;
-  width: 100%;
-}
-
-.result-actions-row .btn {
-  width: 100%;
-  min-height: 44px;
-  padding: 10px 12px;
-  border-radius: 12px;
-}
-
-.result-actions-row .result-map {
-  border-color: var(--course-line-2);
-  background: var(--course-surface-2);
-  color: var(--course-text);
-}
-
-.result-actions-row .result-save {
-  border-color: var(--course-accent);
-  background: var(--course-accent);
-  color: var(--course-on-ac);
-}
-
-.temporary-course-notice {
-  margin: 0;
-  color: var(--course-text-2);
-  font-size: 0.72rem;
-  line-height: 1.45;
-  text-align: center;
-  word-break: keep-all;
-}
-
-@media (min-width: 768px) {
-  .result-actions-block {
-    align-self: center;
-  }
-}
-
-@media (max-width: 767px) {
-  .result-actions-block {
-    width: 100%;
-  }
-
-  .course-day > header {
-    padding: 14px 0 11px;
-  }
-
-  .course-result-grid {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .course-side {
-    display: contents;
-  }
-
-  .course-result-grid > main {
-    order: 2;
-    min-width: 0;
-    width: 100%;
-  }
-
-  :deep(.accommodation-recommendations) {
-    order: 1;
-    min-width: 0;
-    width: 100%;
-  }
-
-  .course-summary-card {
-    order: 4;
-    min-width: 0;
-    width: 100%;
-  }
-}
+.result-actions-block{display:grid;align-self:center}
+.temporary-course-notice{margin:0;line-height:1.45;word-break:keep-all}
+.ai-course-page,.ai-course-page :deep(input),.ai-course-page :deep(button){font-family:'Noto Sans KR','Be Vietnam Pro',Figtree,sans-serif}
+.ai-course-page :deep(h1),.ai-course-page :deep(h2),.ai-course-page :deep(h3){font-family:Figtree,'Noto Sans KR',sans-serif}
+/* Result layout follows the supplied itinerary reference, independently of the builder card. */
+.ai-course-page .result-shell{padding-top:42px;border:0;background:transparent;box-shadow:none}
+.course-result-head{padding:0 0 26px;margin-bottom:24px;border:0;border-bottom:1px solid var(--course-line);border-radius:0;background:transparent;box-shadow:none;align-items:center}
+.result-label{display:inline-block;font-size:10px;letter-spacing:0;background:var(--course-accent-bg);padding:3px 9px;border-radius:20px}
+.course-result-head h2{font-size:26px;line-height:1.4;margin:0 0 5px;color:#11231f}
+.course-result-head p{font-size:12px}
+.result-condition-tags{display:inline-flex;gap:8px;margin-top:7px}.result-condition-tags span{font-size:11px;padding:0;background:transparent;font-weight:500}
+.result-actions-block{flex:0 1 auto;width:auto;gap:8px}
+.result-actions-row{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.result-actions-row .btn{width:auto;min-height:34px;padding:8px 11px;border-radius:9px;font-size:11px;gap:5px;white-space:nowrap;background:var(--course-surface);border:1px solid var(--course-line);color:var(--course-text)}
+.result-actions-row .result-regenerate{background:var(--course-accent-bg);color:var(--course-accent-dark)}
+.result-actions-row .result-save{background:var(--course-accent);color:white;border-color:var(--course-accent)}
+.course-result-head .temporary-course-notice{text-align:right;font-size:10px;color:var(--course-text-3)}
+.course-result-grid{grid-template-columns:minmax(0,2.08fr) minmax(280px,1fr);gap:28px;align-items:start}
+.itinerary-card{min-width:0;border:1px solid var(--course-line);border-radius:16px;overflow:hidden;background:var(--course-surface);box-shadow:0 2px 4px #173a3305}
+.day-tabs{display:flex;overflow-x:auto;background:#fafcfc;border-bottom:1px solid var(--course-line);padding:0 24px}
+.day-tabs button{flex-shrink:0;padding:20px 14px 17px;border-bottom:2px solid transparent;font-size:13px;color:var(--course-text-2);white-space:nowrap}
+.day-tabs button[aria-selected=true]{color:var(--course-accent);border-color:var(--course-accent);font-weight:700}
+.day-tabs small{font-size:11px;margin-left:3px}.day-tabs button:focus-visible{outline:2px solid var(--course-accent);outline-offset:-4px}
+.course-day{margin:0;padding:0 24px 12px;border:0;border-radius:0;background:transparent;box-shadow:none}
+.course-day>header{display:flex;flex-wrap:wrap;gap:10px;padding:20px 0 15px;border-bottom:1px solid var(--course-line)}
+.day-title b{font-size:13px;color:var(--course-accent)}.day-title span{font-size:11px;color:var(--course-text-3)}
+.course-day :deep(.course-item){padding:16px 14px;grid-template-columns:54px 104px minmax(0,1fr);gap:14px;border:1px solid #f0f3f1;border-radius:13px;background:#fafcfc}
+.course-day :deep(.course-item img){width:104px;height:82px;border-radius:10px}
+.course-day :deep(.item-time b){font-size:12px}.course-day :deep(.item-time small){font-size:10px}
+.course-day :deep(.item-head h3){font-size:15px}.course-day :deep(.item-head small){font-size:10px}
+.course-day :deep(.level){font-size:10px;padding:3px 6px}.course-day :deep(.item-reason){font-size:11px;line-height:1.7}
+.course-day :deep(.btn.small){font-size:10px;padding:5px 9px;border-radius:8px}.course-day :deep(.travel-line){font-size:10px;padding-block:16px;color:var(--course-text-3)}
+.course-side{display:grid;gap:24px;position:static}
+.course-summary-card{border:1px solid var(--course-line);border-radius:16px;padding:24px;background:var(--course-surface);box-shadow:0 2px 4px #173a3305}
+.summary-kicker{font-size:10px;letter-spacing:.06em}.course-summary-card h3{font-size:17px;margin:6px 0 20px}
+.course-summary-card dl{font-size:12px;row-gap:15px}.accommodation-change{margin-top:20px;width:100%;padding:9px;font-size:11px;border:1px solid var(--course-line);border-radius:9px}
+:deep(.accommodation-recommendations){padding:24px;border-color:var(--course-line);border-radius:16px;box-shadow:0 2px 4px #173a3305}
+:deep(.accommodation-recommendations article){padding:12px;border:1px solid var(--course-line);border-radius:12px;margin-top:12px;background:#fafcfc}
+@media(max-width:1023px){.course-result-head{align-items:flex-start;flex-direction:column;gap:18px}.result-actions-block{width:100%}.result-actions-row{justify-content:flex-start}.course-result-head .temporary-course-notice{text-align:left}.course-result-grid{grid-template-columns:minmax(0,1fr) 280px;gap:18px}}
+@media(max-width:767px){.ai-course-page .result-shell{padding-top:24px}.course-result-head h2{font-size:24px}.course-result-grid{display:flex;flex-direction:column}.course-result-grid>main{order:0}.course-side{display:grid;width:100%;order:1}.course-summary-card,:deep(.accommodation-recommendations){order:initial}.result-actions-row{display:grid;grid-template-columns:1fr 1fr;width:100%}.result-actions-row .btn{width:100%;min-height:40px;font-size:11px}.day-tabs{padding:0 8px}.day-tabs button{padding:16px 10px;font-size:12px}.day-tabs small{font-size:10px}.course-day{padding:0 12px 12px}.course-day>header{padding:16px 0;align-items:flex-start;flex-direction:column}.course-day :deep(.course-item){grid-template-columns:72px minmax(0,1fr);padding:12px;gap:6px 10px}.course-day :deep(.course-item img){width:72px;height:76px}.course-day :deep(.item-head h3){font-size:14px}.course-day :deep(.travel-line){padding-left:20px}.course-day :deep(.item-reason){font-size:11px}}
 </style>

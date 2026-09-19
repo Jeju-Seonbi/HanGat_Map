@@ -17,11 +17,13 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useNotificationStore } from '../../stores/notifications.js'
+import { useUiStore } from '../../stores/ui.js'
 import AppIcon from '../common/AppIcon.vue'
 import { NAV_TABS, isTabActive } from '../../config/navTabs.js'
 
 const route = useRoute()
 const notifications = useNotificationStore()
+const ui = useUiStore()
 
 /*
   탭 목록은 헤더와 **같은 파일**에서 온다 (config/navTabs.js).
@@ -39,6 +41,7 @@ const isOn = computed(() => tab => isTabActive(tab, route.path))
   <nav class="mtabbar" aria-label="주요 메뉴">
     <RouterLink
       v-for="t in TABS"
+      @click="ui.enterAiCourse(t.to, $event)"
       :key="t.to"
       :to="t.to"
       class="mt"
