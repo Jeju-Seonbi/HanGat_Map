@@ -4,7 +4,7 @@ import type { AccommodationInput, CourseCondition, CourseResult } from '../../as
 
 const oldHotel: AccommodationInput = { source_code: 'KAKAO_LOCAL', source_place_id: 'old', place_name: '기존 숙소', latitude: 33.4, longitude: 126.5 }
 const selected: AccommodationInput = { source_code: 'KAKAO_LOCAL', source_place_id: 'new', place_name: '선택 숙소', latitude: 33.5, longitude: 126.6 }
-const condition: CourseCondition = { start_date: '2026-09-11', end_date: '2026-09-11', people: 2, budget_total: 400000,
+const condition: CourseCondition = { start_date: '2026-09-11', end_date: '2026-09-11', people: 2,
   transport: 'PUBLIC_TRANSIT', course_regions: [], course_styles: [], course_place_preferences: [], accommodation: oldHotel }
 const course: CourseResult = { id: 49, course_type: 'USER', status: 'READY', ...condition, accommodation: oldHotel, days: [],
   claim_token: 'course-proof', claim_expires_at: '2099-01-01T00:00:00Z' }

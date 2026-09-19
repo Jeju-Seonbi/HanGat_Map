@@ -234,7 +234,7 @@ class CourseAiResultValidatorContractTest {
         return new CourseAiInputDto(
                 "2.0",
                 new TripConditionDto(date("2026-08-27"), date("2026-08-29"),
-                        2, 500000, Transport.RENTAL_CAR),
+                        2,  Transport.RENTAL_CAR),
                 new UserPreferencesDto(List.of(), List.of(), List.of(required), List.of(), null),
                 List.of(candidate("want-1", "성산일출봉"),
                         candidate("normal-1", "만장굴"), candidate("normal-2", "비자림")),
@@ -244,7 +244,7 @@ class CourseAiResultValidatorContractTest {
     private CourseAiInputDto singleDayInput() {
         CourseAiInputDto base = input();
         return new CourseAiInputDto(base.contractVersion(),
-                new TripConditionDto(date("2026-08-28"), date("2026-08-28"), 2, 500000,
+                new TripConditionDto(date("2026-08-28"), date("2026-08-28"), 2,
                         Transport.RENTAL_CAR), base.userPreferences(), base.candidates(),
                 base.travelFacts(), base.generationMetadata());
     }

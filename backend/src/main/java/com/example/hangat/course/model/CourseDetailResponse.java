@@ -37,7 +37,6 @@ public record CourseDetailResponse(
         int durationDays,
         String durationText,
         Short people,
-        Integer budgetTotal,
         Transport transport,
         Integer estimatedCostMin,
         Integer estimatedCostMax,

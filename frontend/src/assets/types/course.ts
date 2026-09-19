@@ -36,7 +36,7 @@ export interface KakaoPlaceSearchResult {
 export interface AccommodationInput extends KakaoPlaceSearchResult { region?: RegionRef['code']; image_url?: string }
 export interface AccommodationRecommendation extends AccommodationInput { recommendation_reason: string }
 export interface CourseCondition {
-  start_date: string; end_date: string; people: number; budget_total: number; transport: Transport
+  start_date: string; end_date: string; people: number; transport: Transport
   course_regions: RegionRef[]; course_styles: CourseStyle[]; course_place_preferences: PlacePreference[]; accommodation?: AccommodationInput
 }
 export interface CourseItemCost {
@@ -52,7 +52,6 @@ export interface CourseCostSummary {
 }
 export interface CourseBudgetSummary {
   has_cost_data: boolean
-  budget_total?: number
   verified_total: number
   estimated_total?: number
   estimated_min?: number
@@ -60,9 +59,6 @@ export interface CourseBudgetSummary {
   total_expected?: number
   total_expected_min?: number
   total_expected_max?: number
-  remaining_budget?: number
-  usage_rate?: number
-  over_budget?: boolean
   unknown_count: number
 }
 export interface CourseItem {
@@ -110,7 +106,7 @@ export interface CourseResult {
   id: number; course_type: CourseType; generation_reason?: GenerationReason; status: CourseStatus; title?: string
   swappable?: boolean; manageable?: boolean
   claim_token?: string; claim_expires_at?: string
-  start_date: string; end_date: string; people: number; budget_total?: number; transport: Transport
+  start_date: string; end_date: string; people: number; transport: Transport
   estimated_cost_min?: number; estimated_cost_max?: number; average_congestion_rate?: number | null
   cost_summary?: CourseCostSummary; budget_summary?: CourseBudgetSummary
   generation_error_code?: string; accommodation?: AccommodationInput | null; days: CourseDay[]

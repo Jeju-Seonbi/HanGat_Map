@@ -12,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class CourseMenuCostResolverTest {
     @Test
     void priceLookingDescriptionWithoutGoodPriceDesignationCannotBecomeAMealEstimate() {
-        var course = Course.builder().people((short) 2).budgetTotal(400000).build();
+        var course = Course.builder().people((short) 2).build();
         var place = Place.builder().overview("대표메뉴: 정식 8,000원").isGoodPrice(false).build();
         var item = CourseItem.builder().id(1L).course(course).place(place).build();
         var result = new CourseMenuCostResolver().resolve(course, List.of(item), List.of());
@@ -24,12 +24,12 @@ class CourseMenuCostResolverTest {
 
     @Test
     void existingVerifiedCostsAreNotDoubleCountedOrOverwrittenByMenuEstimates() {
-        var course = Course.builder().people((short) 2).budgetTotal(400000).build();
+        var course = Course.builder().people((short) 2).build();
         var place = Place.builder().overview("대표메뉴: 정식 8,000원").isGoodPrice(true).build();
         var item = CourseItem.builder().id(1L).course(course).place(place).build();
         var verified = CourseItemCost.verified(course, item, 5L, CostCategory.FOOD, 12000, "검증된 주문");
         var costs = new CourseMenuCostResolver().resolve(course, List.of(item), List.of(verified));
-        var result = new CourseBudgetCalculator().calculate(course.getBudgetTotal(), costs);
+        var result = new CourseBudgetCalculator().calculate(costs);
         assertThat(costs).hasSize(1);
         assertThat(result.summary().verifiedTotal()).isEqualTo(12000);
         assertThat(result.summary().estimatedTotal()).isZero();

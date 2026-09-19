@@ -25,8 +25,7 @@ class DbCourseWeatherFactsProviderTest {
     final DbCourseWeatherFactsProvider provider = new DbCourseWeatherFactsProvider(repository, regions, clock);
     CourseRequestDto request() throws Exception {
         return json.readValue("""
-            {"start_date":"2026-09-11","end_date":"2026-09-13","people":2,"budget_total":400000,
-             "transport":"PUBLIC_TRANSIT","course_regions":[{"code":"EAST"}],"course_styles":[{"code":"NATURE"}]}
+            {"start_date":"2026-09-11","end_date":"2026-09-13","people":2,"transport":"PUBLIC_TRANSIT","course_regions":[{"code":"EAST"}],"course_styles":[{"code":"NATURE"}]}
             """, CourseRequestDto.class);
     }
     List<CourseCandidateDto> candidates() throws Exception {

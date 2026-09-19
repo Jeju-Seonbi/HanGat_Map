@@ -600,7 +600,6 @@ class CoursePersistenceServiceTest {
                   "start_date":"2026-08-27",
                   "end_date":"2026-08-29",
                   "people":2,
-                  "budget_total":500000,
                   "transport":"RENTAL_CAR",
                   "course_regions":[],
                   "course_styles":[{"code":"NATURE","weight":1}],

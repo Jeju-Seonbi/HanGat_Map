@@ -557,7 +557,7 @@ async function generateMockCourse(condition: CourseCondition, generationReason: 
     start_date: condition.start_date,
     end_date: condition.end_date,
     people: condition.people,
-    budget_total: condition.budget_total,
+
     transport: condition.transport,
     accommodation: condition.accommodation ? { ...condition.accommodation } : undefined,
     days,
@@ -591,7 +591,6 @@ export function toCourseRequestPayload(condition: CourseCondition, regenerate = 
     start_date: condition.start_date,
     end_date: condition.end_date,
     people: condition.people,
-    budget_total: condition.budget_total,
     transport: condition.transport,
     course_regions: condition.course_regions,
     course_styles: condition.course_styles,

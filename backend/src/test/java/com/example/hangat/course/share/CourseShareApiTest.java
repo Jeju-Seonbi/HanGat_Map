@@ -50,7 +50,7 @@ class CourseShareApiTest {
         em.persist(owner); em.persist(stranger);
         course = courses.save(Course.builder().startDate(LocalDate.of(2026, 10, 1))
                 .endDate(LocalDate.of(2026, 10, 1)).transport(Transport.RENTAL_CAR)
-                .people((short) 3).budgetTotal(999999).estimatedCostMin(888888).build());
+                .people((short) 3).estimatedCostMin(888888).build());
         course.markReady(); course.markSaved(owner, "제주 하루 여행");
         Region region = Region.builder().code("SHARE").name("공유 지역").displayOrder((byte) 9).build();
         PlaceCategory category = PlaceCategory.builder().code("SHARE").name("공유 관광지").build();

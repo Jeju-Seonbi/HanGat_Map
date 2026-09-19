@@ -32,8 +32,7 @@ class CourseDbCandidateServiceTest {
     }
     CourseRequestDto request(String extra)throws Exception {
         return mapper.readValue("""
-            {"start_date":"2026-09-07","end_date":"2026-09-09","people":2,"budget_total":400000,
-             "transport":"PUBLIC_TRANSIT","course_regions":[{"code":"DB_TEST"}],"course_styles":[{"code":"NATURE"}]
+            {"start_date":"2026-09-07","end_date":"2026-09-09","people":2,"transport":"PUBLIC_TRANSIT","course_regions":[{"code":"DB_TEST"}],"course_styles":[{"code":"NATURE"}]
             """+extra+"}",CourseRequestDto.class);
     }
     PlaceSourceMapping place(String identity,String name,String lat,Region r) {

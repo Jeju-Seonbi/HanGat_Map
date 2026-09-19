@@ -116,7 +116,7 @@ class CourseAiResultValidatorTest {
                 "2.0",
                 new TripConditionDto(
                         LocalDate.parse("2026-08-28"), LocalDate.parse("2026-08-29"),
-                        2, 500000, Transport.RENTAL_CAR),
+                        2,  Transport.RENTAL_CAR),
                 new UserPreferencesDto(List.of(), List.of(), List.of(required), List.of(), null),
                 List.of(candidate("want-1", "성산일출봉", PreferenceType.WANT),
                         candidate("normal-1", "만장굴", null)),
@@ -146,7 +146,7 @@ class CourseAiResultValidatorTest {
     private CourseAiInputDto inputWithCongestion() {
         CourseAiInputDto base = inputWithoutFixedTime();
         return new CourseAiInputDto(base.contractVersion(), new TripConditionDto(
-                LocalDate.parse("2026-08-28"), LocalDate.parse("2026-08-28"), 2, 500000,
+                LocalDate.parse("2026-08-28"), LocalDate.parse("2026-08-28"), 2,
                 Transport.RENTAL_CAR), base.userPreferences(),
                 List.of(candidate("want-1", "성산일출봉", PreferenceType.WANT),
                         candidateWithCongestion("crowded", CongestionLevel.CROWDED),

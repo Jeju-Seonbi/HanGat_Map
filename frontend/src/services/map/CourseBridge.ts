@@ -14,7 +14,6 @@ import type { CourseDetail } from '../CourseService'
 export interface AiCourseResult {
   start_date: string
   end_date: string
-  budget_total: number | null
   days: AiCourseDay[]
 }
 
@@ -46,7 +45,6 @@ export interface MapCourse {
   startDate: string
   days: number
   stops: MapCourseStop[]
-  bud: number
   spent: number
   /** 코스 평균 혼잡. 혼잡값이 하나도 없으면 null - 0으로 그리지 않는다 */
   avg: number | null
@@ -121,7 +119,6 @@ export function toMapCourse (
     startDate: result.start_date,
     days: result.days.length,
     stops,
-    bud: result.budget_total ?? 0,
     spent: stops.reduce((a, b) => a + b.cost, 0),
     avg: rated.length ? Math.round(rated.reduce((a, b) => a + (b.c ?? 0), 0) / rated.length) : null,
     pav: null,
@@ -161,7 +158,6 @@ export function toMapCourseFromDetail (
     startDate: detail.startDate,
     days: detail.days.length,
     stops,
-    bud: 0,
     spent: 0,
     avg: rated.length ? Math.round(rated.reduce((a, b) => a + (b.c ?? 0), 0) / rated.length) : null,
     pav: null,

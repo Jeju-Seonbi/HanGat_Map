@@ -20,7 +20,7 @@ const validId = (id: unknown): id is number => Number.isSafeInteger(id) && Numbe
 function inputOnly(c: CourseCondition): CourseCondition {
   // Explicit input allowlist: claim proof is handled separately, never from arbitrary input fields.
   return {
-    start_date: c.start_date, end_date: c.end_date, people: c.people, budget_total: c.budget_total, transport: c.transport,
+    start_date: c.start_date, end_date: c.end_date, people: c.people, transport: c.transport,
     course_regions: c.course_regions.map(x => ({ region_id: x.region_id, code: x.code, name: x.name })),
     course_styles: c.course_styles.map(x => ({ tag_id: x.tag_id, code: x.code, name: x.name, weight: x.weight })),
     course_place_preferences: c.course_place_preferences.map(x => ({ place_id: x.place_id, source_code: x.source_code,
@@ -45,7 +45,7 @@ export function readRestore(port = storage()): RestoreState | null {
     const c = value?.condition
     if (!['result', 'editing'].includes(value?.mode) || (value.mode === 'result' && !validId(value.courseId))
       || !c || !/^\d{4}-\d{2}-\d{2}$/.test(c.start_date) || !/^\d{4}-\d{2}-\d{2}$/.test(c.end_date)
-      || !Number.isInteger(c.people) || c.people < 1 || !Number.isFinite(c.budget_total)
+      || !Number.isInteger(c.people) || c.people < 1
       || !['RENTAL_CAR', 'PUBLIC_TRANSIT', 'TAXI', 'WALK_BIKE'].includes(c.transport)
       || !Array.isArray(c.course_regions) || !Array.isArray(c.course_styles) || !Array.isArray(c.course_place_preferences)
       || [...c.course_regions, ...c.course_styles].some(x => !x || typeof x.code !== 'string')
@@ -119,7 +119,7 @@ export function resultFromDetail(detail: CourseDetail, proof?: RestoreState): Co
   if (!validId(detail.id) || !Array.isArray(detail.days) || (proof?.courseId != null && proof.courseId !== detail.id)) throw new Error('Invalid course response')
   return {
     id: detail.id, course_type: detail.course_type, status: detail.status, title: detail.title,
-    start_date: detail.start_date, end_date: detail.end_date, people: detail.people, budget_total: detail.budget_total,
+    start_date: detail.start_date, end_date: detail.end_date, people: detail.people,
     transport: detail.transport, estimated_cost_min: detail.estimated_cost_min, estimated_cost_max: detail.estimated_cost_max,
     budget_summary: detail.budget_summary,
     average_congestion_rate: detail.average_congestion_rate, accommodation: detail.accommodation,

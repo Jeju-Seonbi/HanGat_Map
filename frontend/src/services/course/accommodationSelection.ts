@@ -58,7 +58,7 @@ export function useAccommodationSelection(
 export function syncConfirmedCourseCondition(condition: CourseCondition, course: CourseResult) {
   Object.assign(condition, {
     start_date: course.start_date, end_date: course.end_date, people: course.people,
-    budget_total: course.budget_total ?? condition.budget_total, transport: course.transport,
+    transport: course.transport,
     accommodation: course.accommodation ?? undefined,
   })
 }
