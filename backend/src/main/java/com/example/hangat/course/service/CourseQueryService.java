@@ -130,7 +130,6 @@ public class CourseQueryService {
                 duration.days(),
                 duration.text(),
                 course.getPeople(),
-                course.getBudgetTotal(),
                 course.getTransport(),
                 budget.totalExpectedMin(),
                 budget.totalExpectedMax(),

@@ -418,7 +418,6 @@ public record CourseAiInputDto(
             LocalDate startDate,
             LocalDate endDate,
             Integer people,
-            Integer budgetTotal,
             Transport transport
     ) {
     }

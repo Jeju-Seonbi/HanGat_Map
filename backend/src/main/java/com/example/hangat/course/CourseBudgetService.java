@@ -23,7 +23,7 @@ public class CourseBudgetService {
     /** Legacy saved courses get the same estimate without writes from a GET request. */
     @Transactional(readOnly = true)
     public CourseBudgetCalculation calculate(Course course, List<CourseItem> courseItems) {
-        return calculator.calculate(course.getBudgetTotal(), new CourseMenuCostResolver().resolve(
+        return calculator.calculate(new CourseMenuCostResolver().resolve(
                 course, courseItems, costRepository.findByCourseId(course.getId())));
     }
 
@@ -40,7 +40,7 @@ public class CourseBudgetService {
         var resolved = new CourseMenuCostResolver().resolve(course, items.findItemsWithPlace(courseId),
                 costRepository.findByCourseId(courseId));
         costRepository.saveAll(resolved.stream().filter(cost -> cost.getId() == null).toList());
-        CourseBudgetCalculation calculation = calculator.calculate(course.getBudgetTotal(), resolved);
+        CourseBudgetCalculation calculation = calculator.calculate(resolved);
         course.updateAggregates(
                 calculation.totalExpectedMin(),
                 calculation.totalExpectedMax(),

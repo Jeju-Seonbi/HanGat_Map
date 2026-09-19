@@ -121,7 +121,6 @@ class CourseCandidateShortlistServiceTest {
                   "start_date":"2026-08-28",
                   "end_date":"2026-08-29",
                   "people":2,
-                  "budget_total":400000,
                   "transport":"RENTAL_CAR",
                   "course_regions":%s,
                   "course_styles":[{"code":"NATURE","weight":1}],

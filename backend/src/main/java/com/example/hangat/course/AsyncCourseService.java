@@ -526,12 +526,10 @@ public class AsyncCourseService {
                 || request.getEndDate().isBefore(request.getStartDate())
                 || request.getPeople() == null
                 || request.getPeople() < 1
-                || request.getPeople() > 100
-                || request.getBudgetTotal() == null
-                || request.getBudgetTotal() <= 0) {
+                || request.getPeople() > 100) {
             throw problem(
                     HttpStatus.BAD_REQUEST,
-                    "여행 날짜, 인원, 예산을 확인하세요."
+                    "여행 날짜와 인원을 확인하세요."
             );
         }
     }

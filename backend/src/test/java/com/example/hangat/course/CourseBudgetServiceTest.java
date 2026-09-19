@@ -24,7 +24,6 @@ class CourseBudgetServiceTest {
         CourseItemCostRepository costRepository = mock(CourseItemCostRepository.class);
         Course course = mock(Course.class);
         when(course.getId()).thenReturn(10L);
-        when(course.getBudgetTotal()).thenReturn(100000);
         when(course.getAverageCongestionRate()).thenReturn(new BigDecimal("42.50"));
         when(courseRepository.findById(10L)).thenReturn(Optional.of(course));
         when(costRepository.findByCourseId(10L)).thenReturn(List.of(
@@ -37,7 +36,6 @@ class CourseBudgetServiceTest {
 
         CourseBudgetCalculation result = service.calculateAndCache(10L);
 
-        assertThat(result.summary().overBudget()).isTrue();
         verify(course).updateAggregates(
                 70000, 120000, new BigDecimal("42.50"));
     }
