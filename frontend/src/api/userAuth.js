@@ -29,6 +29,10 @@ export function normalizeUser (user) {
 
 function normalizeLogin (loginResponse) {
   if (!loginResponse) return null
+  if (loginResponse.recoveryRequired === true) {
+    clearBackendSession()
+    return { recoveryRequired: true }
+  }
   const normalized = {
     ...loginResponse,
     user: normalizeUser(loginResponse.user)
@@ -75,6 +79,27 @@ export async function logout () {
   } finally {
     clearBackendSession()
   }
+}
+
+export async function withdrawAccount (email) {
+  const result = await apiRequest('/users/me/withdrawal', {
+    method: 'POST', body: { email }, auth: true, sessionBound: true, retryAuth: false
+  })
+  clearBackendSession()
+  return result
+}
+
+// 복구 확인은 HttpOnly 쿠키로만 인증한다. 이메일/토큰을 URL이나 로컬 저장소에 두지 않는다.
+export function getWithdrawalContext () {
+  return apiRequest('/auth/withdrawal')
+}
+
+export function cancelWithdrawal () {
+  return apiRequest('/auth/withdrawal/cancel', { method: 'POST' })
+}
+
+export function declineWithdrawalRecovery () {
+  return apiRequest('/auth/withdrawal/decline', { method: 'POST' })
 }
 
 // ────────────────────────── 이메일 인증 ──────────────────────────

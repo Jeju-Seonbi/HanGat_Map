@@ -9,6 +9,7 @@ import FieldText from '../../components/auth/FieldText.vue'
 import FieldPassword from '../../components/auth/FieldPassword.vue'
 import ThemeToggle from '../../components/layout/ThemeToggle.vue'
 import NotificationPreferences from '../../components/mypage/NotificationPreferences.vue'
+import WithdrawalModal from '../../components/mypage/WithdrawalModal.vue'
 import { useAuthStore } from '../../stores/auth.js'
 import { useUiStore } from '../../stores/ui.js'
 import { useApiError } from '../../composables/useApiError.js'
@@ -24,6 +25,7 @@ const router = useRouter()
 const toMessage = useApiError()
 
 const user = computed(() => auth.user)
+const withdrawalOpen = ref(false)
 const birth = computed(() => (user.value?.birthDate ? fmtFull(user.value.birthDate) : '등록하지 않았어요'))
 
 /* ── MY_011 닉네임 변경 ── */
@@ -294,6 +296,16 @@ async function onLogout () {
         <button class="btn2 danger" @click="onLogout">로그아웃</button>
       </div>
     </section>
+
+    <section class="blk withdrawal-section">
+      <h2 class="sect">회원탈퇴</h2>
+      <p v-if="user?.demoAccount" class="note">데모 계정은 회원탈퇴할 수 없어요.</p>
+      <template v-else>
+        <p class="note">탈퇴 후 30일 이내에는 다시 로그인해 취소할 수 있어요. 30일이 지나면 계정과 관련 데이터가 영구 삭제돼요.</p>
+        <div class="acts"><button class="btn2 danger" @click="withdrawalOpen = true">회원탈퇴</button></div>
+      </template>
+    </section>
+    <WithdrawalModal v-if="withdrawalOpen" @close="withdrawalOpen = false" />
 
     <!-- MY_011 닉네임 변경 -->
     <BaseModal v-if="editingNick" title="닉네임 변경" @close="editingNick = false">
