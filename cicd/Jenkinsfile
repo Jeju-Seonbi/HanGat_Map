@@ -145,6 +145,7 @@ pipeline {
                           --values cicd/helm/values.yaml \
                           --values cicd/helm/values-oci-k3s.yaml \
                           --values "$HELM_VALUES_PRIVATE" \
+                          --set-string backend.configEnv.HANGAT_ASYNC_ENABLED=true \
                           --set ingress.swagger.enabled=false
 
                         helm template "$HELM_RELEASE" cicd/helm \
@@ -153,6 +154,7 @@ pipeline {
                           --values cicd/helm/values-oci-k3s.yaml \
                           --values "$HELM_VALUES_PRIVATE" \
                           --set ingress.swagger.enabled=false \
+                          --set-string backend.configEnv.HANGAT_ASYNC_ENABLED=true \
                           > /dev/null
 
                         # 비활성 기간에도 CronJob 템플릿의 문법 오류를 검사한다.
@@ -162,6 +164,7 @@ pipeline {
                           --values cicd/helm/values-oci-k3s.yaml \
                           --values "$HELM_VALUES_PRIVATE" \
                           --set ingress.swagger.enabled=false \
+                          --set-string backend.configEnv.HANGAT_ASYNC_ENABLED=true \
                           --set batch.enabled=true \
                           --set batch.suspend=true \
                           > /dev/null
@@ -378,6 +381,7 @@ String deploymentScript() {
           --values cicd/helm/values.yaml \
           --values cicd/helm/values-oci-k3s.yaml \
           --values "$HELM_VALUES_PRIVATE" \
+          --set-string backend.configEnv.HANGAT_ASYNC_ENABLED=true \
           --set ingress.swagger.enabled=false \
           --set-string deployment.revision="$DEPLOYMENT_REVISION" \
           --set-string backend.image.repository="$BACKEND_IMAGE" \
