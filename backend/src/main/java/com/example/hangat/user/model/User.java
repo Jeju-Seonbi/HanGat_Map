@@ -98,6 +98,9 @@ public class User {
     @Column(name = "withdrawn_at")
     private LocalDateTime withdrawnAt;
 
+    @Column(name = "auth_version", nullable = false)
+    private long authVersion;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -183,11 +186,22 @@ public class User {
      * status와 withdrawnAt이 같이 움직여야 DB CHECK를 안 어김.
      */
     public void withdraw() {
+        withdrawAt(DateTimes.nowUtc());
+    }
+
+    public void withdrawAt(LocalDateTime at) {
         if (this.status == UserStatus.WITHDRAWN) {
             return; // 멱등
         }
         this.status = UserStatus.WITHDRAWN;
-        this.withdrawnAt = DateTimes.nowUtc();
+        this.withdrawnAt = at;
+        this.authVersion++;
+    }
+
+    public void cancelWithdrawal() {
+        if (this.status != UserStatus.WITHDRAWN) throw new BaseException(BaseResponseStatus.REQUEST_ERROR);
+        this.status = UserStatus.ACTIVE;
+        this.withdrawnAt = null;
     }
 
     // ────────────────────────── 조회 ──────────────────────────

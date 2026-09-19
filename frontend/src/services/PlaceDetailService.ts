@@ -87,6 +87,19 @@ export const PlaceDetailService = {
   },
 
   /**
+   * 소개 페이지용 - "없는 장소"와 "못 받음"을 가른다(2026-09-19). 전엔 인터넷이 끊겨도 "주소가 잘못되었거나…"라고 했다.
+   * missing = 백엔드가 4xx 로 답함(없는 id·PLACE_NOT_FOUND 3201) / detail null + missing false = 연결·서버 문제라 다시 시도가 맞다.
+   * 지도 MapPlaceService.getById 와 같은 기준
+   */
+  async getById (placeId: number): Promise<{ detail: PlaceDetail | null, missing: boolean }> {
+    try {
+      return { detail: await apiGet<PlaceDetail>(`/places/${placeId}`, 15000), missing: false }
+    } catch (e) {
+      return { detail: null, missing: /^HTTP 4\d\d$/.test((e as Error)?.message ?? '') }
+    }
+  },
+
+  /**
    * 혼잡 예보는 장소별 엔드포인트가 없어 최신 발표분 전체에서 이 장소만 뽑는다.
    * 지도(CrowdService)와 같은 응답이라 브라우저 캐시가 겹친다.
    */

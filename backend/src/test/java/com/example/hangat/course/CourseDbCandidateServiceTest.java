@@ -2,6 +2,7 @@ package com.example.hangat.course;
 
 import com.example.hangat.course.model.*;
 import com.example.hangat.map.model.entity.*;
+import com.example.hangat.map.model.entity.Tag;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.*;
@@ -51,6 +52,43 @@ class CourseDbCandidateServiceTest {
         assertThat(result).extracting(c->c.getStoredCandidate().identity().placeId()).containsExactly(a.getPlace().getId(),b.getPlace().getId());
         assertThat(result.get(0).getStoredCandidate().styleHints()).extracting(h->h.styleCode()).contains("NATURE");
         assertThat(result.get(0).getStoredCandidate().congestionFacts()).isEmpty();
+    }
+    @Test void usesStoredTourismTagsWithoutRawPayloadForEveryStyle() throws Exception {
+        String[][] cases = {{"NA010200","NATURE"},{"EX010100","LOCAL"},{"FD050100","CAFE"},
+                {"LS010300","ACTIVITY"},{"VE030300","WITH_KIDS"},{"NA020800","PHOTO"}};
+        for (int i=0;i<cases.length;i++) {
+            Place p=em.persist(Place.builder().name("tagged"+i).normalizedName("tagged"+i).region(region)
+                    .primaryCategory(category).latitude(new BigDecimal("33.4")).longitude(new BigDecimal("126.6")).build());
+            em.persist(PlaceSourceMapping.builder().place(p).source(source).sourcePlaceId("TAG"+i).build());
+            Tag tag=em.persist(Tag.builder().code(cases[i][0]).name("test tag"+i).build());
+            em.persist(PlaceTag.fromApi(p,tag));
+        }
+        em.flush();
+        var tree=(com.fasterxml.jackson.databind.node.ObjectNode)mapper.valueToTree(request(""));
+        var styles=tree.putArray("course_styles");
+        for(var c:cases)styles.addObject().put("code",c[1]);
+        var req=mapper.treeToValue(tree,CourseRequestDto.class);
+        var result=new CourseDbCandidateService(em.getEntityManager(),mapper).find(req);
+        for(int i=0;i<cases.length;i++) {
+            String id="TAG"+i;
+            assertThat(result.stream().filter(c->id.equals(c.getStoredCandidate().identity().candidateId()))
+                    .findFirst().orElseThrow().getStoredCandidate().styleHints())
+                    .extracting(h->h.styleCode()).contains(cases[i][1]);
+        }
+    }
+    @Test void reservesCafeBeyondRawLimitEvenForRentalCar() throws Exception {
+        for(int i=0;i<305;i++)place("A"+String.format("%04d",i),"ordinary"+i,"33.4",region);
+        Place p=em.persist(Place.builder().name("cafe").normalizedName("cafe").region(region)
+                .primaryCategory(category).latitude(new BigDecimal("33.6")).longitude(new BigDecimal("126.6")).build());
+        em.persist(PlaceSourceMapping.builder().place(p).source(source).sourcePlaceId("ZCAFE").build());
+        Tag tag=em.persist(Tag.builder().code("FD050100").name("test cafe").build());
+        em.persist(PlaceTag.fromApi(p,tag));em.flush();
+        var tree=(com.fasterxml.jackson.databind.node.ObjectNode)mapper.valueToTree(request(""));
+        tree.put("transport","RENTAL_CAR");tree.putArray("course_styles").addObject().put("code","CAFE");
+        var req=mapper.treeToValue(tree,CourseRequestDto.class);
+        var result=new CourseDbCandidateService(em.getEntityManager(),mapper).find(req);
+        assertThat(result).hasSize(15);
+        assertThat(result).extracting(c->c.getStoredCandidate().identity().candidateId()).contains("ZCAFE");
     }
     @Test void wantUsesExactIdentityAndStoredFactsAndFixedSchedule()throws Exception {
         var p=place("DB_WANT","stored name","33.4",region);place("DB_OTHER_ID","stored name","33.5",region);em.flush();

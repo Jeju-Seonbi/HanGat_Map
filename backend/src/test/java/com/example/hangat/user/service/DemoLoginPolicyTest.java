@@ -11,7 +11,7 @@ import static org.mockito.Mockito.*;
 class DemoLoginPolicyTest {
     @Test void disabledByDefaultWithoutQueryingAccounts() {
         var users = mock(UserRepository.class);
-        var service = new AuthService(users, null, null, null, null);
+        var service = new AuthService(users, null, null, null, null, null, null);
         assertThatThrownBy(service::loginDemo).isInstanceOfSatisfying(ResponseStatusException.class,
                 e -> assertThat(e.getStatusCode().value()).isEqualTo(503));
         verifyNoInteractions(users);

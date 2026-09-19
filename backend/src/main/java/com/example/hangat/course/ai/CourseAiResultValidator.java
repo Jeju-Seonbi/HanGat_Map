@@ -80,7 +80,7 @@ public class CourseAiResultValidator {
         boolean cafeScheduled = scheduled.keySet().stream()
                 .map(candidates::get).filter(java.util.Objects::nonNull).anyMatch(this::isCafe);
         if (!cafeAvailable) {
-            fail(CourseAiValidationCode.AI_RESULT_SELECTED_STYLE_MISSING,
+            fail(CourseAiValidationCode.AI_RESULT_STYLE_CANDIDATE_MISSING,
                     "카페 스타일을 유지할 확인된 카페 후보가 부족합니다.");
         }
         if (!cafeScheduled) {
@@ -142,7 +142,7 @@ public class CourseAiResultValidator {
                 .filter(fact -> previousCandidateId.equals(fact.fromRef()) && item.candidateId().equals(fact.toRef()))
                 .map(CourseAiInputDto.TravelFactDto::travelMinutes).filter(java.util.Objects::nonNull)
                 .findFirst().orElse(0);
-        if (item.startTime().isBefore(previousTime.plusMinutes((long) dwell + travel))) {
+        if (item.startTime().toSecondOfDay()/60L < previousTime.toSecondOfDay()/60L + dwell + travel) {
             fail(CourseAiValidationCode.AI_RESULT_TRAVEL_TIME_OVERLAP,
                     "AI 코스 일정이 체류 및 추정 이동시간과 겹칩니다.");
         }

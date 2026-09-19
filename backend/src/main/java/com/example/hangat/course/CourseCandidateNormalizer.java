@@ -192,7 +192,8 @@ final class CourseCandidateNormalizer {
 
     private InternalPlaceCategory ktoInternalCategory(TourPlaceDto place) {
         String code;
-        if ("A05020900".equals(place.getCategory3())) {
+        if ("A05020900".equals(place.getCategory3())
+                || StoredPlaceStyleResolver.resolve(place.getClassificationCode()).contains("CAFE")) {
             code = "CAFE";
         } else if ("A05".equals(place.getCategory())) {
             code = "FOOD";
@@ -238,7 +239,9 @@ final class CourseCandidateNormalizer {
                 continue;
             }
             String normalizedCode = styleCode.trim().toUpperCase(Locale.ROOT);
-            if ("NATURE".equals(normalizedCode) && "A01".equals(place.getCategory())) {
+            if (StoredPlaceStyleResolver.resolve(place.getClassificationCode()).contains(normalizedCode)) {
+                result.add(new StyleHint(normalizedCode, "KTO_CLASSIFICATION", place.getClassificationCode()));
+            } else if ("NATURE".equals(normalizedCode) && "A01".equals(place.getCategory())) {
                 result.add(new StyleHint("NATURE", "KTO_CAT1", "A01"));
             } else if ("ACTIVITY".equals(normalizedCode) && "A03".equals(place.getCategory())) {
                 result.add(new StyleHint("ACTIVITY", "KTO_CAT1", "A03"));

@@ -219,11 +219,11 @@ class ProfileImageIntegrationTest {
         owner.withdraw();
         users.saveAndFlush(owner);
         String privatePath = "/users/me/profile-image/" + path.substring(path.lastIndexOf('/') + 1);
-        mvc.perform(get(privatePath).header("Authorization", token(owner))).andExpect(status().isForbidden());
+        mvc.perform(get(privatePath).header("Authorization", token(owner))).andExpect(status().isUnauthorized());
         mvc.perform(multipart("/users/me/profile-image")
                         .file(new MockMultipartFile("file", png))
                         .with(r -> { r.setMethod("PUT"); return r; }).header("Authorization", token(owner)))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test void 공개_프로필은_다른_회원과_비회원도_읽지만_변경할_수_없다() throws Exception {

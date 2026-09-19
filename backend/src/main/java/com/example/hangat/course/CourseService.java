@@ -213,8 +213,9 @@ public class CourseService {
 
         List<CourseCandidateDto> stored = dbCandidateService.map(service -> service.find(request)).orElseGet(List::of);
         int target = CourseCandidateShortlistService.targetSize(request);
-        log.info("AI_CANDIDATES db={} target={} ktoFallback={}", stored.size(), target, stored.size() < target);
-        if (stored.size() >= target) {
+        boolean needsSupplement = stored.size() < target || !coversSelectedStyles(request,stored);
+        log.info("AI_CANDIDATES db={} target={} ktoFallback={}", stored.size(), target, needsSupplement);
+        if (!needsSupplement) {
             return prepareCandidates(request, stored);
         }
         List<TourPlaceDto> tourPlaces;
@@ -249,7 +250,9 @@ public class CourseService {
             TourPlaceDto place = shortlisted.place();
             if (stored.stream().anyMatch(c -> c.getStoredCandidate().identity().sourceCode().equals("KTO")
                     && c.getStoredCandidate().identity().sourcePlaceId().equals(place.getContentId()))) continue;
-            if (!stored.isEmpty() && courseCandidates.size() >= target && shortlisted.preferenceType() != PreferenceType.WANT) continue;
+            if (!stored.isEmpty() && courseCandidates.size() >= target && shortlisted.preferenceType() != PreferenceType.WANT
+                    && request.getCourseStyles().stream().noneMatch(style -> shortlisted.confirmedStyleHints().contains(style.getCode())
+                    && courseCandidates.stream().noneMatch(c -> c.getConfirmedStyleHints().contains(style.getCode())))) continue;
             PreferenceType preferenceType = shortlisted.preferenceType();
             List<String> confirmedStyleHints = shortlisted.confirmedStyleHints();
             String signguCd;
@@ -306,7 +309,28 @@ public class CourseService {
         if (dbCandidateService.isPresent() && courseCandidates.size() < java.time.temporal.ChronoUnit.DAYS.between(startDate, endDate) + 1) {
             throw new KtoApiException(true);
         }
-        return prepareCandidates(request, courseCandidates);
+        return prepareCandidates(request, capCandidatesPreservingStyles(request,courseCandidates,target));
+    }
+
+    private boolean coversSelectedStyles(CourseRequestDto request,List<CourseCandidateDto> candidates) {
+        return request.getCourseStyles().stream().allMatch(style -> candidates.stream()
+                .anyMatch(c -> c.getConfirmedStyleHints().contains(style.getCode())));
+    }
+
+    private List<CourseCandidateDto> capCandidatesPreservingStyles(CourseRequestDto request,
+            List<CourseCandidateDto> candidates,int target) {
+        List<CourseCandidateDto> selected = new ArrayList<>(candidates.stream()
+                .filter(c -> c.getPreferenceType()==PreferenceType.WANT).toList());
+        for(var style:request.getCourseStyles()) {
+            if(selected.size()>=target)break;
+            if(selected.stream().anyMatch(c -> c.getConfirmedStyleHints().contains(style.getCode())))continue;
+            candidates.stream().filter(c -> c.getConfirmedStyleHints().contains(style.getCode())).findFirst().ifPresent(selected::add);
+        }
+        for(var candidate:candidates) {
+            if(selected.size()>=target)break;
+            if(!selected.contains(candidate))selected.add(candidate);
+        }
+        return selected;
     }
 
     private PreparedCourse prepareCandidates(CourseRequestDto request, List<CourseCandidateDto> courseCandidates) {

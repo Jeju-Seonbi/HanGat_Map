@@ -19,10 +19,31 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Transactional
-class NotificationInboxTest {
+public class NotificationInboxTest {
     @Autowired MockMvc mvc;
     @Autowired JwtProvider jwt;
     @Autowired JdbcTemplate jdbc;
+    @Autowired com.example.hangat.notification.service.inbox.NotificationService notificationService;
+
+    @org.junit.jupiter.api.BeforeEach
+    void activeAccount() {
+        if (jdbc.queryForObject("SELECT COUNT(*) FROM users WHERE id=1", Integer.class) == 0) {
+            jdbc.update("INSERT INTO users(id,email,nickname,status,auth_version,created_at,updated_at) VALUES (1,'inbox@example.com','알림회원','ACTIVE',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
+        }
+    }
+
+    @Test void withdrawnUserCannotReceiveDelayedNotification() {
+        jdbc.execute("CREATE ALIAS IF NOT EXISTS UTC_TIMESTAMP FOR 'com.example.hangat.notification.NotificationInboxTest.utcTimestamp'");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS notification_outbox(notification_id BIGINT PRIMARY KEY, user_id BIGINT, created_at TIMESTAMP)");
+        jdbc.update("UPDATE users SET status='WITHDRAWN', withdrawn_at=CURRENT_TIMESTAMP WHERE id=1");
+        notificationService.enqueue(1L, "SECURITY_LOGIN", "제목", "내용", "USER", "1", "delayed-withdrawn");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notifications WHERE dedupe_key='delayed-withdrawn'", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_outbox WHERE user_id=1", Integer.class)).isZero();
+    }
+
+    public static java.sql.Timestamp utcTimestamp(int precision) {
+        return java.sql.Timestamp.valueOf(java.time.LocalDateTime.now(java.time.ZoneOffset.UTC));
+    }
 
     private String auth() { return "Bearer " + jwt.createAccessToken(1L); }
 

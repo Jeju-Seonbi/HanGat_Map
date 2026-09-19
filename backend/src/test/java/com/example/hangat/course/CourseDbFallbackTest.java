@@ -34,11 +34,21 @@ class CourseDbFallbackTest {
         """,CourseRequestDto.class);}
     CourseCandidateDto fact(int i){return CourseCandidateDto.fromStored(new CourseCandidate(new CandidateIdentity("db"+i,(long)i+1,"KTO","db"+i),
             new PlaceFact("same name",null,null,new BigDecimal("33.4"),new BigDecimal("126.6"),null),UserConstraint.none(),"EAST",List.of(),
-            new InternalPlaceCategory(1L,"TOURIST","Tourist"),List.of(),List.of(),null));}
+            new InternalPlaceCategory(1L,"TOURIST","Tourist"),List.of(new StyleHint("NATURE","KTO_CLASSIFICATION","NA010200")),List.of(),null));}
     void ready(){when(prep.prepareGeneration(any(),anyList())).thenReturn(new CourseAiPreparationService.PreparedGeneration(null,mock(CourseAiInputDto.class),null));}
     @Test void enoughDbSkipsKtoAndCongestionApi()throws Exception{
         ready();var facts=java.util.stream.IntStream.range(0,15).mapToObj(this::fact).toList();when(db.find(any())).thenReturn(facts);
         assertThat(service.prepareAiInput(request())).isNotNull();verifyNoInteractions(kto,congestion,ai,persistence);verify(prep).prepareGeneration(any(),eq(facts));
+    }
+    @Test void enoughOrdinaryCandidatesStillSupplementsMissingCafeWithoutExceedingLimit()throws Exception {
+        ready();when(db.find(any())).thenReturn(java.util.stream.IntStream.range(0,15).mapToObj(this::fact).toList());
+        var tree=(com.fasterxml.jackson.databind.node.ObjectNode)mapper.valueToTree(request());
+        tree.putArray("course_styles").addObject().put("code","CAFE");
+        var req=mapper.treeToValue(tree,CourseRequestDto.class);
+        when(kto.getTourPlaces()).thenReturn(List.of(mapper.readValue("{\"contentid\":\"cafe\",\"title\":\"카페\",\"addr1\":\"제주시\",\"cat3\":\"A05020900\"}",TourPlaceDto.class)));
+        when(congestion.getCongestionData(any(),any())).thenReturn(List.of());
+        service.prepareAiInput(req);
+        verify(prep).prepareGeneration(any(),argThat(c->c.size()==15 && c.stream().anyMatch(x->"cafe".equals(x.getPlace().getContentId()))));
     }
     @Test void shortageMakesOneLogicalCallAndDeduplicatesSourceIdentity()throws Exception{
         ready();when(db.find(any())).thenReturn(List.of(fact(0)));

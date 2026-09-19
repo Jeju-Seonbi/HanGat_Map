@@ -210,9 +210,10 @@ public class SecurityConfig {
     @Bean
     public JwtAuthenticationFilter jwtAuthenticationFilter(
             JwtProvider jwtProvider,
-            JwtAuthenticationEntryPoint entryPoint) {
+            JwtAuthenticationEntryPoint entryPoint,
+            com.example.hangat.user.repository.UserRepository users) {
 
-        return new JwtAuthenticationFilter(jwtProvider, entryPoint);
+        return new JwtAuthenticationFilter(jwtProvider, entryPoint, users);
     }
 
     @Bean

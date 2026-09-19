@@ -66,12 +66,36 @@ export const absUrl = (u: string): string =>
     서버 검증 실패는 { success:false, message } JSON 이지만, 5MB 를 넘긴 413 은 스프링 기본 오류 본문(message 없음)이고
     프록시 오류는 HTML 이라 - 그대로 json() 하면 "Unexpected end of JSON input" 이 토스트에 떴다 */
 export async function uploadFailMessage (res: Response): Promise<string> {
+  if (res.status === 401) return LOGIN_EXPIRED_TEXT   // 재발급까지 실패한 뒤 - 서버 봉투는 "JWT 토큰 유효하지 않음"이라 사람 말로
   try {
     const body = await res.json()
     if (body?.message) return body.message as string
   } catch { /* JSON 이 아닌 본문 */ }
   if (res.status === 413) return '사진이 너무 커서 올리지 못했어요 · 5MB 이하로 줄여 주세요'
   return '사진을 올리지 못했어요 · 잠시 후 다시 시도해 주세요'
+}
+
+export const LOGIN_EXPIRED_TEXT = '로그인이 만료됐어요 · 다시 로그인한 뒤 시도해 주세요'
+
+/** 백엔드 BaseResponseStatus 3000번대 = 업무 오류. 문구가 사용자용 문장이라 그대로 보여준다(팀 규칙 - 회원·코스·공유 코드도 같은 방식) */
+const isBusinessCode = (code: unknown): code is number => typeof code === 'number' && code >= 3000 && code < 4000
+
+/** 후기 등록·삭제 실패를 사용자 문장으로 바꾼다(2026-09-19).
+    규칙: 업무 오류(3xxx)는 서버 문구를 그대로 - 문구의 주인은 백엔드 한 곳이다. 인증(401·3001·3002)은 코드로
+    판단해 로그인 만료 문구(서버 문구 "JWT 토큰 유효하지 않음"은 로그용). 서버 장애(5xxx)·연결 실패·응답 형식 오류는
+    내부 사정을 내보내지 않고 무엇을 못 했는지(base) + 할 일로 통일한다. 숫자·영어는 화면에 내보내지 않는다 */
+export function failText (err: unknown, base: string): string {
+  const e = err as { status?: number, code?: number | string, message?: string } | null
+  if (e && e.code !== undefined) {   // ApiError(backendClient) - 서버 코드가 있다
+    if (e.code === 'SESSION_CHANGED' && e.message) return e.message   // 계정 전환 안내는 이미 사람 말
+    if (e.status === 401 || e.code === 3001 || e.code === 3002) return LOGIN_EXPIRED_TEXT
+    if (isBusinessCode(e.code) && e.message) return e.message
+    if (e.code === 'NETWORK_ERROR' || e.code === 'REQUEST_TIMEOUT') return `${base} · 인터넷 연결을 확인해 주세요`
+    return `${base} · 잠시 후 다시 시도해 주세요`
+  }
+  // 사진 업로드(uploadPhotos)가 만든 우리 문구는 한글이라 그대로. 브라우저 예외 같은 영어 원문은 숨긴다
+  if (e?.message && /[가-힣]/.test(e.message)) return e.message
+  return `${base} · 잠시 후 다시 시도해 주세요`
 }
 
 export const ReviewApiService = {

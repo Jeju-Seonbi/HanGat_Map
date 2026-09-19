@@ -25,8 +25,17 @@ public class TripNotificationLockRepository {
 
     private final EntityManager entityManager;
 
+    /** 탈퇴·영구 삭제와 같은 회원 잠금을 가장 먼저 잡고 최신 상태를 읽는다. */
+    public boolean lockActiveUser(Long userId) {
+        var statuses = entityManager.createNativeQuery("SELECT status FROM users WHERE id=:id FOR UPDATE")
+                .setParameter("id", userId).getResultList();
+        return !statuses.isEmpty() && "ACTIVE".equals(statuses.get(0));
+    }
+
     /** 최초 동시 요청에도 행은 한 개만 만들고, 기존 수신 설정은 덮어쓰지 않는다. */
     public TripNotificationSettings lock(Long userId) {
+        if (!lockActiveUser(userId)) throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.FORBIDDEN, "사용할 수 없는 계정입니다.");
         entityManager.flush();
         entityManager.createNativeQuery("""
                 INSERT INTO user_notification_settings (
@@ -50,6 +59,7 @@ public class TripNotificationLockRepository {
 
     /** 여행 처리의 잠금 순서는 항상 코스 → 회원 설정이다. */
     public Optional<Course> findSavedCourse(Long userId, Long courseId) {
+        if (!lockActiveUser(userId)) return Optional.empty();
         var rows = entityManager.createQuery("""
                 select c from Course c
                 where c.id = :courseId and c.user.id = :userId and c.status = :status
