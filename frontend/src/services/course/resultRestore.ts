@@ -1,11 +1,13 @@
 import { ref } from 'vue'
-import { apiRequest } from '../../api/backendClient.js'
+import { apiRequest, getBackendUserId } from '../../api/backendClient.js'
 import { ASYNC_COURSES_ENABLED } from '../../api/notifications.js'
 import { ApiError } from '../../api/errors.js'
+import { todayKst } from '../../utils/format.js'
 import type { CourseCondition, CourseResult, CourseItem } from '../../assets/types/course'
 
 export const RESTORE_KEY = 'hangat.ai-course.restore.v1'
 export interface RestoreState {
+  ownerId?: number | null
   mode: 'result' | 'editing'
   courseId?: number
   condition: CourseCondition
@@ -42,6 +44,12 @@ export function readRestore(port = storage()): RestoreState | null {
     if (!raw) return null
     if (raw.length > 50000) throw new Error('Invalid restore state')
     const value = JSON.parse(raw) as RestoreState
+    const ownerId = getBackendUserId()
+    // Legacy member records have no owner marker: recheck only their ID with
+    // the server, without showing potentially another member's inputs/proof.
+    const legacyMember = value && !Object.prototype.hasOwnProperty.call(value, 'ownerId') && ownerId != null
+    if ((!legacyMember && (value.ownerId ?? null) !== (ownerId ?? null))
+      || (legacyMember && value.mode !== 'result')) { clearRestore(port); return null }
     const c = value?.condition
     if (!['result', 'editing'].includes(value?.mode) || (value.mode === 'result' && !validId(value.courseId))
       || !c || !/^\d{4}-\d{2}-\d{2}$/.test(c.start_date) || !/^\d{4}-\d{2}-\d{2}$/.test(c.end_date)
@@ -50,8 +58,9 @@ export function readRestore(port = storage()): RestoreState | null {
       || !Array.isArray(c.course_regions) || !Array.isArray(c.course_styles) || !Array.isArray(c.course_place_preferences)
       || [...c.course_regions, ...c.course_styles].some(x => !x || typeof x.code !== 'string')
       || c.course_place_preferences.some(x => !x || typeof x.place_name !== 'string')) throw new Error('Invalid restore state')
-    const safe: RestoreState = { mode: value.mode, courseId: value.mode === 'result' ? value.courseId : undefined, condition: inputOnly(c),
-      ...(value.mode === 'result' && validProof(value) ? { claim_token: value.claim_token, claim_expires_at: value.claim_expires_at } : {}) }
+    const safe: RestoreState = { ownerId: ownerId ?? null, mode: value.mode, courseId: value.mode === 'result' ? value.courseId : undefined,
+      condition: legacyMember ? { start_date: todayKst(), end_date: todayKst(), people: 2, transport: 'RENTAL_CAR', course_regions: [], course_styles: [], course_place_preferences: [] } : inputOnly(c),
+      ...(!legacyMember && value.mode === 'result' && validProof(value) ? { claim_token: value.claim_token, claim_expires_at: value.claim_expires_at } : {}) }
     port?.setItem(RESTORE_KEY, JSON.stringify(safe)) // same-tab course proof only; no user access/refresh credential
     return safe
   } catch { clearRestore(port); return null }
@@ -60,7 +69,7 @@ export function clearRestore(port = storage()) { try { port?.removeItem(RESTORE_
 export function rememberResult(course: CourseResult, condition: CourseCondition, port = storage()): boolean {
   if (!validId(course.id)) return false
   try {
-    const value: RestoreState = { mode: 'result', courseId: course.id, condition: inputOnly(condition),
+    const value: RestoreState = { ownerId: getBackendUserId() ?? null, mode: 'result', courseId: course.id, condition: inputOnly(condition),
       ...(course.status === 'READY' && validProof(course) ? { claim_token: course.claim_token, claim_expires_at: course.claim_expires_at } : {}) }
     port?.setItem(RESTORE_KEY, JSON.stringify(value)); return !!port
   } catch { return false }
@@ -106,7 +115,7 @@ export function useClaimRenewal(send = (id: number, token: string) => apiRequest
   return { renew, cancel, notice, renewing }
 }
 export function rememberEditing(condition: CourseCondition, port = storage()) {
-  try { port?.setItem(RESTORE_KEY, JSON.stringify({ mode: 'editing', condition: inputOnly(condition) })) } catch { clearRestore(port) }
+  try { port?.setItem(RESTORE_KEY, JSON.stringify({ ownerId: getBackendUserId() ?? null, mode: 'editing', condition: inputOnly(condition) })) } catch { clearRestore(port) }
 }
 
 /** Restore only authoritative detail data; do not fabricate generation facts. */

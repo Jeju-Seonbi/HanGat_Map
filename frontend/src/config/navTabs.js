@@ -46,3 +46,7 @@ export const isTabActive = (tab, path) =>
 
 export const LEFT_TABS = NAV_TABS.filter(t => t.side === 'left')
 export const RIGHT_TABS = NAV_TABS.filter(t => t.side === 'right')
+
+// Menu entry is explicitly different from a result link or a page reload.
+export const tabDestination = tab => tab.to === '/ai-course'
+  ? { path: tab.to, query: { entry: 'new' } } : tab.to

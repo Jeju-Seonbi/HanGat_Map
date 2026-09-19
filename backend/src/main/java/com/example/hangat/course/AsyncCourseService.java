@@ -410,12 +410,17 @@ public class AsyncCourseService {
     }
 
     public Map<String, Object> recent(Long userId) {
-        List<Map<String, Object>> rows = jobs.findRecentByUser(userId);
+        return recent(userId, 0, 20);
+    }
 
-        return Map.of(
-                "items",
-                rows.stream().map(this::jobDto).toList()
-        );
+    public Map<String, Object> recent(Long userId, int page, int size) {
+        if (userId == null) throw problem(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다.");
+        if (page < 0 || page > 10000 || size < 1 || size > 20) {
+            throw problem(HttpStatus.BAD_REQUEST, "페이지는 0~10000, 크기는 1~20이어야 합니다.");
+        }
+        var rows = jobs.findPageByUser(userId, page, size);
+        return Map.of("items", rows.stream().limit(size).map(this::jobDto).toList(),
+                "page", page, "size", size, "hasNext", rows.size() > size);
     }
 
     /**
@@ -499,6 +504,12 @@ public class AsyncCourseService {
         dto.put("status", row.get("status"));
         dto.put("courseId", row.get("course_id"));
         dto.put("errorCode", row.get("error_code"));
+        Object createdAt = row.get("created_at");
+        // DATETIME follows the existing UTC storage contract.
+        dto.put("createdAt", createdAt instanceof java.sql.Timestamp timestamp
+                ? timestamp.toLocalDateTime().atOffset(java.time.ZoneOffset.UTC).toString()
+                : createdAt instanceof java.time.LocalDateTime dateTime
+                ? dateTime.atOffset(java.time.ZoneOffset.UTC).toString() : null);
         dto.put("startDate", row.get("start_date").toString());
         dto.put("endDate", row.get("end_date").toString());
         return dto;

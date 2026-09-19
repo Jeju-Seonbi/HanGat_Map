@@ -19,7 +19,7 @@ import { useRoute } from 'vue-router'
 import { useNotificationStore } from '../../stores/notifications.js'
 import { useUiStore } from '../../stores/ui.js'
 import AppIcon from '../common/AppIcon.vue'
-import { NAV_TABS, isTabActive } from '../../config/navTabs.js'
+import { NAV_TABS, isTabActive, tabDestination } from '../../config/navTabs.js'
 
 const route = useRoute()
 const notifications = useNotificationStore()
@@ -43,7 +43,7 @@ const isOn = computed(() => tab => isTabActive(tab, route.path))
       v-for="t in TABS"
       @click="ui.enterAiCourse(t.to, $event)"
       :key="t.to"
-      :to="t.to"
+      :to="tabDestination(t)"
       class="mt"
       :class="{ on: isOn(t) }"
       :aria-current="isOn(t) ? 'page' : undefined"

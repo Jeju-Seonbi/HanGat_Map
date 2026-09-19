@@ -21,9 +21,9 @@ COPY frontend/src ./src
 
 ARG VITE_API_BASE_URL=/api
 
-# 백엔드 적용 전에 프론트 기능부터 켜지지 않도록 기본값은 false.
+# 회원 비동기 생성은 운영 기본 기능. 다른 알림 플래그는 기존 기본값 유지.
 ARG VITE_NOTIFICATIONS_ENABLED=false
-ARG VITE_ASYNC_COURSES_ENABLED=false
+ARG VITE_ASYNC_COURSES_ENABLED=true
 ARG VITE_TRIP_ALERTS_ENABLED=false
 ARG VITE_TRIP_NOTIFICATIONS_ENABLED=false
 

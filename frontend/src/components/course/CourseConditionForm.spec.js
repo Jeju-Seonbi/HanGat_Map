@@ -80,6 +80,16 @@ function mount(overrides = {}, loading = false) {
   app.provide(Vue.ssrContextKey, {})
   app.mount(root)
 }
+it('step navigation keeps entered conditions and accommodation', async () => {
+  const accommodation = { source_code: 'KAKAO_LOCAL', source_place_id: 'test-hotel', place_name: '선택 숙소', latitude: 33.4, longitude: 126.5 }
+  mount({ accommodation, people: 4 })
+  const view = app._instance.subTree.component.setupState
+  const before = JSON.parse(JSON.stringify(view.form))
+  view.goStep(3); await Vue.nextTick()
+  view.goStep(1); await Vue.nextTick()
+  expect(view.form).toEqual(before)
+  expect(view.form.accommodation.source_place_id).toBe('test-hotel')
+})
 beforeEach(() => {
   vi.stubGlobal('Document', class {})
   vi.stubGlobal('ShadowRoot', class {})

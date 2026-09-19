@@ -3,7 +3,7 @@ import { apiRequest, getBackendUserId } from './backendClient.js'
 const auth = { auth: true, sessionBound: true, timeoutMs: 15000 }
 export const getGenerationJob = id => apiRequest(`/course-generation-jobs/${encodeURIComponent(id)}`, auth)
 export const getGenerationResult = id => apiRequest(`/course-generation-jobs/${encodeURIComponent(id)}/result`, auth)
-export const listGenerationJobs = () => apiRequest('/users/me/course-generation-jobs', auth)
+export const listGenerationJobs = (page = 0, size = 20) => apiRequest(`/users/me/course-generation-jobs?page=${page}&size=${size}`, auth)
 
 /** 응답 유실 후 다시 눌러도 같은 요청 키로 접수한다. 토큰은 브라우저 저장소에 넣지 않는다. */
 export async function submitGenerationJob (request) {

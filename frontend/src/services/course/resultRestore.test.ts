@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { apiRequest } from '../../api/backendClient.js'
+import { apiRequest, getBackendUserId } from '../../api/backendClient.js'
 import { ApiError } from '../../api/errors.js'
 import { RESTORE_KEY, readRestore, rememberResult, rememberEditing, clearRestore, fetchRestoredCourse, resultFromDetail, useResultRestore, validProof, singleFlight, useClaimRenewal, clearCourseProof } from './resultRestore'
 import { courseMockService } from '../courseMockService'
 import { syncConfirmedCourseCondition } from './accommodationSelection'
 import type { CourseDetail, RestoreState } from './resultRestore'
 import type { CourseCondition, CourseResult } from '../../assets/types/course'
-vi.mock('../../api/backendClient.js', () => ({ apiRequest: vi.fn() }))
+vi.mock('../../api/backendClient.js', () => ({ apiRequest: vi.fn(), getBackendUserId: vi.fn(() => null) }))
+vi.mock('../../api/notifications.js', () => ({ ASYNC_COURSES_ENABLED: true }))
 const condition: CourseCondition = { start_date: '2026-09-07', end_date: '2026-09-09', people: 2,
   transport: 'RENTAL_CAR', course_regions: [], course_styles: [], course_place_preferences: [] }
 const detail: CourseDetail = { id: 29, course_type: 'USER', status: 'READY', ...condition, swappable: true, manageable: false,
@@ -17,8 +18,30 @@ const detail: CourseDetail = { id: 29, course_type: 'USER', status: 'READY', ...
     item_source: i === 1 ? 'REPLACEMENT' : 'AI_RECOMMENDED', recommendation_reason: '서버에 저장된 추천 이유' }] })) }
 function memory() { const m = new Map<string, string>(); return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => { m.set(k, v) }, removeItem: (k: string) => { m.delete(k) } } }
 const state: RestoreState = { mode: 'result', courseId: 29, condition }
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => { vi.clearAllMocks(); vi.mocked(getBackendUserId).mockReturnValue(null) })
 describe('same-tab result restoration', () => {
+  it('does not restore another account or signed-out member state', () => {
+    const port = memory()
+    vi.mocked(getBackendUserId).mockReturnValue(6)
+    rememberResult(resultFromDetail(detail), condition, port)
+    vi.mocked(getBackendUserId).mockReturnValue(7)
+    expect(readRestore(port)).toBeNull()
+    expect(port.getItem(RESTORE_KEY)).toBeNull()
+    rememberEditing(condition, port)
+    vi.mocked(getBackendUserId).mockReturnValue(null)
+    expect(readRestore(port)).toBeNull()
+  })
+  it('legacy member restoration rechecks only the course ID without old inputs or proof', () => {
+    const port = memory()
+    port.setItem(RESTORE_KEY, JSON.stringify({ ...state, claim_token: 'test-proof', claim_expires_at: '2099-01-01T00:00:00Z' }))
+    vi.mocked(getBackendUserId).mockReturnValue(6)
+    const restored = readRestore(port)!
+    expect(restored.courseId).toBe(29)
+    expect(restored.ownerId).toBe(6)
+    expect(restored.claim_token).toBeUndefined()
+    expect(restored.condition.course_place_preferences).toEqual([])
+    expect(apiRequest).not.toHaveBeenCalled()
+  })
   it.each([undefined, 400000])('restores drafts with removed legacy budget %s', budget => {
     const port = memory()
     const inputs = condition
@@ -55,7 +78,7 @@ describe('same-tab result restoration', () => {
     const port = memory()
     const course = { ...resultFromDetail(detail), claim_token: 'not-stored', claim_expires_at: '2099-01-01T00:00:00Z' }
     expect(rememberResult(course, condition, port)).toBe(true)
-    const expected = { ...state, claim_token: course.claim_token, claim_expires_at: course.claim_expires_at }
+    const expected = { ...state, ownerId: null, claim_token: course.claim_token, claim_expires_at: course.claim_expires_at }
     expect(JSON.parse(port.getItem(RESTORE_KEY)!)).toEqual(expected)
     expect(port.getItem(RESTORE_KEY)).not.toMatch(/access_token|refresh_token|days|car_route|costs/)
     expect(readRestore(port)).toEqual(expected)
@@ -99,7 +122,7 @@ describe('same-tab result restoration', () => {
   it('editing/new course persists inputs but will not reopen old course', () => {
     const port = memory(); rememberResult(resultFromDetail(detail), condition, port)
     rememberEditing({ ...condition, people: 4 }, port)
-    expect(readRestore(port)).toEqual({ mode: 'editing', condition: { ...condition, people: 4 } })
+    expect(readRestore(port)).toEqual({ ownerId: null, mode: 'editing', condition: { ...condition, people: 4 } })
     clearRestore(port); expect(readRestore(port)).toBeNull()
   })
   it('deduplicates concurrent detail requests and displays loading', async () => {
@@ -171,7 +194,7 @@ describe('course proof renewal', () => {
     const [a, b] = await Promise.all([flow.renew(29, proof), flow.renew(29, proof)])
     expect(a).toEqual(b)
     expect(apiRequest).toHaveBeenCalledTimes(1)
-    expect(apiRequest).toHaveBeenCalledWith('/courses/29/claim/renew', { method: 'POST', auth: false, body: { claim_token: proof.claim_token } })
+    expect(apiRequest).toHaveBeenCalledWith('/courses/29/claim/renew', { method: 'POST', auth: false, optionalAuth: true, body: { claim_token: proof.claim_token } })
     await courseMockService.updateAccommodation({ ...resultFromDetail(detail), ...a }, detail.accommodation!)
     expect(vi.mocked(apiRequest).mock.calls[1][0]).toBe('/courses/29/accommodation')
     expect(vi.mocked(apiRequest).mock.calls[1][1]?.body).toMatchObject({ claim_token: next.claim_token })
@@ -211,6 +234,6 @@ describe('course proof renewal', () => {
   })
   it('malformed or expired stored proof is stripped without discarding valid course id', () => {
     const port = memory(); port.setItem(RESTORE_KEY, JSON.stringify({ ...state, ...proof, claim_expires_at: 'bad' }))
-    expect(readRestore(port)).toEqual(state)
+    expect(readRestore(port)).toEqual({ ...state, ownerId: null })
   })
 })

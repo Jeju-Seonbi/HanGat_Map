@@ -38,5 +38,9 @@ tour-api:
 
 # 착한가격 CSV(resources/data/goodprice_jeju.csv) 발행 기준일 - CSV 를 교체하면 같이 바꾼다
 hangat:
+  # Member async generation and own-request history are shipped together.
+  # Shared by dev/local and prod; explicit false remains available.
+  async:
+    enabled: ${HANGAT_ASYNC_ENABLED:true}
   goodprice:
     base-date: 2026-06-30
