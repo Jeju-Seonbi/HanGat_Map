@@ -17,7 +17,7 @@ function kindOf (d: DailyWeather): string {
   if (s.includes('맑음')) return '맑음'
   return '구름'
 }
-const icon = (d: DailyWeather) => weatherIconSvg(kindOf(d), 24)
+const icon = (d: DailyWeather) => weatherIconSvg(kindOf(d), 36)   // 24 → 36 (2026-09-19 사용자: 날씨 구간이 작다)
 const temp = (d: DailyWeather) => (d.temperature === null ? '-' : `${d.temperature}°`)
 const note = (d: DailyWeather) => [d.sky, d.rainProb ? `${d.rainProb}%` : null].filter(Boolean).join(' ')
 </script>
@@ -37,16 +37,21 @@ const note = (d: DailyWeather) => [d.sky, d.rainProb ? `${d.rainProb}%` : null].
 </template>
 
 <style scoped>
-.wx{padding:16px 8px;border:1px solid var(--border);border-radius:16px;background:var(--surface)}
+/* 크기 - 2026-09-19 사용자 요청으로 한 단계 키움: 칸 여백 16 → 26px, 날짜 11.5 → 13.5px, 아이콘 24 → 36px, 기온 17 → 26px, 하늘 문구 11.5 → 13px */
+.wx{padding:26px 12px;border:1px solid var(--border);border-radius:18px;background:var(--surface)}
 .wx-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}
-.wx-day{display:flex;flex-direction:column;align-items:center;gap:3px;text-align:center}
-.wx-day small{font-size:11.5px;color:var(--sub);font-weight:600;white-space:nowrap}
-.wx-day strong{font-size:17px;font-weight:800;letter-spacing:-.01em}
+.wx-day{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center}
+.wx-day small{font-size:13px;color:var(--sub);font-weight:600;white-space:nowrap}
+.wx-day small:first-child{font-size:13.5px;font-weight:700}
+.wx-day strong{font-size:26px;font-weight:800;letter-spacing:-.02em;line-height:1.1}
 .wx-ic{line-height:0}
 @media (max-width:767px){
-  .wx{padding:12px}
+  .wx{padding:16px 12px;border-radius:16px}
   .wx-days{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
   .wx-days::-webkit-scrollbar{display:none}
-  .wx-day{flex:0 0 76px}
+  .wx-day{flex:0 0 88px;gap:4px}
+  .wx-day small{font-size:12px}
+  .wx-day small:first-child{font-size:12.5px}
+  .wx-day strong{font-size:22px}
 }
 </style>
