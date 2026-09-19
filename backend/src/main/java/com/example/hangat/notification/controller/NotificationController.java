@@ -73,6 +73,11 @@ public class NotificationController {
         return BaseResponse.success(notifications.delete(userId, id));
     }
 
+    @DeleteMapping("/header")
+    public BaseResponse<Notification.InboxResult> clearHeader(@AuthenticationPrincipal Long userId) {
+        return BaseResponse.success(notifications.clearHeader(userId));
+    }
+
     /** 필터·페이지와 관계없이 로그인한 본인의 전체 알림을 삭제한다. */
     @DeleteMapping
     public BaseResponse<Notification.InboxResult> deleteAll(@AuthenticationPrincipal Long userId) {

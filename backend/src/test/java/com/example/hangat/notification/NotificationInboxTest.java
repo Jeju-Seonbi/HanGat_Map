@@ -69,6 +69,24 @@ public class NotificationInboxTest {
     }
 
     @Test
+    void headerClearPreservesHistoryOtherUsersAndNewUnreadNotifications() throws Exception {
+        for (int i = 0; i < 35; i++) seed(1, "NOTICE", "header-" + i);
+        long other = seed(2, "NOTICE", "other-header");
+        mvc.perform(put("/users/me/notifications/read-all").header("Authorization", auth())).andExpect(status().isOk());
+        long incoming = seed(1, "NOTICE", "new-header");
+        mvc.perform(delete("/users/me/notifications/header").header("Authorization", auth())).andExpect(status().isOk());
+        mvc.perform(get("/users/me/notifications").header("Authorization", auth()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.result.items.length()").value(1))
+                .andExpect(jsonPath("$.result.items[0].id").value(String.valueOf(incoming)))
+                .andExpect(jsonPath("$.result.unreadCount").value(1));
+        mvc.perform(get("/users/me/notifications/page").header("Authorization", auth()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.result.totalElements").value(36));
+        assertThat(jdbc.queryForObject("SELECT header_hidden_at FROM notifications WHERE id=?", java.sql.Timestamp.class, other)).isNull();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notifications WHERE user_id=1 AND deleted_at IS NOT NULL", Integer.class)).isZero();
+        mvc.perform(delete("/users/me/notifications/header").header("Authorization", auth())).andExpect(status().isOk());
+    }
+
+    @Test
     void deletedNotificationsDisappearButKeepTheirDedupeRecord() throws Exception {
         long mine = seed(1, "SECURITY_LOGIN", "mine");
         long theirs = seed(2, "NOTICE", "theirs");

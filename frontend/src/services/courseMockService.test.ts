@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { courseMockService, generateMockCourseForTest } from './courseMockService'
+import { courseMockService, generateMockCourseForTest, toCourseRequestPayload } from './courseMockService'
 import type { CourseCondition, CourseItem, PlacePreference } from '../assets/types/course'
 
 const east = { region_id: 1, code: 'EAST' as const, name: '동부' }
@@ -12,7 +12,7 @@ function makeCondition(placePreferences: PlacePreference[] = []): CourseConditio
     start_date: '2026-08-13',
     end_date: '2026-08-15',
     people: 2,
-    budget_total: 500000,
+
     transport: 'RENTAL_CAR',
     course_regions: [east],
     course_styles: [nature],
@@ -31,6 +31,11 @@ function itemsOverlap(a: CourseItem, b: CourseItem) {
 }
 
 describe('courseMockService logical Mock generation', () => {
+  it('omits legacy budget and permits empty optional place preferences in requests', () => {
+    const payload = toCourseRequestPayload(makeCondition())
+    expect(payload).not.toHaveProperty('budget_total')
+    expect(payload.course_place_preferences).toEqual([])
+  })
   it('places USER_FIXED first and prevents every same-day time conflict', async () => {
     const condition = makeCondition([
       { place_id: 101, place_name: '비자림', preference_type: 'WANT', fixed_date: '2026-08-14', fixed_time: '13:00' },

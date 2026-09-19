@@ -29,7 +29,7 @@ class CourseDbFallbackTest {
     final CourseResponseAssembler response=mock(CourseResponseAssembler.class);
     final CourseService service=new CourseService(kto,congestion,new CourseCandidateShortlistService(),prep,ai,persistence,budget,response,Optional.of(db));
     CourseRequestDto request()throws Exception{return mapper.readValue("""
-        {"start_date":"2026-09-07","end_date":"2026-09-09","people":2,"budget_total":400000,"transport":"PUBLIC_TRANSIT",
+        {"start_date":"2026-09-07","end_date":"2026-09-09","people":2,"transport":"PUBLIC_TRANSIT",
          "course_regions":[],"course_styles":[{"code":"NATURE"}]}
         """,CourseRequestDto.class);}
     CourseCandidateDto fact(int i){return CourseCandidateDto.fromStored(new CourseCandidate(new CandidateIdentity("db"+i,(long)i+1,"KTO","db"+i),

@@ -179,7 +179,6 @@ class CourseAiInputAssemblerTest {
 
         assertThat(result.tripCondition().startDate()).isEqualTo(LocalDate.of(2026, 8, 27));
         assertThat(result.tripCondition().people()).isEqualTo(2);
-        assertThat(result.tripCondition().budgetTotal()).isEqualTo(500000);
         assertThat(result.tripCondition().transport()).isEqualTo(Transport.RENTAL_CAR);
         assertThat(result.userPreferences().selectedRegions()).extracting("code").containsExactly("EAST");
         assertThat(result.userPreferences().selectedStyles()).extracting("code").containsExactly("NATURE");
@@ -380,7 +379,6 @@ class CourseAiInputAssemblerTest {
                   "start_date": "2026-08-27",
                   "end_date": "2026-08-29",
                   "people": 2,
-                  "budget_total": 500000,
                   "transport": "RENTAL_CAR",
                   "course_regions": [
                     {"region_id": 2, "code": "EAST", "name": "동부"}
@@ -425,7 +423,6 @@ class CourseAiInputAssemblerTest {
                   "start_date": "2026-08-27",
                   "end_date": "2026-08-29",
                   "people": 2,
-                  "budget_total": 500000,
                   "transport": "RENTAL_CAR",
                   "course_regions": [
                     {"region_id": 2, "code": "EAST", "name": "동부"}

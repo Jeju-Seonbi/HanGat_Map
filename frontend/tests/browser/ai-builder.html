@@ -1,0 +1,20 @@
+<!doctype html><html lang="ko" data-theme="light"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AI 코스 화면 테스트</title></head><body><div id="app"></div><script type="module">
+import {createApp,h,ref} from 'vue';
+import {createPinia} from 'pinia';
+import {createRouter,createMemoryHistory} from 'vue-router';
+import AiCourse from '/src/views/ai-course/AiCourseView.vue';
+import Artwork from '/src/components/course/GenerationArtwork.vue';
+import {courseMockService} from '/src/services/courseMockService';
+import '/src/assets/styles/fonts.css';
+import '/src/assets/styles/tokens.css';
+import '/src/assets/styles/base.css';
+import '/src/assets/styles.css';
+// Isolated local preview: no generation request is sent.
+window.fetch=async()=>Response.json({success:true,result:[]});
+window.failGeneration=()=>{courseMockService.generateCourse=async()=>{throw new Error('fixture failure')};};
+const router=createRouter({history:createMemoryHistory(),routes:[{path:'/',component:AiCourse}]});
+await router.push('/');
+const status=ref(new URLSearchParams(location.search).get('status'));
+window.setArtworkStatus=value=>status.value=value;
+createApp({render:()=>h('main',{class:'content-scope'},[status.value?h(Artwork,{status:status.value}):h(AiCourse)])}).use(createPinia()).use(router).mount('#app');
+</script></body></html>

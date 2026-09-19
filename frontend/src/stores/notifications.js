@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { getBackendSessionVersion } from '../api/backendClient.js'
 import { NOTIFICATIONS_ENABLED, listNotifications, readNotification, readAllNotifications,
-  deleteNotification, deleteAllNotifications, streamNotifications } from '../api/notifications.js'
+  deleteNotification, deleteAllNotifications, clearHeaderNotifications, streamNotifications } from '../api/notifications.js'
 
 /** 헤더 요약과 SSE는 앱 전체에서 공유한다. 마이페이지의 필터·페이지와 섞지 않는다. */
 export const useNotificationStore = defineStore('notifications', () => {
@@ -82,6 +82,9 @@ export const useNotificationStore = defineStore('notifications', () => {
     items.value = items.value.filter(item => String(item.id) !== String(id))
   })
   const removeAll = () => mutate(deleteAllNotifications, () => { items.value = [] })
+  const clearHeader = () => mutate(clearHeaderNotifications, () => {
+    items.value = items.value.filter(item => !item.readAt)
+  })
 
   function stop () {
     active = false; lifecycle++; request++; pending = null; refreshAgain = false
@@ -125,5 +128,5 @@ export const useNotificationStore = defineStore('notifications', () => {
     window.addEventListener('online', onVisibility)
     void refresh(); void connect()
   }
-  return { items, unread, loading, connected, error, revision, busy, refresh, markRead, markAllRead, remove, removeAll, start, stop }
+  return { items, unread, loading, connected, error, revision, busy, refresh, markRead, markAllRead, remove, removeAll, clearHeader, start, stop }
 })

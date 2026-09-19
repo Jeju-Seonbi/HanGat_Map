@@ -122,9 +122,6 @@ public class Course {
     @Column(name = "people", nullable = false)
     private Short people = 1;
 
-    /** 총 예산(원). 조건 미입력이면 NULL - 0원과 구분해야 하므로 기본값을 두지 않는다. */
-    @Column(name = "budget_total")
-    private Integer budgetTotal;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "transport", length = 20, nullable = false)

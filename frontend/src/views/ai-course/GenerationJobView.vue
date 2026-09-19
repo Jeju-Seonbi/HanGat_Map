@@ -5,6 +5,7 @@ import { useRoute } from 'vue-router'
 import { getGenerationJob } from '../../api/courseGeneration.js'
 import { ASYNC_COURSES_ENABLED } from '../../api/notifications.js'
 import { useAuthStore } from '../../stores/auth.js'
+import GenerationArtwork from '../../components/course/GenerationArtwork.vue'
 const auth = useAuthStore()
 const route = useRoute()
 const job = ref(null)
@@ -41,7 +42,9 @@ onBeforeUnmount(() => { epoch++; clearTimeout(timer); document.removeEventListen
 <template>
   <main class="job-page">
     <RouterLink to="/ai-course">AI 코스</RouterLink>
-    <section aria-live="polite">
+    <section>
+      <GenerationArtwork v-if="job && !error" :status="job.status" />
+      <div aria-live="polite">
       <h1>{{ title }}</h1>
       <p v-if="!ASYNC_COURSES_ENABLED">비동기 코스 생성 서비스 준비 중이에요.</p>
       <p v-else-if="error" role="alert">{{ error }}</p>
@@ -53,6 +56,7 @@ onBeforeUnmount(() => { epoch++; clearTimeout(timer); document.removeEventListen
         <p v-if="!terminal">완료 또는 최종 실패 결과는 알림 내역에서도 확인할 수 있어요.</p>
       </template>
       <p v-else-if="loading">진행 상태를 확인하고 있어요.</p>
+      </div>
       <div class="actions">
         <RouterLink v-if="job?.status === 'SUCCEEDED'" class="btn primary" :to="{ name: 'ai-course', query: { job: job.jobId } }">생성된 코스 보기</RouterLink>
         <RouterLink v-if="job?.status === 'FAILED'" class="btn primary" to="/ai-course">여행 조건 다시 선택</RouterLink>
@@ -64,8 +68,8 @@ onBeforeUnmount(() => { epoch++; clearTimeout(timer); document.removeEventListen
 </template>
 <style scoped>
 .job-page { width: min(720px, calc(100% - 40px)); margin: 50px auto; color: var(--tx); }
-section { margin-top: 20px; padding: clamp(20px, 5vw, 40px); background: var(--surf); border: 1px solid var(--line); border-radius: 20px; }
+section { margin-top: 20px; padding: clamp(20px, 5vw, 40px); background: var(--surf); border: 1px solid var(--line); border-radius: 20px; text-align: center; }
 h1 { font-size: clamp(22px, 4vw, 30px); line-height: 1.4; }
 p { line-height: 1.8; color: var(--tx2); }
-.actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 24px; }
+.actions { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; margin-top: 24px; }
 </style>

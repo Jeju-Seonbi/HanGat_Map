@@ -63,7 +63,7 @@ onBeforeUnmount(() => { alive = false; dialog.value?.close(); previousFocus?.foc
       <p class="share-intro">로그인 없이도 링크로 일정, 날씨, 혼잡 예보를 확인할 수 있어요.</p>
       <div id="course-share-policy" class="privacy-box">
         <p><AppIcon name="check" :size="16" /><span><strong>공개되는 정보:</strong> 일정 순서, 장소별 혼잡 예보, 날씨</span></p>
-        <p><AppIcon name="lock" :size="16" /><span><strong>비공개 정보 보호:</strong> 예산·인원·숙소·개인 메모는 공유되지 않아요.</span></p>
+        <p><AppIcon name="lock" :size="16" /><span><strong>비공개 정보 보호:</strong> 인원·숙소·개인 메모는 공유되지 않아요.</span></p>
       </div>
       <p v-if="busy" role="status">공유 상태를 확인하는 중이에요…</p>
       <div v-else-if="error" role="alert">{{ error }} <button type="button" @click="run('status')">다시 확인</button></div>

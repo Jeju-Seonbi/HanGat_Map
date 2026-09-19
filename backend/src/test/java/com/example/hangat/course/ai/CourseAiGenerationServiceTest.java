@@ -249,7 +249,7 @@ class CourseAiGenerationServiceTest {
                 "1.0",
                 new TripConditionDto(
                         LocalDate.parse("2026-08-27"), LocalDate.parse("2026-08-29"),
-                        2, 500000, Transport.RENTAL_CAR),
+                        2,  Transport.RENTAL_CAR),
                 new UserPreferencesDto(List.of(), List.of(), List.of(), List.of(), null),
                 List.of(want), List.of(), null);
     }
@@ -275,7 +275,7 @@ class CourseAiGenerationServiceTest {
         CourseAiInputDto original = input();
         return new CourseAiInputDto(original.contractVersion(),
                 new TripConditionDto(LocalDate.parse("2026-08-28"), LocalDate.parse("2026-08-28"),
-                        2, 500000, Transport.RENTAL_CAR),
+                        2,  Transport.RENTAL_CAR),
                 original.userPreferences(), original.candidates(), original.travelFacts(), original.generationMetadata());
     }
 
@@ -284,7 +284,7 @@ class CourseAiGenerationServiceTest {
                 candidate("candidate-a"), candidate("candidate-b"), candidate("candidate-c"));
         return new CourseAiInputDto("1.0",
                 new TripConditionDto(LocalDate.parse("2026-08-28"), LocalDate.parse("2026-08-28"),
-                        2, 500000, Transport.PUBLIC_TRANSIT),
+                        2,  Transport.PUBLIC_TRANSIT),
                 new UserPreferencesDto(List.of(), List.of(), List.of(), List.of(), null),
                 candidates, List.of(), new CourseAiInputDto.GenerationMetadataDto(reason, null, null));
     }

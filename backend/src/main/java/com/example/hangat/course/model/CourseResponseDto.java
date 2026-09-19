@@ -26,7 +26,6 @@ public record CourseResponseDto(
         LocalDate startDate,
         LocalDate endDate,
         Short people,
-        Integer budgetTotal,
         Transport transport,
         AccommodationDto accommodation,
         Integer estimatedCostMin,
@@ -62,7 +61,6 @@ public record CourseResponseDto(
                 null,
                 null,
                 null,
-                null,
                 days,
                 null,
                 null);
@@ -77,13 +75,12 @@ public record CourseResponseDto(
             LocalDate startDate,
             LocalDate endDate,
             Short people,
-            Integer budgetTotal,
             Transport transport,
             AccommodationDto accommodation,
             List<DayDto> days
     ) {
         this(id, contractVersion, courseType, generationReason, status, startDate, endDate,
-                people, budgetTotal, transport, accommodation, null, null, null,
+                people, transport, accommodation, null, null, null,
                 null, days, null, null);
     }
 
@@ -96,7 +93,6 @@ public record CourseResponseDto(
             LocalDate startDate,
             LocalDate endDate,
             Short people,
-            Integer budgetTotal,
             Transport transport,
             AccommodationDto accommodation,
             Integer estimatedCostMin,
@@ -105,25 +101,25 @@ public record CourseResponseDto(
             List<DayDto> days
     ) {
         this(id, contractVersion, courseType, generationReason, status, startDate, endDate,
-                people, budgetTotal, transport, accommodation, estimatedCostMin,
+                people, transport, accommodation, estimatedCostMin,
                 estimatedCostMax, budgetSummary, null, days, null, null);
     }
 
     public CourseResponseDto(
             Long id, String contractVersion, CourseType courseType, GenerationReason generationReason,
             CourseStatus status, LocalDate startDate, LocalDate endDate, Short people,
-            Integer budgetTotal, Transport transport, AccommodationDto accommodation,
+            Transport transport, AccommodationDto accommodation,
             Integer estimatedCostMin, Integer estimatedCostMax, BudgetSummaryDto budgetSummary,
             BigDecimal averageCongestionRate, List<DayDto> days
     ) {
         this(id, contractVersion, courseType, generationReason, status, startDate, endDate,
-                people, budgetTotal, transport, accommodation, estimatedCostMin,
+                people, transport, accommodation, estimatedCostMin,
                 estimatedCostMax, budgetSummary, averageCongestionRate, days, null, null);
     }
 
     public CourseResponseDto withClaimProof(String token, Instant expiresAt) {
         return new CourseResponseDto(id, contractVersion, courseType, generationReason, status,
-                startDate, endDate, people, budgetTotal, transport, accommodation,
+                startDate, endDate, people, transport, accommodation,
                 estimatedCostMin, estimatedCostMax, budgetSummary, averageCongestionRate,
                 days, token, expiresAt);
     }
@@ -205,7 +201,6 @@ public record CourseResponseDto(
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record BudgetSummaryDto(
             boolean hasCostData,
-            Integer budgetTotal,
             int verifiedTotal,
             Integer estimatedTotal,
             Integer estimatedMin,
@@ -213,9 +208,6 @@ public record CourseResponseDto(
             Integer totalExpected,
             Integer totalExpectedMin,
             Integer totalExpectedMax,
-            Integer remainingBudget,
-            BigDecimal usageRate,
-            Boolean overBudget,
             int unknownCount
     ) {
     }

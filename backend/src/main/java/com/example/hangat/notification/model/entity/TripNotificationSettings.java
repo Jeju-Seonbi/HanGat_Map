@@ -30,8 +30,6 @@ public class TripNotificationSettings {
 
     @Column(name = "ai_course", nullable = false, columnDefinition = "boolean")
     private boolean aiCourse;
-    @Column(name = "weather_warning", nullable = false, columnDefinition = "boolean")
-    private boolean weatherWarning;
     @Column(name = "forecast_change", nullable = false, columnDefinition = "boolean")
     private boolean forecastChange;
     @Column(name = "congestion", nullable = false, columnDefinition = "boolean")
@@ -61,12 +59,11 @@ public class TripNotificationSettings {
     private LocalDateTime updatedAt;
 
     /** 수신 항목 변경 시 여행 확정 버전은 건드리지 않는다. */
-    public void changePreferences(boolean aiCourse, boolean weatherWarning,
+    public void changePreferences(boolean aiCourse,
                                   boolean forecastChange, boolean congestion,
                                   boolean tripSummary, boolean reviewRequest,
                                   LocalDateTime now) {
         this.aiCourse = aiCourse;
-        this.weatherWarning = weatherWarning;
         this.forecastChange = forecastChange;
         this.congestion = congestion;
         this.tripSummary = tripSummary;

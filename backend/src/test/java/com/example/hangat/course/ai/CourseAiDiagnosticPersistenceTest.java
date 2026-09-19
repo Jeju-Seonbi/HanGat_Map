@@ -217,7 +217,7 @@ class CourseAiDiagnosticPersistenceTest {
                 new CourseAiInputDto.PlaceIdentityDto("candidate-a", null, "KTO", "a"),
                 "장소", "주소", 33.4, 126.6, null, "EAST", null, List.of(), List.of(), null);
         return new CourseAiInputDto("1.0", new CourseAiInputDto.TripConditionDto(
-                LocalDate.of(2026, 9, 18), LocalDate.of(2026, 9, 18), 2, 500000,
+                LocalDate.of(2026, 9, 18), LocalDate.of(2026, 9, 18), 2,
                 com.example.hangat.course.model.Transport.RENTAL_CAR),
                 new CourseAiInputDto.UserPreferencesDto(List.of(), List.of(), List.of(), List.of(), null),
                 withCandidate ? List.of(candidate) : List.of(), List.of(), null);

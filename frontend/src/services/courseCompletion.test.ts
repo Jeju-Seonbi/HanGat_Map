@@ -3,10 +3,9 @@ import type { CourseCondition, CourseItem } from '../assets/types/course'
 import { calculateCourseCostSummary, generateMockCourseForTest } from './courseMockService'
 import { savedCourseMockService } from './savedCourseMockService'
 import { getMockWeather, weatherRecommendationAdjustment } from './weatherMockService'
-import { calculateBudgetOverrun } from './budgetUtils'
 
 const condition = (fixed = false): CourseCondition => ({
-  start_date: '2026-08-13', end_date: '2026-08-15', people: 2, budget_total: 500000, transport: 'RENTAL_CAR',
+  start_date: '2026-08-13', end_date: '2026-08-15', people: 2, transport: 'RENTAL_CAR',
   course_regions: [{ region_id: 1, code: 'EAST', name: '동부' }],
   course_styles: [{ tag_id: 1, code: 'NATURE', name: '자연', weight: 1 }],
   course_place_preferences: fixed ? [{ place_id: 103, place_name: '성산일출봉', preference_type: 'WANT', fixed_date: '2026-08-15', fixed_time: '15:00' }] : [],
@@ -40,8 +39,6 @@ describe('COURSE_006 cost accuracy', () => {
     expect(summary.estimated_min).toBe(140000)
     expect(summary.estimated_max).toBe(230000)
     expect(summary.unknown_count).toBe(1)
-    expect(calculateBudgetOverrun(200000, summary.verified_amount + summary.estimated_max)).toBe(46000)
-    expect(calculateBudgetOverrun(300000, summary.verified_amount + summary.estimated_max)).toBe(0)
   })
 })
 

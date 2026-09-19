@@ -29,8 +29,6 @@ const moveText = computed(() => {
   const m = course.value.move
   return `${Math.floor(m / 60) ? Math.floor(m / 60) + '시간 ' : ''}${m % 60}분`
 })
-const spentPct = computed(() => Math.min(100, course.value.spent / course.value.bud * 100))
-const rest = computed(() => course.value.bud - course.value.spent)
 
 /* 일차 날짜·날씨는 코스의 여행일 기준. 전엔 위 날짜 선택기(state.di)를 따라가서 선택기를 옮기면 1일차 날짜까지 밀렸다(최종점검 #2).
    날씨 권역은 그 일차 첫 경유지의 권역 - 전엔 권역을 안 넘겨 항상 북부 값이었다(#38). 권역을 모르는 날(대체 객체뿐)은 북부로 때우지 않고 비운다 */
@@ -117,24 +115,6 @@ const poiClass = poiMarkerClass
     </div>
 
     <div class="pf">
-      <!-- 저장 코스 상세엔 비용 데이터가 없다 - bud=0이면 0원/0원 거짓 표시 대신 숨긴다 -->
-      <template v-if="course.bud">
-        <div class="bh">
-          <span style="color:var(--tx2)">예상 경비</span>
-          <b class="tnum">{{ won(course.spent) }} / {{ won(course.bud) }}</b>
-        </div>
-        <div class="bar">
-          <i :style="{ width: spentPct + '%', background: rest < 0 ? 'var(--busy)' : 'var(--ac)' }"></i>
-        </div>
-        <div class="bn">
-          <template v-if="rest >= 0">
-            {{ won(rest) }}원 남아요 · 식비 ● 입장료 ● 실측 / 숙박·이동비 ○ 미포함
-          </template>
-          <template v-else>
-            <span style="color:var(--busy)">{{ won(-rest) }}원 넘었어요</span> · 식사를 더 저렴한 곳으로 바꿔보세요
-          </template>
-        </div>
-      </template>
 
     </div>
   </div>

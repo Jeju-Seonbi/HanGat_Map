@@ -172,7 +172,6 @@ public class CourseService {
         LocalDate startDate = request.getStartDate();
         LocalDate endDate = request.getEndDate();
         Integer people = request.getPeople();
-        Integer budgetTotal = request.getBudgetTotal();
         Transport transport = request.getTransport();
         List<CourseRegionDto> courseRegions = request.getCourseRegions();
         List<CourseStyleDto> courseStyles = request.getCourseStyles();
@@ -191,10 +190,6 @@ public class CourseService {
 
         if (people == null || people <= 0) {
             throw new IllegalArgumentException("인원은 1명 이상이어야 합니다.");
-        }
-
-        if (budgetTotal == null || budgetTotal <= 0) {
-            throw new IllegalArgumentException("예산은 0원보다 커야 합니다.");
         }
 
         if (transport == null) {

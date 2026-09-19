@@ -173,7 +173,7 @@ class CourseAiPreparationServiceTest {
         CourseRequestDto request = objectMapper.readValue("""
                 {
                   "start_date":"2026-08-27","end_date":"2026-08-27","people":2,
-                  "budget_total":500000,"transport":"PUBLIC_TRANSIT","regenerate":true,
+                  "transport":"PUBLIC_TRANSIT","regenerate":true,
                   "course_regions":[],"course_styles":[{"code":"NATURE"}],
                   "course_place_preferences":[]
                 }
@@ -200,7 +200,6 @@ class CourseAiPreparationServiceTest {
                   "start_date": "2026-08-27",
                   "end_date": "2026-08-29",
                   "people": 2,
-                  "budget_total": 500000,
                   "transport": "RENTAL_CAR",
                   "course_regions": [{"region_id": 2, "code": "EAST", "name": "동부"}],
                   "course_styles": [{"tag_id": 1, "code": "NATURE", "name": "자연", "weight": 1}],

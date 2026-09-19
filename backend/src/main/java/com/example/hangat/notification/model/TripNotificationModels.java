@@ -18,7 +18,6 @@ public final class TripNotificationModels {
      */
     public record Preferences(
             @NotNull Boolean aiCourse,
-            @NotNull Boolean weatherWarning,
             @NotNull Boolean forecastChange,
             @NotNull Boolean congestion,
             @NotNull Boolean tripSummary,

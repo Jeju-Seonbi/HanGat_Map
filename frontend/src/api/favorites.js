@@ -23,6 +23,12 @@ export const FAVORITE_SORTS = [
   { key: 'category', label: '카테고리순' }
 ]
 
+/** 개수 조회에는 날씨 등의 부가 요청이 필요하지 않다. */
+export async function countFavorites () {
+  const rows = await apiRequest('/favorites', { auth: true, sessionBound: true })
+  return rows.length
+}
+
 /** 찜 목록. 정렬은 목록이 작아(수십 건) 여기서 한다 */
 export async function listFavorites ({ sort = 'recent' } = {}) {
   const [rows, weather] = await Promise.all([
