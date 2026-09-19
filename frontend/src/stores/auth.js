@@ -70,7 +70,7 @@ export const useAuthStore = defineStore('auth', {
       this.loading = true
       try {
         const res = await authApi.login(payload)
-        this.user = res.user
+        this.user = res.recoveryRequired ? null : res.user
         this.endedReason = null
         return res
       } finally {
@@ -80,6 +80,14 @@ export const useAuthStore = defineStore('auth', {
 
     async verifyEmail (token) {
       return authApi.verifyEmail(token)
+    },
+
+    async withdraw (email) {
+      const result = await authApi.withdrawAccount(email)
+      this.user = null
+      this.returnTo = null
+      this.endedReason = null
+      return result
     },
 
     async logout () {

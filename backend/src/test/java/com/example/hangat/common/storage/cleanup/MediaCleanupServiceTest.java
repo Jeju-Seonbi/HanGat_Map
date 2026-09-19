@@ -93,11 +93,38 @@ class MediaCleanupServiceTest {
         verify(storage, never()).delete(anyString());
     }
 
+    @Test void committedDeletedOwnerCanBeRetriedAndDeletedAfterGrace() {
+        when(users.findByIdForUpdate(1L)).thenReturn(Optional.empty());
+        when(candidates.deletedOwnerCount(1L)).thenReturn(1);
+        candidate(now.minusSeconds(86400));
+        assertThat(service.inspect(image, false)).isEqualTo(MediaCleanupService.Outcome.DELETED);
+        verify(storage).delete(key);
+    }
+
+    @Test void tombstoneDoesNotOverridePublicPlaceReference() {
+        when(users.findByIdForUpdate(1L)).thenReturn(Optional.empty());
+        when(candidates.deletedOwnerCount(1L)).thenReturn(1);
+        when(candidates.isReferenced(key)).thenReturn(true);
+        assertThat(service.inspect(image, false)).isEqualTo(MediaCleanupService.Outcome.PROTECTED);
+        verify(storage, never()).delete(anyString());
+    }
+
     @Test void storageFailureKeepsCandidateForRetry() {
         candidate(now.minusSeconds(86400));
         doThrow(new IllegalStateException("storage unavailable")).when(storage).delete(key);
         assertThatThrownBy(() -> service.inspect(image, false)).isInstanceOf(IllegalStateException.class);
         verify(candidates, never()).deleteById(key);
+    }
+
+    @Test void accountOnlyJobNeverDeletesExistingOwnersOrUnknownMissingOwners() {
+        candidate(now.minusSeconds(86400));
+        assertThat(service.inspect(image, false, true)).isEqualTo(MediaCleanupService.Outcome.PROTECTED);
+        when(users.findByIdForUpdate(1L)).thenReturn(Optional.empty());
+        assertThat(service.inspect(image, false, true)).isEqualTo(MediaCleanupService.Outcome.PROTECTED);
+        verify(storage, never()).delete(anyString());
+        when(candidates.deletedOwnerCount(1L)).thenReturn(1);
+        assertThat(service.inspect(image, false, true)).isEqualTo(MediaCleanupService.Outcome.DELETED);
+        verify(storage).delete(key);
     }
 
     @Test void profileUsesSameGracePeriod() {

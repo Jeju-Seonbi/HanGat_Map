@@ -1,4 +1,4 @@
-const AUTH_PATH = /^\/(login|signup|verify|find-password|oauth)(\/|$)/i
+const AUTH_PATH = /^\/(login|signup|verify|find-password|oauth|auth)(\/|$)/i
 
 export function isAuthPath (path) {
   return typeof path === 'string' && AUTH_PATH.test(path.split(/[?#]/)[0])

@@ -21,7 +21,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
+@org.springframework.transaction.annotation.Transactional
 class MyReviewControllerTest {
+
+    @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
+
+    @org.junit.jupiter.api.BeforeEach
+    void activeAccount() {
+        if (jdbc.queryForObject("SELECT COUNT(*) FROM users WHERE id=1", Integer.class) == 0) {
+            jdbc.update("INSERT INTO users(id,email,nickname,status,auth_version,created_at,updated_at) VALUES (1,'review-boundary@example.com','경계회원','ACTIVE',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
+        }
+    }
 
     @Autowired
     MockMvc mockMvc;
@@ -73,13 +83,13 @@ class MyReviewControllerTest {
 
     /**
      * 토큰은 유효하지만 그 회원이 DB 에 없거나 ACTIVE 가 아니면 목록을 주지 않는다.
-     * 지금은 둘을 구분하지 않고 3106 으로 나간다 - 탈퇴 뒤 남은 토큰과 같은 경로다.
+     * 필터에서 유효하지 않은 세션으로 차단한다.
      */
     @Test
     void tokenWithoutAnActiveAccountGetsNoList() throws Exception {
-        mockMvc.perform(get("/users/me/reviews").header(HttpHeaders.AUTHORIZATION, bearer()))
-                .andExpect(status().isBadRequest())
+        mockMvc.perform(get("/users/me/reviews").header(HttpHeaders.AUTHORIZATION, "Bearer " + jwtProvider.createAccessToken(Long.MAX_VALUE)))
+                .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.code").value(3106));
+                .andExpect(jsonPath("$.code").value(3002));
     }
 }

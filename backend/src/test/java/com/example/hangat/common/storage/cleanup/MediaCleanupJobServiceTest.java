@@ -15,11 +15,11 @@ class MediaCleanupJobServiceTest {
         var first = new StoredImage("first", Instant.EPOCH, "1");
         var second = new StoredImage("second", Instant.EPOCH, "2");
         when(storage.inventory()).thenReturn(List.of(first, second));
-        when(service.inspect(first, true)).thenThrow(new IllegalStateException());
-        when(service.inspect(second, true)).thenReturn(MediaCleanupService.Outcome.PROTECTED);
+        when(service.inspect(first, true, false)).thenThrow(new IllegalStateException());
+        when(service.inspect(second, true, false)).thenReturn(MediaCleanupService.Outcome.PROTECTED);
         var job = new MediaCleanupJobService(storage, service, true);
         assertThatThrownBy(() -> job.run(null)).isInstanceOf(IllegalStateException.class);
-        verify(service).inspect(second, true);
+        verify(service).inspect(second, true, false);
     }
 
     @Test void listingFailureIsNotReportedAsSuccess() {

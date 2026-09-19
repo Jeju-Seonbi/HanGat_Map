@@ -38,6 +38,26 @@ public class AuthMailSender {
 
     // 가입 인증 링크
     @Async
+    public void sendWithdrawal(String to, java.time.Instant deleteAt) {
+        String deadline = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss 'KST'")
+                .withZone(java.time.ZoneId.of("Asia/Seoul")).format(deleteAt);
+        String text = "회원탈퇴가 처리되었습니다. 신청 시각부터 30일간 데이터를 보관합니다. "
+                + "삭제 예정 시각은 " + deadline + "입니다. 그 전에 기존 계정으로 로그인하면 탈퇴를 취소할 수 있습니다. "
+                + "기한 이후에는 취소할 수 없으며 다음 정리 작업에서 영구 삭제됩니다.";
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, false, "UTF-8");
+            helper.setFrom(from);
+            helper.setTo(to);
+            helper.setSubject("회원탈퇴가 처리되었습니다");
+            helper.setText(text, false);
+            mailSender.send(message);
+        } catch (Exception ignored) {
+            log.warn("Withdrawal mail delivery failed");
+        }
+    }
+
+    @Async
     public void sendVerification(String to, String token) {
         String link = frontendUrl + "/verify?token=" + token;
         send(to, AuthMailTemplates.verification(link));

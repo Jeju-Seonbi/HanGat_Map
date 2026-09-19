@@ -40,6 +40,7 @@ public class NotificationService {
     private final NotificationCommandRepository commands;
     private final TripNotificationService tripAlerts;
     private final ApplicationEventPublisher events;
+    private final com.example.hangat.notification.repository.trip.TripNotificationLockRepository accountLocks;
 
     @Value("${hangat.notifications.enabled:false}")
     private boolean enabled;
@@ -60,7 +61,7 @@ public class NotificationService {
             String targetId,
             String dedupeKey
     ) {
-        if (!enabled || !tripAlerts.allowsGeneral(userId, type)) {
+        if (!enabled || !accountLocks.lockActiveUser(userId) || !tripAlerts.allowsGeneral(userId, type)) {
             return;
         }
 
@@ -88,7 +89,7 @@ public class NotificationService {
             String message,
             String eventKey
     ) {
-        if (!enabled) {
+        if (!enabled || !accountLocks.lockActiveUser(userId)) {
             return;
         }
 

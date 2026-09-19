@@ -25,6 +25,7 @@ function applyAccessToken (tokens) {
 }
 
 async function readBaseResponse (response) {
+  if (response.ok && response.status === 204) return null
   let body
   try {
     body = await response.json()

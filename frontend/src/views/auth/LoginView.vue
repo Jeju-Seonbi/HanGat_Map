@@ -87,10 +87,15 @@ async function submit () {
   locked.value = false
   if (!canSubmit.value) return
   try {
-    await auth.login({
+    const result = await auth.login({
       email: email.value.trim(),
       password: password.value
     })
+    if (result.recoveryRequired) {
+      password.value = ''
+      await router.replace({ name: 'withdrawal-recovery' })
+      return
+    }
     pushRecentLogin(auth.user, { rememberEmail: rememberEmail.value })
     writeLastProvider('email')
     ui.toast(`${auth.displayName}님, 반가워요`)
@@ -122,6 +127,15 @@ function startSocialLogin (provider) {
     lead="나만의 제주 여행 코스를 저장하고, 혼잡도를 피해 여유로운 여행을 계획해보세요."
     :hero-images="AUTH_HERO_IMAGES"
   >
+    <p v-if="route.query.withdrawn === '1'" class="notice" role="status">
+      회원탈퇴가 처리되었어요. 안내 메일을 확인해 주세요. 탈퇴 시점부터 30일 이내에 로그인하면 취소할 수 있어요.
+    </p>
+    <p v-else-if="route.query.withdrawal === 'cancelled'" class="notice" role="status">
+      회원탈퇴를 취소했어요. 다시 로그인해 주세요.
+    </p>
+    <p v-else-if="route.query.withdrawal === 'kept'" class="notice" role="status">
+      탈퇴 상태를 유지했어요. 기존 삭제 예정 시각은 바뀌지 않아요.
+    </p>
     <p v-if="route.query.redirect" class="notice">
       로그인하면 보던 화면으로 돌아가요.
     </p>

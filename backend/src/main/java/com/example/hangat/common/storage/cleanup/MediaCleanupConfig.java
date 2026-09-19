@@ -11,7 +11,7 @@ import java.time.Clock;
 /** 정리 배치만 MinIO 빈을 만든다. 기존 적재 배치는 저장소 자격증명을 요구하지 않는다. */
 @Configuration(proxyBeanMethods = false)
 @Profile("batch")
-@ConditionalOnProperty(name = "hangat.batch.job", havingValue = "media-cleanup")
+@org.springframework.boot.autoconfigure.condition.ConditionalOnExpression("'${hangat.batch.job:}' == 'media-cleanup' || '${hangat.batch.job:}' == 'account-media-cleanup'")
 public class MediaCleanupConfig {
     @Bean(destroyMethod = "close")
     MinioFileStorage cleanupStorage(@Value("${app.storage.minio.endpoint}") String endpoint,
@@ -32,7 +32,8 @@ public class MediaCleanupConfig {
 
     @Bean
     MediaCleanupJobService mediaCleanupJobService(MinioFileStorage storage, MediaCleanupService service,
-                         @Value("${hangat.media-cleanup.dry-run:true}") boolean dryRun) {
-        return new MediaCleanupJobService(storage, service, dryRun);
+                         @Value("${hangat.media-cleanup.dry-run:true}") boolean dryRun,
+                         @Value("${hangat.batch.job}") String job) {
+        return new MediaCleanupJobService(storage, service, dryRun, job.equals("account-media-cleanup"));
     }
 }

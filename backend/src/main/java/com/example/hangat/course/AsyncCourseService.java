@@ -142,7 +142,7 @@ public class AsyncCourseService {
         return transaction.execute(status -> {
             jobs.lockQueue();
 
-            requireActiveUser(userId);
+            requireLockedActiveUser(userId);
 
             List<Map<String, Object>> existing = jobs.findByUserAndRequestKey(userId, requestKey);
 
@@ -207,7 +207,9 @@ public class AsyncCourseService {
             } catch (RejectedExecutionException rejected) {
                 active.remove(ticket.id(), ticket);
 
-                jobs.requeueIfOwned(ticket.id(), ticket.leaseToken());
+                transaction.executeWithoutResult(status -> {
+                    if (jobs.lockActiveUser(ticket.userId())) jobs.requeueIfOwned(ticket.id(), ticket.leaseToken());
+                });
 
                 return;
             }
@@ -224,7 +226,7 @@ public class AsyncCourseService {
                 return null;
             }
 
-            List<Map<String, Object>> rows = jobs.lockOldestQueued();
+            List<Map<String, Object>> rows = jobs.findOldestQueued();
 
             if (rows.isEmpty()) {
                 return null;
@@ -233,6 +235,8 @@ public class AsyncCourseService {
             Map<String, Object> row = rows.get(0);
             String id = (String) row.get("id");
             Long userId = ((Number) row.get("user_id")).longValue();
+            if (!jobs.lockActiveUser(userId)) return null;
+            if (!"QUEUED".equals(jobs.lockJob(id).get("status"))) return null;
             String leaseToken = UUID.randomUUID().toString();
 
             jobs.markRunning(id, leaseToken);
@@ -285,13 +289,12 @@ public class AsyncCourseService {
             KakaoAccommodationProvider.VerifiedAccommodation accommodation
     ) {
         transaction.executeWithoutResult(status -> {
+            requireLockedActiveUser(ticket.userId());
             Map<String, Object> row = jobs.lockJob(ticket.id());
 
             if (!ownsLease(row, ticket.leaseToken())) {
                 return;
             }
-
-            requireActiveUser(ticket.userId());
 
             var response = courses.persistComputedCourse(
                     ticket.request(),
@@ -338,7 +341,8 @@ public class AsyncCourseService {
     @Scheduled(fixedDelay = 5000, scheduler = "alarmScheduler")
     public void heartbeat() {
         for (Ticket ticket : active.values()) {
-            int updated = jobs.extendLeaseIfValid(ticket.id(), ticket.leaseToken());
+            int updated = transaction.execute(status -> jobs.lockActiveUser(ticket.userId())
+                    ? jobs.extendLeaseIfValid(ticket.id(), ticket.leaseToken()) : 0);
             // 만료된 실행은 중단을 요청한다. 실제 종료 전에는 슬롯을 빼지 않아 동시 실행 상한을 지킨다.
             if (updated == 0) {
                 // finally의 제거와 원자적으로 처리하여 풀에서 재사용된 다음 작업을 중단하지 않는다.
@@ -364,6 +368,8 @@ public class AsyncCourseService {
 
     private void fail(String id, String leaseToken, String errorCode) {
         transaction.executeWithoutResult(status -> {
+            Long userId = jobs.findOwner(id);
+            if (userId == null || !jobs.lockActiveUser(userId)) return;
             Map<String, Object> row = jobs.lockJob(id);
 
             if (!"RUNNING".equals(row.get("status"))
@@ -378,8 +384,6 @@ public class AsyncCourseService {
             if ("WORKER_INTERRUPTED".equals(errorCode) && ownsLease(row, leaseToken)) return;
 
             jobs.markFailed(id, errorCode);
-
-            Long userId = ((Number) row.get("user_id")).longValue();
 
             Long activeUser = jobs.countActiveUser(userId);
 
@@ -509,6 +513,10 @@ public class AsyncCourseService {
                     "사용할 수 없는 계정입니다."
             );
         }
+    }
+
+    private void requireLockedActiveUser(Long userId) {
+        if (!jobs.lockActiveUser(userId)) throw problem(HttpStatus.FORBIDDEN, "사용할 수 없는 계정입니다.");
     }
 
     private void validateRequest(CourseRequestDto request) {

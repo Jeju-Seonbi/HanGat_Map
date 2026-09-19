@@ -34,14 +34,21 @@ public class MediaCleanupService {
     }
 
     public Outcome inspect(StoredImage image, boolean dryRun) {
+        return inspect(image, dryRun, false);
+    }
+
+    public Outcome inspect(StoredImage image, boolean dryRun, boolean onlyDeletedOwners) {
         var matcher = KEY.matcher(image.key());
         if (!matcher.matches() || image.modifiedAt() == null || image.etag() == null) return Outcome.IGNORED;
         final long owner;
         try { owner = Long.parseLong(matcher.group(1)); }
         catch (NumberFormatException e) { return Outcome.IGNORED; }
         return transaction.execute(status -> {
-            // 소유자가 불명확하면 보호한다. 회원 행 잠금으로 첨부와의 경쟁을 막는다.
-            if (users.findByIdForUpdate(owner).isEmpty()) return Outcome.PROTECTED;
+            // 알 수 없는 소유자는 보호하되, 영구 삭제 트랜잭션이 남긴 증거가 있으면 재시도한다.
+            boolean ownerExists = users.findByIdForUpdate(owner).isPresent();
+            if (onlyDeletedOwners && ownerExists) return Outcome.PROTECTED;
+            if (!ownerExists && candidates.deletedOwnerCount(owner) == 0)
+                return Outcome.PROTECTED;
             if (candidates.isReferenced(image.key())) {
                 candidates.deleteById(image.key());
                 return Outcome.PROTECTED;
