@@ -7,6 +7,7 @@ import { useUiStore } from '../../stores/ui.js'
 import CourseService from '../../services/CourseService'
 import { useNotificationStore } from '../../stores/notifications.js'
 import { listMyReviews } from '../../api/myActivity.js'
+import { countFavorites } from '../../api/favorites.js'
 import { getBackendSessionVersion } from '../../api/backendClient.js'
 import AppIcon from '../../components/common/AppIcon.vue'
 import ProfileImageEditor from '../../components/mypage/ProfileImageEditor.vue'
@@ -19,6 +20,7 @@ const notifications = useNotificationStore()
 const unread = computed(() => notifications.unread)
 const courseCount = ref(null)
 const reviewCount = ref(null)
+const favoriteCount = ref(null)
 let statsVersion = 0
 onBeforeUnmount(() => { statsVersion += 1 })
 
@@ -26,13 +28,15 @@ async function loadStats () {
   const version = ++statsVersion
   const epoch = getBackendSessionVersion()
   // 개수만 필요하므로 첫 페이지의 항목 하나만 요청한다.
-  const [c, r] = await Promise.allSettled([
+  const [c, r, f] = await Promise.allSettled([
     CourseService.getSavedCourses(0, 1),
-    listMyReviews({ size: 1 })
+    listMyReviews({ size: 1 }),
+    countFavorites()
   ])
   if (version !== statsVersion || epoch !== getBackendSessionVersion()) return
   courseCount.value = c.status === 'fulfilled' && c.value.ok ? c.value.totalElements : null
   reviewCount.value = r.status === 'fulfilled' ? r.value.totalElements : null
+  favoriteCount.value = f.status === 'fulfilled' ? f.value : null
 }
 
 onMounted(loadStats)
@@ -40,6 +44,7 @@ watch(() => [route.fullPath, ui.alertsVersion], loadStats)
 watch(() => auth.user?.userId, () => {
   statsVersion += 1
   reviewCount.value = null
+  favoriteCount.value = null
   courseCount.value = null
   if (auth.user) loadStats()
 }, { flush: 'sync' })
@@ -60,10 +65,11 @@ const TABS = [
         <section class="hero" aria-label="내 프로필">
           <div class="profile-top">
             <ProfileImageEditor />
-            <span class="tagline"><AppIcon name="flower" :size="14" />조용한 여행자</span>
+            <div class="profile-intro">
+              <h1>{{ auth.displayName }}</h1>
+              <p class="sub">나의 제주 여행과 소중한 기록을 모아 보세요.</p>
+            </div>
           </div>
-          <h1>{{ auth.displayName }}</h1>
-          <p class="sub">나의 제주 여행과 소중한 기록을 모아 보세요.</p>
           <div class="stats">
             <span class="stat"><span class="lbl">저장한 코스</span><b>{{ courseCount ?? '–' }}<small>개</small></b></span>
             <span class="stat"><span class="lbl">작성한 리뷰</span><b>{{ reviewCount ?? '–' }}<small>개</small></b></span>
@@ -76,11 +82,12 @@ const TABS = [
             <AppIcon :name="t.icon" :size="19" />
             <span class="txt">{{ t.label }}</span>
             <span v-if="t.name === 'my-reviews' && reviewCount != null" class="nav-count">{{ reviewCount }}</span>
+            <span v-if="t.name === 'my-favorites' && favoriteCount != null" class="nav-count">{{ favoriteCount }}</span>
             <span v-if="t.dot && unread" class="nav-count new" :aria-label="`읽지 않은 알림 ${unread}건`">{{ unread }} 신규</span>
           </RouterLink>
         </nav>
       </aside>
-      <div class="body"><RouterView @reviews-changed="loadStats" /></div>
+      <div class="body"><RouterView @reviews-changed="loadStats" @favorites-changed="loadStats" /></div>
     </div>
   </main>
 </template>
@@ -105,9 +112,10 @@ const TABS = [
 .profile-top :deep(.avatar) { border-radius: 14px; }
 .profile-top :deep(.photo-note) { font-size: 10px; }
 .profile-top :deep(.photo-button) { font-size: 11px; padding: 5px 10px; min-height: 32px; }
-.tagline { display: inline-flex; align-items: center; gap: 4px; border: 1px solid #b9e8cd; color: var(--ac); background: var(--ac-bg); border-radius: 99px; padding: 4px 8px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.profile-intro { flex: 1; min-width: 0; padding-top: 8px; }
+.profile-top :deep(.profile-photo) { flex-shrink: 0; }
 h1 { font-size: 20px; font-weight: 800; letter-spacing: -.03em; overflow-wrap: anywhere; margin: 0 0 8px; }
-.sub { color: var(--tx2); font-size: 13px; line-height: 1.7; margin: 0 0 24px; }
+.sub { color: var(--tx2); font-size: 13px; line-height: 1.7; margin: 0; }
 .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); background: var(--surf2); border: 1px solid var(--line); border-radius: 12px; padding: 14px 0; }
 .stat { display: grid; gap: 5px; text-align: center; font-variant-numeric: tabular-nums; }
 .stat + .stat { border-left: 1px solid var(--line); }
@@ -152,7 +160,7 @@ h1 { font-size: 20px; font-weight: 800; letter-spacing: -.03em; overflow-wrap: a
   .mypage { padding: 20px 16px calc(80px + env(safe-area-inset-bottom, 0px)); }
   .cols { gap: 20px; }
   .hero { padding: 20px; }
-  .sub { margin-bottom: 18px; }
+  .profile-top :deep(.profile-photo) { width: 80px; }
   .body :deep(.bar-top), .body :deep(.blk), .body :deep(.inbox-header) { padding: 18px; margin-bottom: 16px; }
   .body :deep(.sect) { font-size: 18px; }
 }

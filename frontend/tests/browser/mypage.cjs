@@ -14,15 +14,29 @@ const {tmpdir}=require('node:os');
   const content=await page.locator('.body').boundingBox();
   assert.ok(profile.x+profile.width<=content.x,'Desktop profile must sit beside, not above, tab content');
   assert.ok(Math.abs(profile.y-content.y)<3,'Desktop profile and content must share a top edge');
+  const assertProfile = async () => {
+   const photo=await page.locator('.profile-top .profile-photo').boundingBox();
+   const intro=await page.locator('.profile-intro').boundingBox();
+   assert.ok(intro.x>=photo.x+photo.width,'Name and description sit beside photo');
+   assert.ok(Math.abs(intro.y-photo.y)<16,'Name starts at photo top');
+   assert.equal(await page.getByText('조용한 여행자',{exact:true}).count(),0);
+   await page.waitForFunction(()=>document.querySelector('a[href="/mypage/favorites"] .nav-count')?.textContent==='15');
+  };
+  await assertProfile();
   await page.screenshot({path:join(tmpdir(),'hangat-mypage-desktop-final.png'),fullPage:true});
   for(const width of [390,320]){
    await page.close();
    page=await browser.newPage({viewport:{width,height:844},isMobile:true,hasTouch:true});
    await page.goto(process.env.MYPAGE_PREVIEW_URL || 'http://127.0.0.1:5211/tests/browser/mypage.html');
    await page.getByRole('link',{name:'성이시돌목장',exact:true}).first().waitFor();
+   await assertProfile();
    assert.ok(await page.evaluate(w=>document.documentElement.scrollWidth<=w,width),'No horizontal overflow');
    for(const label of ['찜한 장소','알림 내역','설정','작성한 리뷰']){
     await page.getByRole('navigation',{name:'마이페이지 메뉴'}).getByRole('link',{name:label}).tap();
+    if(label==='찜한 장소'){
+     await page.getByRole('combobox',{name:'찜 정렬 기준'}).selectOption('name');
+     assert.equal(await page.getByRole('combobox',{name:'찜 정렬 기준'}).inputValue(),'name');
+    }
     assert.ok(await page.evaluate(w=>document.documentElement.scrollWidth<=w,width),`${label} fits ${width}px`);
    }
   }
