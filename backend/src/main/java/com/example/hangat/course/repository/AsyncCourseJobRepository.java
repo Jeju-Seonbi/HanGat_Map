@@ -113,16 +113,25 @@ public class AsyncCourseJobRepository {
         );
     }
 
-    /** 접수 순서상 가장 오래된 대기 작업 한 건을 잠근다. */
-    public List<Map<String, Object>> lockOldestQueued() {
+    /** 대기열 잠금 안에서 후보를 읽고 서비스가 회원 → 작업 순으로 잠근다. */
+    public List<Map<String, Object>> findOldestQueued() {
         return jdbc.queryForList("""
-                SELECT *
-                FROM course_generation_jobs
-                WHERE status = 'QUEUED'
-                ORDER BY created_at, id
+                SELECT j.*
+                FROM course_generation_jobs j JOIN users u ON u.id=j.user_id
+                WHERE j.status = 'QUEUED' AND u.status='ACTIVE'
+                ORDER BY j.created_at, j.id
                 LIMIT 1
-                FOR UPDATE
                 """);
+    }
+
+    public boolean lockActiveUser(Long userId) {
+        var statuses = jdbc.queryForList("SELECT status FROM users WHERE id=? FOR UPDATE", String.class, userId);
+        return !statuses.isEmpty() && "ACTIVE".equals(statuses.get(0));
+    }
+
+    public Long findOwner(String id) {
+        var owners = jdbc.queryForList("SELECT user_id FROM course_generation_jobs WHERE id=?", Long.class, id);
+        return owners.isEmpty() ? null : owners.get(0);
     }
 
     /** 잠근 작업에 실행 권한과 최대 실행 기한을 설정한다. */

@@ -4,8 +4,10 @@ import com.example.hangat.map.model.dto.PlaceListResponse;
 import com.example.hangat.map.model.entity.Place;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import jakarta.persistence.LockModeType;
 
 import java.math.BigDecimal;
 import java.util.Collection;
@@ -34,6 +36,11 @@ import java.util.Optional;
  * 넷 다 {@code @Query} 전용이며 부팅 시 {@code em.createQuery}로 검증된다.
  */
 public interface PlaceRepository extends JpaRepository<Place, Long> {
+
+    /** 후기 쓰기와 탈퇴 계정 정리가 같은 장소의 평점 집계를 직렬화한다. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select p from Place p where p.id = :id")
+    Optional<Place> findByIdForUpdate(@Param("id") Long id);
 
     /**
      * 목록 SELECT 절. <b>이 인자 순서가 곧 {@link PlaceListResponse} 생성자 시그니처</b>이며

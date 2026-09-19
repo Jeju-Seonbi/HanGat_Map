@@ -16,12 +16,15 @@ import com.example.hangat.review.repository.ReviewImageRepository;
 import com.example.hangat.review.repository.ReviewRepository;
 import com.example.hangat.user.model.User;
 import com.example.hangat.user.repository.UserRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -50,6 +53,7 @@ public class ReviewService {
     private final UserRepository userRepository;
     private final ReviewPhotoService photoService;
     private final ApplicationEventPublisher events;
+    private final EntityManager entityManager;
 
     // ────────────────────────── 후기 목록 조회 ──────────────────────────
 
@@ -87,10 +91,10 @@ public class ReviewService {
     // ────────────────────────── 후기 작성 및 삭제 ──────────────────────────
 
     /** 본인이 업로드한 사진만 첨부하고 후기와 장소의 평점 요약을 함께 저장한다. */
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public ReviewResponse create(Long placeId, Long userId, ReviewCreateRequest req) {
-        Place place = placeRepository.findById(placeId)
-                .orElseThrow(() -> new BaseException(BaseResponseStatus.PLACE_NOT_FOUND));
+        lockActiveUser(userId);
+        Place place = placeForUpdate(placeId);
         validate(req);
 
         var attachments = photoService.validateAttachments(req.getImageUrls(), userId);
@@ -121,9 +125,11 @@ public class ReviewService {
     }
 
     /** 최초 작성 후 7일 이내에만 수정한다. 기존 첨부는 유지하고 새 사진만 소유권을 검증한다. */
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public ReviewResponse update(Long reviewId, Long userId, ReviewCreateRequest req) {
+        lockActiveUser(userId);
         Review review = ownedReviewForUpdate(reviewId, userId);
+        Place place = placeForUpdate(review.getPlace().getId());
         assertEditable(review);
         validate(req);
         var report = parseReport(req.getCongestionReport());
@@ -164,7 +170,7 @@ public class ReviewService {
             images.add(image);
         }
         review.edit(req.getRating(), report, req.getContent(), now);
-        refreshSummary(review.getPlace());
+        refreshSummary(place);
         if (!removed.isEmpty()) {
             events.publishEvent(new ReviewPhotosDeleted(removed.stream().map(ReviewImage::getStorageKey).toList()));
         }
@@ -183,8 +189,11 @@ public class ReviewService {
     /** 같은 후기의 편집과 삭제는 잠금 이후 상태·소유자를 검사한다. */
     private Review ownedReviewForUpdate(Long reviewId, Long userId) {
         Review review = reviewRepository.findForUpdate(reviewId)
-                .filter(r -> r.getStatus() == ReviewStatus.ACTIVE)
                 .orElseThrow(() -> new BaseException(BaseResponseStatus.REVIEW_NOT_FOUND));
+        entityManager.refresh(review, LockModeType.PESSIMISTIC_WRITE);
+        if (review.getStatus() != ReviewStatus.ACTIVE) {
+            throw new BaseException(BaseResponseStatus.REVIEW_NOT_FOUND);
+        }
         if (!review.getUserId().equals(userId)) {
             throw new BaseException(BaseResponseStatus.REVIEW_FORBIDDEN);
         }
@@ -192,11 +201,13 @@ public class ReviewService {
     }
 
     /** 본인 후기만 논리 삭제하고, 커밋이 성공한 경우에만 사진 정리를 진행한다. */
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public void delete(Long reviewId, Long userId) {
+        lockActiveUser(userId);
         Review review = ownedReviewForUpdate(reviewId, userId);
+        Place place = placeForUpdate(review.getPlace().getId());
         review.delete();
-        refreshSummary(review.getPlace());
+        refreshSummary(place);
         // 수신자는 AFTER_COMMIT이므로 DB 롤백 시 파일이 먼저 사라지지 않는다.
         events.publishEvent(new ReviewPhotosDeleted(
                 imageRepository.findByReviewIdOrderBySortOrder(reviewId).stream()
@@ -205,6 +216,24 @@ public class ReviewService {
     }
 
     // ────────────────────────── 입력 검증 및 평점 집계 ──────────────────────────
+
+    /** 인증 이후 탈퇴한 지연 요청도 차단한다. 잠금 순서는 회원 → 후기 → 장소다. */
+    private void lockActiveUser(Long userId) {
+        User user = userRepository.findByIdForUpdate(userId)
+                .orElseThrow(() -> new BaseException(BaseResponseStatus.USER_NOT_FOUND));
+        // OSIV에 남은 엔티티는 잠금 조회만으로 최신 상태가 되지 않는다.
+        entityManager.refresh(user, LockModeType.PESSIMISTIC_WRITE);
+        if (!user.getStatus().isLoginAllowed()) {
+            throw new BaseException(user.getStatus().getLoginDeniedStatus());
+        }
+    }
+
+    private Place placeForUpdate(Long placeId) {
+        Place place = placeRepository.findByIdForUpdate(placeId)
+                .orElseThrow(() -> new BaseException(BaseResponseStatus.PLACE_NOT_FOUND));
+        entityManager.refresh(place, LockModeType.PESSIMISTIC_WRITE);
+        return place;
+    }
 
     /** 별점/제보 중 하나는 필수이며 한줄평 길이와 사진 개수를 제한한다. */
     private void validate(ReviewCreateRequest req) {
@@ -238,6 +267,7 @@ public class ReviewService {
 
     /** places 의 평점 요약(비정규화) 갱신 - 별점 없는 후기는 평균에서 빠지고 건수에는 들어간다 */
     private void refreshSummary(Place place) {
+        // READ_COMMITTED에서 장소 잠금 이전에 확정된 다른 회원의 변경까지 집계한다.
         Object[] row = (Object[]) reviewRepository.summarize(place.getId())[0];
         Double avg = (Double) row[0];
         long count = (Long) row[1];

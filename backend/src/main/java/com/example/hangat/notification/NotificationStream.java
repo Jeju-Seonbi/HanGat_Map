@@ -40,6 +40,8 @@ public class NotificationStream {
     private static final int MAX_CONNECTIONS_PER_USER = 6;
 
     private final NotificationOutboxRepository outbox;
+    private final com.example.hangat.notification.repository.trip.TripNotificationLockRepository accountLocks;
+    private final org.springframework.transaction.PlatformTransactionManager transactionManager;
 
     private final Map<Long, Set<SseEmitter>> connections =
             new ConcurrentHashMap<>();
@@ -116,6 +118,19 @@ public class NotificationStream {
     }
 
     private void send(Long userId, SseEmitter emitter, String event) {
+        var transaction = new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+        transaction.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        transaction.executeWithoutResult(status -> {
+            if (!accountLocks.lockActiveUser(userId)) {
+                remove(userId, emitter);
+                emitter.complete();
+                return;
+            }
+            sendActive(userId, emitter, event);
+        });
+    }
+
+    private void sendActive(Long userId, SseEmitter emitter, String event) {
         try {
             emitter.send(
                     SseEmitter.event()
