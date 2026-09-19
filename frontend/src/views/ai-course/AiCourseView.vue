@@ -546,7 +546,6 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
 
     <section v-else-if="editing" class="course-shell builder-shell">
       <div v-if="error" class="generation-failure" role="alert">
-        <GenerationArtwork status="FAILED" />
         <p class="course-error">{{ error }} <button class="text-link" @click="generate(condition)">다시 시도</button></p>
       </div>
       <CourseConditionForm :key="`${(auth.user as { userId: number } | null)?.userId ?? 'guest'}:${formRevision}`" :initial="condition" :loading="loading" @submit="generate" @draft="draft => Object.assign(condition, draft, { accommodation: draft.accommodation })" />
@@ -646,13 +645,29 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
         <button class="btn primary wide" :disabled="!title.trim() || saveLoading" @click="save">{{ saveLoading ? '저장 중…' : '저장' }}</button>
       </section>
     </div>
-    <div v-if="toast" class="toast">{{ toast }}</div>
+    <div v-if="toast" class="toast" role="status" aria-live="polite">{{ toast }}</div>
   </div>
 </template>
 
 <style scoped>
-.ai-course-page { --course-accent: #1f7a6d; --course-accent-dark: #145147; --course-accent-bg: #eff9f6; --course-bg: #f7faf8; --course-line: #e6ede9; --course-line-2: #d1ded8; --course-surface: #fff; --course-surface-2: #f8faf9; --course-text: #1c2925; --course-text-2: #61736d; --course-text-3: #87958f; --course-muted: #87958f; background: var(--course-bg); }
+.ai-course-page { --course-accent: #1f7a6d; --course-accent-dark: #145147; --course-accent-bg: #eff9f6; --course-on-ac: #fff; --course-bg: #f7faf8; --course-line: #e6ede9; --course-line-2: #d1ded8; --course-surface: #fff; --course-surface-2: #f8faf9; --course-text: #1c2925; --course-text-2: #61736d; --course-text-3: #61736d; --course-muted: var(--course-text-2); background: var(--course-bg); }
+/* Follow both the saved theme and the OS preference, like the shared tokens. */
+:global(:root[data-theme="dark"] .ai-course-page) { --course-accent: var(--primary); --course-accent-dark: var(--primary-dark); --course-accent-bg: var(--ac-bg); --course-on-ac: var(--on-ac); --course-bg: var(--bg); --course-line: var(--border); --course-line-2: var(--line2); --course-surface: var(--surface); --course-surface-2: var(--muted); --course-text: var(--text); --course-text-2: var(--sub); --course-text-3: var(--tx3); }
+@media(prefers-color-scheme:dark) {
+  :global(:root:not([data-theme="light"]) .ai-course-page) { --course-accent: var(--primary); --course-accent-dark: var(--primary-dark); --course-accent-bg: var(--ac-bg); --course-on-ac: var(--on-ac); --course-bg: var(--bg); --course-line: var(--border); --course-line-2: var(--line2); --course-surface: var(--surface); --course-surface-2: var(--muted); --course-text: var(--text); --course-text-2: var(--sub); --course-text-3: var(--tx3); }
+}
 .ai-course-page .generation-state { border: 0; box-shadow: none; background: transparent; }
+.ai-course-page .toast {
+  bottom: calc(var(--mobile-tabbar-h, 0px) + 24px);
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  box-sizing: border-box;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: center;
+  line-height: 1.5;
+  pointer-events: none;
+}
 .builder-page { background: var(--course-bg); min-height: calc(100vh - 80px); padding-bottom: 40px; }
 .builder-page .course-page-header { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding-block: 38px 28px; }
 .builder-page .course-page-header h1 { font-size: clamp(22px, 2.5vw, 30px); letter-spacing: -.04em; }
@@ -689,25 +704,25 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
 .ai-course-page .result-shell{padding-top:42px;border:0;background:transparent;box-shadow:none}
 .course-result-head{padding:0 0 26px;margin-bottom:24px;border:0;border-bottom:1px solid var(--course-line);border-radius:0;background:transparent;box-shadow:none;align-items:center}
 .result-label{display:inline-block;font-size:10px;letter-spacing:0;background:var(--course-accent-bg);padding:3px 9px;border-radius:20px}
-.course-result-head h2{font-size:26px;line-height:1.4;margin:0 0 5px;color:#11231f}
+.course-result-head h2{font-size:26px;line-height:1.4;margin:0 0 5px;color:var(--course-text)}
 .course-result-head p{font-size:12px}
 .result-condition-tags{display:inline-flex;gap:8px;margin-top:7px}.result-condition-tags span{font-size:11px;padding:0;background:transparent;font-weight:500}
 .result-actions-block{flex:0 1 auto;width:auto;gap:8px}
 .result-actions-row{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 .result-actions-row .btn{width:auto;min-height:34px;padding:8px 11px;border-radius:9px;font-size:11px;gap:5px;white-space:nowrap;background:var(--course-surface);border:1px solid var(--course-line);color:var(--course-text)}
 .result-actions-row .result-regenerate{background:var(--course-accent-bg);color:var(--course-accent-dark)}
-.result-actions-row .result-save{background:var(--course-accent);color:white;border-color:var(--course-accent)}
+.result-actions-row .result-save{background:var(--course-accent);color:var(--course-on-ac);border-color:var(--course-accent)}
 .course-result-head .temporary-course-notice{text-align:right;font-size:10px;color:var(--course-text-3)}
 .course-result-grid{grid-template-columns:minmax(0,2.08fr) minmax(280px,1fr);gap:28px;align-items:start}
 .itinerary-card{min-width:0;border:1px solid var(--course-line);border-radius:16px;overflow:hidden;background:var(--course-surface);box-shadow:0 2px 4px #173a3305}
-.day-tabs{display:flex;overflow-x:auto;background:#fafcfc;border-bottom:1px solid var(--course-line);padding:0 24px}
+.day-tabs{display:flex;overflow-x:auto;background:var(--course-surface-2);border-bottom:1px solid var(--course-line);padding:0 24px}
 .day-tabs button{flex-shrink:0;padding:20px 14px 17px;border-bottom:2px solid transparent;font-size:13px;color:var(--course-text-2);white-space:nowrap}
 .day-tabs button[aria-selected=true]{color:var(--course-accent);border-color:var(--course-accent);font-weight:700}
 .day-tabs small{font-size:11px;margin-left:3px}.day-tabs button:focus-visible{outline:2px solid var(--course-accent);outline-offset:-4px}
 .course-day{margin:0;padding:0 24px 12px;border:0;border-radius:0;background:transparent;box-shadow:none}
 .course-day>header{display:flex;flex-wrap:wrap;gap:10px;padding:20px 0 15px;border-bottom:1px solid var(--course-line)}
 .day-title b{font-size:13px;color:var(--course-accent)}.day-title span{font-size:11px;color:var(--course-text-3)}
-.course-day :deep(.course-item){padding:16px 14px;grid-template-columns:54px 104px minmax(0,1fr);gap:14px;border:1px solid #f0f3f1;border-radius:13px;background:#fafcfc}
+.course-day :deep(.course-item){padding:16px 14px;grid-template-columns:54px 104px minmax(0,1fr);gap:14px;border:1px solid var(--course-line);border-radius:13px;background:var(--course-surface-2)}
 .course-day :deep(.course-item img){width:104px;height:82px;border-radius:10px}
 .course-day :deep(.item-time b){font-size:12px}.course-day :deep(.item-time small){font-size:10px}
 .course-day :deep(.item-head h3){font-size:15px}.course-day :deep(.item-head small){font-size:10px}
@@ -718,7 +733,7 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
 .summary-kicker{font-size:10px;letter-spacing:.06em}.course-summary-card h3{font-size:17px;margin:6px 0 20px}
 .course-summary-card dl{font-size:12px;row-gap:15px}.accommodation-change{margin-top:20px;width:100%;padding:9px;font-size:11px;border:1px solid var(--course-line);border-radius:9px}
 :deep(.accommodation-recommendations){padding:24px;border-color:var(--course-line);border-radius:16px;box-shadow:0 2px 4px #173a3305}
-:deep(.accommodation-recommendations article){padding:12px;border:1px solid var(--course-line);border-radius:12px;margin-top:12px;background:#fafcfc}
+:deep(.accommodation-recommendations article){padding:12px;border:1px solid var(--course-line);border-radius:12px;margin-top:12px;background:var(--course-surface-2)}
 @media(max-width:1023px){.course-result-head{align-items:flex-start;flex-direction:column;gap:18px}.result-actions-block{width:100%}.result-actions-row{justify-content:flex-start}.course-result-head .temporary-course-notice{text-align:left}.course-result-grid{grid-template-columns:minmax(0,1fr) 280px;gap:18px}}
 @media(max-width:767px){.ai-course-page .result-shell{padding-top:24px}.course-result-head h2{font-size:24px}.course-result-grid{display:flex;flex-direction:column}.course-result-grid>main{order:0}.course-side{display:grid;width:100%;order:1}.course-summary-card,:deep(.accommodation-recommendations){order:initial}.result-actions-row{display:grid;grid-template-columns:1fr 1fr;width:100%}.result-actions-row .btn{width:100%;min-height:40px;font-size:11px}.day-tabs{padding:0 8px}.day-tabs button{padding:16px 10px;font-size:12px}.day-tabs small{font-size:10px}.course-day{padding:0 12px 12px}.course-day>header{padding:16px 0;align-items:flex-start;flex-direction:column}.course-day :deep(.course-item){grid-template-columns:72px minmax(0,1fr);padding:12px;gap:6px 10px}.course-day :deep(.course-item img){width:72px;height:76px}.course-day :deep(.item-head h3){font-size:14px}.course-day :deep(.travel-line){padding-left:20px}.course-day :deep(.item-reason){font-size:11px}}
 </style>
