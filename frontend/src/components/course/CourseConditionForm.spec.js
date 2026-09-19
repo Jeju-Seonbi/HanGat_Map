@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { compileScript, compileTemplate, parse } from '@vue/compiler-sfc'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import CourseConditionForm from './CourseConditionForm.vue'
+import AppIcon from '../common/AppIcon.vue'
 import { courseDateWindow } from '../../services/course/courseDatePolicy'
 
 vi.mock('./AccommodationSearch.vue', () => ({ default: { render: () => null } }))
@@ -14,6 +15,13 @@ const { descriptor } = parse(source)
 const { code } = compileTemplate({ source: descriptor.template.content, id: 'condition-feedback',
   compilerOptions: { bindingMetadata: compileScript(descriptor, { id: 'condition-feedback' }).bindings } })
 CourseConditionForm.render = new Function('Vue', code
+  .replace(/import \{([^}]+)\} from "vue"/g, (_, names) => `const {${names.replace(/ as /g, ': ')}} = Vue`)
+  .replace('export function render', 'return function render'))(Vue)
+// The custom renderer runs client templates; compile the real icon as well.
+const iconDescriptor = parse(readFileSync(new URL('../common/AppIcon.vue', import.meta.url), 'utf8')).descriptor
+const iconCode = compileTemplate({ source: iconDescriptor.template.content, id: 'condition-icon',
+  compilerOptions: { bindingMetadata: compileScript(iconDescriptor, { id: 'condition-icon' }).bindings } }).code
+AppIcon.render = new Function('Vue', iconCode
   .replace(/import \{([^}]+)\} from "vue"/g, (_, names) => `const {${names.replace(/ as /g, ': ')}} = Vue`)
   .replace('export function render', 'return function render'))(Vue)
 
@@ -91,7 +99,7 @@ describe('course input validation feedback', () => {
   })
   it('shows one error next to the button and at the input, and clears immediately', async () => {
     mount({ people: 0 })
-    expect(cta().props.disabled).toBe(true)
+    expect(cta().props.disabled).toBe(false)
     expect(text(feedback())).toContain('인원은 1명 이상')
     expect(text(feedback())).not.toContain('개 오류')
     expect(input('people').props['aria-invalid']).toBe(true)
@@ -106,16 +114,19 @@ describe('course input validation feedback', () => {
     mount({ start_date: '', end_date: '', people: '', transport: '', course_styles: [] })
     expect(text(feedback())).toContain('여행 시작일과 종료일을 모두 입력')
     expect(text(feedback())).toContain('외 3개 오류')
-    expect(cta().props.disabled).toBe(true)
+    expect(cta().props.disabled).toBe(false)
     expect(feedback().props['aria-live']).toBe('polite')
     expect(feedback().props['aria-atomic']).toBe('true')
   })
-  it('moves focus and scroll only when the review button is activated', async () => {
-    mount({ people: 0, budget_total: 0 })
+  it('moves to the invalid step on generation without emitting a request', async () => {
+    mount({ people: 0 })
     expect(focus).not.toHaveBeenCalled()
-    const review = find(el => el.props.class === 'validation-review')
-    expect(review.tag).toBe('button'); expect(review.props.type).toBe('button')
-    await review.props.onClick()
+    const nav = find(el => el.props['aria-label'] === '코스 조건 입력 단계')
+    all(nav, el => el.tag === 'button')[3].props.onClick()
+    await Vue.nextTick()
+    await find(el => el.tag === 'form').props.onSubmit({ preventDefault() {} })
+    expect(submitted).not.toHaveBeenCalled()
+    expect(find(el => el.tag === 'form').props.class).toContain('step-1')
     expect(focus.mock.lastCall?.[0] === input('people')).toBe(true)
     expect(focus.mock.lastCall?.[1]).toEqual({ preventScroll: true })
     expect(scroll.mock.lastCall?.[0] === field('people')).toBe(true)
@@ -125,7 +136,7 @@ describe('course input validation feedback', () => {
   })
   it('targets the missing end date without changing date rules', async () => {
     mount({ end_date: '' })
-    await find(el => el.props.class === 'validation-review').props.onClick()
+    await find(el => el.tag === 'form').props.onSubmit({ preventDefault() {} })
     expect(focus.mock.lastCall?.[0] === input('end-date')).toBe(true)
   })
   it('retains date boundary errors and blocks programmatic invalid submission', () => {
@@ -136,7 +147,7 @@ describe('course input validation feedback', () => {
   })
   it('updates selection errors and focuses a keyboard-operable style control', async () => {
     mount({ course_styles: [] })
-    await find(el => el.props.class === 'validation-review').props.onClick()
+    await find(el => el.tag === 'form').props.onSubmit({ preventDefault() {} })
     const styleButton = all(field('styles'), el => el.tag === 'button')[0]
     expect(focus.mock.lastCall?.[0] === styleButton).toBe(true)
     styleButton.props.onClick(); await Vue.nextTick()
@@ -145,7 +156,7 @@ describe('course input validation feedback', () => {
   it('includes the existing fixed-schedule validation without relaxing it', () => {
     mount({ course_place_preferences: [{ place_id: 1, place_name: '방문 장소', preference_type: 'WANT', fixed_time: '10:00' }] })
     expect(text(feedback())).toContain('방문 장소: 시간을 지정하려면 날짜도 선택')
-    expect(cta().props.disabled).toBe(true)
+    expect(cta().props.disabled).toBe(false)
   })
   it('keeps generation progress distinct, and blocks duplicate submission', async () => {
     mount({}, true)

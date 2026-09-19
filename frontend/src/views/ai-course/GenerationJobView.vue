@@ -68,7 +68,7 @@ onBeforeUnmount(() => { epoch++; clearTimeout(timer); document.removeEventListen
 </template>
 <style scoped>
 .job-page { width: min(720px, calc(100% - 40px)); margin: 50px auto; color: var(--tx); }
-section { margin-top: 20px; padding: clamp(20px, 5vw, 40px); background: var(--surf); border: 1px solid var(--line); border-radius: 20px; text-align: center; }
+section { margin-top: 20px; padding: clamp(20px, 5vw, 40px); background: transparent; border: 0; text-align: center; }
 h1 { font-size: clamp(22px, 4vw, 30px); line-height: 1.4; }
 p { line-height: 1.8; color: var(--tx2); }
 .actions { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; margin-top: 24px; }
