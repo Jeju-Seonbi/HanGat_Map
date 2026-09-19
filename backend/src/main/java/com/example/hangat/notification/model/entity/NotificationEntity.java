@@ -64,4 +64,8 @@ public class NotificationEntity {
     /** 사용자 알림함에서 삭제한 시각. 원래 이벤트의 중복 방지 키는 유지한다. */
     @Column(name = "deleted_at", columnDefinition = "DATETIME(6)")
     private LocalDateTime deletedAt;
+
+    /** 헤더에서만 숨김. 마이페이지 알림 내역은 보존한다. */
+    @Column(name = "header_hidden_at", columnDefinition = "DATETIME(6)")
+    private LocalDateTime headerHiddenAt;
 }

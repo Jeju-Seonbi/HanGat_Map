@@ -78,6 +78,14 @@ async function readAll () {
   }
 }
 
+async function clearHeader () {
+  try {
+    await notifications.clearHeader()
+  } catch {
+    ui.toast('알림을 숨기지 못했어요. 다시 시도해 주세요.')
+  }
+}
+
 const label = computed(() =>
   unread.value ? `알림 ${unread.value}건 (읽지 않음)` : '알림'
 )
@@ -108,12 +116,13 @@ const label = computed(() =>
       <div class="ph">
         <b>알림</b>
         <button v-if="unread" class="sw" type="button" :disabled="notifications.busy" @click="readAll">모두 읽음</button>
+        <button v-else-if="items.length" class="sw" type="button" :disabled="notifications.busy" @click="clearHeader">모두 삭제</button>
       </div>
 
       <p v-if="!NOTIFICATIONS_ENABLED" class="pmsg">알림 서비스 준비 중이에요.</p>
       <p v-else-if="notifications.error && !items.length" class="pmsg" role="alert">{{ notifications.error }}</p>
       <p v-else-if="loading && !items.length" class="pmsg">불러오는 중…</p>
-      <p v-else-if="!items.length" class="pmsg">새 알림이 없어요.</p>
+      <div v-else-if="!items.length" class="pmsg empty-notifications"><AppIcon name="bell" :size="28" /><p>알림이 없습니다.</p></div>
 
       <ul v-else class="plist">
         <li v-for="a in preview" :key="a.id">
@@ -177,6 +186,7 @@ const label = computed(() =>
 .ph b { font-family: var(--font-head); font-size: 13px; font-weight: 800; }
 
 .pmsg { padding: 10px 10px 16px; font-size: 12px; color: var(--tx3); }
+.empty-notifications { display: grid; justify-items: center; gap: 12px; padding: 28px 10px; }
 
 .plist { display: flex; flex-direction: column; }
 .prow {

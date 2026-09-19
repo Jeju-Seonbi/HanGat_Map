@@ -14,6 +14,8 @@ import * as api from '../../api/notifications.js'
 vi.mock('../../api/notifications.js', async importOriginal => ({
   ...await importOriginal(), NOTIFICATIONS_ENABLED: true,
   readNotification: vi.fn(),
+  clearHeaderNotifications: vi.fn(),
+  deleteAllNotifications: vi.fn(),
 }))
 
 // Node Vitest builds SFCs for SSR; client render functions let this renderer
@@ -98,6 +100,21 @@ afterEach(() => {
 })
 
 describe('헤더 알림 패널', () => {
+  it('읽은 알림만 헤더에서 숨기고 전체 알림 삭제 API는 호출하지 않는다', async () => {
+    store.items[0].readAt = new Date().toISOString()
+    store.unread = 0
+    api.clearHeaderNotifications.mockResolvedValue({ unreadCount: 0 })
+    await findClass('bell')[0].props.onClick()
+    expect(textOf(findClass('sw')[0])).toBe('모두 삭제')
+    await findClass('sw')[0].props.onClick()
+    await nextTick()
+    expect(api.clearHeaderNotifications).toHaveBeenCalledTimes(1)
+    expect(api.deleteAllNotifications).not.toHaveBeenCalled()
+    expect(findClass('prow')).toHaveLength(0)
+    expect(textOf(findClass('panel')[0])).toContain('알림이 없습니다.')
+    expect(findClass('empty-notifications')[0].children.some(node => node.tag === 'svg')).toBe(true)
+  })
+
   it('종을 열고 다시 열어도 알림을 재조회하지 않는다', async () => {
     await findClass('bell')[0].props.onClick()
     expect(findClass('panel')).toHaveLength(1)

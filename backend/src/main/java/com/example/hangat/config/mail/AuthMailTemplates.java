@@ -52,6 +52,29 @@ final class AuthMailTemplates {
      */
     static final String BRAND_IMAGE_CID = "hangat-mark";
     static final String BRAND_IMAGE_PATH = "mail/hangat-mark.png";
+    static final String WITHDRAWAL_IMAGE_CID = "hangat-withdrawal";
+
+    static MailContent withdrawal(java.time.Instant deleteAt) {
+        String deadline = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss 'KST'")
+                .withZone(java.time.ZoneId.of("Asia/Seoul")).format(deleteAt);
+        String message = "회원탈퇴가 처리되었습니다. 신청 시각부터 30일간 데이터를 보관합니다. "
+                + "삭제 예정 시각은 " + deadline + "입니다. 그 전에 기존 계정으로 로그인하면 탈퇴를 취소할 수 있습니다.";
+        String text = "지금까지 이용해주셔서 감사합니다.\n\n" + message;
+        String html = shell("회원탈퇴가 처리되었습니다", "신청 시각부터 30일간 데이터를 보관합니다.", """
+                <tr><td style="padding:22px 32px 0;">
+                  <h1 style="margin:0;font:700 22px/1.45 {{FONT}};color:{{TEXT}};">회원탈퇴가 처리되었습니다</h1>
+                </td></tr>
+                <tr><td align="center" style="padding:24px 32px;">
+                  <img src="cid:hangat-withdrawal" width="360" alt="인사하는 한갓지도 캐릭터들" style="display:block;width:100%;max-width:360px;height:auto;border:0;">
+                </td></tr>
+                <tr><td style="padding:0 32px;">
+                  <p style="margin:0 0 16px;font:700 19px/1.6 {{FONT}};color:{{BRAND}};">지금까지 이용해주셔서 감사합니다.</p>
+                  <p style="margin:0;font:400 15px/1.8 {{FONT}};color:{{SUB}};">{{MESSAGE}}</p>
+                </td></tr>
+                """.replace("{{MESSAGE}}", escape(message)))
+                .replace("본인이 요청하지 않았다면 이 메일을 무시해주세요.<br>", "");
+        return new MailContent("회원탈퇴가 처리되었습니다", text, html);
+    }
     // 원본 166x144 - 워드마크(18px) 옆에 맞춘 표시 크기
     private static final String BRAND_IMAGE_WIDTH = "32";
     private static final String BRAND_IMAGE_HEIGHT = "28";

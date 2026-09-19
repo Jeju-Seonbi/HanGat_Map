@@ -214,6 +214,12 @@ public class NotificationService {
         return new InboxResult(notifications.countUnread(userId));
     }
 
+    @Transactional
+    public InboxResult clearHeader(Long userId) {
+        if (notifications.hideHeader(userId, utcNow()) > 0) events.publishEvent(new InboxChanged(userId));
+        return new InboxResult(notifications.countUnread(userId));
+    }
+
     /** UTC로 저장한 시각과 숫자 ID를 기존 응답 형식으로 변환한다. */
     private NotificationDto mapNotification(NotificationView row) {
         return new NotificationDto(

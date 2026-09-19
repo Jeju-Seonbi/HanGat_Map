@@ -39,10 +39,10 @@ public class TripNotificationLockRepository {
         entityManager.flush();
         entityManager.createNativeQuery("""
                 INSERT INTO user_notification_settings (
-                    user_id, ai_course, weather_warning, forecast_change,
+                    user_id, ai_course, forecast_change,
                     congestion, trip_summary, review_request,
                     preferences_version, trip_version, updated_at
-                ) VALUES (:userId, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, 0, 0, :now)
+                ) VALUES (:userId, TRUE, TRUE, TRUE, TRUE, TRUE, 0, 0, :now)
                 ON DUPLICATE KEY UPDATE user_id = user_id
                 """)
                 .setParameter("userId", userId)

@@ -11,7 +11,6 @@ import CrowdBadge from '../../components/common/CrowdBadge.vue'
 import WeatherBadge from '../../components/common/WeatherBadge.vue'
 import EmptyState from '../../components/common/EmptyState.vue'
 import StateBlock from '../../components/common/StateBlock.vue'
-import SortSeg from '../../components/mypage/SortSeg.vue'
 import ListPagination from '../../components/mypage/ListPagination.vue'
 import PlaceThumb from '../../components/mypage/PlaceThumb.vue'
 import StarRating from '../../components/mypage/StarRating.vue'
@@ -22,6 +21,7 @@ import { useUiStore } from '../../stores/ui.js'
 import { useApiError } from '../../composables/useApiError.js'
 
 const ui = useUiStore()
+const emit = defineEmits(['favorites-changed'])
 const toMessage = useApiError()
 
 const sort = ref('recent')
@@ -78,6 +78,7 @@ async function unfavorite (item) {
       total: data.value.total - 1
     }
     if (selectedId.value === item.placeId) selectedId.value = null
+    emit('favorites-changed')
     ui.toast(`${item.name} 찜을 해제했어요`)
   } catch (e) {
     const msg = toMessage(e)
@@ -100,7 +101,11 @@ const status = item => item.closed
   <section>
     <div class="bar-top">
       <div class="sect">찜한 장소 <span class="cnt tnum">{{ data.total }}</span></div>
-      <SortSeg v-model="sort" :options="FAVORITE_SORTS" label="찜 정렬 기준" />
+      <label class="favorite-sort">정렬 :
+        <select v-model="sort" aria-label="찜 정렬 기준">
+          <option v-for="option in FAVORITE_SORTS" :key="option.key" :value="option.key">{{ option.label }}</option>
+        </select>
+      </label>
     </div>
 
     <div v-if="!loading && !error && data.items.length" class="tools">
@@ -187,6 +192,9 @@ const status = item => item.closed
 .bar-top { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
 .bar-top .sect { margin: 0; flex: 1; }
 .cnt { color: var(--tx3); font-weight: 700; }
+.favorite-sort { display: flex; align-items: center; gap: 8px; color: var(--tx2); font-size: 12px; }
+.favorite-sort select { min-height: 40px; max-width: 100%; padding: 8px 28px 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surf2); color: var(--tx2); font: inherit; }
+.favorite-sort select:focus-visible { outline: 2px solid var(--ac); outline-offset: 2px; }
 
 .tools { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .seg.small { width: 150px; }

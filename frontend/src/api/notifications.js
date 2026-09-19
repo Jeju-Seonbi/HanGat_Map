@@ -15,7 +15,7 @@ export function notificationTypeLabel (type) {
   const labels = {
     AI_COURSE_COMPLETED: 'AI 코스 완성', AI_COURSE_FAILED: 'AI 코스 생성 실패',
     FORECAST_CHANGE: '날씨 예보 변경', CONGESTION_WORSENED: '혼잡 예보 악화',
-    TRIP_SUMMARY: '여행 일정', REVIEW_REQUEST: '여행 후 리뷰', WEATHER_WARNING: '공식 기상특보',
+    TRIP_SUMMARY: '여행 일정', REVIEW_REQUEST: '여행 후 리뷰',
     SECURITY_LOGIN: '로그인 안내', SECURITY_PASSWORD_CHANGED: '비밀번호 변경', NOTICE: '중요 공지'
   }
   return Object.hasOwn(labels, type) ? labels[type] : '알림'
@@ -35,6 +35,7 @@ export const readNotification = id => apiRequest(`/users/me/notifications/${enco
 export const readAllNotifications = () => apiRequest('/users/me/notifications/read-all', { ...authenticated, method: 'PUT' })
 export const deleteNotification = id => apiRequest(`/users/me/notifications/${encodeURIComponent(id)}`, { ...authenticated, method: 'DELETE' })
 export const deleteAllNotifications = () => apiRequest('/users/me/notifications', { ...authenticated, method: 'DELETE' })
+export const clearHeaderNotifications = () => apiRequest('/users/me/notifications/header', { ...authenticated, method: 'DELETE' })
 export const listNotificationPage = (page = 0, category = 'ALL') => apiRequest(
   `/users/me/notifications/page?${new URLSearchParams({ page: String(page), category })}`, authenticated)
 
