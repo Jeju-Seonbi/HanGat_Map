@@ -1,6 +1,26 @@
 import type { CourseItem } from '../../assets/types/course'
 import { addCalendarDays, todayKst } from '../../utils/format.js'
 type ItemWeather = Pick<CourseItem, 'visit_date' | 'weather'>
+/** Compact presentation of the same API evidence, without inventing missing values. */
+export function dayWeatherBadges(items: ItemWeather[]) {
+  const groups = new Map<string, { key: string; scope: string; icon: string; state: string; temperature: string | null; rain: string | null; detail: string }>()
+  for (const item of items) {
+    const fact = daily(item)
+    const evidence = fact?.daily_evidence
+    const scope = evidence?.spatial_scope === 'JEJU_ISLAND' ? '제주 전역' : regions[evidence?.region_code ?? ''] ?? ''
+    const key = `${item.visit_date}:${scope}`
+    if (groups.has(key)) continue
+    const state = !evidence ? '예보 준비 중' : precipitation[fact?.precipitation_type_code ?? ''] || sky[fact?.sky_condition_code ?? ''] || '상태 정보 없음'
+    groups.set(key, { key, scope, state,
+      icon: state === '맑음' ? 'sun' : state.includes('눈') ? 'snow' : ['비', '소나기'].includes(state) ? 'rain' : 'cloud',
+      temperature: evidence?.temp_min != null && evidence.temp_max != null ? `${evidence.temp_min}~${evidence.temp_max}°C`
+        : evidence?.temp_min != null ? `최저 ${evidence.temp_min}°C` : evidence?.temp_max != null ? `최고 ${evidence.temp_max}°C` : null,
+      rain: fact?.precipitation_probability != null ? `${fact.precipitation_probability}%` : null,
+      detail: dailyWeatherLabel(item),
+    })
+  }
+  return [...groups.values()]
+}
 const regions: Record<string, string> = { NORTH: '북부', SOUTH: '남부', EAST: '동부', WEST: '서부' }
 const precipitation: Record<string, string> = { RAIN: '비', RAIN_SNOW: '비·눈', SNOW: '눈', SHOWER: '소나기' }
 const sky: Record<string, string> = { '맑음': '맑음', '구름많음': '구름많음', '구름 많음': '구름많음', '흐림': '흐림' }

@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { dailyWeatherLabel, dayWeatherLabels } from './dailyWeather'
+import { dailyWeatherLabel, dayWeatherLabels, dayWeatherBadges } from './dailyWeather'
 describe('stored daily weather', () => {
+  it('builds compact badges from actual daily values, preserving zero and missing data', () => {
+    const item = { visit_date: '2026-09-20', weather: [{ forecast_date: '2026-09-20', sky_condition_code: '맑음', precipitation_probability: 0,
+      daily_evidence: { source_code: 'KMA_SHORT', spatial_scope: 'REGION', issued_at_utc: '2026-09-19T20:00:00Z', granularity: 'DAILY', region_code: 'EAST', temp_min: 20, temp_max: 26 } }] }
+    expect(dayWeatherBadges([item, item])).toMatchObject([{ icon: 'sun', state: '맑음', temperature: '20~26°C', rain: '0%', scope: '동부' }])
+    expect(dayWeatherBadges([{ ...item, visit_date: '2026-09-21' }])).toMatchObject([{ icon: 'cloud', state: '예보 준비 중', temperature: null, rain: null }])
+  })
   const evidence = { source_code: 'KMA_MID', region_code: 'EAST', spatial_scope: 'JEJU_ISLAND', granularity: 'DAILY', issued_at_utc: '2026-09-07T09:00:00', temp_min: 23, temp_max: 29 }
   it('labels island-wide daily evidence, not an hourly temperature', () => {
     const text = dailyWeatherLabel({ visit_date: '2026-09-11', weather: [{ forecast_date: '2026-09-11', sky_condition_code: '흐림', daily_evidence: evidence }] })
