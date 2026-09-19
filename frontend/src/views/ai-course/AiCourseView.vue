@@ -11,13 +11,13 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../app/stores/auth'
 import CourseConditionForm from '../../components/course/CourseConditionForm.vue'
 import CourseItemCard from '../../components/course/CourseItemCard.vue'
-import BudgetGauge from '../../components/course/BudgetGauge.vue'
 import AlternativePlaceModal from '../../components/course/AlternativePlaceModal.vue'
 import AccommodationRecommendations from '../../components/course/AccommodationRecommendations.vue'
 import { courseGenerationErrorMessage, courseMockService, toCourseRequestPayload } from '../../services/courseMockService'
 import { ASYNC_COURSES_ENABLED } from '../../api/notifications.js'
 import { getGenerationResult, submitGenerationJob } from '../../api/courseGeneration.js'
 import GenerationJobs from '../../components/course/GenerationJobs.vue'
+import GenerationArtwork from '../../components/course/GenerationArtwork.vue'
 import { storePendingCourseClaim, takePendingCourseClaim } from '../../services/pendingCourseClaim'
 import { routeSummary, accessNotices } from '../../services/course/courseSummary'
 import { ApiError } from '../../api/errors.js'
@@ -30,7 +30,6 @@ const condition = reactive<CourseCondition>({
   start_date: today,
   end_date: addCalendarDays(today, 2),
   people: 2,
-  budget_total: 400000,
   transport: 'RENTAL_CAR',
   course_regions: [],
   course_styles: [],
@@ -59,6 +58,7 @@ const saveError = ref('')
 const saveLoading = ref(false)
 const toast = ref('')
 const auth = useAuthStore()
+const historyDialog = ref<HTMLDialogElement>()
 const router = useRouter()
 const route = useRoute()
 const restoration = useResultRestore()
@@ -214,14 +214,6 @@ const averageCongestionText = computed(() => {
 })
 const regionSummary = computed(() => condition.course_regions.map(region => region.name).join(' · ') || '전체')
 const styleSummary = computed(() => condition.course_styles.map(style => style.name).join(' · '))
-const estimatedCost = computed(() => {
-  const summary = result.value?.budget_summary
-  if (!summary?.has_cost_data) return '정보 없음'
-  if (summary.total_expected_min == null || summary.total_expected_max == null) return '정보 없음'
-  return summary.total_expected_min === summary.total_expected_max
-    ? `${summary.total_expected_max.toLocaleString()}원`
-    : `${summary.total_expected_min.toLocaleString()} ~ ${summary.total_expected_max.toLocaleString()}원`
-})
 
 async function generate(next: CourseCondition, regenerate = false) {
   if (loading.value) return
@@ -449,14 +441,18 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
 </script>
 
 <template>
-  <div class="ai-course-page">
+  <div class="ai-course-page" :class="{ 'builder-page': editing && !loading }">
     <header class="course-page-header">
       <div>
-        <span>AI 코스 만들기</span>
-        <h1>{{ loading ? '제주 여행을 구성하고 있어요' : editing ? '나만의 제주 여행' : '추천 코스' }}</h1>
-        <p>{{ loading ? '선택한 조건을 바탕으로 잠시만 기다려 주세요.' : editing ? '여행 조건을 선택하면 혼잡도와 동선을 고려해 코스를 추천해드려요.' : '선택한 조건과 예상 혼잡도를 반영한 제주 여행 일정이에요.' }}</p>
+        <h1>{{ loading ? '제주 여행을 구성하고 있어요' : editing ? '언제, 누구와 같이 한갓진 코스를 생성하고 싶으신가요?' : '추천 코스' }}</h1>
+        <p v-if="!editing">{{ loading ? '선택한 조건을 바탕으로 잠시만 기다려 주세요.' : '선택한 조건과 예상 혼잡도를 반영한 제주 여행 일정이에요.' }}</p>
       </div>
+      <button v-if="editing && auth.isLoggedIn && ASYNC_COURSES_ENABLED" class="history-trigger" @click="historyDialog?.showModal()">최근에 생성한 코스들 ↗</button>
     </header>
+    <dialog ref="historyDialog" class="history-dialog" @click="($event.target === historyDialog) && historyDialog?.close()">
+      <button class="history-close" aria-label="최근 생성 코스 닫기" @click="historyDialog?.close()">×</button>
+      <GenerationJobs v-if="auth.isLoggedIn" />
+    </dialog>
 
     <section v-if="jobResultError" class="course-shell generation-state" role="alert">
       <h2>{{ jobResultError }}</h2>
@@ -469,19 +465,22 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
       <button class="btn" @click="editConditions">새 코스 만들기</button>
     </section>
     <section v-else-if="loading" class="course-shell generation-state" aria-live="polite">
-      <div class="generation-spinner" aria-hidden="true" />
+      <GenerationArtwork status="RUNNING" />
       <span class="result-label">AI 코스 생성 중</span>
       <h2>여행 조건을 분석하고 있어요.</h2>
       <p>혼잡도와 이동 동선을 고려해 코스를 만들고 있어요.</p>
     </section>
 
-    <section v-else-if="editing" class="course-shell">
-      <GenerationJobs />
+    <section v-else-if="editing" class="course-shell builder-shell">
+      <div v-if="error" class="generation-failure" role="alert">
+        <GenerationArtwork status="FAILED" />
+        <p class="course-error">{{ error }} <button class="text-link" @click="generate(condition)">다시 시도</button></p>
+      </div>
       <CourseConditionForm :initial="condition" :loading="loading" @submit="generate" @draft="draft => Object.assign(condition, draft, { accommodation: draft.accommodation })" />
-      <p v-if="error" class="course-error">{{ error }} <button class="text-link" @click="generate(condition)">다시 시도</button></p>
     </section>
 
     <section v-else-if="result" class="course-shell result-shell">
+      <GenerationArtwork status="SUCCEEDED" />
       <header class="course-result-head">
         <div class="result-heading-copy">
           <span class="result-label">추천 코스</span>
@@ -493,7 +492,6 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
           </div>
           <div class="result-metrics">
             <span>평균 혼잡도 <b>{{ averageCongestionText }}</b></span>
-            <span>예상 비용 <b>{{ estimatedCost }}</b></span>
           </div>
         </div>
         <div class="result-actions-block">
@@ -537,7 +535,6 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
         </main>
 
         <aside class="course-side">
-          <BudgetGauge :summary="result.budget_summary" :budget-total="result.budget_total" />
           <section class="course-summary-card">
             <span class="summary-kicker">TRIP SUMMARY</span>
             <h3>코스 요약</h3>
@@ -545,8 +542,6 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
               <dt>여행 일정</dt><dd>{{ tripNights }}박 {{ tripDays }}일</dd>
               <dt>방문 장소</dt><dd>{{ visitCount }}곳</dd>
               <dt>평균 혼잡도</dt><dd>{{ averageCongestionText }}</dd>
-              <dt>예상 비용</dt><dd>{{ estimatedCost }}</dd>
-              <dt>전체 예산</dt><dd>{{ result.budget_total?.toLocaleString() }}원</dd>
               <dt>이동수단</dt><dd>{{ transportLabel[result.transport] }}</dd>
               <dt>숙소</dt><dd>{{ result.accommodation?.place_name ?? '미정' }}</dd>
             </dl>
@@ -587,6 +582,15 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
 </template>
 
 <style scoped>
+.builder-page { background: var(--surf2); min-height: calc(100vh - 80px); padding-bottom: 40px; }
+.builder-page .course-page-header { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding-block: 38px 28px; }
+.builder-page .course-page-header h1 { font-size: clamp(22px, 2.5vw, 30px); letter-spacing: -.04em; }
+.ai-course-page .course-shell.builder-shell { border: 0; background: transparent; box-shadow: none; overflow: visible; }
+.history-trigger { flex-shrink: 0; border: 1px solid var(--line); color: var(--ac); border-radius: 24px; background: var(--ac-bg); padding: 9px 14px; font-size: 12px; font-weight: 700; }
+.history-dialog { width: min(600px, calc(100% - 32px)); margin: auto; padding: 26px; border: 1px solid var(--line); border-radius: 22px; background: var(--surf); color: var(--tx); max-height: 80vh; overflow: auto; }
+.history-dialog::backdrop { background: #10292380; }
+.history-close { display: block; margin-left: auto; width: 36px; height: 36px; font-size: 24px; }
+@media(max-width: 767px) { .builder-page .course-page-header { align-items: flex-start; flex-direction: column; gap: 14px; padding-block: 24px; } }
 /* 일차 머리의 예보·총 이동·경로 안내는 본문 크기 그대로라 일정보다 눈에 먼저 들어왔다 - 보조 정보 크기로.
    route-status는 일정 안팎에 흩어져 있다. 한 화면에 같은 성격의 안내가 두 모양으로 뜨지 않게 전부 같이 잡는다 */
 .daily-weather,
@@ -680,12 +684,6 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
 
   :deep(.accommodation-recommendations) {
     order: 1;
-    min-width: 0;
-    width: 100%;
-  }
-
-  :deep(.budget) {
-    order: 3;
     min-width: 0;
     width: 100%;
   }

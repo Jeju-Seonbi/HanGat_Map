@@ -61,7 +61,7 @@ class CourseServiceAiGenerationFlowTest {
                 mock(CourseAiGenerationService.class), persistence, budget, assembler));
         CourseRequestDto request = objectMapper.readValue("""
                 {"start_date":"2026-08-27","end_date":"2026-08-27","people":2,
-                 "budget_total":500000,"transport":"PUBLIC_TRANSIT","course_regions":[],
+                 "transport":"PUBLIC_TRANSIT","course_regions":[],
                  "course_styles":[{"code":"NATURE","weight":1}],"course_place_preferences":[],
                  "accommodation":{"source_code":"KAKAO_LOCAL","source_place_id":"hotel-real-1",
                     "place_name":"선택 숙소","latitude":33.4,"longitude":126.5}}
@@ -81,7 +81,7 @@ class CourseServiceAiGenerationFlowTest {
         doReturn(computed).when(service).computeCourse(request);
         when(accommodations.verifyGeneratedAccommodation(request.getAccommodation(), computed)).thenReturn(verified);
         when(persistence.persist(request, computed.facts(), computed.result(), computed.metadata(), verified)).thenReturn(stored);
-        when(budget.calculateAndCache(101L)).thenReturn(CourseBudgetCalculation.noData(500000));
+        when(budget.calculateAndCache(101L)).thenReturn(CourseBudgetCalculation.noData());
 
         // API 컨텍스트에 숙소 서비스가 있으면 선택적 주입 후 실제 검증 경로를 사용해야 한다.
         new ApplicationContextRunner()
@@ -135,7 +135,6 @@ class CourseServiceAiGenerationFlowTest {
         when(course.getStartDate()).thenReturn(LocalDate.of(2026, 8, 27));
         when(course.getEndDate()).thenReturn(LocalDate.of(2026, 8, 29));
         when(course.getPeople()).thenReturn((short) 2);
-        when(course.getBudgetTotal()).thenReturn(500000);
         when(course.getTransport()).thenReturn(Transport.RENTAL_CAR);
         // 저장 결과도 3일의 서로 다른 장소를 반환해야 응답 조립까지 검증할 수 있다.
         CourseItem firstItem = persistedItem(course, 201L, 301L, (short) 1,
@@ -157,7 +156,7 @@ class CourseServiceAiGenerationFlowTest {
                                 "candidate-2", "관광지", "candidate-3", "관광지")));
         CourseBudgetService budgetService = mock(CourseBudgetService.class);
         when(budgetService.calculateAndCache(101L))
-                .thenReturn(CourseBudgetCalculation.noData(500000));
+                .thenReturn(CourseBudgetCalculation.noData());
         CourseService service = new CourseService(
                 new StubTourApiService(),
                 new StubCongestionApiService(),
@@ -202,7 +201,6 @@ class CourseServiceAiGenerationFlowTest {
                 .extracting(item -> item.placeName())
                 .containsExactly("만장굴", "성산일출봉", "비자림");
         assertThat(response.budgetSummary().hasCostData()).isFalse();
-        assertThat(response.budgetSummary().budgetTotal()).isEqualTo(500000);
         assertThat(response.days().get(0).items().get(0).placeName()).isEqualTo("만장굴");
         assertThat(response.days().get(0).items().get(0).recommendationReason())
                 .isEqualTo("한글 추천 이유");
@@ -242,7 +240,6 @@ class CourseServiceAiGenerationFlowTest {
                   "start_date": "2026-08-27",
                   "end_date": "2026-08-29",
                   "people": 2,
-                  "budget_total": 500000,
                   "transport": "RENTAL_CAR",
                   "course_regions": [],
                   "course_styles": [{"code": "NATURE", "weight": 1}],

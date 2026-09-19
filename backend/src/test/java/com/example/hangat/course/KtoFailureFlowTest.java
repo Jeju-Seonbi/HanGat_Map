@@ -21,8 +21,7 @@ class KtoFailureFlowTest {
         var mvc=MockMvcBuilders.standaloneSetup(new CourseController(service,mock(CourseClaimService.class),token))
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
         mvc.perform(post("/courses").contentType(MediaType.APPLICATION_JSON).content("""
-          {"start_date":"2026-09-06","end_date":"2026-09-08","people":2,"budget_total":400000,
-           "transport":"PUBLIC_TRANSIT","course_regions":[],"course_styles":[{"code":"NATURE","weight":1}],"course_place_preferences":[]}
+          {"start_date":"2026-09-06","end_date":"2026-09-08","people":2,"transport":"PUBLIC_TRANSIT","course_regions":[],"course_styles":[{"code":"NATURE","weight":1}],"course_place_preferences":[]}
           """))
           .andExpect(status().isServiceUnavailable()).andExpect(jsonPath("$.code").value(5002))
           .andExpect(jsonPath("$.success").value(false)).andExpect(jsonPath("$.message").value(KtoApiException.USER_MESSAGE))

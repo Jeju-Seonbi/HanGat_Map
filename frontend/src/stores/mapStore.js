@@ -62,7 +62,7 @@ export const state = reactive({
   courseDay: 'all',
   coursePanel: true,     // 코스 패널 펼침 여부. ×는 패널만 접고 코스(핀·경로·URL)는 남긴다 - 지우는 건 '코스 지우기'뿐(2026-09-14 결정)
   filterOffset: 0,       // 업종 필터 캐러셀 위치
-  F: { reg: savedRegion(), bud: 150000, cat: '' },   // reg 기본 '전체'(탭 안 마지막 선택 기억), cat='' = 모든 종류
+  F: { reg: savedRegion(), cat: '' },   // reg 기본 '전체'(탭 안 마지막 선택 기억), cat='' = 모든 종류
   // 기본은 관광지 핀만 - 착한가격(271)까지 켜면 전체 권역에서 분홍 마커가 혼잡 색을 가린다. 칩으로 켠다 (2026-09-11 결정)
   L: { crowd: 1, spot: 1, food: 0, dine: 0, cafe: 0, cvs: 0, stay: 0, mart: 0, rain: 1 },
   /** 로그인한 회원이 찜한 장소 ID (MAP_009). 백엔드 /favorites 가 원본이고 이건 화면용 사본. 비로그인이면 빈 배열 */

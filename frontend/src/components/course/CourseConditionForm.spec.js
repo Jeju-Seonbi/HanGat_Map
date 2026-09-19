@@ -23,7 +23,7 @@ function all(node, predicate) {
 const focus = vi.fn()
 const scroll = vi.fn()
 function node(tag, text = '') {
-  return Vue.markRaw({ tag, tagName: tag.toUpperCase(), text, children: [], parent: null, props: {},
+  return Vue.markRaw({ tag, tagName: tag.toUpperCase(), text, children: [], parent: null, props: {}, style: {},
     getRootNode() { return { activeElement: null } },
     addEventListener() {}, removeEventListener() {}, setAttribute() {}, removeAttribute() {},
     get dataset() { return { errorTarget: this.props['data-error-target'] } },
@@ -64,7 +64,7 @@ function mount(overrides = {}, loading = false) {
   const minimum = courseDateWindow().minimum
   props = Vue.reactive({ loading })
   submitted = vi.fn()
-  const initial = { start_date: minimum, end_date: minimum, people: 2, budget_total: 100000,
+  const initial = { start_date: minimum, end_date: minimum, people: 2,
     transport: 'PUBLIC_TRANSIT', course_regions: [], course_styles: [{ tag_id: 1, code: 'NATURE', name: '자연', weight: 1 }],
     course_place_preferences: [], ...overrides }
   root = node('root')
@@ -103,9 +103,9 @@ describe('course input validation feedback', () => {
     expect(focus).not.toHaveBeenCalled(); expect(scroll).not.toHaveBeenCalled()
   })
   it('reports missing values in input order with the remaining error count', () => {
-    mount({ start_date: '', end_date: '', people: '', budget_total: '', transport: '', course_styles: [] })
+    mount({ start_date: '', end_date: '', people: '', transport: '', course_styles: [] })
     expect(text(feedback())).toContain('여행 시작일과 종료일을 모두 입력')
-    expect(text(feedback())).toContain('외 4개 오류')
+    expect(text(feedback())).toContain('외 3개 오류')
     expect(cta().props.disabled).toBe(true)
     expect(feedback().props['aria-live']).toBe('polite')
     expect(feedback().props['aria-atomic']).toBe('true')
@@ -115,18 +115,17 @@ describe('course input validation feedback', () => {
     expect(focus).not.toHaveBeenCalled()
     const review = find(el => el.props.class === 'validation-review')
     expect(review.tag).toBe('button'); expect(review.props.type).toBe('button')
-    review.props.onClick()
+    await review.props.onClick()
     expect(focus.mock.lastCall?.[0] === input('people')).toBe(true)
     expect(focus.mock.lastCall?.[1]).toEqual({ preventScroll: true })
     expect(scroll.mock.lastCall?.[0] === field('people')).toBe(true)
     expect(scroll.mock.lastCall?.[1]).toEqual({ block: 'center', behavior: 'auto' })
     await change('people', 1)
-    find(el => el.props.class === 'validation-review').props.onClick()
-    expect(focus.mock.lastCall?.[0] === input('budget')).toBe(true)
+    expect(cta().props.disabled).toBe(false)
   })
-  it('targets the missing end date without changing date rules', () => {
+  it('targets the missing end date without changing date rules', async () => {
     mount({ end_date: '' })
-    find(el => el.props.class === 'validation-review').props.onClick()
+    await find(el => el.props.class === 'validation-review').props.onClick()
     expect(focus.mock.lastCall?.[0] === input('end-date')).toBe(true)
   })
   it('retains date boundary errors and blocks programmatic invalid submission', () => {
@@ -137,7 +136,7 @@ describe('course input validation feedback', () => {
   })
   it('updates selection errors and focuses a keyboard-operable style control', async () => {
     mount({ course_styles: [] })
-    find(el => el.props.class === 'validation-review').props.onClick()
+    await find(el => el.props.class === 'validation-review').props.onClick()
     const styleButton = all(field('styles'), el => el.tag === 'button')[0]
     expect(focus.mock.lastCall?.[0] === styleButton).toBe(true)
     styleButton.props.onClick(); await Vue.nextTick()

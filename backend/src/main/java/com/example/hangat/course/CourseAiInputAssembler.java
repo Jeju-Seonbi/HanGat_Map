@@ -163,7 +163,6 @@ public class CourseAiInputAssembler {
                 request.getStartDate(),
                 request.getEndDate(),
                 request.getPeople(),
-                request.getBudgetTotal(),
                 request.getTransport()
         );
     }

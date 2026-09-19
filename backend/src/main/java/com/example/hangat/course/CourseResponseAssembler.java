@@ -36,10 +36,8 @@ public class CourseResponseAssembler {
             CoursePersistenceResult persistence,
             AccommodationDto accommodation
     ) {
-        Integer budgetTotal = persistence == null || persistence.course() == null
-                ? null : persistence.course().getBudgetTotal();
         return assemble(facts, result, persistence, accommodation,
-                CourseBudgetCalculation.noData(budgetTotal));
+                CourseBudgetCalculation.noData());
     }
 
     public CourseResponseDto assemble(
@@ -88,7 +86,6 @@ public class CourseResponseAssembler {
                 course.getStartDate(),
                 course.getEndDate(),
                 course.getPeople(),
-                course.getBudgetTotal(),
                 course.getTransport(),
                 accommodation,
                 budget.totalExpectedMin(),
@@ -210,7 +207,6 @@ public class CourseResponseAssembler {
         CourseBudgetCalculation.BudgetSummary summary = budget.summary();
         return new BudgetSummaryDto(
                 summary.hasCostData(),
-                summary.budgetTotal(),
                 summary.verifiedTotal(),
                 summary.estimatedTotal(),
                 summary.estimatedMin(),
@@ -218,9 +214,6 @@ public class CourseResponseAssembler {
                 summary.totalExpected(),
                 budget.totalExpectedMin(),
                 budget.totalExpectedMax(),
-                summary.remainingBudget(),
-                summary.usageRate(),
-                summary.overBudget(),
                 summary.unknownCount());
     }
 

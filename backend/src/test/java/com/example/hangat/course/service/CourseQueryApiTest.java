@@ -94,7 +94,7 @@ class CourseQueryApiTest {
         var detail = mapper.valueToTree(queryService.detail(저장코스.getId(), 주인.getId()));
         assertThat(detail.path("budget_summary").path("has_cost_data").asBoolean()).isFalse();
         assertThat(detail.path("budget_summary").path("total_expected_max").isNull()).isTrue();
-        assertThat(detail.path("budget_summary").path("budget_total").asInt()).isEqualTo(400000);
+        assertThat(detail.path("budget_summary").has("budget_total")).isFalse();
     }
 
     @Test
@@ -104,13 +104,13 @@ class CourseQueryApiTest {
         em.flush();
         long before = costs.count();
         var detail = mapper.valueToTree(queryService.detail(저장코스.getId(), 주인.getId()));
-        assertThat(detail.path("budget_summary").path("budget_total").asInt()).isEqualTo(400000);
+        assertThat(detail.has("budget_total")).isFalse();
         assertThat(detail.path("budget_summary").path("estimated_min").asInt()).isEqualTo(16000);
         assertThat(detail.path("budget_summary").path("estimated_max").asInt()).isEqualTo(24000);
         assertThat(detail.path("budget_summary").path("verified_total").asInt()).isZero();
         assertThat(detail.path("days").get(0).path("items").get(0).path("costs").get(0).path("accuracy_type").asText()).isEqualTo("ESTIMATED");
         var card = mapper.valueToTree(queryService.savedCourses(주인.getId(), PageRequest.of(0, 10)).getContent().get(0));
-        assertThat(card.path("budget_total").asInt()).isEqualTo(400000);
+        assertThat(card.has("budget_total")).isFalse();
         assertThat(costs.count()).isEqualTo(before);
     }
 
@@ -125,7 +125,7 @@ class CourseQueryApiTest {
         assertThat(costs.findByCourseId(임시코스.getId())).hasSize(3);
         mockMvc.perform(get("/courses/{id}", 임시코스.getId()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result.budget_summary.budget_total").value(400000))
+                .andExpect(jsonPath("$.result.budget_summary.budget_total").doesNotExist())
                 .andExpect(jsonPath("$.result.budget_summary.estimated_max").value(16000))
                 .andExpect(jsonPath("$.result.budget_summary.unknown_count").value(2));
     }
@@ -224,7 +224,7 @@ class CourseQueryApiTest {
     private Course course(User owner, String title) {
         return courseRepository.save(Course.builder()
                 .user(owner).title(title)
-                .people((short) 2).budgetTotal(400000)
+                .people((short) 2)
                 .startDate(출발일).endDate(출발일.plusDays(1))
                 .transport(Transport.RENTAL_CAR)
                 .averageCongestionRate(new BigDecimal("33.00"))

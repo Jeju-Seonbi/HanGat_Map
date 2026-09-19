@@ -83,7 +83,6 @@ public class CoursePersistenceService {
                 .startDate(request.getStartDate())
                 .endDate(request.getEndDate())
                 .people(toPeople(request.getPeople()))
-                .budgetTotal(request.getBudgetTotal())
                 .transport(com.example.hangat.course.model.enums.Transport.valueOf(
                         request.getTransport().name()))
                 .algorithmVersion(metadata.algorithmVersion());

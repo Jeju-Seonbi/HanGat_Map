@@ -727,7 +727,7 @@ class GeminiCourseAiProviderTest {
                 "1.0",
                 new TripConditionDto(
                         LocalDate.parse("2026-08-27"), LocalDate.parse("2026-08-29"),
-                        2, 500000, Transport.RENTAL_CAR),
+                        2,  Transport.RENTAL_CAR),
                 new UserPreferencesDto(List.of(), List.of(), List.of(), List.of(), null),
                 List.of(), List.of(), null);
     }
@@ -757,7 +757,7 @@ class GeminiCourseAiProviderTest {
 
         return new CourseAiInputDto(
                 "1.0",
-                new TripConditionDto(firstDay, firstDay.plusDays(1), 2, 300000, Transport.RENTAL_CAR),
+                new TripConditionDto(firstDay, firstDay.plusDays(1), 2,  Transport.RENTAL_CAR),
                 new UserPreferencesDto(
                         List.of(new SelectedRegionDto(null, "EAST", "동부")),
                         List.of(

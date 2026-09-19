@@ -119,7 +119,6 @@ function loadFromURL() {
   }
   const r = p.get('r')
   if (r && ['전체', '동부', '서부', '남부', '북부'].includes(r)) state.F.reg = r
-  if (p.get('b')) state.F.bud = +p.get('b') || state.F.bud
 }
 
 /** ?place=(공유 링크·마이페이지) 와 ?placeId=(장소 상세 페이지 링크) 둘 다 받는다 */
