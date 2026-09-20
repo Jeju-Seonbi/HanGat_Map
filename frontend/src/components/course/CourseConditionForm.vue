@@ -434,9 +434,6 @@ const summary = computed(() => ({
 [data-error-target] {
   scroll-margin-block: 100px calc(var(--mobile-tabbar-h, 0px) + 24px);
 }
-.course-form-footer {
-  padding-bottom: calc(28px + var(--mobile-tabbar-h, 0px));
-}
 .validation-feedback {
   max-width: 440px;
   margin-inline: auto;
