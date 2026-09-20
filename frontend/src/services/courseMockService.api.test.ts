@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AlternativePlace, CourseCondition, CourseItem, CourseResult } from '../assets/types/course'
 import { apiRequest } from '../api/backendClient.js'
 import { ApiError } from '../api/errors.js'
@@ -9,6 +9,8 @@ import {
 } from './courseMockService'
 
 vi.mock('../api/backendClient.js', () => ({ apiRequest: vi.fn() }))
+const flags = vi.hoisted(() => ({ async: true }))
+vi.mock('../api/notifications.js', () => ({ get ASYNC_COURSES_ENABLED() { return flags.async } }))
 
 const condition: CourseCondition = {
   start_date: '2026-08-28',
@@ -93,7 +95,8 @@ const itineraryContract = (course: CourseResult) => course.days.flatMap(day =>
 
 afterEach(() => vi.clearAllMocks())
 
-describe('courseMockService Backend generation', () => {
+describe.each([true, false])('courseMockService Backend generation (async=%s)', enabled => {
+  beforeEach(() => { flags.async = enabled })
   it('refuses save without proof and never reports an expired server claim as saved', async () => {
     const mock = vi.mocked(apiRequest)
     await expect(courseMockService.saveCourse(response, '제주')).rejects.toThrow('저장 권한')
@@ -236,6 +239,7 @@ describe('courseMockService Backend generation', () => {
     expect(requestMock).toHaveBeenCalledWith('/courses/101/accommodation', {
       method: 'PATCH',
       auth: false,
+      ...(enabled ? { optionalAuth: true } : {}),
       body: {
         accommodation: condition.accommodation,
         claim_token: 'opaque-proof',
@@ -291,6 +295,7 @@ describe('courseMockService Backend generation', () => {
     expect(requestMock).toHaveBeenCalledWith('/courses/101/accommodations/search', {
       method: 'POST',
       auth: false,
+      ...(enabled ? { optionalAuth: true } : {}),
       body: { claim_token: 'opaque-proof' },
     })
     expect(recommendations).toEqual([expect.objectContaining({
@@ -328,6 +333,7 @@ describe('courseMockService Backend generation', () => {
     expect(requestMock).toHaveBeenCalledWith('/courses/101/routes/car', {
       method: 'GET',
       auth: false,
+      ...(enabled ? { optionalAuth: true } : {}),
     })
     expect(response).toEqual(before)
   })
@@ -363,6 +369,7 @@ describe('courseMockService Backend generation', () => {
     expect(requestMock).toHaveBeenCalledWith('/courses/101/accommodation', {
       method: 'PATCH',
       auth: true,
+      ...(enabled ? { optionalAuth: true } : {}),
       body: { accommodation: condition.accommodation },
     })
   })
@@ -442,7 +449,8 @@ describe('courseMockService Backend generation', () => {
   })
 })
 
-describe('alternative places and swap (backend, 담당 정동현)', () => {
+describe.each([true, false])('alternative places and swap (async=%s)', enabled => {
+  beforeEach(() => { flags.async = enabled })
   const item = (id: number, place_id: number, place_name: string, extra: Partial<CourseItem> = {}): CourseItem => ({
     id, course_id: 101, place_id, place_name, category_name: '관광지', day_no: 1, position: id, visit_date: '2026-08-28',
     start_time: '09:00', end_time: '11:00', item_source: 'AI_RECOMMENDED', costs: [], latitude: 33.46, longitude: 126.94, ...extra,
@@ -514,7 +522,7 @@ describe('alternative places and swap (backend, 담당 정동현)', () => {
     expect(replaced.days.map(day => ({ date: day.visit_date, slots: day.items.map(item => [item.visit_date, item.start_time, item.end_time]) })))
       .toEqual(before.days.map(day => ({ date: day.visit_date, slots: day.items.map(item => [item.visit_date, item.start_time, item.end_time]) })))
 
-    expect(requestMock).toHaveBeenCalledWith('/courses/101/items/1/swap', { method: 'POST', body: { place_id: 601 }, auth: false })
+    expect(requestMock).toHaveBeenCalledWith('/courses/101/items/1/swap', { method: 'POST', body: { place_id: 601 }, auth: false, ...(enabled ? { optionalAuth: true } : {}) })
     const changed = replaced.days[0].items[0]
     expect(changed).toMatchObject({
       id: 1, place_id: 601, place_name: '두산봉', item_source: 'REPLACEMENT', replaced_from_place_id: 501,
