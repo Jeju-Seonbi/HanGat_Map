@@ -19,6 +19,10 @@ const reviews=[{reviewId:1,placeId:1,placeName:'성이시돌목장',placeCategor
 const names=['금오름','협재해수욕장','한림공원','비자림','사려니숲길','섭지코지','성산일출봉','월정리해변','함덕해수욕장','천지연폭포','정방폭포','산방산','송악산','용머리해안','오설록'];
 let favorites=names.map((name,i)=>({placeId:i+1,name,categoryName:'관광지',categoryCode:'TOURIST',regionName:'제주',roadAddress:'제주특별자치도 · 미리보기 주소',latitude:33.4,longitude:126.5,imageUrl:'/images/places/gwangchigi.jpg',favoritedAt:new Date(Date.now()-i*86400000).toISOString(),ratingAvg:4.5,reviewCount:12,crowdRate:24,free:true,operatingHoursText:null}));
 if(new URLSearchParams(location.search).has('pagination')) for(let i=3;i<=21;i++) reviews.push({...reviews[0],reviewId:i,placeName:`예시 장소 ${i}`});
+if(new URLSearchParams(location.search).has('missing-images')) {
+ favorites[0].imageUrl=null;
+ favorites[1].imageUrl='/images/not-found-qa.jpg';
+}
 window.fetch=async(input,options={})=>{
  const url=new URL(typeof input==='string'?input:input.url,location.origin);let result=null;
  if(window.qaFailFavoriteDelete && options.method==='DELETE' && /\/favorites\/\d+$/.test(url.pathname)){window.qaFailFavoriteDelete=false;return Response.json({success:false,message:'테스트 찜 해제 실패'},{status:400});}
