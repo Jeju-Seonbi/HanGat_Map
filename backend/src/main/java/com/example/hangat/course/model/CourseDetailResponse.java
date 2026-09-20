@@ -6,6 +6,8 @@ import com.example.hangat.course.model.enums.CourseType;
 import com.example.hangat.course.model.enums.Transport;
 import com.example.hangat.map.model.enums.BusinessStatus;
 import com.example.hangat.map.model.enums.CongestionLevel;
+import com.example.hangat.course.service.IndoorClassifier;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 
@@ -105,5 +107,10 @@ public record CourseDetailResponse(
             List<CourseResponseDto.WeatherFactDto> weather,
             List<CourseResponseDto.CourseItemCostDto> costs
     ) {
+        /** 실내 여부 - 이름 키워드 휴리스틱(IndoorClassifier). 생성 응답(CourseResponseDto.ItemDto)과 같은 규칙으로 복원 화면도 배지를 그린다 */
+        @JsonProperty(value = "indoor", access = JsonProperty.Access.READ_ONLY)
+        public boolean indoor() {
+            return IndoorClassifier.isIndoor(placeName);
+        }
     }
 }

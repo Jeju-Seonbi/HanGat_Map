@@ -141,6 +141,7 @@ export function resultFromDetail(detail: CourseDetail, proof?: RestoreState): Co
       congestion_rate: item.congestion_rate, congestion_level: item.congestion_level,
       recommendation_reason: item.recommendation_reason, recommendation_reason_code: item.recommendation_reason_code,
       replaced_from_place_id: item.replaced_from_place_id, weather: item.weather, costs: item.costs ?? [],
+      indoor: item.indoor,
     })) })),
   }
 }

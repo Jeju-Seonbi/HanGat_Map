@@ -6,6 +6,7 @@ import '@fontsource/noto-sans-kr/700.css'
 import { congestionLabel } from '../../utils/congestion'
 import DailyWeatherBadges from '../../components/course/DailyWeatherBadges.vue'
 import AppIcon from '../../components/common/AppIcon.vue'
+import { rainyIndoorNotice } from '../../services/course/dailyWeather'
 import { expectedTransitEdges, transitTopologyMatches, useTransitRoute } from '../../services/course/transitRoute'
 import { useAccommodationSelection, syncConfirmedCourseCondition } from '../../services/course/accommodationSelection'
 import TransitDayRoute from '../../components/course/TransitDayRoute.vue'
@@ -582,7 +583,12 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
             <button v-for="(day, index) in result.days" :id="`course-tab-${day.day_no}`" :key="day.day_no" role="tab" :aria-selected="activeDays[0]?.day_no === day.day_no" :aria-controls="`course-day-${day.day_no}`" :tabindex="activeDays[0]?.day_no === day.day_no ? 0 : -1" @click="selectedDay = day.day_no" @keydown="navigateDay($event, index)">DAY {{ day.day_no }} <small>{{ formatDate(day.visit_date) }}</small></button>
           </div>
           <section v-for="day in activeDays" :id="`course-day-${day.day_no}`" :key="day.day_no" class="course-day" role="tabpanel" :aria-labelledby="`course-tab-${day.day_no}`" tabindex="0">
-            <header><div class="day-title"><b>● {{ day.day_no }}일차 일정</b><span> · {{ formatDate(day.visit_date) }}</span></div><DailyWeatherBadges :items="day.items" /></header>
+            <header>
+              <div class="day-title"><b>● {{ day.day_no }}일차 일정</b><span> · {{ formatDate(day.visit_date) }}</span></div>
+              <DailyWeatherBadges :items="day.items" />
+              <!-- 비 예보일 + 실내 과반일 때만 - 실내는 이름 휴리스틱이라 '위주'까지만 -->
+              <p v-if="rainyIndoorNotice(day.items)" class="rain-notice">{{ rainyIndoorNotice(day.items) }}</p>
+            </header>
             <TransitDayRoute v-if="result.transport === 'PUBLIC_TRANSIT'" :day="transitData?.days.find(d => d.day_no === day.day_no)" :expected-edges="expectedTransitEdges(result, day.day_no)" :loading="transitLoading" :error="transitError" />
             <p v-if="result.transport === 'RENTAL_CAR'" class="route-summary">
               총 이동 {{ routeSummary([routeForDay(day.day_no) ?? {}], routeLoading) }}
@@ -677,6 +683,8 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
 .history-dialog::backdrop { background: #10292380; }
 .history-close { display: block; margin-left: auto; width: 36px; height: 36px; font-size: 24px; }
 @media(max-width: 767px) { .builder-page .course-page-header { align-items: flex-start; flex-direction: column; gap: 14px; padding-block: 24px; } }
+/* 비 예보일 실내 위주 배지 - 일차 머리의 날씨 알약 옆에 붙는 단색 알약 */
+.rain-notice{display:inline-flex;align-items:center;margin:0;padding:4px 9px;border-radius:20px;background:var(--course-accent);color:var(--course-on-ac);font-size:11px;font-weight:700;white-space:nowrap}
 /* 일차 머리의 예보·총 이동·경로 안내는 본문 크기 그대로라 일정보다 눈에 먼저 들어왔다 - 보조 정보 크기로.
    route-status는 일정 안팎에 흩어져 있다. 한 화면에 같은 성격의 안내가 두 모양으로 뜨지 않게 전부 같이 잡는다 */
 .daily-weather,
