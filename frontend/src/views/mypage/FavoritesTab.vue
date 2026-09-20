@@ -132,8 +132,8 @@ const status = item => item.closed
           <li v-for="p in visibleItems" :key="p.placeId">
             <article class="card hoverable" :class="{ sel: p.placeId === selectedId }">
               <button class="hit" :aria-label="`${p.name} 메뉴`" :aria-expanded="selectedId === p.placeId" @click="select(p.placeId)">
-                <!-- 대표사진 = 장소 상세에 뜨는 첫 사진(백엔드 imageUrl). 없거나 깨지면 색 썸네일 -->
-                <PlaceThumb :category="p.category" :name="p.name" :src="p.imageUrl" size="100%" radius="12px" class="th" />
+                <!-- 없거나 깨진 대표사진은 메인과 같은 이미지 준비 안내를 표시한다. -->
+                <PlaceThumb :category="p.category" :name="p.name" :src="p.imageUrl" image-placeholder size="100%" radius="12px" class="th" />
                 <div class="cbody">
                   <div class="cname">{{ p.name }}</div>
                   <p class="note addr">{{ p.category }} · {{ p.addr }}</p>
