@@ -36,16 +36,6 @@ const activeOf = computed(() => tab => isTabActive(tab, route.path))
 // 내 정보는 이전 프론트 호환용 /me 주소이므로 로그인한 사용자의 공개 경로로 변환한다.
 const profileImagePath = computed(() => currentProfileImagePath(auth.user))
 
-function openMobilePreview () {
-  const href = router.resolve(route.fullPath).href
-  const preview = window.open(
-    href,
-    'hangat-mobile-preview',
-    'popup,width=390,height=844,resizable=yes,scrollbars=yes'
-  )
-  preview?.focus()
-}
-
 async function onLogout () {
   mobileMenuOpen.value = false
   await auth.logout()
@@ -91,18 +81,6 @@ async function onLogout () {
         <span v-if="t.badge && unread" class="nbadge tnum">{{ unread }}</span>
       </RouterLink>
 
-      <button
-        type="button"
-        class="mobile-preview-button"
-        aria-label="모바일 화면으로 미리보기"
-        title="모바일 화면으로 미리보기"
-        @click="openMobilePreview"
-      >
-        <svg width="15" height="18" viewBox="0 0 15 18" aria-hidden="true">
-          <rect x="2" y="1" width="11" height="16" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.5" />
-          <path d="M6 14.5h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-        </svg>
-      </button>
       <ThemeToggle variant="icon" />
       <NotificationBell />
 
@@ -184,19 +162,6 @@ async function onLogout () {
 .tab { position: relative; }
 .account-actions { display: contents; }
 
-.mobile-preview-button {
-  width: 34px;
-  height: 34px;
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  color: var(--tx2);
-  transition: background .15s, color .15s;
-}
-.mobile-preview-button:hover { background: var(--surf2); color: var(--tx); }
-
 .mobile-menu-button,
 .mobile-header-menu { display: none; }
 .mobile-menu-button {
@@ -252,7 +217,6 @@ async function onLogout () {
 .ghost.lg:hover { filter: brightness(.96); background: var(--ac-bg); }
 
 @media (max-width: 768px) {
-  .mobile-preview-button { display: none; }
   .account-actions { display: none; }
   .mobile-menu-button { display: inline-flex; }
   .mobile-header-menu {
@@ -290,10 +254,9 @@ async function onLogout () {
 
 /*
   좁은 데스크톱에서는 모바일 메뉴 대신 압축한 상단 메뉴를 유지한다.
-  주요 탐색을 우선하기 위해 모바일 미리보기와 계정 이름만 감춘다.
+  주요 탐색을 우선하기 위해 계정 이름만 감춘다.
 */
 @media (max-width: 768px) and (hover: hover) and (pointer: fine) {
-  .mobile-preview-button { display: none; }
   .account-actions { display: contents; }
   .mobile-menu-button,
   .mobile-header-menu { display: none; }
