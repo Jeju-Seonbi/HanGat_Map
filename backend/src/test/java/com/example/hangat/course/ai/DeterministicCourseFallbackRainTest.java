@@ -1,13 +1,16 @@
 package com.example.hangat.course.ai;
 
 import com.example.hangat.course.ai.CourseAiInputDto.CandidateFactDto;
+import com.example.hangat.course.ai.CourseAiInputDto.CongestionFactDto;
 import com.example.hangat.course.ai.CourseAiInputDto.RequiredCandidateConstraintDto;
 import com.example.hangat.course.ai.CourseAiInputDto.WeatherAiFactDto;
 import com.example.hangat.course.ai.CourseAiInputDto.WeatherAiFactSetDto;
 import com.example.hangat.course.model.Transport;
 import com.example.hangat.course.service.RainyDayRule;
+import com.example.hangat.map.model.enums.CongestionLevel;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
@@ -16,13 +19,14 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * LLM이 실패해도 우천 동작은 배치 코스와 같아야 한다 - 비 예보일에는 실내 후보를 먼저, 맑은 날은 기존 순서 그대로,
- * WANT·고정 일정은 규칙보다 우선.
+ * LLM이 실패해도 우천 동작은 배치 코스와 같아야 한다 - 후보를 고르는 순서(스타일·혼잡)는 그대로 두고 실내 후보는
+ * 비 예보일로, 실외 후보는 맑은 날로 보낸다. 비 예보일이 없으면 기존 순서 그대로, WANT·고정 일정은 규칙보다 우선.
  */
 class DeterministicCourseFallbackRainTest {
 
     private static final LocalDate RAINY = LocalDate.of(2026, 9, 20);
     private static final LocalDate SUNNY = LocalDate.of(2026, 9, 21);
+    private static final LocalDate DAY3 = LocalDate.of(2026, 9, 22);
     private static final String EAST = "db-weather-EAST";
 
     private final DeterministicCourseFallback fallback = new DeterministicCourseFallback();
@@ -52,7 +56,7 @@ class DeterministicCourseFallbackRainTest {
 
     @Test
     void 비_예보일이_둘째_날이어도_맑은_첫날이_실내_후보를_먼저_써_버리지_않는다() {
-        // 날짜는 덜 찬 날부터 채우므로 첫날(맑음)이 먼저 고른다 - 실내 후보를 아껴 두지 않으면 비 오는 둘째 날에 실외만 남는다
+        // 실내 후보는 비 예보일로, 실외 후보는 맑은 날로 - 둘째 날이 비여도 맑은 첫날이 실내 후보를 써 버리지 않는다
         CourseAiResultDto result = fallback.generate(input(CANDIDATES, List.of(), weather(Map.of(RAINY, 10, SUNNY, 80))));
 
         Map<LocalDate, List<String>> byDate = names(result);
@@ -92,6 +96,70 @@ class DeterministicCourseFallbackRainTest {
     }
 
     @Test
+    void 스타일_후보는_그대로_먼저_고르고_실내면_비_예보일로_보낸다() {
+        // 카페 취향 - 후보를 고르는 순서는 우천 규칙과 무관하다(카페가 먼저). 고른 카페가 실내라 비 오는 둘째 날로 간다
+        List<CandidateFactDto> candidates = List.of(
+                new CandidateFactDto("cafe", "월정리 카페", "EAST", "CAFE", List.of("CAFE"), List.of(), EAST, null),
+                new CandidateFactDto("oreum", "다랑쉬오름", "EAST", "TOURIST", List.of(), List.of(), EAST, null));
+
+        CourseAiResultDto result = fallback.generate(
+                input(candidates, List.of(), weather(Map.of(RAINY, 10, SUNNY, 80)), List.of("CAFE"), SUNNY));
+
+        assertThat(names(result).get(SUNNY)).containsExactly("cafe");    // 둘째 날이 비 - 실내인 카페
+        assertThat(names(result).get(RAINY)).containsExactly("oreum");   // 첫날은 맑음 - 실외
+        assertThat(result.days().stream().filter(day -> day.date().equals(SUNNY)).findFirst().orElseThrow()
+                .items().get(0).recommendationReason()).isEqualTo(RainyDayRule.INDOOR_REASON);
+    }
+
+    @Test
+    void 비_예보일이라도_혼잡한_실내가_한산한_후보보다_먼저_자리를_잡지_않는다() {
+        // 하루 세 자리에 후보 넷 - 비가 와도 후보 순서는 혼잡 낮은 순 그대로라 붐비는 박물관이 밀려난다
+        List<CandidateFactDto> candidates = List.of(
+                congested("b", "협재해수욕장", CongestionLevel.QUIET),
+                congested("g", "빛의 벙커 전시관", CongestionLevel.QUIET),
+                congested("m", "제주민속자연사박물관", CongestionLevel.CROWDED),
+                congested("o", "다랑쉬오름", CongestionLevel.QUIET));
+
+        CourseAiResultDto result = fallback.generate(
+                input(candidates, List.of(), weather(Map.of(RAINY, 90)), List.of(), RAINY));
+
+        assertThat(names(result).get(RAINY)).containsExactly("b", "g", "o").doesNotContain("m");
+    }
+
+    @Test
+    void 비_예보일이_다_차면_실내_후보도_맑은_날로_간다() {
+        List<CandidateFactDto> candidates = List.of(
+                candidate("a", "성산일출봉", EAST), candidate("b", "제주민속자연사박물관", EAST),
+                candidate("c", "협재해수욕장", EAST), candidate("d", "빛의 벙커 전시관", EAST),
+                candidate("e", "천지연폭포", EAST), candidate("f", "산방산탄산온천", EAST),
+                candidate("g", "용머리해안", EAST), candidate("h", "제주도립미술관", EAST),
+                candidate("i", "쇠소깍", EAST));
+
+        CourseAiResultDto result = fallback.generate(
+                input(candidates, List.of(), weather(Map.of(RAINY, 90, SUNNY, 10, DAY3, 10)), List.of(), DAY3));
+
+        Map<LocalDate, List<String>> byDate = names(result);
+        assertThat(byDate.get(RAINY)).containsExactly("b", "d", "f");
+        assertThat(byDate.get(SUNNY)).containsExactly("a", "e", "h");   // 비 오는 날이 다 찬 뒤엔 h(미술관)도 맑은 날로 간다
+        assertThat(byDate.get(DAY3)).containsExactly("c", "g", "i");
+    }
+
+    @Test
+    void 실내_후보만_있어도_비_예보일이_아닌_날을_비워_두지_않는다() {
+        // 실내 셋뿐이고 둘째 날만 비 - 셋 다 비 오는 날로 몰리면 첫날이 비어 코스가 성립하지 않는다
+        List<CandidateFactDto> indoorOnly = List.of(
+                candidate("b", "제주민속자연사박물관", EAST),
+                candidate("d", "빛의 벙커 전시관", EAST),
+                candidate("f", "산방산탄산온천", EAST));
+
+        CourseAiResultDto result = fallback.generate(input(indoorOnly, List.of(), weather(Map.of(RAINY, 10, SUNNY, 80))));
+
+        Map<LocalDate, List<String>> byDate = names(result);
+        assertThat(byDate.get(SUNNY)).containsExactly("b", "d");   // 둘째 날이 비 - 실내 둘
+        assertThat(byDate.get(RAINY)).containsExactly("f");        // 마지막 후보는 빈 첫날로
+    }
+
+    @Test
     void 날씨_세트가_없는_후보는_비_예보일로_보지_않는다() {
         List<CandidateFactDto> noWeather = List.of(
                 candidate("a", "성산일출봉", null),
@@ -116,12 +184,24 @@ class DeterministicCourseFallbackRainTest {
                 .toList()));
     }
 
+    private static CandidateFactDto congested(String id, String name, CongestionLevel level) {
+        return new CandidateFactDto(id, name, "EAST", "TOURIST", List.of(),
+                List.of(new CongestionFactDto(RAINY, BigDecimal.valueOf(50), level)), EAST, null);
+    }
+
     private static CourseAiInputDto input(List<CandidateFactDto> candidates,
                                           List<RequiredCandidateConstraintDto> required,
                                           List<WeatherAiFactSetDto> weatherFactSets) {
+        return input(candidates, required, weatherFactSets, List.of(), SUNNY);
+    }
+
+    private static CourseAiInputDto input(List<CandidateFactDto> candidates,
+                                          List<RequiredCandidateConstraintDto> required,
+                                          List<WeatherAiFactSetDto> weatherFactSets,
+                                          List<String> styles, LocalDate endDate) {
         return new CourseAiInputDto("2.0",
-                new CourseAiInputDto.TripConstraintDto(RAINY, SUNNY, Transport.RENTAL_CAR),
-                new CourseAiInputDto.SoftPreferencesDto(List.of("EAST"), List.of()),
+                new CourseAiInputDto.TripConstraintDto(RAINY, endDate, Transport.RENTAL_CAR),
+                new CourseAiInputDto.SoftPreferencesDto(List.of("EAST"), styles),
                 new CourseAiInputDto.HardConstraintsDto(required), null,
                 candidates, weatherFactSets, List.of(), null);
     }

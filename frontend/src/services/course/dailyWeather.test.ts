@@ -1,15 +1,16 @@
 import { describe, it, expect } from 'vitest'
-import { dailyWeatherLabel, dayWeatherLabels, dayWeatherBadges, rainyIndoorNotice, RAINY_INDOOR_NOTICE, RAINY_PROB_FROM } from './dailyWeather'
+import { dailyWeatherLabel, dayWeatherLabels, dayWeatherBadges, rainyIndoorNotice, RAINY_INDOOR_BADGE, RAINY_PROB_FROM } from './dailyWeather'
 
 describe('rainyIndoorNotice - 비 예보일 실내 위주 배지', () => {
   const evidence = { source_code: 'KMA_SHORT', region_code: 'EAST', spatial_scope: 'REGION', granularity: 'DAILY', issued_at_utc: '2026-09-19T20:00:00Z', temp_min: 20, temp_max: 25 }
-  const item = (indoor: boolean | undefined, probability: number | null) => ({
+  const item = (indoor: boolean | undefined, probability: number | null, region = 'EAST') => ({
     visit_date: '2026-09-20', indoor,
-    weather: [{ forecast_date: '2026-09-20', precipitation_probability: probability, daily_evidence: evidence }],
+    weather: [{ forecast_date: '2026-09-20', precipitation_probability: probability, daily_evidence: { ...evidence, region_code: region } }],
   })
 
-  it('강수확률이 임계값 이상이고 실내가 과반이면 배치 코스와 같은 문장을 준다', () => {
-    expect(rainyIndoorNotice([item(true, 80), item(true, 80), item(false, 80)])).toBe(RAINY_INDOOR_NOTICE)
+  it('강수확률이 임계값 이상이고 실내가 과반이면 사실 문장을 준다 - 인과("비라서 담았다")는 주장하지 않는다', () => {
+    expect(rainyIndoorNotice([item(true, 80), item(true, 80), item(false, 80)])).toBe(RAINY_INDOOR_BADGE)
+    expect(RAINY_INDOOR_BADGE).toBe('비 예보일 · 실내 위주 일정')
     expect(RAINY_PROB_FROM).toBe(60)   // 백엔드 RainyDayRule.PROB_FROM과 같아야 한다
   })
 
@@ -20,13 +21,22 @@ describe('rainyIndoorNotice - 비 예보일 실내 위주 배지', () => {
 
   it('임계값 바로 아래거나 강수확률을 모르면 띄우지 않는다', () => {
     expect(rainyIndoorNotice([item(true, RAINY_PROB_FROM - 1), item(true, RAINY_PROB_FROM - 1)])).toBeNull()
-    expect(rainyIndoorNotice([item(true, RAINY_PROB_FROM), item(true, RAINY_PROB_FROM)])).toBe(RAINY_INDOOR_NOTICE)
+    expect(rainyIndoorNotice([item(true, RAINY_PROB_FROM), item(true, RAINY_PROB_FROM)])).toBe(RAINY_INDOOR_BADGE)
     expect(rainyIndoorNotice([item(true, null), item(true, null)])).toBeNull()
     expect(rainyIndoorNotice([])).toBeNull()
   })
 
   it('실내 여부가 없는 옛 응답은 실외로 세어 배지를 띄우지 않는다', () => {
     expect(rainyIndoorNotice([item(undefined, 90), item(undefined, 90)])).toBeNull()
+  })
+
+  it('권역이 섞인 날은 장소마다 제 권역 예보로 본다 - 비 권역 장소가 실외뿐이면 다른 권역이 실내여도 띄우지 않는다', () => {
+    // 동부만 비(80%), 서부는 맑음(10%). 비 권역의 장소가 실외 하나뿐이면 "실내 위주"는 사실이 아니다
+    expect(rainyIndoorNotice([item(false, 80, 'EAST'), item(true, 10, 'WEST'), item(true, 10, 'WEST')])).toBeNull()
+    // 비 권역 장소 둘이 실내이고 그날 전체도 실내 과반이면 띄운다
+    expect(rainyIndoorNotice([item(true, 80, 'EAST'), item(true, 80, 'EAST'), item(false, 10, 'WEST')])).toBe(RAINY_INDOOR_BADGE)
+    // 비 권역 장소는 실내지만 그날 전체로는 실외가 과반이면 띄우지 않는다
+    expect(rainyIndoorNotice([item(true, 80, 'EAST'), item(false, 10, 'WEST'), item(false, 10, 'WEST')])).toBeNull()
   })
 })
 describe('stored daily weather', () => {
