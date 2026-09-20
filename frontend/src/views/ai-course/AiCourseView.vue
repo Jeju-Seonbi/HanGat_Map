@@ -722,7 +722,7 @@ const formatDistance = (metres?: number | null) => metres == null ? '정보 없�
 .result-actions-row .result-save{background:var(--course-accent);color:var(--course-on-ac);border-color:var(--course-accent)}
 .course-result-head .temporary-course-notice{text-align:right;font-size:10px;color:var(--course-text-3)}
 .course-result-grid{grid-template-columns:minmax(0,2.08fr) minmax(280px,1fr);gap:28px;align-items:start}
-.itinerary-card{min-width:0;border:1px solid var(--course-line);border-radius:16px;overflow:hidden;background:var(--course-surface);box-shadow:0 2px 4px #173a3305}
+.itinerary-card{width:100%;min-width:0;border:1px solid var(--course-line);border-radius:16px;overflow:hidden;background:var(--course-surface);box-shadow:0 2px 4px #173a3305}
 .day-tabs{display:flex;overflow-x:auto;background:var(--course-surface-2);border-bottom:1px solid var(--course-line);padding:0 24px}
 .day-tabs button{flex-shrink:0;padding:20px 14px 17px;border-bottom:2px solid transparent;font-size:13px;color:var(--course-text-2);white-space:nowrap}
 .day-tabs button[aria-selected=true]{color:var(--course-accent);border-color:var(--course-accent);font-weight:700}

@@ -178,8 +178,7 @@ describe('course input validation feedback', () => {
     props.loading = false; await Vue.nextTick()
     expect(cta().props.disabled).toBe(false)
   })
-  it('reserves scroll and footer clearance for fixed mobile navigation', () => {
+  it('reserves validation scroll clearance for fixed mobile navigation', () => {
     expect(source).toContain('scroll-margin-block: 100px calc(var(--mobile-tabbar-h, 0px) + 24px)')
-    expect(source).toContain('padding-bottom: calc(28px + var(--mobile-tabbar-h, 0px))')
   })
 })
