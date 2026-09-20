@@ -1,4 +1,7 @@
 package com.example.hangat.course.model;
+
+import com.example.hangat.course.service.IndoorClassifier;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.example.hangat.map.model.enums.CongestionLevel;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -178,6 +181,12 @@ public record CourseResponseDto(
             costs = immutableList(costs);
             congestion = immutableList(congestion);
             weather = weather == null ? null : List.copyOf(weather);
+        }
+
+        /** 실내 여부 - 이름 키워드 휴리스틱(IndoorClassifier). 컬럼이 아니라 응답에서만 파생한다. 화면의 비 예보일 실내 배지 근거 */
+        @JsonProperty(value = "indoor", access = JsonProperty.Access.READ_ONLY)
+        public boolean indoor() {
+            return IndoorClassifier.isIndoor(placeName);
         }
 
     }

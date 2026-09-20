@@ -64,8 +64,7 @@ public class SampleCourseGenerator {
     private static final int SPOTS_PER_DAY = 3;
     /** 카드 수 = 서로 다른 권역 수. */
     private static final int REGIONS_TO_PICK = 3;
-    /** 이 이상이면 그날은 "비 예보"로 보고 실내 우선 배치. 기상청 강수확률(%) 기준. */
-    private static final int RAINY_PROB_FROM = 60;
+    // 비 예보 임계값과 실내 사유 문구는 RainyDayRule 하나만 쓴다 - AI 생성·폴백과 같은 값이어야 한다.
     /** 동선 묶기 전 저혼잡 후보 풀 크기 - 너무 크면 동선이 저혼잡을 이기고, 너무 작으면 다 몰린다. */
     private static final int ROUTE_POOL_SIZE = 10;
 
@@ -279,7 +278,7 @@ public class SampleCourseGenerator {
     }
 
     private boolean isRainy(DailyWeather day) {
-        return day != null && day.rainProb() != null && day.rainProb() >= RAINY_PROB_FROM;
+        return day != null && RainyDayRule.isRainy(day.rainProb());
     }
 
     /**
@@ -379,7 +378,7 @@ public class SampleCourseGenerator {
 
     /** 근거 문구 - 한산 장소 카드(MainService)와 같은 우선순위 + 날씨 사유 추가. */
     private String reasonFor(Place place, CongestionForecast forecast, boolean rainy, boolean indoor) {
-        if (rainy && indoor) return "비 예보가 있어 실내 위주로 담았어요";
+        if (rainy && indoor) return RainyDayRule.INDOOR_REASON;
         if (place.isGoodPrice()) return "착한가격업소 검증가";
         if (place.isHiddenGem()) return "덜 알려진 숨은 명소";
         if (CongestionLevel.from(forecast.getRate()) == CongestionLevel.QUIET) {

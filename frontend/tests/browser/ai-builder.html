@@ -20,7 +20,7 @@ courseMockService.generateCourse=async condition=>{
  const names=['김녕요트투어','제주도 국가 지질공원','사려니숲길'];
  return {id:991,course_type:'USER',status:'READY',start_date:condition.start_date,end_date:condition.end_date,people:condition.people,transport:'TAXI',
  claim_token:'local-preview-only',claim_expires_at:new Date(Date.now()+7200000).toISOString(),average_congestion_rate:36,
- days:[1,2,3].map((day,i)=>{const date=new Date(condition.start_date);date.setDate(date.getDate()+i);const visit_date=date.toISOString().slice(0,10);
+ days:Array.from({length:Number(new URLSearchParams(location.search).get('days')) || 3},(_,i)=>i+1).map((day,i)=>{const date=new Date(condition.start_date);date.setDate(date.getDate()+i);const visit_date=date.toISOString().slice(0,10);
  return {day_no:day,visit_date,items:names.map((name,j)=>({id:day*10+j,course_id:991,place_id:j+1,place_name:day===1?name:`${day}일차 ${name}`,category_name:'관광지',image_url:'/images/places/gwangchigi.jpg',
  day_no:day,position:j+1,visit_date,start_time:`${10+j*3}:00`,end_time:`${12+j*3}:00`,item_source:'AI_RECOMMENDED',inbound_travel_minutes:j?22:undefined,inbound_distance_m:j?11500:undefined,
  congestion_level:j?'NORMAL':undefined,congestion_rate:j?36:undefined,costs:[],recommendation_reason:'제주의 풍경을 감상하며 여유롭게 여행할 수 있는 장소입니다.',

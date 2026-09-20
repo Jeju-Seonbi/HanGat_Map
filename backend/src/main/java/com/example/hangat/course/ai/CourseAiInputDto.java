@@ -6,8 +6,10 @@ import com.example.hangat.course.model.PreferenceType;
 import com.example.hangat.course.model.Transport;
 import com.example.hangat.course.travel.DistanceCalculationMethod;
 import com.example.hangat.course.weather.CourseWeatherDto;
+import com.example.hangat.course.service.IndoorClassifier;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -167,6 +169,16 @@ public record CourseAiInputDto(
         public CandidateFactDto {
             styleHintCodes = immutableList(styleHintCodes);
             congestionFacts = immutableList(congestionFacts);
+        }
+
+        /**
+         * 실내 여부 - 이름 키워드 휴리스틱({@link IndoorClassifier}). DB 컬럼이 아니라 이름에서 파생하므로
+         * 생성자 인자로 두지 않고 직렬화 때만 붙인다(읽기 전용). 시스템 프롬프트의 "indoor=true 후보"가 이 값이고,
+         * 규칙 기반 폴백도 같은 값으로 비 예보일 실내 우선을 판단한다.
+         */
+        @JsonProperty(value = "indoor", access = JsonProperty.Access.READ_ONLY)
+        public boolean indoor() {
+            return IndoorClassifier.isIndoor(name);
         }
 
         /** Compatibility constructor for persistence/response tests during downstream migration. */
