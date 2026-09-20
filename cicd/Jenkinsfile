@@ -113,11 +113,14 @@ pipeline {
                       --user "$(id -u):$(id -g)" \
                       --env HOME=/tmp \
                       --env npm_config_cache=/tmp/npm-cache \
-                      --workdir /workspace \
+                      --workdir /workspace/frontend \
                       node:22-alpine \
                       sh -c "npm ci && npm run type-check && npm test"
 
-                    docker cp "$WORKSPACE/frontend/." "$TEST_CONTAINER:/workspace"
+                    # Preserve repository-relative paths used by deployment contract tests.
+                    docker cp "$WORKSPACE/frontend/." "$TEST_CONTAINER:/workspace/frontend"
+                    docker cp "$WORKSPACE/cicd" "$TEST_CONTAINER:/workspace/cicd"
+                    docker cp "$WORKSPACE/backend" "$TEST_CONTAINER:/workspace/backend"
                     docker start --attach "$TEST_CONTAINER"
                 '''
             }
